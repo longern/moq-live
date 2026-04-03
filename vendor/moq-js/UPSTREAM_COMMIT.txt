@@ -1,0 +1,6 @@
+moq-js upstream commit:
+a8ca08f19580f049d5d37244452f19f859c72e15
+
+Local vendoring note:
+- built from GitHub main
+- patched video-moq to await Player.create() and bind the created player instance so built-in controls work

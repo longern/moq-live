@@ -1,7 +1,7 @@
 {
   "name": "moq-live",
   "version": "1.0.0",
-  "description": "用 @moq/lite + @moq/hang 播放 Cloudflare BBB 流的浏览器页面。",
+  "description": "基于 vendored moq-js 的 Cloudflare MoQ 播放与推流页面。",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,8 +12,9 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@moq/hang": "^0.2.1",
-    "@moq/lite": "^0.1.7",
+    "@preact/preset-vite": "^2.10.5",
+    "mp4box": "^0.5.2",
+    "preact": "^10.29.1",
     "vite": "^8.0.3"
   },
   "devDependencies": {

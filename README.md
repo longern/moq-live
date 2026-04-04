@@ -1,12 +1,22 @@
 # MoQ Draft 14 Browser Tests
 
-这个目录现在是基于 `@moq/lite + @moq/hang` 的浏览器测试页，默认目标是 Cloudflare 的 draft-14 BBB relay。
+这个目录现在是一个基于 vendored `moq-js` 的浏览器测试页，目标是 Cloudflare 的 draft-14 relay。页面同时提供：
+
+- `video-moq` 播放
+- `publisher-moq` 摄像头 + 麦克风推流
+
+播放器和推流器使用同一个 `namespace`，方便在同一页里直接“推了就播”。手工测试时请使用一个新的、唯一的 `namespace`，不要复用已存在内容的流名。
 
 ## 文件
 
-- `index.html`: 只负责页面结构和样式，脚本入口改为外部模块。
-- `src/main.js`: 主线程播放器逻辑（连接 relay、MSE append、canvas 渲染、UI 状态管理）。
-- `src/segment-worker.js`: worker 线程，负责 CMAF 时间戳解析与音视频段调度（减轻主线程负担）。
+- `index.html`: 页面结构和样式，包含播放器区和推流区。
+- `src/main.js`: 页面入口，负责播放器生命周期，以及把 Relay URL / Namespace 同步给 `publisher-moq`。
+- `vendor/moq-js/moq-player.esm.js`: 已 vendored 的 `moq-js` 播放器 bundle。
+- `vendor/moq-js/moq-publisher/`: 从 upstream `moq-js` 复制过来的推流自定义元素源码。
+- `vendor/moq-js/publish/`: `PublisherApi` 入口。
+- `vendor/moq-js/contribute/`: 浏览器采集、`WebCodecs` 编码、CMAF 分片和发布轨道实现。
+- `vendor/moq-js/transport/`: `moq-js` 的 draft-14 传输层实现。
+- `vendor/moq-js/media/`: catalog 和 MP4 封装辅助代码。
 - `public/_headers`: Cloudflare Pages 所需的 COOP/COEP 头。
 - `vite.config.js`: 本地开发头配置和构建哈希注入。
 
@@ -19,19 +29,37 @@
    npm run dev -- --host 127.0.0.1 --port 8080
    ```
 
-2. 用支持 `WebTransport` / `WebCodecs` 的 Chromium 浏览器打开:
+2. 用支持 `WebTransport` / `WebCodecs` / `MediaStreamTrackProcessor` 的 Chromium 浏览器打开:
 
    - `http://127.0.0.1:8080/`
+
+3. 如果要推流：
+
+   - 先确认 `Relay URL` 和 `Namespace`
+   - 在推流区允许摄像头和麦克风权限
+   - 点击 `Start Publish`
+
+4. 如果要播放：
+
+   - 保持相同的 `Relay URL` 和 `Namespace`
+   - 点击 `创建播放器`
 
 ## 默认参数
 
 - Relay URL: `https://draft-14.cloudflare.mediaoverquic.com/`
-- Namespace: `bbb`
+- Namespace: 留空，手工输入一个新的唯一值
 
-页面会订阅 `.catalog`，自动选择默认音视频轨道并播放。
+## 当前实现
 
-## 说明
+- 播放链路：页面直接加载 vendored `moq-js` 的 `video-moq` bundle。
+- 推流链路：页面加载 vendored `moq-js` 的 `publisher-moq` 源码，自定义元素内部通过 `PublisherApi -> Broadcast -> Track -> transport/*` 发布。
+- 浏览器侧编码：
+  - 视频默认 H.264 `avc1.42E01E`
+  - 音频默认 Opus
+- CMAF 封装依赖 `mp4box`。
 
-- 不依赖 vendored `moq-js` 或 `video-moq`，也没有默认内置控件。
-- 当前播放链路是：`@moq/lite` 拉流 + `.catalog` 解析 + `segment-worker` 调度 + `MediaSource` 音频/视频缓冲 + `canvas` 渲染。
-- 缓冲策略是“略增延迟换稳定”：启动前先累积一小段缓冲，并在缓冲过深时回拉到目标延迟。
+## Vendoring 说明
+
+- upstream commit 记录在 `vendor/moq-js/UPSTREAM_COMMIT.txt`
+- 当前仓库保留了既有的 `moq-player.esm.js`
+- 同时补充复制了 upstream 发布侧源码目录，便于在本仓库里继续魔改推流逻辑

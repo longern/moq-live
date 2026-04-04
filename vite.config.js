@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import preact from "@preact/preset-vite";
 import { defineConfig } from "vite";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
@@ -42,6 +43,7 @@ function computeBuildHash() {
 const buildHash = computeBuildHash();
 
 export default defineConfig({
+  plugins: [preact()],
   define: {
     __BUILD_HASH__: JSON.stringify(buildHash),
   },

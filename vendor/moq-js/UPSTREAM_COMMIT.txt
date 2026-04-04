@@ -4,3 +4,5 @@ a8ca08f19580f049d5d37244452f19f859c72e15
 Local vendoring note:
 - built from GitHub main
 - patched video-moq to await Player.create() and bind the created player instance so built-in controls work
+- copied publish-side source directories into this project: `common/`, `contribute/`, `media/`, `moq-publisher/`, `publish/`, `transport/`, `types/`
+- patched `moq-publisher/index.ts` locally so its shadow-DOM controls receive stable ids and usable button labels

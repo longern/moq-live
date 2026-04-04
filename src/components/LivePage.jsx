@@ -56,6 +56,14 @@ export function LivePage({
         </section>
 
         <aside class="control-column">
+          <div class="info-strip info-strip-mobile">
+            <div class="info-item">
+              <strong data-room-label>{roomLabel}</strong>
+            </div>
+            <div class="info-item info-item-pill">
+              <StatusPill id="publishBadgeInlineMobile" label={publishBadge.label} state={publishBadge.state} />
+            </div>
+          </div>
           <section class="control-block">
             <div class="control-head">
               <h3>开播</h3>

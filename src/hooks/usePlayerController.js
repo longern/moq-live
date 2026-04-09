@@ -120,6 +120,18 @@ function syncContainedCanvasLayout(playerEl) {
   return mediaHeight > mediaWidth ? "portrait" : "landscape";
 }
 
+function isNoCatalogDataMessage(message = "") {
+  return message.toLowerCase().includes("no catalog data");
+}
+
+function getPlayerStatusFromMessage(message = "") {
+  if (isNoCatalogDataMessage(message)) {
+    return `未开播：${message}`;
+  }
+
+  return `失败：${message}`;
+}
+
 export function usePlayerController({
   initialAutorun,
   relayUrlRef,
@@ -396,8 +408,8 @@ export function usePlayerController({
       }
       const detail = event?.detail;
       const err = detail instanceof Error ? detail : new Error(String(detail ?? "unknown player error"));
-      setPlayerStatus(`失败：${err.message}`);
-      log(`失败：${err.stack ?? err.message}`);
+      setPlayerStatus(getPlayerStatusFromMessage(err.message));
+      log(`${isNoCatalogDataMessage(err.message) ? "未开播" : "失败"}：${err.stack ?? err.message}`);
     });
 
     const shadowErrorEl = playerEl.shadowRoot?.querySelector?.("#error");
@@ -412,8 +424,8 @@ export function usePlayerController({
         if (!message) {
           return;
         }
-        setPlayerStatus(`失败：${message}`);
-        log(`播放器错误：${message}`);
+        setPlayerStatus(getPlayerStatusFromMessage(message));
+        log(`${isNoCatalogDataMessage(message) ? "未开播" : "播放器错误"}：${message}`);
       });
       shadowErrorObserver.observe(shadowErrorEl, { childList: true, subtree: true, characterData: true });
     }

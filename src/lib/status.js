@@ -1,4 +1,7 @@
 export function describePlayerState(message = "") {
+  if (message.includes("未开播") || message.toLowerCase().includes("no catalog data")) {
+    return { label: "未开播", state: "idle" };
+  }
   if (message.includes("播放中")) {
     return { label: "正在收看", state: "live" };
   }

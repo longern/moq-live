@@ -7,22 +7,27 @@ export function generateRoomId() {
 export function getInitialViewState() {
   const params = new URLSearchParams(window.location.search);
   const requestedPage = params.get("p");
-  let room = params.get("r") ?? "";
+  const routeRoom = params.get("r") ?? "";
   let page = requestedPage === "l" || requestedPage === "s" ? requestedPage : "w";
+  let watchRoom = "";
+  let liveRoom = "";
 
-  if (!requestedPage && room) {
+  if (!requestedPage && routeRoom) {
     page = "w";
   }
 
-  if (page === "l" && !room) {
-    room = generateRoomId();
+  if (page === "w") {
+    watchRoom = routeRoom;
+  } else if (page === "l") {
+    liveRoom = routeRoom || generateRoomId();
   }
 
   return {
     page: page === "l" ? "live" : page === "s" ? "settings" : "watch",
-    room,
+    watchRoom,
+    liveRoom,
     relayUrl: DEFAULT_RELAY_URL,
-    autorun: Boolean(room)
+    autorun: page === "w" && Boolean(watchRoom)
   };
 }
 
@@ -46,18 +51,18 @@ export function getRelayHostValue(relayUrl) {
   }
 }
 
-export function writeRoute({ page, room, relayUrl, autorun }) {
+export function writeRoute({ page, watchRoom, liveRoom }) {
   const next = new URL(window.location.href);
   next.search = "";
 
   if (page === "watch") {
-    if (room) {
-      next.searchParams.set("r", room);
+    if (watchRoom) {
+      next.searchParams.set("r", watchRoom);
     }
   } else if (page === "live") {
     next.searchParams.set("p", "l");
-    if (room) {
-      next.searchParams.set("r", room);
+    if (liveRoom) {
+      next.searchParams.set("r", liveRoom);
     }
   } else if (page === "settings") {
     next.searchParams.set("p", "s");

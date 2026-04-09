@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { PublisherApi } from "../../vendor/moq-js/publish/index.ts";
+import { getPublishBlockReason } from "../lib/roomPolicy.js";
 import { createSyntheticMedia, sampleCanvasMarkerSignature } from "../lib/syntheticMedia.js";
 
 function hasUsableMediaStream(stream) {
@@ -25,7 +26,11 @@ export function usePublisherController({
   const [microphoneOptions, setMicrophoneOptions] = useState([]);
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState("");
+  const [cameraEnabled, setCameraEnabledState] = useState(true);
+  const [microphoneEnabled, setMicrophoneEnabledState] = useState(true);
   const [previewActive, setPreviewActive] = useState(false);
+  const [previewHasVideo, setPreviewHasVideo] = useState(false);
+  const [syntheticPublishing, setSyntheticPublishing] = useState(false);
 
   const previewVideoRef = useRef(null);
   const syntheticSessionRef = useRef(null);
@@ -44,6 +49,14 @@ export function usePublisherController({
     return nextRoom;
   }
 
+  function assertPublishAllowed(room) {
+    const reason = getPublishBlockReason(room);
+    if (reason) {
+      setPublishStatus(`失败：${reason}`);
+      throw new Error(reason);
+    }
+  }
+
   function stopLivePreview() {
     const stream = liveMediaStreamRef.current;
     if (stream) {
@@ -54,6 +67,30 @@ export function usePublisherController({
       previewVideoRef.current.srcObject = null;
     }
     setPreviewActive(false);
+    setPreviewHasVideo(false);
+  }
+
+  function setCameraEnabled(nextEnabled) {
+    setCameraEnabledState(nextEnabled);
+    const nextHasVideo = nextEnabled && Boolean(liveMediaStreamRef.current?.getVideoTracks().length);
+
+    for (const stream of [liveMediaStreamRef.current, publishMediaStreamRef.current]) {
+      stream?.getVideoTracks().forEach((track) => {
+        track.enabled = nextEnabled;
+      });
+    }
+
+    setPreviewHasVideo(nextHasVideo);
+  }
+
+  function setMicrophoneEnabled(nextEnabled) {
+    setMicrophoneEnabledState(nextEnabled);
+
+    for (const stream of [liveMediaStreamRef.current, publishMediaStreamRef.current]) {
+      stream?.getAudioTracks().forEach((track) => {
+        track.enabled = nextEnabled;
+      });
+    }
   }
 
   async function refreshMediaDevices(preferredStream = null) {
@@ -106,15 +143,39 @@ export function usePublisherController({
       liveMediaStreamRef.current = null;
     }
 
-    const videoConstraints = selectedCameraId
+    const videoConstraints = !cameraEnabled
+      ? false
+      : selectedCameraId
       ? { deviceId: { exact: selectedCameraId }, height: { ideal: 480 }, frameRate: { ideal: 30 } }
       : { height: { ideal: 480 }, frameRate: { ideal: 30 } };
-    const audioConstraints = selectedMicrophoneId ? { deviceId: { exact: selectedMicrophoneId } } : true;
+    const audioConstraints = !microphoneEnabled
+      ? false
+      : selectedMicrophoneId
+        ? { deviceId: { exact: selectedMicrophoneId } }
+        : true;
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: videoConstraints,
-      audio: audioConstraints
-    });
+    let stream = null;
+    let lastError = null;
+    for (const constraints of [
+      { video: videoConstraints, audio: audioConstraints },
+      { video: false, audio: audioConstraints },
+      { video: videoConstraints, audio: false }
+    ]) {
+      if (!constraints.video && !constraints.audio) {
+        continue;
+      }
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (!stream) {
+      throw (lastError instanceof Error ? lastError : new Error("未检测到可用的摄像头或麦克风"));
+    }
 
     liveMediaStreamRef.current = stream;
     appliedCameraIdRef.current = selectedCameraId;
@@ -136,10 +197,12 @@ export function usePublisherController({
         });
       }, { once: true });
     }
+    const hasVideoTrack = stream.getVideoTracks().length > 0;
     if (previewVideoRef.current) {
-      previewVideoRef.current.srcObject = stream;
+      previewVideoRef.current.srcObject = hasVideoTrack ? stream : null;
     }
     setPreviewActive(true);
+    setPreviewHasVideo(hasVideoTrack && cameraEnabled);
     await refreshMediaDevices(stream);
   }
 
@@ -159,6 +222,7 @@ export function usePublisherController({
     }
 
     const namespace = ensureRoomId();
+    assertPublishAllowed(namespace);
     const nextRelayUrl = new URL(relayUrlRef.current).toString();
     const previewVideoTrack = stream.getVideoTracks()[0];
     const previewAudioTrack = stream.getAudioTracks()[0];
@@ -169,46 +233,60 @@ export function usePublisherController({
     if (previewAudioTrack) {
       clonedTracks.push(previewAudioTrack.clone());
     }
-    if (!previewAudioTrack) {
-      throw new Error("未获取到麦克风音频轨");
+    if (!previewVideoTrack && !previewAudioTrack) {
+      throw new Error("未获取到可推流的音视频轨");
     }
     const publishStream = new MediaStream(clonedTracks);
     publishMediaStreamRef.current = publishStream;
 
     const audioTrack = publishStream.getAudioTracks()[0];
-    const sampleRate = audioTrack?.getSettings().sampleRate ?? (await new AudioContext()).sampleRate;
-    const numberOfChannels = audioTrack?.getSettings().channelCount ?? 2;
     const previewVideo = previewVideoRef.current;
     const makeEven = (value) => Math.floor(value / 2) * 2;
-    const width = makeEven(previewVideo?.videoWidth || 640);
-    const height = makeEven(previewVideo?.videoHeight || 360);
 
     setPublishStatus("正在启动直播。");
 
-    const publisher = new PublisherApi({
+    const publisherOptions = {
       url: nextRelayUrl,
       namespace: [namespace],
-      media: publishStream,
-      video: {
+      media: publishStream
+    };
+
+    if (previewVideoTrack) {
+      const width = makeEven(previewVideo?.videoWidth || 640);
+      const height = makeEven(previewVideo?.videoHeight || 360);
+      publisherOptions.video = {
         codec: "avc1.42E01E",
         width,
         height,
         bitrate: 1_000_000,
         framerate: 30
-      },
-      audio: {
+      };
+    }
+
+    if (audioTrack) {
+      const sampleRate = audioTrack.getSettings().sampleRate ?? (await new AudioContext()).sampleRate;
+      const numberOfChannels = audioTrack.getSettings().channelCount ?? 2;
+      publisherOptions.audio = {
         codec: "opus",
         sampleRate,
         numberOfChannels,
         bitrate: 64_000
-      }
-    });
+      };
+    }
+
+    const publisher = new PublisherApi(publisherOptions);
 
     try {
       await publisher.publish();
       livePublisherRef.current = publisher;
       publisherIsPublishingRef.current = true;
       setPublisherIsPublishing(true);
+      publishStream.getVideoTracks().forEach((track) => {
+        track.enabled = cameraEnabled;
+      });
+      publishStream.getAudioTracks().forEach((track) => {
+        track.enabled = microphoneEnabled;
+      });
       setPublishStatus(`直播已启动：${namespace}`);
       log(`camera publish started: url=${nextRelayUrl} namespace=${namespace}`);
     } catch (error) {
@@ -257,6 +335,7 @@ export function usePublisherController({
     }
 
     const namespace = ensureRoomId();
+    assertPublishAllowed(namespace);
     const nextRelayUrl = new URL(relayUrlRef.current).toString();
     if (!namespace) {
       throw new Error("Namespace 不能为空");
@@ -292,6 +371,7 @@ export function usePublisherController({
     }
 
     syntheticSessionRef.current = { namespace, publisher, syntheticMedia };
+    setSyntheticPublishing(true);
     setPublishStatus(`合成推流已启动：${namespace}`);
     log(`synthetic publish started: url=${nextRelayUrl} namespace=${namespace}`);
     return namespace;
@@ -300,6 +380,7 @@ export function usePublisherController({
   async function stopSyntheticPublish() {
     const current = syntheticSessionRef.current;
     syntheticSessionRef.current = null;
+    setSyntheticPublishing(false);
 
     if (!current) {
       setPublishStatus("等待推流。");
@@ -340,7 +421,7 @@ export function usePublisherController({
     if (!publisherIsPublishing) {
       stopLivePreview();
     }
-  }, [page, selectedCameraId, selectedMicrophoneId, publisherIsPublishing]);
+  }, [page, selectedCameraId, selectedMicrophoneId, cameraEnabled, microphoneEnabled, publisherIsPublishing]);
 
   useEffect(() => {
     if (page !== "live") {
@@ -349,14 +430,17 @@ export function usePublisherController({
 
     const previewVideo = previewVideoRef.current;
     const stream = liveMediaStreamRef.current;
-    if (!previewVideo || !stream) {
+    if (!previewVideo || !stream || !previewHasVideo) {
+      if (previewVideo) {
+        previewVideo.srcObject = null;
+      }
       return;
     }
 
     if (previewVideo.srcObject !== stream) {
       previewVideo.srcObject = stream;
     }
-  }, [page, previewActive]);
+  }, [page, previewActive, previewHasVideo]);
 
   useEffect(() => {
     void refreshMediaDevices(liveMediaStreamRef.current).catch(() => {});
@@ -408,11 +492,17 @@ export function usePublisherController({
     microphoneOptions,
     selectedCameraId,
     selectedMicrophoneId,
+    cameraEnabled,
+    microphoneEnabled,
     previewActive,
+    previewHasVideo,
+    syntheticPublishing,
     previewVideoRef,
     syntheticSessionRef,
     setSelectedCameraId,
     setSelectedMicrophoneId,
+    setCameraEnabled,
+    setMicrophoneEnabled,
     startCameraPublish,
     stopCameraPublish,
     startSyntheticPublish,

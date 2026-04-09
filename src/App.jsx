@@ -161,7 +161,6 @@ export function App() {
             playerStatus={player.playerStatus}
             playerBadge={playerBadge}
             fullscreenActive={player.fullscreenActive}
-            fullscreenRotate={player.fullscreenRotate}
             playerPaused={player.playerPaused}
             playerMuted={player.playerMuted}
             playerOrientation={player.playerOrientation}

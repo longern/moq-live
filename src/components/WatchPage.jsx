@@ -8,7 +8,6 @@ export function WatchPage({
   playerStatus,
   playerBadge,
   fullscreenActive,
-  fullscreenRotate,
   playerPaused,
   playerMuted,
   playerOrientation,
@@ -111,7 +110,7 @@ export function WatchPage({
         <section class="stage-column">
           <div
             ref={stageRef}
-            class={`stage-frame watch-stage-frame${controlsVisible ? " controls-visible" : ""}${playerOrientation === "portrait" ? " is-portrait" : ""}${fullscreenRotate ? " is-fullscreen-rotate" : ""}`}
+            class={`stage-frame watch-stage-frame${controlsVisible ? " controls-visible" : ""}${playerOrientation === "portrait" ? " is-portrait" : ""}`}
             onMouseMove={handleStagePointerMove}
             onMouseLeave={handleStagePointerLeave}
             onClick={handleStageClick}

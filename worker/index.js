@@ -22,6 +22,7 @@ import {
   upsertMicrosoftUser,
   verifyMicrosoftIdToken
 } from "./auth.js";
+import { ChatRoomDO } from "./chat-room.js";
 
 export default {
   async fetch(request, env, ctx) {
@@ -47,6 +48,9 @@ export default {
       if (url.pathname === "/api/auth/logout" && (request.method === "POST" || request.method === "GET")) {
         return await handleLogout(env, request);
       }
+      if (request.method === "GET" && /^\/api\/chat\/[^/]+\/ws$/.test(url.pathname)) {
+        return await handleChatWebSocket(env, request);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return json({ ok: false, error: message }, { status: 500 });
@@ -55,6 +59,8 @@ export default {
     return json({ ok: false, error: "Not found" }, { status: 404 });
   }
 };
+
+export { ChatRoomDO };
 
 async function handleMe(env, request) {
   const db = getDb(env);
@@ -183,4 +189,43 @@ function buildCallbackCookieHeaders(request, sessionToken, sessionExpiresAt) {
 
 function slugifyError(message) {
   return String(message).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "login_failed";
+}
+
+async function handleChatWebSocket(env, request) {
+  if (!env.CHAT_ROOM) {
+    return json({ ok: false, error: "Missing CHAT_ROOM durable object binding" }, { status: 500 });
+  }
+
+  const url = new URL(request.url);
+  const room = decodeURIComponent(url.pathname.split("/")[3] ?? "").trim();
+  if (!/^[a-z0-9-]{3,80}$/i.test(room)) {
+    return json({ ok: false, error: "Invalid room id" }, { status: 400 });
+  }
+
+  const session = await getOptionalSessionUser(env, request);
+  const stub = env.CHAT_ROOM.get(env.CHAT_ROOM.idFromName(room));
+  const headers = new Headers(request.headers);
+  headers.set("x-chat-room", room);
+  headers.set("x-chat-read-only", session?.user ? "0" : "1");
+  if (session?.user) {
+    headers.set("x-chat-user", encodeURIComponent(JSON.stringify(session.user)));
+  } else {
+    headers.delete("x-chat-user");
+  }
+
+  return stub.fetch(new Request(request.url, {
+    method: "GET",
+    headers
+  }));
+}
+
+async function getOptionalSessionUser(env, request) {
+  try {
+    if (!(env.AUTH_DB ?? env.DB)) {
+      return null;
+    }
+    return await getSessionUser(getDb(env), request);
+  } catch {
+    return null;
+  }
 }

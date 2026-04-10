@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { ChatPanel } from "./ChatPanel.jsx";
 import { StatusPill } from "./StatusPill.jsx";
 
 export function WatchSessionPage({
@@ -17,11 +18,27 @@ export function WatchSessionPage({
   onFullscreen,
   stageRef,
   playerSession,
-  playerRef
+  playerRef,
+  authAvailable,
+  authLoading,
+  authUser,
+  chatMessages,
+  chatDraft,
+  chatConnectionState,
+  chatOnlineCount,
+  chatReadOnly,
+  chatError,
+  onChatDraftChange,
+  onChatSend,
+  onChatRequireLogin
 }) {
   const [controlsVisible, setControlsVisible] = useState(false);
+  const [moreMounted, setMoreMounted] = useState(false);
+  const [moreVisible, setMoreVisible] = useState(false);
   const hideTimerRef = useRef(null);
   const touchModeRef = useRef(false);
+  const closeTimerRef = useRef(null);
+  const openFrameRef = useRef(null);
 
   function clearHideTimer() {
     if (hideTimerRef.current) {
@@ -45,6 +62,15 @@ export function WatchSessionPage({
 
   useEffect(() => {
     touchModeRef.current = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  }, []);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    if (openFrameRef.current) {
+      cancelAnimationFrame(openFrameRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -100,6 +126,45 @@ export function WatchSessionPage({
     revealControls();
   }
 
+  function openMoreSheet() {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    if (openFrameRef.current) {
+      cancelAnimationFrame(openFrameRef.current);
+      openFrameRef.current = null;
+    }
+    setMoreMounted(true);
+    setMoreVisible(false);
+    openFrameRef.current = requestAnimationFrame(() => {
+      setMoreVisible(true);
+      openFrameRef.current = null;
+    });
+  }
+
+  function closeMoreSheet() {
+    if (openFrameRef.current) {
+      cancelAnimationFrame(openFrameRef.current);
+      openFrameRef.current = null;
+    }
+    setMoreVisible(false);
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      setMoreMounted(false);
+      closeTimerRef.current = null;
+    }, 260);
+  }
+
+  useEffect(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, [moreMounted]);
+
   function renderMobileHud(className = "", persistent = false) {
     const visible = persistent || controlsVisible || playerBadge.state === "error";
 
@@ -116,16 +181,31 @@ export function WatchSessionPage({
             aria-label="离开直播间"
           >
             <svg viewBox="0 0 24 24">
-              <path d="M10 17H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4" />
-              <path d="M14 8l4 4-4 4" />
-              <path d="M18 12H9" />
+              <path d="M14.5 5.5 8 12l6.5 6.5" />
             </svg>
           </button>
           <div class="stage-mobile-meta stage-mobile-meta-left">
             <strong>{roomLabel}</strong>
           </div>
         </div>
-        <StatusPill id="playerBadgeOverlay" label={playerBadge.label} state={playerBadge.state} />
+        <div class="stage-mobile-hud-actions">
+          <StatusPill id="playerBadgeOverlay" label={playerBadge.label} state={playerBadge.state} />
+          <button
+            type="button"
+            class="stage-mobile-more"
+            onClick={(event) => {
+              event.stopPropagation();
+              openMoreSheet();
+            }}
+            aria-label="更多操作"
+          >
+            <svg viewBox="0 0 24 24">
+              <circle cx="6" cy="12" r="1.8" />
+              <circle cx="12" cy="12" r="1.8" />
+              <circle cx="18" cy="12" r="1.8" />
+            </svg>
+          </button>
+        </div>
       </div>
     );
   }
@@ -155,7 +235,27 @@ export function WatchSessionPage({
                 <p>{playerStatus}</p>
               </div>
             ) : null}
-            {playerOrientation === "portrait" ? renderMobileHud("stage-mobile-hud-overlay") : null}
+            {playerOrientation === "portrait" ? renderMobileHud("stage-mobile-hud-overlay", true) : null}
+            {playerOrientation === "portrait" ? (
+              <div class="watch-portrait-chat-overlay">
+                <ChatPanel
+                  room={playerSession?.namespace || ""}
+                  authAvailable={authAvailable}
+                  authLoading={authLoading}
+                  authUser={authUser}
+                  messages={chatMessages}
+                  draft={chatDraft}
+                  onDraftChange={onChatDraftChange}
+                  onSend={onChatSend}
+                  onRequireLogin={onChatRequireLogin}
+                  connectionState={chatConnectionState}
+                  onlineCount={chatOnlineCount}
+                  readOnly={chatReadOnly}
+                  chatError={chatError}
+                  variant="floating"
+                />
+              </div>
+            ) : null}
             {playerBadge.state !== "error" ? (
               <div class={`stage-controls${controlsVisible ? " is-visible" : ""}`}>
                 <div class="stage-controls-fade" />
@@ -267,14 +367,63 @@ export function WatchSessionPage({
               <button type="button" class="secondary" id="stop" onClick={onStop}>离开直播间</button>
             </div>
           </section>
-          <section class="control-block">
+          <section class="control-block watch-link-block">
             <div class="summary-item">
               <strong>观看链接</strong>
               <span data-watch-link>{watchLink}</span>
             </div>
           </section>
+          <ChatPanel
+            room={playerSession?.namespace || ""}
+            authAvailable={authAvailable}
+            authLoading={authLoading}
+            authUser={authUser}
+            messages={chatMessages}
+            draft={chatDraft}
+            onDraftChange={onChatDraftChange}
+            onSend={onChatSend}
+            onRequireLogin={onChatRequireLogin}
+            connectionState={chatConnectionState}
+            onlineCount={chatOnlineCount}
+            readOnly={chatReadOnly}
+            chatError={chatError}
+          />
         </aside>
       </div>
+      {moreMounted ? (
+        <>
+          <button
+            type="button"
+            class={`watch-mobile-more-backdrop${moreVisible ? " is-open" : ""}`}
+            aria-label="关闭更多操作"
+            onClick={closeMoreSheet}
+          />
+          <section class={`watch-mobile-more-panel${moreVisible ? " is-open" : ""}`}>
+            <div class="watch-mobile-more-header">
+              <strong>{roomLabel}</strong>
+              <span>{playerBadge.label}</span>
+            </div>
+            <div class="summary-item">
+              <strong>观看链接</strong>
+              <span data-watch-link>{watchLink}</span>
+            </div>
+            <button
+              type="button"
+              class="secondary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(watchLink);
+                  closeMoreSheet();
+                } catch {
+                  closeMoreSheet();
+                }
+              }}
+            >
+              复制观看链接
+            </button>
+          </section>
+        </>
+      ) : null}
     </section>
   );
 }

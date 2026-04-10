@@ -407,9 +407,9 @@ export async function upsertMicrosoftUser(db, claims) {
     await db.batch([
       db.prepare(
         `UPDATE ${TABLES.users}
-         SET display_name = ?, primary_email = ?, updated_at = ?, last_login_at = ?
+         SET primary_email = ?, updated_at = ?, last_login_at = ?
          WHERE id = ?`
-      ).bind(displayName, email, now, now, existingIdentity.user_id),
+      ).bind(email, now, now, existingIdentity.user_id),
       db.prepare(
         `UPDATE ${TABLES.userIdentities}
          SET tenant_id = ?, provider_oid = ?, email = ?, raw_profile_json = ?, updated_at = ?

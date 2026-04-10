@@ -32,6 +32,10 @@ export function persistLiveRoom(room) {
   }
 }
 
+export function getOrCreateLiveRoom() {
+  return persistLiveRoom(readStoredLiveRoom() || generateRoomId());
+}
+
 export function getInitialViewState() {
   const params = new URLSearchParams(window.location.search);
   const requestedPage = params.get("p");
@@ -48,7 +52,7 @@ export function getInitialViewState() {
   if (page === "w") {
     watchRoom = routeRoom;
   } else if (page === "l") {
-    liveRoom = persistLiveRoom(storedLiveRoom || generateRoomId());
+    liveRoom = getOrCreateLiveRoom();
   }
 
   return {

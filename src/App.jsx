@@ -1,18 +1,15 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { LoginPromptModal } from "./components/LoginPromptModal.jsx";
 import { DesktopNavigation, MobileNavigation } from "./components/Navigation.jsx";
 import { LivePage } from "./components/LivePage.jsx";
 import { SettingsPage } from "./components/SettingsPage.jsx";
 import { WatchPage } from "./components/WatchPage.jsx";
+import { useAuthController } from "./hooks/useAuthController.js";
+import { useChatController } from "./hooks/useChatController.js";
 import { usePlayerController } from "./hooks/usePlayerController.js";
 import { usePublisherController } from "./hooks/usePublisherController.js";
-import {
-  buildWatchLink,
-  generateRoomId,
-  getInitialViewState,
-  getRelayHostValue,
-  persistLiveRoom,
-  writeRoute
-} from "./lib/routeState.js";
+import { useRouteController } from "./hooks/useRouteController.js";
+import { buildWatchLink, generateRoomId, getRelayHostValue } from "./lib/routeState.js";
 import { describePlayerState, describePublishState } from "./lib/status.js";
 import { getPublishBlockReason, isPublishBlocked } from "./lib/roomPolicy.js";
 
@@ -61,116 +58,42 @@ function getCameraMode(cameraOptions, selectedCameraId, cameraEnabled) {
 }
 
 export function App() {
-  const initial = useRef(getInitialViewState()).current;
-
-  const [page, setPage] = useState(initial.page);
-  const [relayUrl, setRelayUrl] = useState(initial.relayUrl);
-  const [watchRoom, setWatchRoom] = useState(initial.watchRoom);
-  const [liveRoom, setLiveRoom] = useState(initial.liveRoom);
   const [logText, setLogText] = useState("");
-  const [authState, setAuthState] = useState({
-    loading: true,
-    available: true,
-    user: null
-  });
-
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const logRef = useRef(null);
-  const autorunRef = useRef(initial.autorun);
-  const pageRef = useRef(initial.page);
-  const relayUrlRef = useRef(initial.relayUrl);
-  const watchRoomRef = useRef(initial.watchRoom);
-  const liveRoomRef = useRef(initial.liveRoom);
-
-  pageRef.current = page;
-  relayUrlRef.current = relayUrl;
-  watchRoomRef.current = watchRoom;
-  liveRoomRef.current = liveRoom;
 
   function log(message) {
     const line = `[${new Date().toLocaleTimeString()}] ${message}`;
     setLogText((current) => `${current}${line}\n`);
   }
 
-  async function refreshAuthState() {
-    try {
-      const response = await fetch("/api/me", {
-        credentials: "same-origin"
-      });
-      if (!response.ok) {
-        throw new Error(`auth endpoint returned ${response.status}`);
-      }
-      const payload = await response.json();
-      setAuthState({
-        loading: false,
-        available: true,
-        user: payload.user ?? null
-      });
-    } catch (error) {
-      setAuthState({
-        loading: false,
-        available: false,
-        user: null
-      });
-      log(`auth unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  const {
+    initialAutorun,
+    page,
+    relayUrl,
+    watchRoom,
+    liveRoom,
+    autorunRef,
+    pageRef,
+    relayUrlRef,
+    watchRoomRef,
+    liveRoomRef,
+    setWatchRoomValue,
+    setLiveRoomValue,
+    setRelayUrlValue,
+    selectPage
+  } = useRouteController();
+
+  const {
+    authState,
+    startMicrosoftLogin,
+    logout
+  } = useAuthController({
+    log,
+    onAuthenticated: () => {
+      setLoginPromptOpen(false);
     }
-  }
-
-  function startMicrosoftLogin() {
-    const redirectTo = `${window.location.pathname}${window.location.search}`;
-    window.location.href = `/api/auth/microsoft/start?redirect_to=${encodeURIComponent(redirectTo)}`;
-  }
-
-  async function logout() {
-    try {
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin"
-      });
-      if (!response.ok) {
-        throw new Error(`logout failed with ${response.status}`);
-      }
-      setAuthState((current) => ({
-        ...current,
-        user: null,
-        available: true
-      }));
-      log("signed out");
-    } catch (error) {
-      log(`logout failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  function setWatchRoomValue(nextRoom) {
-    watchRoomRef.current = nextRoom;
-    setWatchRoom(nextRoom);
-    return nextRoom;
-  }
-
-  function setLiveRoomValue(nextRoom) {
-    const persistedRoom = persistLiveRoom(nextRoom);
-    liveRoomRef.current = persistedRoom;
-    setLiveRoom(persistedRoom);
-    return persistedRoom;
-  }
-
-  function setRelayUrlValue(nextRelayUrl) {
-    relayUrlRef.current = nextRelayUrl;
-    setRelayUrl(nextRelayUrl);
-    return nextRelayUrl;
-  }
-
-  function selectPage(nextPage, { updateAutorun = true } = {}) {
-    pageRef.current = nextPage;
-    if (nextPage === "live" && !liveRoomRef.current) {
-      setLiveRoomValue(generateRoomId());
-    }
-
-    if (updateAutorun) {
-      autorunRef.current = false;
-    }
-
-    setPage(nextPage);
-  }
+  });
 
   const publisher = usePublisherController({
     page,
@@ -182,12 +105,19 @@ export function App() {
   });
 
   const player = usePlayerController({
-    initialAutorun: initial.autorun,
+    initialAutorun,
     relayUrlRef,
     roomRef: watchRoomRef,
     setLogText,
     log,
     syntheticSessionRef: publisher.syntheticSessionRef
+  });
+
+  const chat = useChatController({
+    room: player.playerSession?.namespace ?? "",
+    enabled: page === "watch" && Boolean(player.playerSession),
+    authKey: authState.user?.id ?? "anonymous",
+    log
   });
 
   const watchRoomLabel = watchRoom || "等待输入房间 ID";
@@ -254,23 +184,7 @@ export function App() {
   }, [logText]);
 
   useEffect(() => {
-    const url = new URL(window.location.href);
-    const authError = url.searchParams.get("auth_error");
-    if (authError) {
-      log(`auth failed: ${authError}`);
-      url.searchParams.delete("auth_error");
-      history.replaceState({}, "", url);
-    }
-
-    void refreshAuthState();
-  }, []);
-
-  useEffect(() => {
-    writeRoute({ page, watchRoom, liveRoom });
-  }, [page, watchRoom, liveRoom]);
-
-  useEffect(() => {
-    if (!initial.autorun) {
+    if (!initialAutorun) {
       return;
     }
 
@@ -389,6 +303,24 @@ export function App() {
             stageRef={player.watchStageRef}
             playerSession={player.playerSession}
             playerRef={player.playerRef}
+            authAvailable={authState.available}
+            authLoading={authState.loading}
+            authUser={authState.user}
+            chatMessages={chat.messages}
+            chatDraft={chat.draft}
+            chatConnectionState={chat.connectionState}
+            chatOnlineCount={chat.onlineCount}
+            chatReadOnly={chat.readOnly}
+            chatError={chat.chatError}
+            onChatDraftChange={(event) => {
+              chat.setDraft(event.currentTarget.value);
+            }}
+            onChatSend={() => {
+              chat.sendMessage();
+            }}
+            onChatRequireLogin={() => {
+              setLoginPromptOpen(true);
+            }}
           />
 
           <LivePage
@@ -495,6 +427,15 @@ export function App() {
       </div>
 
       <MobileNavigation currentPage={page} onSelect={(nextPage) => selectPage(nextPage)} />
+      <LoginPromptModal
+        open={loginPromptOpen}
+        authAvailable={authState.available}
+        authLoading={authState.loading}
+        onClose={() => {
+          setLoginPromptOpen(false);
+        }}
+        onLogin={startMicrosoftLogin}
+      />
     </>
   );
 }

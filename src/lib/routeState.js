@@ -1,13 +1,42 @@
 const DEFAULT_RELAY_URL = "https://draft-14.cloudflare.mediaoverquic.com/";
+const LIVE_ROOM_STORAGE_KEY = "moq-live.live-room-id";
 
 export function generateRoomId() {
-  return `live-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  const suffix = Array.from(bytes, (value) => value.toString(36).padStart(2, "0")).join("").slice(0, 10);
+  return `puptv-${suffix}`;
+}
+
+export function readStoredLiveRoom() {
+  try {
+    const stored = window.localStorage.getItem(LIVE_ROOM_STORAGE_KEY)?.trim();
+    return stored || "";
+  } catch {
+    return "";
+  }
+}
+
+export function persistLiveRoom(room) {
+  try {
+    const normalized = room?.trim() ?? "";
+    if (normalized) {
+      window.localStorage.setItem(LIVE_ROOM_STORAGE_KEY, normalized);
+      return normalized;
+    }
+
+    window.localStorage.removeItem(LIVE_ROOM_STORAGE_KEY);
+    return "";
+  } catch {
+    return room?.trim() ?? "";
+  }
 }
 
 export function getInitialViewState() {
   const params = new URLSearchParams(window.location.search);
   const requestedPage = params.get("p");
   const routeRoom = params.get("r") ?? "";
+  const storedLiveRoom = readStoredLiveRoom();
   let page = requestedPage === "l" || requestedPage === "s" ? requestedPage : "w";
   let watchRoom = "";
   let liveRoom = "";
@@ -19,7 +48,7 @@ export function getInitialViewState() {
   if (page === "w") {
     watchRoom = routeRoom;
   } else if (page === "l") {
-    liveRoom = routeRoom || generateRoomId();
+    liveRoom = persistLiveRoom(storedLiveRoom || generateRoomId());
   }
 
   return {
@@ -61,9 +90,6 @@ export function writeRoute({ page, watchRoom, liveRoom }) {
     }
   } else if (page === "live") {
     next.searchParams.set("p", "l");
-    if (liveRoom) {
-      next.searchParams.set("r", liveRoom);
-    }
   } else if (page === "settings") {
     next.searchParams.set("p", "s");
   }

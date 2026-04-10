@@ -1,0 +1,4 @@
+MICROSOFT_CLIENT_ID=your-microsoft-client-id
+MICROSOFT_CLIENT_SECRET=your-microsoft-client-secret
+AUTH_COOKIE_SECRET=replace-with-a-long-random-secret
+AUTH_SESSION_TTL_DAYS=30

@@ -83,6 +83,20 @@ function ensureContainedPlayerStyles(playerEl) {
   shadowRoot.append(style);
 }
 
+function ensureInitialCanvasSize(playerEl) {
+  const canvasEl = playerEl?.shadowRoot?.querySelector("canvas#canvas");
+  if (!(canvasEl instanceof HTMLCanvasElement)) {
+    return;
+  }
+
+  // Browsers default canvas to 300x150 (2:1), which distorts the empty-state layout.
+  // Seed a conventional 16:9 size until the player writes the real media dimensions.
+  if (canvasEl.width === 300 && canvasEl.height === 150) {
+    canvasEl.width = 1280;
+    canvasEl.height = 720;
+  }
+}
+
 function syncContainedCanvasLayout(playerEl) {
   const shadowRoot = playerEl?.shadowRoot;
   const baseEl = shadowRoot?.querySelector("#base");
@@ -346,6 +360,7 @@ export function usePlayerController({
     }
 
     const updateCanvasLayout = () => {
+      ensureInitialCanvasSize(playerEl);
       const nextOrientation = syncContainedCanvasLayout(playerEl);
       if (nextOrientation) {
         setPlayerOrientation(nextOrientation);

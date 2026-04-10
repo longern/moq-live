@@ -88,11 +88,40 @@ pre {
   margin-left: auto;
   display: flex;
   align-items: center;
+  gap: 14px;
 }
 
 .desktop-nav {
   display: flex;
   gap: 8px;
+}
+
+.auth-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-toolbar-user,
+.auth-toolbar-note {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+
+.auth-toolbar-user {
+  color: var(--text);
+}
+
+.auth-toolbar-note {
+  color: var(--muted);
+}
+
+.auth-toolbar-button {
+  min-height: 38px;
+  padding: 0 14px;
 }
 
 .nav-button {
@@ -604,6 +633,35 @@ publisher-moq {
   .watch-layout .stage-column {
     gap: 0;
   }
+
+  .watch-layout .stage-column,
+  .live-layout .stage-column {
+    justify-items: center;
+  }
+
+  .watch-layout .watch-stage-frame:not(:fullscreen),
+  .live-layout .live-stage-frame:not(:fullscreen) {
+    width: 100%;
+    max-height: calc(100vh - 12rem);
+    aspect-ratio: 16 / 9;
+    justify-self: center;
+    display: grid;
+    place-items: center;
+    background: #000;
+  }
+
+  .watch-layout .watch-stage-frame:not(:fullscreen) #playerMount,
+  .live-layout .live-stage-frame:not(:fullscreen) .publisher-host {
+    width: min(100%, calc((100vh - 12rem) * 16 / 9));
+    height: 100%;
+    max-height: calc(100vh - 12rem);
+    aspect-ratio: 16 / 9;
+  }
+
+  .watch-layout .info-strip,
+  .live-layout .info-strip {
+    width: 100%;
+  }
 }
 
 .stack {
@@ -757,6 +815,10 @@ pre {
   }
 
   .topbar {
+    display: none;
+  }
+
+  .auth-toolbar {
     display: none;
   }
 

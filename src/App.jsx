@@ -10,6 +10,7 @@ import {
   generateRoomId,
   getInitialViewState,
   getRelayHostValue,
+  persistLiveRoom,
   writeRoute
 } from "./lib/routeState.js";
 import { describePlayerState, describePublishState } from "./lib/status.js";
@@ -67,6 +68,11 @@ export function App() {
   const [watchRoom, setWatchRoom] = useState(initial.watchRoom);
   const [liveRoom, setLiveRoom] = useState(initial.liveRoom);
   const [logText, setLogText] = useState("");
+  const [authState, setAuthState] = useState({
+    loading: true,
+    available: true,
+    user: null
+  });
 
   const logRef = useRef(null);
   const autorunRef = useRef(initial.autorun);
@@ -85,6 +91,55 @@ export function App() {
     setLogText((current) => `${current}${line}\n`);
   }
 
+  async function refreshAuthState() {
+    try {
+      const response = await fetch("/api/me", {
+        credentials: "same-origin"
+      });
+      if (!response.ok) {
+        throw new Error(`auth endpoint returned ${response.status}`);
+      }
+      const payload = await response.json();
+      setAuthState({
+        loading: false,
+        available: true,
+        user: payload.user ?? null
+      });
+    } catch (error) {
+      setAuthState({
+        loading: false,
+        available: false,
+        user: null
+      });
+      log(`auth unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  function startMicrosoftLogin() {
+    const redirectTo = `${window.location.pathname}${window.location.search}`;
+    window.location.href = `/api/auth/microsoft/start?redirect_to=${encodeURIComponent(redirectTo)}`;
+  }
+
+  async function logout() {
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin"
+      });
+      if (!response.ok) {
+        throw new Error(`logout failed with ${response.status}`);
+      }
+      setAuthState((current) => ({
+        ...current,
+        user: null,
+        available: true
+      }));
+      log("signed out");
+    } catch (error) {
+      log(`logout failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   function setWatchRoomValue(nextRoom) {
     watchRoomRef.current = nextRoom;
     setWatchRoom(nextRoom);
@@ -92,9 +147,10 @@ export function App() {
   }
 
   function setLiveRoomValue(nextRoom) {
-    liveRoomRef.current = nextRoom;
-    setLiveRoom(nextRoom);
-    return nextRoom;
+    const persistedRoom = persistLiveRoom(nextRoom);
+    liveRoomRef.current = persistedRoom;
+    setLiveRoom(persistedRoom);
+    return persistedRoom;
   }
 
   function setRelayUrlValue(nextRelayUrl) {
@@ -198,6 +254,18 @@ export function App() {
   }, [logText]);
 
   useEffect(() => {
+    const url = new URL(window.location.href);
+    const authError = url.searchParams.get("auth_error");
+    if (authError) {
+      log(`auth failed: ${authError}`);
+      url.searchParams.delete("auth_error");
+      history.replaceState({}, "", url);
+    }
+
+    void refreshAuthState();
+  }, []);
+
+  useEffect(() => {
     writeRoute({ page, watchRoom, liveRoom });
   }, [page, watchRoom, liveRoom]);
 
@@ -246,6 +314,34 @@ export function App() {
 
           <div class="topbar-right">
             <DesktopNavigation currentPage={page} onSelect={(nextPage) => selectPage(nextPage)} />
+            <div class="auth-toolbar">
+              {authState.available ? (
+                authState.user ? (
+                  <>
+                    <span class="auth-toolbar-user" title={authState.user.email || authState.user.displayName}>
+                      {authState.user.displayName || authState.user.email || "已登录"}
+                    </span>
+                    <button type="button" class="secondary auth-toolbar-button" onClick={() => {
+                      void logout();
+                    }}
+                    >
+                      退出
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    class="secondary auth-toolbar-button"
+                    onClick={startMicrosoftLogin}
+                    disabled={authState.loading}
+                  >
+                    {authState.loading ? "鉴权检查中" : "登录"}
+                  </button>
+                )
+              ) : (
+                <span class="auth-toolbar-note">Auth API 未连接</span>
+              )}
+            </div>
           </div>
         </header>
 
@@ -381,6 +477,13 @@ export function App() {
             relayUrl={relayUrl}
             relayHost={relayHost}
             buildLabel={buildLabel}
+            authAvailable={authState.available}
+            authLoading={authState.loading}
+            authUser={authState.user}
+            onMicrosoftLogin={startMicrosoftLogin}
+            onLogout={() => {
+              void logout();
+            }}
             onRelayUrlInput={(event) => {
               autorunRef.current = false;
               setRelayUrlValue(event.currentTarget.value);

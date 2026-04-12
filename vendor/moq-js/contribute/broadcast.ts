@@ -202,11 +202,10 @@ export class Broadcast {
 			const { value: segment, done } = await segments.read()
 			if (done) break
 
-			// Serve the segment and log any errors that occur.
-			this.#serveSegment(subscriber, segment).catch((e) => {
-				const err = asError(e)
-				console.warn("failed to serve segment", err)
-			})
+			// Keep subgroup creation serialized per subscribed track.
+			// Unbounded parallel segment sends can exhaust the relay's stream budget,
+			// leaving viewers stuck in the "connecting" state while send-stream creation fails.
+			await this.#serveSegment(subscriber, segment)
 		}
 	}
 

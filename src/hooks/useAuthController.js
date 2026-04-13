@@ -63,6 +63,36 @@ export function useAuthController({ log, onAuthenticated }) {
     }
   }
 
+  async function updateDisplayName(displayName) {
+    const response = await fetch("/api/me/profile", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        displayName
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload.error || `profile update failed with ${response.status}`);
+    }
+
+    if (payload.user) {
+      setAuthState((current) => ({
+        ...current,
+        available: true,
+        loading: false,
+        user: payload.user
+      }));
+      onAuthenticatedRef.current?.(payload.user);
+    }
+
+    return payload;
+  }
+
   useEffect(() => {
     const url = new URL(window.location.href);
     const authError = url.searchParams.get("auth_error");
@@ -79,6 +109,7 @@ export function useAuthController({ log, onAuthenticated }) {
     authState,
     refreshAuthState,
     startMicrosoftLogin,
-    logout
+    logout,
+    updateDisplayName
   };
 }

@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS moq_users (
   primary_email TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  last_login_at TEXT
+  last_login_at TEXT,
+  display_name_changed_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS moq_user_identities (

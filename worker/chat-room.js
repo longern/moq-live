@@ -1,5 +1,6 @@
 const MAX_MESSAGE_LENGTH = 280;
 const MAX_RECENT_MESSAGES = 80;
+const MESSAGE_TTL_MS = 24 * 60 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 5_000;
 const RATE_LIMIT_MAX_MESSAGES = 4;
 
@@ -14,6 +15,7 @@ export class ChatRoomDO {
 
   async fetch(request) {
     await this.ready;
+    await this.persistPrunedMessages();
     const url = new URL(request.url);
 
     if (!url.pathname.endsWith("/ws")) {
@@ -56,6 +58,7 @@ export class ChatRoomDO {
 
   async webSocketMessage(ws, rawData) {
     await this.ready;
+    this.pruneRecentMessages();
     const session = normalizeAttachment(ws.deserializeAttachment());
     if (!session) {
       this.send(ws, {
@@ -200,6 +203,26 @@ export class ChatRoomDO {
   send(socket, payload) {
     socket.send(JSON.stringify(payload));
   }
+
+  pruneRecentMessages(now = Date.now()) {
+    const nextMessages = this.recentMessages
+      .filter((message) => isMessageFresh(message, now))
+      .slice(-MAX_RECENT_MESSAGES);
+
+    if (nextMessages.length === this.recentMessages.length) {
+      return false;
+    }
+
+    this.recentMessages = nextMessages;
+    return true;
+  }
+
+  async persistPrunedMessages(now = Date.now()) {
+    if (!this.pruneRecentMessages(now)) {
+      return;
+    }
+    await this.ctx.storage.put("recentMessages", this.recentMessages);
+  }
 }
 
 function normalizeAttachment(attachment) {
@@ -229,4 +252,13 @@ function parseUserHeader(headerValue) {
 
 function sanitizeMessage(text) {
   return String(text ?? "").replace(/\s+/g, " ").trim();
+}
+
+function isMessageFresh(message, now) {
+  if (!message || typeof message !== "object") {
+    return false;
+  }
+
+  const sentAt = Date.parse(message.sentAt);
+  return Number.isFinite(sentAt) && now - sentAt < MESSAGE_TTL_MS;
 }

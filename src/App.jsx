@@ -87,7 +87,8 @@ export function App() {
   const {
     authState,
     startMicrosoftLogin,
-    logout
+    logout,
+    updateDisplayName
   } = useAuthController({
     log,
     onAuthenticated: () => {
@@ -416,6 +417,7 @@ export function App() {
             onLogout={() => {
               void logout();
             }}
+            onUpdateDisplayName={(displayName) => updateDisplayName(displayName)}
             onRelayUrlInput={(event) => {
               autorunRef.current = false;
               setRelayUrlValue(event.currentTarget.value);

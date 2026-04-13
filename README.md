@@ -77,9 +77,7 @@
 
 把 `migrations/0001_auth.sql` 应用到你的 D1 数据库，并将 D1 绑定命名为：
 
-- `AUTH_DB`
-
-如果你已经使用默认命名 `DB`，代码也会自动兼容。
+- `APP_DB`
 
 ### 微软应用注册
 
@@ -102,7 +100,7 @@
 - 静态资源目录：`dist`
 - 仅 `/api/*` 命中 Worker：`assets.run_worker_first = ["/api/*"]`
 
-在正式部署前，你还需要把 `AUTH_DB` 的 D1 绑定补到 `wrangler.jsonc` 里。
+在正式部署前，你还需要把 `APP_DB` 的 D1 绑定补到 `wrangler.jsonc` 里。
 
 ### 部署提示
 

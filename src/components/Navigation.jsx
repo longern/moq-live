@@ -22,18 +22,11 @@ const navItems = [
   },
   {
     id: "settings",
-    label: "设置",
+    label: "我的",
     icon: (
       <svg viewBox="0 0 24 24">
-        <path d="M12 3v3" />
-        <path d="M12 18v3" />
-        <path d="M4.9 4.9l2.1 2.1" />
-        <path d="m17 17 2.1 2.1" />
-        <path d="M3 12h3" />
-        <path d="M18 12h3" />
-        <path d="m4.9 19.1 2.1-2.1" />
-        <path d="M17 7l2.1-2.1" />
-        <circle cx="12" cy="12" r="4" />
+        <circle cx="12" cy="8" r="3.25" />
+        <path d="M5.5 19.5c1.8-3.2 4.1-4.8 6.5-4.8s4.7 1.6 6.5 4.8" />
       </svg>
     )
   }

@@ -4,6 +4,9 @@ const SESSION_COOKIE_NAME = "moq_session";
 const MICROSOFT_OAUTH_COOKIE_NAME = "moq_oauth_microsoft";
 const DEFAULT_SESSION_TTL_DAYS = 30;
 const MICROSOFT_OPENID_CONFIG_URL = "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration";
+const NICKNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const MIN_NICKNAME_LENGTH = 2;
+const MAX_NICKNAME_LENGTH = 32;
 const TABLES = {
   users: "moq_users",
   userIdentities: "moq_user_identities",
@@ -41,9 +44,9 @@ export function redirect(url, init = {}) {
 }
 
 export function getDb(env) {
-  const db = env.AUTH_DB ?? env.DB;
+  const db = env.APP_DB;
   if (!db) {
-    throw new Error("Missing D1 binding. Set AUTH_DB or DB.");
+    throw new Error("Missing D1 binding. Set APP_DB.");
   }
   return db;
 }
@@ -250,8 +253,9 @@ export async function getSessionUser(db, request) {
     `SELECT
       sessions.id AS session_id,
       sessions.user_id AS user_id,
-      sessions.expires_at AS session_expires_at,
       users.display_name AS display_name,
+      users.display_name_changed_at AS display_name_changed_at,
+      sessions.expires_at AS session_expires_at,
       users.primary_email AS primary_email,
       users.avatar_url AS avatar_url
     FROM ${TABLES.sessions} AS sessions
@@ -270,12 +274,7 @@ export async function getSessionUser(db, request) {
 
   return {
     token: sessionToken,
-    user: {
-      id: row.user_id,
-      displayName: row.display_name,
-      email: row.primary_email,
-      avatarUrl: row.avatar_url
-    }
+    user: buildUserPayload(row)
   };
 }
 
@@ -428,12 +427,13 @@ export async function upsertMicrosoftUser(db, claims) {
       `INSERT INTO ${TABLES.users} (
         id,
         display_name,
+        display_name_changed_at,
         avatar_url,
         primary_email,
         created_at,
         updated_at,
         last_login_at
-      ) VALUES (?, ?, NULL, ?, ?, ?, ?)`
+      ) VALUES (?, ?, NULL, NULL, ?, ?, ?, ?)`
     ).bind(userId, displayName, email, now, now, now),
     db.prepare(
       `INSERT INTO ${TABLES.userIdentities} (
@@ -465,6 +465,57 @@ export async function upsertMicrosoftUser(db, claims) {
   return userId;
 }
 
+export async function updateUserDisplayName(db, userId, nextDisplayNameValue) {
+  const displayName = sanitizeDisplayName(nextDisplayNameValue);
+  const currentUser = await getUserRowById(db, userId);
+
+  if (!currentUser) {
+    throw createHttpError(404, "User not found", "user_not_found");
+  }
+
+  const normalizedCurrentDisplayName = normalizeDisplayName(currentUser.display_name || "");
+  if (normalizedCurrentDisplayName === displayName.normalized) {
+    return buildUserPayload(currentUser);
+  }
+
+  const nextChangeAt = getDisplayNameNextChangeAt(currentUser.display_name_changed_at);
+  if (nextChangeAt && Date.parse(nextChangeAt) > Date.now()) {
+    throw createHttpError(
+      429,
+      "显示名 7 天内只能修改一次",
+      "display_name_change_cooldown",
+      { nextDisplayNameChangeAt: nextChangeAt }
+    );
+  }
+
+  const existingUser = await db.prepare(
+    `SELECT id
+     FROM ${TABLES.users}
+     WHERE id <> ?
+       AND display_name IS NOT NULL
+       AND lower(trim(display_name)) = ?
+     LIMIT 1`
+  ).bind(userId, displayName.normalized).first();
+
+  if (existingUser) {
+    throw createHttpError(409, "显示名已被占用", "display_name_taken");
+  }
+
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE ${TABLES.users}
+     SET display_name = ?, display_name_changed_at = ?, updated_at = ?
+     WHERE id = ?`
+  ).bind(displayName.value, now, now, userId).run();
+
+  const updatedUser = await getUserRowById(db, userId);
+  if (!updatedUser) {
+    throw createHttpError(404, "User not found", "user_not_found");
+  }
+
+  return buildUserPayload(updatedUser);
+}
+
 export function buildSessionCookie(token, expiresAt, secure = true) {
   const expires = new Date(expiresAt);
   const maxAge = Math.max(0, Math.floor((expires.getTime() - Date.now()) / 1000));
@@ -487,6 +538,77 @@ function randomToken(bytes) {
   const value = new Uint8Array(bytes);
   crypto.getRandomValues(value);
   return uint8ArrayToBase64Url(value);
+}
+
+function buildUserPayload(row) {
+  const effectiveDisplayName = row.display_name || row.primary_email || "匿名用户";
+  return {
+    id: row.user_id,
+    displayName: effectiveDisplayName,
+    displayNameChangedAt: row.display_name_changed_at,
+    nextDisplayNameChangeAt: getDisplayNameNextChangeAt(row.display_name_changed_at),
+    email: row.primary_email,
+    avatarUrl: row.avatar_url
+  };
+}
+
+async function getUserRowById(db, userId) {
+  return db.prepare(
+    `SELECT
+      id AS user_id,
+      display_name,
+      display_name_changed_at,
+      primary_email,
+      avatar_url
+     FROM ${TABLES.users}
+     WHERE id = ?
+     LIMIT 1`
+  ).bind(userId).first();
+}
+
+function sanitizeDisplayName(value) {
+  if (typeof value !== "string") {
+    throw createHttpError(400, "显示名不能为空", "invalid_display_name");
+  }
+
+  const displayName = value.trim().replace(/\s+/g, " ");
+  const length = Array.from(displayName).length;
+  if (!displayName) {
+    throw createHttpError(400, "显示名不能为空", "invalid_display_name");
+  }
+  if (length < MIN_NICKNAME_LENGTH || length > MAX_NICKNAME_LENGTH) {
+    throw createHttpError(400, `显示名长度需在 ${MIN_NICKNAME_LENGTH}-${MAX_NICKNAME_LENGTH} 个字符之间`, "invalid_display_name");
+  }
+
+  return {
+    value: displayName,
+    normalized: normalizeDisplayName(displayName)
+  };
+}
+
+function normalizeDisplayName(value) {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
+function getDisplayNameNextChangeAt(changedAt) {
+  if (!changedAt) {
+    return null;
+  }
+
+  const changedAtMs = Date.parse(changedAt);
+  if (!Number.isFinite(changedAtMs)) {
+    return null;
+  }
+
+  return new Date(changedAtMs + NICKNAME_CHANGE_COOLDOWN_MS).toISOString();
+}
+
+function createHttpError(status, message, code, details = undefined) {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  error.details = details;
+  return error;
 }
 
 async function sha256Hex(input) {

@@ -19,6 +19,7 @@ import {
   revokeSession,
   sanitizeRedirectTo,
   shouldUseSecureCookies,
+  updateUserDisplayName,
   upsertMicrosoftUser,
   verifyMicrosoftIdToken
 } from "./auth.js";
@@ -39,6 +40,9 @@ export default {
       if (url.pathname === "/api/me" && request.method === "GET") {
         return await handleMe(env, request);
       }
+      if (url.pathname === "/api/me/profile" && request.method === "POST") {
+        return await handleProfileUpdate(env, request);
+      }
       if (url.pathname === "/api/auth/microsoft/start" && request.method === "GET") {
         return await handleMicrosoftStart(env, request);
       }
@@ -53,7 +57,15 @@ export default {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return json({ ok: false, error: message }, { status: 500 });
+      const status = Number.isInteger(error?.status) ? error.status : 500;
+      const payload = { ok: false, error: message };
+      if (error?.code) {
+        payload.code = error.code;
+      }
+      if (error?.details) {
+        payload.details = error.details;
+      }
+      return json(payload, { status });
     }
 
     return json({ ok: false, error: "Not found" }, { status: 404 });
@@ -80,6 +92,25 @@ async function handleMe(env, request) {
     authenticated: true,
     loginUrl: getMicrosoftLoginUrl(request),
     user: session.user
+  });
+}
+
+async function handleProfileUpdate(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+  if (!session?.user) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const payload = await request.json().catch(() => null);
+  if (!payload || typeof payload !== "object") {
+    return json({ ok: false, error: "Invalid JSON body", code: "invalid_json" }, { status: 400 });
+  }
+
+  const user = await updateUserDisplayName(db, session.user.id, payload.displayName);
+  return json({
+    ok: true,
+    user
   });
 }
 
@@ -221,7 +252,7 @@ async function handleChatWebSocket(env, request) {
 
 async function getOptionalSessionUser(env, request) {
   try {
-    if (!(env.AUTH_DB ?? env.DB)) {
+    if (!env.APP_DB) {
       return null;
     }
     return await getSessionUser(getDb(env), request);

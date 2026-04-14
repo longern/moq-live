@@ -13,6 +13,9 @@ function getConnectionLabel(state) {
   if (state === "connected") {
     return "已连接";
   }
+  if (state === "idle") {
+    return "加载中";
+  }
   if (state === "connecting") {
     return "连接中";
   }
@@ -39,7 +42,9 @@ export function ChatPanel({
   onlineCount,
   readOnly,
   chatError,
-  variant = "default"
+  variant = "default",
+  title = "聊天室",
+  emptyText = "还没有聊天消息，来发第一条。"
 }) {
   const listRef = useRef(null);
 
@@ -53,13 +58,18 @@ export function ChatPanel({
   const disabled = connectionState !== "connected" || readOnly;
   const canSend = !disabled && draft.trim().length > 0;
   const floating = variant === "floating";
+  const showWelcomeMessage =
+    connectionState === "connected" && messages.length === 0;
+  const welcomeText = room
+    ? `欢迎来到 ${room} 的直播间`
+    : "欢迎来到直播间";
 
   return (
     <section class={`control-block chat-panel-block${floating ? " chat-panel-floating" : ""}`}>
       {!floating ? (
         <div class="control-head chat-panel-head">
           <div class="chat-panel-title-row">
-            <h3>聊天室</h3>
+            <h3>{title}</h3>
             <span class="chat-panel-online-count">{onlineCount} 在线</span>
           </div>
           <span class={`chat-connection-state is-${connectionState}`}>{getConnectionLabel(connectionState)}</span>
@@ -83,11 +93,18 @@ export function ChatPanel({
               </p>
             </div>
           </article>
-        )) : (
-          <div class="chat-empty-state">
-            <p>还没有聊天消息，来发第一条。</p>
-          </div>
-        )}
+        )) : null}
+
+        {showWelcomeMessage ? (
+          <article class="chat-message-card chat-message-card-system chat-message-card-system-no-avatar">
+            <div class="chat-message-body chat-message-body-system">
+              <p>
+                <strong>系统</strong>
+                <span>{welcomeText}</span>
+              </p>
+            </div>
+          </article>
+        ) : null}
       </div>
 
       {chatError ? <p class={`inline-warning${floating ? " chat-floating-warning" : ""}`}>{chatError}</p> : null}
@@ -129,13 +146,10 @@ export function ChatPanel({
             onInput={onDraftChange}
             disabled={disabled}
           />
-          <button type="submit" disabled={!canSend}>发送</button>
+          <button type="submit" disabled={!canSend}>{readOnly ? "只读" : "发送"}</button>
         </form>
       )}
 
-      {authUser && readOnly ? (
-        <p class="chat-panel-note">当前连接为只读状态，请稍后重试。</p>
-      ) : null}
     </section>
   );
 }

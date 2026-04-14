@@ -10,6 +10,7 @@ const VIDEO_TARGET_WIDTH = 1280;
 const VIDEO_TARGET_HEIGHT = 720;
 const VIDEO_TARGET_FRAMERATE = 30;
 const VIDEO_TARGET_BITRATE = 2_500_000;
+const DEFAULT_PREVIEW_SOURCE = "camera";
 
 function hasUsableMediaStream(stream) {
   if (!stream) {
@@ -41,6 +42,12 @@ export function usePublisherController({
   const [previewActive, setPreviewActive] = useState(false);
   const [previewHasVideo, setPreviewHasVideo] = useState(false);
   const [syntheticPublishing, setSyntheticPublishing] = useState(false);
+  const [previewSourceType, setPreviewSourceType] = useState(
+    DEFAULT_PREVIEW_SOURCE,
+  );
+  const [screenShareSupported] = useState(() =>
+    Boolean(navigator.mediaDevices?.getDisplayMedia),
+  );
 
   const previewVideoRef = useRef(null);
   const syntheticSessionRef = useRef(null);
@@ -50,8 +57,11 @@ export function usePublisherController({
   const publisherIsPublishingRef = useRef(false);
   const appliedCameraIdRef = useRef("");
   const appliedMicrophoneIdRef = useRef("");
+  const previewSourceTypeRef = useRef(DEFAULT_PREVIEW_SOURCE);
+  const appliedMicrophoneEnabledRef = useRef(true);
 
   publisherIsPublishingRef.current = publisherIsPublishing;
+  previewSourceTypeRef.current = previewSourceType;
 
   function ensureRoomId(force = false) {
     const currentRoom = roomRef.current;
@@ -67,7 +77,7 @@ export function usePublisherController({
     }
   }
 
-  function stopLivePreview() {
+  function stopLivePreview({ resetSource = false } = {}) {
     const stream = liveMediaStreamRef.current;
     if (stream) {
       liveMediaStreamRef.current = null;
@@ -78,21 +88,29 @@ export function usePublisherController({
     }
     setPreviewActive(false);
     setPreviewHasVideo(false);
+    if (resetSource) {
+      previewSourceTypeRef.current = DEFAULT_PREVIEW_SOURCE;
+      setPreviewSourceType(DEFAULT_PREVIEW_SOURCE);
+    }
   }
 
   function setCameraEnabled(nextEnabled) {
     setCameraEnabledState(nextEnabled);
     const nextHasVideo =
-      nextEnabled &&
+      previewSourceTypeRef.current === "screen"
+        ? Boolean(liveMediaStreamRef.current?.getVideoTracks().length)
+        : nextEnabled &&
       Boolean(liveMediaStreamRef.current?.getVideoTracks().length);
 
-    for (const stream of [
-      liveMediaStreamRef.current,
-      publishMediaStreamRef.current,
-    ]) {
-      stream?.getVideoTracks().forEach((track) => {
-        track.enabled = nextEnabled;
-      });
+    if (previewSourceTypeRef.current !== "screen") {
+      for (const stream of [
+        liveMediaStreamRef.current,
+        publishMediaStreamRef.current,
+      ]) {
+        stream?.getVideoTracks().forEach((track) => {
+          track.enabled = nextEnabled;
+        });
+      }
     }
 
     setPreviewHasVideo(nextHasVideo);
@@ -170,11 +188,29 @@ export function usePublisherController({
     });
   }
 
-  async function startLivePreview() {
-    if (publisherIsPublishingRef.current) {
-      return;
+  function setLivePreviewStream(stream, sourceType) {
+    liveMediaStreamRef.current = stream;
+    appliedCameraIdRef.current = selectedCameraId;
+    appliedMicrophoneIdRef.current = selectedMicrophoneId;
+    appliedMicrophoneEnabledRef.current = microphoneEnabled;
+    previewSourceTypeRef.current = sourceType;
+    setPreviewSourceType(sourceType);
+  }
+
+  async function requestPreferredMicrophoneTrack() {
+    if (!microphoneEnabled) {
+      return null;
     }
 
+    const microphoneConstraints = selectedMicrophoneId
+      ? { audio: { deviceId: { exact: selectedMicrophoneId } } }
+      : { audio: true };
+    const microphoneStream =
+      await navigator.mediaDevices.getUserMedia(microphoneConstraints);
+    return microphoneStream.getAudioTracks()[0] ?? null;
+  }
+
+  async function startCameraPreview() {
     const existing = liveMediaStreamRef.current;
     if (existing) {
       existing.getTracks().forEach((track) => track.stop());
@@ -226,9 +262,7 @@ export function usePublisherController({
         : new Error("未检测到可用的摄像头或麦克风");
     }
 
-    liveMediaStreamRef.current = stream;
-    appliedCameraIdRef.current = selectedCameraId;
-    appliedMicrophoneIdRef.current = selectedMicrophoneId;
+    setLivePreviewStream(stream, "camera");
     for (const track of stream.getTracks()) {
       track.addEventListener(
         "ended",
@@ -236,11 +270,15 @@ export function usePublisherController({
           if (liveMediaStreamRef.current !== stream) {
             return;
           }
-          if (publisherIsPublishingRef.current || pageRef.current !== "live") {
+          if (pageRef.current !== "live") {
             return;
           }
 
           stopLivePreview();
+          if (publisherIsPublishingRef.current) {
+            return;
+          }
+
           void startLivePreview().catch((error) => {
             const message =
               error instanceof Error ? error.message : String(error);
@@ -258,6 +296,157 @@ export function usePublisherController({
     setPreviewActive(true);
     setPreviewHasVideo(hasVideoTrack && cameraEnabled);
     await refreshMediaDevices(stream);
+  }
+
+  async function startScreenSharePreview() {
+    if (!screenShareSupported) {
+      throw new Error("当前浏览器不支持屏幕共享");
+    }
+
+    const existing = liveMediaStreamRef.current;
+    if (existing) {
+      existing.getTracks().forEach((track) => track.stop());
+      liveMediaStreamRef.current = null;
+    }
+
+    let displayStream = null;
+    let lastDisplayError = null;
+    for (const constraints of [
+      {
+        video: {
+          frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
+          width: { ideal: VIDEO_TARGET_WIDTH },
+          height: { ideal: VIDEO_TARGET_HEIGHT },
+        },
+        audio: true,
+      },
+      {
+        video: {
+          frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
+          width: { ideal: VIDEO_TARGET_WIDTH },
+          height: { ideal: VIDEO_TARGET_HEIGHT },
+        },
+        audio: false,
+      },
+    ]) {
+      try {
+        displayStream = await navigator.mediaDevices.getDisplayMedia(
+          constraints,
+        );
+        break;
+      } catch (error) {
+        lastDisplayError = error;
+      }
+    }
+
+    if (!displayStream) {
+      throw lastDisplayError instanceof Error
+        ? lastDisplayError
+        : new Error("未获取到可共享的屏幕画面");
+    }
+
+    const videoTrack = displayStream.getVideoTracks()[0] ?? null;
+    let audioTrack = displayStream.getAudioTracks()[0] ?? null;
+    let microphoneTrack = null;
+
+    if (microphoneEnabled) {
+      try {
+        microphoneTrack = await requestPreferredMicrophoneTrack();
+      } catch (error) {
+        if (!audioTrack) {
+          displayStream.getTracks().forEach((track) => track.stop());
+          throw error instanceof Error
+            ? error
+            : new Error("未获取到可用的麦克风");
+        }
+        log(
+          `screen share microphone warning: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    if (microphoneTrack) {
+      if (audioTrack && audioTrack !== microphoneTrack) {
+        audioTrack.stop();
+      }
+      audioTrack = microphoneTrack;
+    }
+
+    if (!videoTrack && !audioTrack) {
+      displayStream.getTracks().forEach((track) => track.stop());
+      throw new Error("未获取到可推流的屏幕共享轨道");
+    }
+
+    const usedTracks = [videoTrack, audioTrack].filter(Boolean);
+    const stream = new MediaStream(usedTracks);
+    for (const track of displayStream.getTracks()) {
+      if (!usedTracks.includes(track)) {
+        track.stop();
+      }
+    }
+
+    setLivePreviewStream(stream, "screen");
+    for (const track of stream.getTracks()) {
+      track.addEventListener(
+        "ended",
+        () => {
+          if (liveMediaStreamRef.current !== stream || pageRef.current !== "live") {
+            return;
+          }
+
+          stopLivePreview({ resetSource: true });
+          if (publisherIsPublishingRef.current) {
+            void stopCameraPublish();
+            setPublishStatus("屏幕共享已结束，请重新开始直播。");
+            return;
+          }
+
+          void startLivePreview().catch((error) => {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            setPublishStatus(`预览失败：${message}`);
+            log(`screen share restore failed: ${message}`);
+          });
+        },
+        { once: true },
+      );
+    }
+
+    if (previewVideoRef.current) {
+      previewVideoRef.current.srcObject = videoTrack ? stream : null;
+    }
+    setPreviewActive(true);
+    setPreviewHasVideo(Boolean(videoTrack));
+    setPublishStatus("屏幕共享已就绪。");
+    await refreshMediaDevices(stream);
+  }
+
+  async function startLivePreview() {
+    if (publisherIsPublishingRef.current) {
+      return;
+    }
+
+    if (previewSourceTypeRef.current === "screen") {
+      await startScreenSharePreview();
+      return;
+    }
+
+    await startCameraPreview();
+  }
+
+  async function startScreenShare() {
+    await startScreenSharePreview();
+  }
+
+  async function stopScreenShare() {
+    if (previewSourceTypeRef.current !== "screen") {
+      return;
+    }
+
+    stopLivePreview({ resetSource: true });
+    if (pageRef.current === "live" && !publisherIsPublishingRef.current) {
+      await startLivePreview();
+    }
   }
 
   async function startCameraPublish() {
@@ -338,7 +527,8 @@ export function usePublisherController({
       publisherIsPublishingRef.current = true;
       setPublisherIsPublishing(true);
       publishStream.getVideoTracks().forEach((track) => {
-        track.enabled = cameraEnabled;
+        track.enabled =
+          previewSourceTypeRef.current === "screen" ? true : cameraEnabled;
       });
       publishStream.getAudioTracks().forEach((track) => {
         track.enabled = microphoneEnabled;
@@ -466,8 +656,11 @@ export function usePublisherController({
       const currentStream = liveMediaStreamRef.current;
       const shouldRestartPreview =
         !hasUsableMediaStream(currentStream) ||
-        appliedCameraIdRef.current !== selectedCameraId ||
-        appliedMicrophoneIdRef.current !== selectedMicrophoneId;
+        (previewSourceTypeRef.current === "screen"
+          ? appliedMicrophoneIdRef.current !== selectedMicrophoneId ||
+            appliedMicrophoneEnabledRef.current !== microphoneEnabled
+          : appliedCameraIdRef.current !== selectedCameraId ||
+            appliedMicrophoneIdRef.current !== selectedMicrophoneId);
 
       if (shouldRestartPreview) {
         stopLivePreview();
@@ -542,7 +735,10 @@ export function usePublisherController({
         return;
       }
 
-      if (!publisherIsPublishingRef.current) {
+      if (
+        !publisherIsPublishingRef.current &&
+        previewSourceTypeRef.current !== "screen"
+      ) {
         stopLivePreview();
       }
     };
@@ -557,7 +753,7 @@ export function usePublisherController({
     () => () => {
       void stopSyntheticPublish();
       void stopCameraPublish();
-      stopLivePreview();
+      stopLivePreview({ resetSource: true });
     },
     [],
   );
@@ -573,6 +769,9 @@ export function usePublisherController({
     microphoneEnabled,
     previewActive,
     previewHasVideo,
+    previewSourceType,
+    screenShareSupported,
+    screenShareActive: previewSourceType === "screen" && previewActive,
     syntheticPublishing,
     previewVideoRef,
     syntheticSessionRef,
@@ -582,6 +781,8 @@ export function usePublisherController({
     setMicrophoneEnabled,
     startCameraPublish,
     stopCameraPublish,
+    startScreenShare,
+    stopScreenShare,
     startSyntheticPublish,
     stopSyntheticPublish,
     getSyntheticSignatures: () => ({

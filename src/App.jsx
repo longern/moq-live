@@ -10,6 +10,7 @@ import { usePlayerController } from "./hooks/usePlayerController.js";
 import { usePublisherController } from "./hooks/usePublisherController.js";
 import { useRouteController } from "./hooks/useRouteController.js";
 import { buildWatchLink, generateRoomId, getRelayHostValue } from "./lib/routeState.js";
+import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from "./lib/watchHistory.js";
 import { describePlayerState, describePublishState } from "./lib/status.js";
 import { getPublishBlockReason, isPublishBlocked } from "./lib/roomPolicy.js";
 
@@ -60,7 +61,10 @@ function getCameraMode(cameraOptions, selectedCameraId, cameraEnabled) {
 export function App() {
   const [logText, setLogText] = useState("");
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
+  const [settingsLoginPanelRequestKey, setSettingsLoginPanelRequestKey] = useState(0);
+  const [watchHistoryItems, setWatchHistoryItems] = useState(() => readWatchHistory());
   const logRef = useRef(null);
+  const pendingProtectedPageRef = useRef(null);
 
   function log(message) {
     const line = `[${new Date().toLocaleTimeString()}] ${message}`;
@@ -120,6 +124,12 @@ export function App() {
     authKey: authState.user?.id ?? "anonymous",
     log
   });
+  const liveChat = useChatController({
+    room: liveRoom,
+    enabled: page === "live" && Boolean(liveRoom),
+    authKey: authState.user?.id ?? "anonymous",
+    log
+  });
 
   const watchRoomLabel = watchRoom || "等待输入房间 ID";
   const liveRoomLabel = liveRoom || "等待生成频道号";
@@ -137,6 +147,34 @@ export function App() {
   );
   const buildLabel = `Build ${__BUILD_HASH__}`;
   const mobileWatchJoinedClass = page === "watch" && Boolean(player.playerSession) ? " app-container-watch-joined" : "";
+  const requireLoginForLive = import.meta.env.PROD;
+
+  function openSettingsLogin(options) {
+    pendingProtectedPageRef.current = null;
+    selectPage("settings", options);
+    setSettingsLoginPanelRequestKey((current) => current + 1);
+  }
+
+  function selectPageWithGuard(nextPage, options) {
+    if (!requireLoginForLive || nextPage !== "live") {
+      pendingProtectedPageRef.current = null;
+      selectPage(nextPage, options);
+      return;
+    }
+
+    if (authState.loading) {
+      pendingProtectedPageRef.current = { nextPage, options };
+      return;
+    }
+
+    if (!authState.user) {
+      openSettingsLogin(options);
+      return;
+    }
+
+    pendingProtectedPageRef.current = null;
+    selectPage(nextPage, options);
+  }
 
   async function copyWatchLink() {
     if (!liveWatchLink || liveWatchLink === "等待生成观看链接") {
@@ -194,6 +232,24 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!requireLoginForLive || authState.loading || !pendingProtectedPageRef.current) {
+      return;
+    }
+
+    const pendingPage = pendingProtectedPageRef.current;
+    pendingProtectedPageRef.current = null;
+    selectPageWithGuard(pendingPage.nextPage, pendingPage.options);
+  }, [authState.loading, authState.user, requireLoginForLive]);
+
+  useEffect(() => {
+    if (!requireLoginForLive || authState.loading || authState.user || page !== "live") {
+      return;
+    }
+
+    openSettingsLogin({ updateAutorun: false });
+  }, [authState.loading, authState.user, page, requireLoginForLive]);
+
+  useEffect(() => {
     window.__moqTest = {
       startPlayer: async () => {
         await player.startPlayer();
@@ -219,6 +275,27 @@ export function App() {
     };
   }, [player.playerStatus, publisher.publishStatus, watchRoom, liveRoom]);
 
+  useEffect(() => {
+    const room = player.playerSession?.namespace?.trim();
+    if (!room) {
+      return;
+    }
+
+    setWatchHistoryItems(persistWatchHistoryEntry({
+      room,
+      relayUrl,
+      relayHost
+    }));
+  }, [player.playerSession?.key, relayUrl, relayHost]);
+
+  function openWatchHistoryItem(item) {
+    autorunRef.current = true;
+    setRelayUrlValue(item.relayUrl || relayUrl);
+    setWatchRoomValue(item.room);
+    selectPage("watch", { updateAutorun: false });
+    void player.startPlayer();
+  }
+
   return (
     <>
       <div class={`app-container${mobileWatchJoinedClass}`}>
@@ -228,7 +305,7 @@ export function App() {
           </div>
 
           <div class="topbar-right">
-            <DesktopNavigation currentPage={page} onSelect={(nextPage) => selectPage(nextPage)} />
+            <DesktopNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
             <div class="auth-toolbar">
               {authState.available ? (
                 authState.user ? (
@@ -277,13 +354,13 @@ export function App() {
             }}
             onStart={() => {
               autorunRef.current = true;
-              selectPage("watch", { updateAutorun: false });
+              selectPageWithGuard("watch", { updateAutorun: false });
               void player.startPlayer();
             }}
             onStop={() => {
               autorunRef.current = false;
               setWatchRoomValue("");
-              selectPage("watch", { updateAutorun: false });
+              selectPageWithGuard("watch", { updateAutorun: false });
               void player.stopPlayer();
             }}
             onTogglePlayback={() => {
@@ -393,15 +470,48 @@ export function App() {
               });
             }}
             onStartSynthetic={() => {
-              selectPage("live");
+              selectPageWithGuard("live");
               void publisher.startSyntheticPublish().catch((error) => {
                 const message = error instanceof Error ? error.message : String(error);
                 log(`synthetic publish failed: ${message}`);
               });
             }}
             onStopSynthetic={() => {
-              selectPage("live");
+              selectPageWithGuard("live");
               void publisher.stopSyntheticPublish();
+            }}
+            screenShareSupported={publisher.screenShareSupported}
+            screenShareActive={publisher.screenShareActive}
+            previewSourceType={publisher.previewSourceType}
+            onStartScreenShare={() => {
+              void publisher.startScreenShare().catch((error) => {
+                const message = error instanceof Error ? error.message : String(error);
+                log(`screen share failed: ${message}`);
+              });
+            }}
+            onStopScreenShare={() => {
+              void publisher.stopScreenShare().catch((error) => {
+                const message = error instanceof Error ? error.message : String(error);
+                log(`screen share stop failed: ${message}`);
+              });
+            }}
+            chatMessages={liveChat.messages}
+            chatDraft={liveChat.draft}
+            chatConnectionState={liveChat.connectionState}
+            chatOnlineCount={liveChat.onlineCount}
+            chatReadOnly={liveChat.readOnly}
+            chatError={liveChat.chatError}
+            authAvailable={authState.available}
+            authLoading={authState.loading}
+            authUser={authState.user}
+            onChatDraftChange={(event) => {
+              liveChat.setDraft(event.currentTarget.value);
+            }}
+            onChatSend={() => {
+              liveChat.sendMessage();
+            }}
+            onChatRequireLogin={() => {
+              setLoginPromptOpen(true);
             }}
           />
 
@@ -422,13 +532,19 @@ export function App() {
               autorunRef.current = false;
               setRelayUrlValue(event.currentTarget.value);
             }}
+            watchHistoryItems={watchHistoryItems}
+            onOpenWatchHistoryItem={openWatchHistoryItem}
+            onClearWatchHistory={() => {
+              setWatchHistoryItems(clearWatchHistory());
+            }}
+            loginPanelRequestKey={settingsLoginPanelRequestKey}
             logText={logText}
             logRef={logRef}
           />
         </main>
       </div>
 
-      <MobileNavigation currentPage={page} onSelect={(nextPage) => selectPage(nextPage)} />
+      <MobileNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
       <LoginPromptModal
         open={loginPromptOpen}
         authAvailable={authState.available}

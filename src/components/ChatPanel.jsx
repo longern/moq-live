@@ -35,7 +35,10 @@ export function ChatPanel({
   readOnly,
   chatError,
   variant = "default",
+  className = "",
   title = "聊天室",
+  showComposer = true,
+  showWelcome = true,
   emptyText = "还没有聊天消息，来发第一条。"
 }) {
   const listRef = useRef(null);
@@ -50,14 +53,19 @@ export function ChatPanel({
   const disabled = connectionState !== "connected" || readOnly;
   const canSend = !disabled && draft.trim().length > 0;
   const floating = variant === "floating";
+  const panelClassName = [
+    "chat-panel-block",
+    floating ? "chat-panel-floating" : "control-block",
+    className
+  ].filter(Boolean).join(" ");
   const showWelcomeMessage =
-    connectionState === "connected" && messages.length === 0;
+    showWelcome && connectionState === "connected" && messages.length === 0;
   const welcomeText = room
     ? `欢迎来到 ${room} 的直播间`
     : "欢迎来到直播间";
 
   return (
-    <section class={`control-block chat-panel-block${floating ? " chat-panel-floating" : ""}`}>
+    <section class={panelClassName}>
       {!floating ? (
         <div class="control-head chat-panel-head">
           <div class="chat-panel-title-row">
@@ -103,46 +111,48 @@ export function ChatPanel({
 
       {chatError ? <p class={`inline-warning${floating ? " chat-floating-warning" : ""}`}>{chatError}</p> : null}
 
-      {!authUser ? (
-        <div class={`chat-composer chat-composer-readonly${floating ? " chat-composer-floating" : ""}`}>
-          <input
-            value=""
-            readOnly
-            placeholder={authAvailable ? (authLoading ? "鉴权检查中" : "登录后参与聊天") : "登录服务未连接"}
-            onClick={() => {
-              if (authAvailable && !authLoading) {
-                onRequireLogin();
-              }
+      {showComposer ? (
+        !authUser ? (
+          <div class={`chat-composer chat-composer-readonly${floating ? " chat-composer-floating" : ""}`}>
+            <input
+              value=""
+              readOnly
+              placeholder={authAvailable ? (authLoading ? "鉴权检查中" : "登录后参与聊天") : "登录服务未连接"}
+              onClick={() => {
+                if (authAvailable && !authLoading) {
+                  onRequireLogin();
+                }
+              }}
+              onFocus={(event) => {
+                event.currentTarget.blur();
+                if (authAvailable && !authLoading) {
+                  onRequireLogin();
+                }
+              }}
+            />
+            <button type="button" class="secondary" onClick={onRequireLogin} disabled={!authAvailable || authLoading}>
+              登录
+            </button>
+          </div>
+        ) : (
+          <form
+            class={`chat-composer${floating ? " chat-composer-floating" : ""}`}
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSend();
             }}
-            onFocus={(event) => {
-              event.currentTarget.blur();
-              if (authAvailable && !authLoading) {
-                onRequireLogin();
-              }
-            }}
-          />
-          <button type="button" class="secondary" onClick={onRequireLogin} disabled={!authAvailable || authLoading}>
-            登录
-          </button>
-        </div>
-      ) : (
-        <form
-          class={`chat-composer${floating ? " chat-composer-floating" : ""}`}
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSend();
-          }}
-        >
-          <input
-            value={draft}
-            placeholder={disabled ? "聊天室连接中或当前只读" : "输入聊天内容"}
-            maxLength={280}
-            onInput={onDraftChange}
-            disabled={disabled}
-          />
-          <button type="submit" disabled={!canSend}>{readOnly ? "只读" : "发送"}</button>
-        </form>
-      )}
+          >
+            <input
+              value={draft}
+              placeholder={disabled ? "聊天室连接中或当前只读" : "输入聊天内容"}
+              maxLength={280}
+              onInput={onDraftChange}
+              disabled={disabled}
+            />
+            <button type="submit" disabled={!canSend}>{readOnly ? "只读" : "发送"}</button>
+          </form>
+        )
+      ) : null}
 
     </section>
   );

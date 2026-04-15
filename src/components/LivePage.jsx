@@ -232,6 +232,29 @@ export function LivePage({
           </div>
           <div class="stage-frame live-stage-frame live-stage-frame-mobile">
             {renderPreview(previewVideoRef, previewActive, previewHasVideo)}
+            <div class="live-mobile-chat-overlay">
+              <ChatPanel
+                room={room}
+                authAvailable={authAvailable}
+                authLoading={authLoading}
+                authUser={authUser}
+                messages={chatMessages}
+                draft={chatDraft}
+                onDraftChange={onChatDraftChange}
+                onSend={onChatSend}
+                onRequireLogin={onChatRequireLogin}
+                connectionState={chatConnectionState}
+                onlineCount={chatOnlineCount}
+                readOnly={chatReadOnly}
+                chatError={chatError}
+                variant="floating"
+                className="chat-panel-live-mobile"
+                title="评论"
+                showComposer={false}
+                showWelcome={false}
+                emptyText="还没有评论，开播后等观众来互动。"
+              />
+            </div>
             {publishBlocked ? (
               <div class="live-mobile-warning">{publishBlockedReason}</div>
             ) : null}
@@ -598,6 +621,8 @@ export function LivePage({
             readOnly={chatReadOnly}
             chatError={chatError}
             title="评论"
+            showComposer={false}
+            showWelcome={false}
             emptyText="还没有评论，开播后等观众来互动。"
           />
         </aside>

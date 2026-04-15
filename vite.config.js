@@ -3,9 +3,26 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
+
+function injectSiteTitle(siteTitle) {
+  const escapedSiteTitle = siteTitle
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
+  return {
+    name: "inject-site-title",
+    transformIndexHtml(html) {
+      return html.replace(
+        /<title>.*<\/title>/,
+        `<title>${escapedSiteTitle}</title>`,
+      );
+    },
+  };
+}
 
 const isolationHeaders = {
   "Cross-Origin-Embedder-Policy": "require-corp",
@@ -42,15 +59,21 @@ function computeBuildHash() {
 
 const buildHash = computeBuildHash();
 
-export default defineConfig({
-  plugins: [preact()],
-  define: {
-    __BUILD_HASH__: JSON.stringify(buildHash),
-  },
-  server: {
-    headers: isolationHeaders,
-  },
-  preview: {
-    headers: isolationHeaders,
-  },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, rootDir, "");
+  const siteTitle = env.VITE_SITE_TITLE?.trim() || "MoQ Live Deck";
+
+  return {
+    plugins: [injectSiteTitle(siteTitle), preact()],
+    define: {
+      __APP_TITLE__: JSON.stringify(siteTitle),
+      __BUILD_HASH__: JSON.stringify(buildHash),
+    },
+    server: {
+      headers: isolationHeaders,
+    },
+    preview: {
+      headers: isolationHeaders,
+    },
+  };
 });

@@ -253,6 +253,7 @@ export function WatchSessionPage({
                   readOnly={chatReadOnly}
                   chatError={chatError}
                   variant="floating"
+                  className="chat-panel-watch-overlay"
                 />
               </div>
             ) : null}

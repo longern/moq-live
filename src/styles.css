@@ -2040,6 +2040,20 @@ button.tertiary {
   min-height: 0;
 }
 
+.chat-panel-floating {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  pointer-events: auto;
+}
+
 .chat-panel-head {
   align-items: center;
 }
@@ -2999,7 +3013,7 @@ pre {
     position: absolute;
     left: 16px;
     right: 16px;
-    bottom: 108px;
+    bottom: calc(238px + env(safe-area-inset-bottom));
     z-index: 4;
     padding: 10px 12px;
     border-radius: 16px;
@@ -3009,6 +3023,97 @@ pre {
     font-size: 0.86rem;
     line-height: 1.45;
     text-align: center;
+  }
+
+  .live-mobile-chat-overlay {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    z-index: 4;
+    min-height: 0;
+    pointer-events: none;
+  }
+
+  .chat-panel-live-mobile {
+    width: 100%;
+  }
+
+  .chat-panel-live-mobile .chat-message-list {
+    flex: 0 1 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 0;
+    max-height: min(24vh, 156px);
+    gap: 8px;
+    padding: 0 2px 6px 0;
+    border: 0;
+    border-radius: 0;
+    outline: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: auto;
+  }
+
+  .chat-panel-live-mobile .chat-message-card {
+    width: fit-content;
+    max-width: min(84%, 320px);
+    grid-template-columns: 16px minmax(0, 1fr);
+    gap: 5px;
+    padding: 4px 6px;
+    border-radius: 12px;
+    background: rgba(9, 18, 29, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .chat-panel-live-mobile .chat-avatar {
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+  }
+
+  .chat-panel-live-mobile .chat-message-body p {
+    display: block;
+    font-size: 0.86rem;
+    line-height: 1.42;
+  }
+
+  .chat-panel-live-mobile .chat-message-body strong {
+    font-size: 0.86rem;
+    line-height: 1.42;
+  }
+
+  .chat-panel-live-mobile .chat-composer-floating {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .chat-panel-live-mobile .chat-composer-floating input {
+    min-height: 42px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(15, 24, 34, 0.84);
+    backdrop-filter: blur(12px);
+  }
+
+  .chat-panel-live-mobile .chat-composer-floating button {
+    width: auto;
+    min-width: 64px;
+    min-height: 42px;
+    padding: 0 16px;
+    border-radius: 999px;
+  }
+
+  .chat-panel-live-mobile .chat-floating-warning {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 14px;
+    background: rgba(255, 100, 121, 0.14);
+    color: #ffd6de;
   }
 
   .live-mobile-actions {
@@ -3564,23 +3669,11 @@ pre {
     );
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait) .chat-panel-floating {
+  .chat-panel-watch-overlay {
     width: 100%;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    backdrop-filter: none;
-    pointer-events: auto;
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
-    .chat-panel-floating
-    .chat-message-list {
+  .chat-panel-watch-overlay .chat-message-list {
     flex: 0 1 auto;
     min-height: 0;
     max-height: min(34vh, 260px);
@@ -3605,9 +3698,7 @@ pre {
     );
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
-    .chat-panel-floating
-    .chat-message-card {
+  .chat-panel-watch-overlay .chat-message-card {
     width: fit-content;
     max-width: min(84%, 320px);
     grid-template-columns: 18px minmax(0, 1fr);
@@ -3620,24 +3711,16 @@ pre {
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
-    .chat-panel-floating
-    .chat-message-body
-    p {
+  .chat-panel-watch-overlay .chat-message-body p {
     font-size: 0.9rem;
     line-height: 1.42;
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
-    .chat-panel-floating
-    .chat-message-body
-    strong {
+  .chat-panel-watch-overlay .chat-message-body strong {
     font-size: 0.9rem;
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
-    .chat-panel-floating
-    .chat-composer-floating {
+  .chat-panel-watch-overlay .chat-composer-floating {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
@@ -3645,31 +3728,25 @@ pre {
     padding-right: 0;
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
-    .chat-panel-floating
-    .chat-composer-floating
-    input {
-    min-height: 46px;
+  .chat-panel-watch-overlay .chat-composer-floating input {
+    min-height: 40px;
     border: 0;
     border-radius: 999px;
     background: rgba(15, 24, 34, 0.78);
     backdrop-filter: blur(14px);
+    padding: 0 14px;
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
-    .chat-panel-floating
-    .chat-composer-floating
-    button {
+  .chat-panel-watch-overlay .chat-composer-floating button {
     width: auto;
-    min-width: 72px;
-    padding: 0 18px;
+    min-width: 60px;
+    min-height: 40px;
+    padding: 0 14px;
     border-radius: 999px;
     box-shadow: 0 12px 24px rgba(255, 114, 64, 0.22);
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
-    .chat-panel-floating
-    .chat-floating-warning {
+  .chat-panel-watch-overlay .chat-floating-warning {
     margin: 0 0 2px;
     padding: 8px 10px;
     border-radius: 14px;

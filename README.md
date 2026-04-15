@@ -30,8 +30,11 @@
 
    ```bash
    npm install
+   export VITE_SITE_TITLE="你的站点名"
    npm run dev -- --host 127.0.0.1 --port 8080
    ```
+
+   也可以把 `VITE_SITE_TITLE=你的站点名` 写到本地 `.env.local`。
 
 2. 用支持 `WebTransport` / `WebCodecs` / `MediaStreamTrackProcessor` 的 Chromium 浏览器打开:
 

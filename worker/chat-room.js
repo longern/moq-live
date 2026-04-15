@@ -3,13 +3,16 @@ const MAX_RECENT_MESSAGES = 80;
 const MESSAGE_TTL_MS = 24 * 60 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 5_000;
 const RATE_LIMIT_MAX_MESSAGES = 4;
+const MAX_ROOM_TITLE_LENGTH = 80;
 
 export class ChatRoomDO {
   constructor(ctx) {
     this.ctx = ctx;
     this.recentMessages = [];
+    this.roomState = getDefaultRoomState();
     this.ready = this.ctx.blockConcurrencyWhile(async () => {
       this.recentMessages = (await this.ctx.storage.get("recentMessages")) ?? [];
+      this.roomState = normalizeRoomState((await this.ctx.storage.get("roomState")) ?? null);
     });
   }
 
@@ -27,6 +30,7 @@ export class ChatRoomDO {
     }
 
     const room = request.headers.get("x-chat-room") ?? "";
+    const role = request.headers.get("x-chat-role") === "broadcaster" ? "broadcaster" : "viewer";
     const readOnly = request.headers.get("x-chat-read-only") !== "0";
     const user = parseUserHeader(request.headers.get("x-chat-user"));
     const pair = new WebSocketPair();
@@ -36,6 +40,7 @@ export class ChatRoomDO {
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({
       room,
+      role,
       readOnly,
       user,
       sentAt: []
@@ -45,8 +50,10 @@ export class ChatRoomDO {
       type: "chat.snapshot",
       room,
       readOnly,
-      onlineCount: this.ctx.getWebSockets().length,
-      messages: this.recentMessages
+      onlineCount: this.getAudienceCount(),
+      messages: this.recentMessages,
+      stream: this.roomState.stream,
+      roomMeta: this.roomState.roomMeta
     });
     this.broadcastPresence();
 
@@ -81,15 +88,102 @@ export class ChatRoomDO {
       return;
     }
 
-    if (payload?.type !== "message.send") {
-      this.send(ws, {
-        type: "error",
-        code: "unsupported_event",
-        message: "不支持的事件类型"
-      });
+    if (payload?.type === "message.send") {
+      await this.handleMessageSend(ws, session, payload);
       return;
     }
 
+    if (payload?.type === "stream.started") {
+      await this.handleStreamStarted(payload);
+      return;
+    }
+
+    if (payload?.type === "stream.stopped") {
+      await this.handleStreamStopped();
+      return;
+    }
+
+    if (payload?.type === "room.updated") {
+      await this.handleRoomUpdated(payload);
+      return;
+    }
+
+    this.send(ws, {
+      type: "error",
+      code: "unsupported_event",
+      message: "不支持的事件类型"
+    });
+  }
+
+  async webSocketClose(ws, code, reason) {
+    ws.close(code, reason);
+    this.broadcastPresence();
+  }
+
+  async webSocketError(ws) {
+    try {
+      ws.close(1011, "chat_error");
+    } catch {
+      return;
+    } finally {
+      this.broadcastPresence();
+    }
+  }
+
+  broadcastPresence() {
+    this.broadcast({
+      type: "presence.snapshot",
+      onlineCount: this.getAudienceCount()
+    });
+  }
+
+  getAudienceCount() {
+    return this.ctx.getWebSockets().reduce((count, socket) => {
+      const session = normalizeAttachment(socket.deserializeAttachment());
+      return session?.role === "broadcaster" ? count : count + 1;
+    }, 0);
+  }
+
+  broadcast(payload) {
+    const serialized = JSON.stringify(payload);
+    for (const socket of this.ctx.getWebSockets()) {
+      try {
+        socket.send(serialized);
+      } catch {
+        try {
+          socket.close(1011, "broadcast_failed");
+        } catch {
+          // Ignore close failures on broken sockets.
+        }
+      }
+    }
+  }
+
+  send(socket, payload) {
+    socket.send(JSON.stringify(payload));
+  }
+
+  pruneRecentMessages(now = Date.now()) {
+    const nextMessages = this.recentMessages
+      .filter((message) => isMessageFresh(message, now))
+      .slice(-MAX_RECENT_MESSAGES);
+
+    if (nextMessages.length === this.recentMessages.length) {
+      return false;
+    }
+
+    this.recentMessages = nextMessages;
+    return true;
+  }
+
+  async persistPrunedMessages(now = Date.now()) {
+    if (!this.pruneRecentMessages(now)) {
+      return;
+    }
+    await this.ctx.storage.put("recentMessages", this.recentMessages);
+  }
+
+  async handleMessageSend(ws, session, payload) {
     if (session.readOnly || !session.user?.id) {
       this.send(ws, {
         type: "error",
@@ -163,66 +257,99 @@ export class ChatRoomDO {
     });
   }
 
-  async webSocketClose(ws, code, reason) {
-    ws.close(code, reason);
-    this.broadcastPresence();
-  }
-
-  async webSocketError(ws) {
-    try {
-      ws.close(1011, "chat_error");
-    } catch {
-      return;
-    } finally {
-      this.broadcastPresence();
-    }
-  }
-
-  broadcastPresence() {
+  async handleStreamStarted(payload) {
+    const nextStream = {
+      isLive: true,
+      startedAt: sanitizeIsoTimestamp(payload.stream?.startedAt) ?? new Date().toISOString()
+    };
+    this.roomState = {
+      ...this.roomState,
+      stream: nextStream
+    };
+    await this.ctx.storage.put("roomState", this.roomState);
     this.broadcast({
-      type: "presence.snapshot",
-      onlineCount: this.ctx.getWebSockets().length
+      type: "stream.started",
+      stream: nextStream
     });
   }
 
-  broadcast(payload) {
-    const serialized = JSON.stringify(payload);
-    for (const socket of this.ctx.getWebSockets()) {
-      try {
-        socket.send(serialized);
-      } catch {
-        try {
-          socket.close(1011, "broadcast_failed");
-        } catch {
-          // Ignore close failures on broken sockets.
-        }
+  async handleStreamStopped() {
+    this.roomState = {
+      ...this.roomState,
+      stream: getDefaultRoomState().stream
+    };
+    await this.ctx.storage.put("roomState", this.roomState);
+    this.broadcast({
+      type: "stream.stopped",
+      stream: this.roomState.stream
+    });
+  }
+
+  async handleRoomUpdated(payload) {
+    const nextRoomMeta = {
+      title: sanitizeRoomTitle(payload.roomMeta?.title),
+      stream: {
+        relayUrl: sanitizeUrl(payload.roomMeta?.stream?.relayUrl),
+        namespace: sanitizeNamespace(payload.roomMeta?.stream?.namespace)
+      },
+      host: {
+        id: sanitizeEntityId(payload.roomMeta?.host?.id),
+        displayName: sanitizeRoomTitle(payload.roomMeta?.host?.displayName),
+        avatarUrl: sanitizeUrl(payload.roomMeta?.host?.avatarUrl)
+      }
+    };
+    this.roomState = {
+      ...this.roomState,
+      roomMeta: nextRoomMeta
+    };
+    await this.ctx.storage.put("roomState", this.roomState);
+    this.broadcast({
+      type: "room.updated",
+      roomMeta: nextRoomMeta
+    });
+  }
+}
+
+function getDefaultRoomState() {
+  return {
+    stream: {
+      isLive: false,
+      startedAt: null
+    },
+    roomMeta: {
+      title: "",
+      stream: {
+        relayUrl: "",
+        namespace: ""
+      },
+      host: {
+        id: "",
+        displayName: "",
+        avatarUrl: ""
       }
     }
-  }
+  };
+}
 
-  send(socket, payload) {
-    socket.send(JSON.stringify(payload));
-  }
-
-  pruneRecentMessages(now = Date.now()) {
-    const nextMessages = this.recentMessages
-      .filter((message) => isMessageFresh(message, now))
-      .slice(-MAX_RECENT_MESSAGES);
-
-    if (nextMessages.length === this.recentMessages.length) {
-      return false;
+function normalizeRoomState(roomState) {
+  return {
+    stream: {
+      isLive: Boolean(roomState?.stream?.isLive),
+      startedAt: sanitizeIsoTimestamp(roomState?.stream?.startedAt)
+    },
+    roomMeta: {
+      title: sanitizeRoomTitle(roomState?.roomMeta?.title),
+      stream: {
+        relayUrl: sanitizeUrl(roomState?.roomMeta?.stream?.relayUrl),
+        namespace: sanitizeNamespace(roomState?.roomMeta?.stream?.namespace)
+      },
+      host: {
+        id: sanitizeEntityId(roomState?.roomMeta?.host?.id),
+        displayName: sanitizeRoomTitle(roomState?.roomMeta?.host?.displayName),
+        avatarUrl: sanitizeUrl(roomState?.roomMeta?.host?.avatarUrl)
+      }
     }
-
-    this.recentMessages = nextMessages;
-    return true;
-  }
-
-  async persistPrunedMessages(now = Date.now()) {
-    if (!this.pruneRecentMessages(now)) {
-      return;
-    }
-    await this.ctx.storage.put("recentMessages", this.recentMessages);
-  }
+  };
 }
 
 function normalizeAttachment(attachment) {
@@ -232,6 +359,7 @@ function normalizeAttachment(attachment) {
 
   return {
     room: typeof attachment.room === "string" ? attachment.room : "",
+    role: attachment.role === "broadcaster" ? "broadcaster" : "viewer",
     readOnly: attachment.readOnly !== false ? true : false,
     user: attachment.user && typeof attachment.user === "object" ? attachment.user : null,
     sentAt: Array.isArray(attachment.sentAt) ? attachment.sentAt.filter((value) => typeof value === "number") : []
@@ -252,6 +380,50 @@ function parseUserHeader(headerValue) {
 
 function sanitizeMessage(text) {
   return String(text ?? "").replace(/\s+/g, " ").trim();
+}
+
+function sanitizeRoomTitle(value) {
+  const title = String(value ?? "").trim().replace(/\s+/g, " ");
+  return title.slice(0, MAX_ROOM_TITLE_LENGTH);
+}
+
+function sanitizeIsoTimestamp(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return null;
+  }
+
+  return new Date(timestamp).toISOString();
+}
+
+function sanitizeEntityId(value) {
+  return String(value ?? "").trim().slice(0, 128);
+}
+
+function sanitizeUrl(value) {
+  const nextValue = String(value ?? "").trim();
+  if (!nextValue) {
+    return "";
+  }
+
+  if (nextValue.startsWith("data:image/")) {
+    return nextValue;
+  }
+
+  try {
+    const url = new URL(nextValue);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function sanitizeNamespace(value) {
+  return String(value ?? "").trim().slice(0, 128);
 }
 
 function isMessageFresh(message, now) {

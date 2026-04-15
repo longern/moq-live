@@ -1,8 +1,10 @@
+const SYNTHETIC_WIDTH = 1280;
+const SYNTHETIC_HEIGHT = 720;
 const SYNTHETIC_MARKER = {
-  x: 488,
-  y: 36,
-  width: 96,
-  height: 96
+  x: SYNTHETIC_WIDTH * 0.7625,
+  y: SYNTHETIC_HEIGHT * 0.1,
+  width: SYNTHETIC_WIDTH * 0.15,
+  height: SYNTHETIC_WIDTH * 0.15
 };
 
 function hashString(value) {
@@ -25,8 +27,8 @@ function createMarkerPalette(namespace) {
 }
 
 export function createSyntheticMedia(namespace) {
-  const width = 640;
-  const height = 360;
+  const width = SYNTHETIC_WIDTH;
+  const height = SYNTHETIC_HEIGHT;
   const fps = 30;
   const markerPalette = createMarkerPalette(namespace);
 
@@ -53,34 +55,34 @@ export function createSyntheticMedia(namespace) {
     ctx.fillRect(0, 0, width, height);
 
     ctx.fillStyle = "rgba(15, 23, 32, 0.72)";
-    ctx.fillRect(24, 24, width - 48, height - 48);
+    ctx.fillRect(48, 48, width - 96, height - 96);
 
     for (let i = 0; i < 16; i += 1) {
       const phase = t * 2.4 + i * 0.35;
-      const barHeight = 24 + ((Math.sin(phase) + 1) / 2) * (height - 140);
-      const barWidth = 18;
-      const gap = 16;
-      const x = 40 + i * (barWidth + gap);
-      const y = height - 36 - barHeight;
+      const barHeight = 48 + ((Math.sin(phase) + 1) / 2) * (height - 280);
+      const barWidth = 36;
+      const gap = 32;
+      const x = 80 + i * (barWidth + gap);
+      const y = height - 72 - barHeight;
       ctx.fillStyle = i % 2 === 0 ? "#f8fafc" : "#fde68a";
       ctx.fillRect(x, y, barWidth, barHeight);
     }
 
     ctx.fillStyle = "#f8fafc";
-    ctx.font = '700 28px "SF Mono", Menlo, monospace';
-    ctx.fillText("MOQ SYNTHETIC LIVE", 38, 72);
-    ctx.font = '500 18px "SF Mono", Menlo, monospace';
-    ctx.fillText(new Date().toISOString(), 38, 102);
-    ctx.fillText(`namespace=${namespace || "unset"}`, 38, 128);
+    ctx.font = '700 56px "SF Mono", Menlo, monospace';
+    ctx.fillText("MOQ SYNTHETIC LIVE", 76, 144);
+    ctx.font = '500 36px "SF Mono", Menlo, monospace';
+    ctx.fillText(new Date().toISOString(), 76, 204);
+    ctx.fillText(`namespace=${namespace || "unset"}`, 76, 256);
 
     const cellWidth = SYNTHETIC_MARKER.width / 2;
     const cellHeight = SYNTHETIC_MARKER.height / 2;
     ctx.fillStyle = "rgba(15, 23, 32, 0.2)";
     ctx.fillRect(
-      SYNTHETIC_MARKER.x - 6,
-      SYNTHETIC_MARKER.y - 6,
-      SYNTHETIC_MARKER.width + 12,
-      SYNTHETIC_MARKER.height + 12
+      SYNTHETIC_MARKER.x - 12,
+      SYNTHETIC_MARKER.y - 12,
+      SYNTHETIC_MARKER.width + 24,
+      SYNTHETIC_MARKER.height + 24
     );
     markerPalette.forEach(([r, g, b], index) => {
       const col = index % 2;
@@ -94,14 +96,14 @@ export function createSyntheticMedia(namespace) {
       );
     });
     ctx.strokeStyle = "#0f1720";
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 8;
     ctx.strokeRect(SYNTHETIC_MARKER.x, SYNTHETIC_MARKER.y, SYNTHETIC_MARKER.width, SYNTHETIC_MARKER.height);
 
-    const orbX = width * 0.78 + Math.sin(t * 1.7) * 56;
-    const orbY = height * 0.52 + Math.cos(t * 1.3) * 46;
+    const orbX = width * 0.78 + Math.sin(t * 1.7) * 112;
+    const orbY = height * 0.52 + Math.cos(t * 1.3) * 92;
     ctx.beginPath();
     ctx.fillStyle = "#fb7185";
-    ctx.arc(orbX, orbY, 26, 0, Math.PI * 2);
+    ctx.arc(orbX, orbY, 52, 0, Math.PI * 2);
     ctx.fill();
 
     rafId = window.requestAnimationFrame(renderFrame);
@@ -197,8 +199,8 @@ export function sampleCanvasMarkerSignature(canvas) {
   return Array.from({ length: 4 }, (_, index) => {
     const col = index % 2;
     const row = Math.floor(index / 2);
-    const x = (SYNTHETIC_MARKER.x + col * cellWidth + cellWidth / 2) / 640;
-    const y = (SYNTHETIC_MARKER.y + row * cellHeight + cellHeight / 2) / 360;
+    const x = (SYNTHETIC_MARKER.x + col * cellWidth + cellWidth / 2) / SYNTHETIC_WIDTH;
+    const y = (SYNTHETIC_MARKER.y + row * cellHeight + cellHeight / 2) / SYNTHETIC_HEIGHT;
     return samplePatch(ctx, canvas, canvas.width * x, canvas.height * y);
   });
 }

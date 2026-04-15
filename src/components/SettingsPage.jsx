@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
+import { UserAvatar } from "./UserAvatar.jsx";
 
 function formatHistoryTime(value) {
   const date = new Date(value);
@@ -183,21 +184,15 @@ export function SettingsPage({
                   disabled={authPending}
                   aria-busy={authPending}
                 >
-                  <span
-                    class={`my-profile-avatar${authUser?.avatarUrl ? "" : authUser?.displayName ? " is-monogram" : " is-placeholder"}`}
-                    aria-hidden="true"
-                  >
-                    {authUser?.avatarUrl ? (
-                      <img src={authUser.avatarUrl} alt={authUser.displayName || "用户头像"} />
-                    ) : authUser?.displayName ? (
-                      <span>{authUser.displayName.trim().slice(0, 1).toUpperCase()}</span>
-                    ) : (
-                      <svg viewBox="0 0 24 24">
-                        <circle cx="12" cy="8" r="3.25" />
-                        <path d="M5.5 19.5c1.8-3.2 4.1-4.8 6.5-4.8s4.7 1.6 6.5 4.8" />
-                      </svg>
-                    )}
-                  </span>
+                  <UserAvatar
+                    avatarUrl={authUser?.avatarUrl}
+                    displayName={authUser?.displayName}
+                    email={authUser?.email}
+                    className="my-profile-avatar"
+                    imgAlt={authUser?.displayName || "用户头像"}
+                    monogramClassName="is-monogram"
+                    placeholderClassName="is-placeholder"
+                  />
                   <span class="my-profile-copy">
                     <strong>{profileName}</strong>
                     {profileSubtitle ? <span>{profileSubtitle}</span> : null}
@@ -360,21 +355,15 @@ export function SettingsPage({
                     <div class="account-list-item account-list-item-avatar">
                       <span class="account-list-label">头像</span>
                       <span class="account-list-value account-list-avatar">
-                        <span
-                          class={`my-profile-avatar${authUser?.avatarUrl ? "" : authUser?.displayName ? " is-monogram" : " is-placeholder"}`}
-                          aria-hidden="true"
-                        >
-                          {authUser?.avatarUrl ? (
-                            <img src={authUser.avatarUrl} alt={authUser.displayName || "用户头像"} />
-                          ) : authUser?.displayName ? (
-                            <span>{authUser.displayName.trim().slice(0, 1).toUpperCase()}</span>
-                          ) : (
-                            <svg viewBox="0 0 24 24">
-                              <circle cx="12" cy="8" r="3.25" />
-                              <path d="M5.5 19.5c1.8-3.2 4.1-4.8 6.5-4.8s4.7 1.6 6.5 4.8" />
-                            </svg>
-                          )}
-                        </span>
+                        <UserAvatar
+                          avatarUrl={authUser?.avatarUrl}
+                          displayName={authUser?.displayName}
+                          email={authUser?.email}
+                          className="my-profile-avatar"
+                          imgAlt={authUser?.displayName || "用户头像"}
+                          monogramClassName="is-monogram"
+                          placeholderClassName="is-placeholder"
+                        />
                       </span>
                     </div>
 

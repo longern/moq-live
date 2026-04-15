@@ -13,10 +13,33 @@ function upsertMessages(currentMessages, incomingMessages) {
   });
 }
 
+function getDefaultStreamState() {
+  return {
+    isLive: false,
+    startedAt: null
+  };
+}
+
+function getDefaultRoomMeta() {
+  return {
+    title: "",
+    stream: {
+      relayUrl: "",
+      namespace: ""
+    },
+    host: {
+      id: "",
+      displayName: "",
+      avatarUrl: ""
+    }
+  };
+}
+
 export function useChatController({
   room,
   enabled,
   authKey,
+  role = "viewer",
   log
 }) {
   const [messages, setMessages] = useState([]);
@@ -25,6 +48,9 @@ export function useChatController({
   const [onlineCount, setOnlineCount] = useState(0);
   const [readOnly, setReadOnly] = useState(true);
   const [chatError, setChatError] = useState("");
+  const [streamState, setStreamState] = useState(getDefaultStreamState);
+  const [roomMeta, setRoomMeta] = useState(getDefaultRoomMeta);
+  const [roomStateReady, setRoomStateReady] = useState(false);
 
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -54,6 +80,9 @@ export function useChatController({
       setOnlineCount(0);
       setReadOnly(true);
       setChatError("");
+      setStreamState(getDefaultStreamState());
+      setRoomMeta(getDefaultRoomMeta());
+      setRoomStateReady(false);
       reconnectAttemptRef.current = 0;
       return undefined;
     }
@@ -64,6 +93,7 @@ export function useChatController({
     const connect = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const socketUrl = new URL(`/api/chat/${encodeURIComponent(room)}/ws`, `${protocol}//${window.location.host}`);
+      socketUrl.searchParams.set("role", role);
       setConnectionState(reconnectAttemptRef.current > 0 ? "reconnecting" : "connecting");
 
       socket = new WebSocket(socketUrl);
@@ -88,6 +118,23 @@ export function useChatController({
           setMessages(Array.isArray(payload.messages) ? payload.messages : []);
           setOnlineCount(Number(payload.onlineCount) || 0);
           setReadOnly(Boolean(payload.readOnly));
+          setStreamState({
+            isLive: Boolean(payload.stream?.isLive),
+            startedAt: payload.stream?.startedAt || null
+          });
+          setRoomMeta({
+            title: payload.roomMeta?.title || "",
+            stream: {
+              relayUrl: payload.roomMeta?.stream?.relayUrl || "",
+              namespace: payload.roomMeta?.stream?.namespace || ""
+            },
+            host: {
+              id: payload.roomMeta?.host?.id || "",
+              displayName: payload.roomMeta?.host?.displayName || "",
+              avatarUrl: payload.roomMeta?.host?.avatarUrl || ""
+            }
+          });
+          setRoomStateReady(true);
           setChatError("");
           return;
         }
@@ -99,6 +146,35 @@ export function useChatController({
 
         if (payload.type === "presence.snapshot") {
           setOnlineCount(Number(payload.onlineCount) || 0);
+          return;
+        }
+
+        if (payload.type === "stream.started") {
+          setStreamState({
+            isLive: true,
+            startedAt: payload.stream?.startedAt || new Date().toISOString()
+          });
+          return;
+        }
+
+        if (payload.type === "stream.stopped") {
+          setStreamState(getDefaultStreamState());
+          return;
+        }
+
+        if (payload.type === "room.updated") {
+          setRoomMeta({
+            title: payload.roomMeta?.title || "",
+            stream: {
+              relayUrl: payload.roomMeta?.stream?.relayUrl || "",
+              namespace: payload.roomMeta?.stream?.namespace || ""
+            },
+            host: {
+              id: payload.roomMeta?.host?.id || "",
+              displayName: payload.roomMeta?.host?.displayName || "",
+              avatarUrl: payload.roomMeta?.host?.avatarUrl || ""
+            }
+          });
           return;
         }
 
@@ -144,7 +220,7 @@ export function useChatController({
         socket.close();
       }
     };
-  }, [authKey, enabled, room]);
+  }, [authKey, enabled, role, room]);
 
   function sendMessage() {
     const text = draft.trim();
@@ -160,6 +236,15 @@ export function useChatController({
     return true;
   }
 
+  function sendEvent(payload) {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    socketRef.current.send(JSON.stringify(payload));
+    return true;
+  }
+
   return {
     messages,
     draft,
@@ -168,6 +253,10 @@ export function useChatController({
     onlineCount,
     readOnly,
     chatError,
-    sendMessage
+    streamState,
+    roomMeta,
+    roomStateReady,
+    sendMessage,
+    sendEvent
   };
 }

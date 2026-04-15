@@ -60,7 +60,7 @@ function NavButton({ item, currentPage, onSelect, mobile = false }) {
 export function DesktopNavigation({ currentPage, onSelect }) {
   return (
     <nav class="desktop-nav" aria-label="Primary">
-      {navItems.map((item) => (
+      {navItems.filter((item) => item.id !== "settings").map((item) => (
         <NavButton key={item.id} item={item} currentPage={currentPage} onSelect={onSelect} />
       ))}
     </nav>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { LoginPromptModal } from "./components/LoginPromptModal.jsx";
 import { DesktopNavigation, MobileNavigation } from "./components/Navigation.jsx";
+import { UserAvatar } from "./components/UserAvatar.jsx";
 import { LivePage } from "./components/LivePage.jsx";
 import { SettingsPage } from "./components/SettingsPage.jsx";
 import { WatchPage } from "./components/WatchPage.jsx";
@@ -58,12 +59,25 @@ function getCameraMode(cameraOptions, selectedCameraId, cameraEnabled) {
   return cameraOptions.length ? "front" : "off";
 }
 
+function getAvatarLabel(authState) {
+  if (!authState.user) {
+    return "匿名";
+  }
+
+  return authState.user.displayName || authState.user.email || "用户";
+}
+
 export function App() {
+  const siteTitle = __APP_TITLE__;
   const [logText, setLogText] = useState("");
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const [settingsLoginPanelRequestKey, setSettingsLoginPanelRequestKey] = useState(0);
   const [watchHistoryItems, setWatchHistoryItems] = useState(() => readWatchHistory());
+  const [authMenuOpen, setAuthMenuOpen] = useState(false);
   const logRef = useRef(null);
+  const authMenuRef = useRef(null);
+  const authMenuCloseTimerRef = useRef(null);
+  const announcedLiveStateRef = useRef({ room: "", isLive: null });
   const pendingProtectedPageRef = useRef(null);
 
   function log(message) {
@@ -119,20 +133,26 @@ export function App() {
   });
 
   const chat = useChatController({
-    room: player.playerSession?.namespace ?? "",
-    enabled: page === "watch" && Boolean(player.playerSession),
+    room: watchRoom,
+    enabled: page === "watch" && Boolean(watchRoom),
     authKey: authState.user?.id ?? "anonymous",
+    role: "viewer",
     log
   });
   const liveChat = useChatController({
     room: liveRoom,
     enabled: page === "live" && Boolean(liveRoom),
     authKey: authState.user?.id ?? "anonymous",
+    role: "broadcaster",
     log
   });
 
-  const watchRoomLabel = watchRoom || "等待输入房间 ID";
-  const liveRoomLabel = liveRoom || "等待生成频道号";
+  const watchRoomLabel = chat.roomMeta.host.displayName || watchRoom || "等待输入房间 ID";
+  const liveRoomLabel = liveChat.roomMeta.host.displayName
+    || authState.user?.displayName
+    || authState.user?.email
+    || liveRoom
+    || "等待生成频道号";
   const watchPageLink = buildWatchLink(relayUrl, watchRoom);
   const liveWatchLink = buildWatchLink(relayUrl, liveRoom);
   const relayHost = getRelayHostValue(relayUrl);
@@ -148,11 +168,53 @@ export function App() {
   const buildLabel = `Build ${__BUILD_HASH__}`;
   const mobileWatchJoinedClass = page === "watch" && Boolean(player.playerSession) ? " app-container-watch-joined" : "";
   const requireLoginForLive = import.meta.env.PROD;
+  const avatarLabel = getAvatarLabel(authState);
+  const avatarStateClass = authState.loading
+    ? " is-loading"
+    : authState.user
+      ? " is-authenticated"
+      : !authState.available
+        ? " is-unavailable"
+        : "";
+  const avatarTitle = authState.loading
+    ? "正在检查登录状态"
+    : authState.user
+      ? (authState.user.email || authState.user.displayName || "已登录")
+      : !authState.available
+        ? "Auth API 未连接"
+        : "匿名用户";
 
   function openSettingsLogin(options) {
+    setAuthMenuOpen(false);
     pendingProtectedPageRef.current = null;
     selectPage("settings", options);
     setSettingsLoginPanelRequestKey((current) => current + 1);
+  }
+
+  function closeAuthMenu() {
+    if (authMenuCloseTimerRef.current) {
+      clearTimeout(authMenuCloseTimerRef.current);
+      authMenuCloseTimerRef.current = null;
+    }
+    setAuthMenuOpen(false);
+  }
+
+  function openAuthMenu() {
+    if (authMenuCloseTimerRef.current) {
+      clearTimeout(authMenuCloseTimerRef.current);
+      authMenuCloseTimerRef.current = null;
+    }
+    setAuthMenuOpen(true);
+  }
+
+  function scheduleCloseAuthMenu() {
+    if (authMenuCloseTimerRef.current) {
+      clearTimeout(authMenuCloseTimerRef.current);
+    }
+    authMenuCloseTimerRef.current = setTimeout(() => {
+      authMenuCloseTimerRef.current = null;
+      setAuthMenuOpen(false);
+    }, 160);
   }
 
   function selectPageWithGuard(nextPage, options) {
@@ -222,6 +284,12 @@ export function App() {
     }
   }, [logText]);
 
+  useEffect(() => () => {
+    if (authMenuCloseTimerRef.current) {
+      clearTimeout(authMenuCloseTimerRef.current);
+    }
+  }, []);
+
   useEffect(() => {
     if (!initialAutorun) {
       return;
@@ -248,6 +316,95 @@ export function App() {
 
     openSettingsLogin({ updateAutorun: false });
   }, [authState.loading, authState.user, page, requireLoginForLive]);
+
+  useEffect(() => {
+    if (page !== "watch" || !watchRoom || !chat.roomStateReady) {
+      return;
+    }
+
+    if (chat.streamState.isLive) {
+      if (!player.playerSession) {
+        void player.startPlayer();
+      }
+    }
+  }, [chat.roomStateReady, chat.streamState.isLive, page, player.playerSession, watchRoom]);
+
+  useEffect(() => {
+    if (!liveRoom) {
+      announcedLiveStateRef.current = { room: "", isLive: null };
+      return;
+    }
+
+    if (liveChat.connectionState !== "connected") {
+      return;
+    }
+
+    const current = announcedLiveStateRef.current;
+    if (current.room === liveRoom && current.isLive === publisher.publisherIsPublishing) {
+      return;
+    }
+
+    const sent = liveChat.sendEvent({
+      type: publisher.publisherIsPublishing ? "stream.started" : "stream.stopped",
+      stream: publisher.publisherIsPublishing
+        ? { startedAt: new Date().toISOString() }
+        : undefined
+    });
+
+    if (sent) {
+      announcedLiveStateRef.current = {
+        room: liveRoom,
+        isLive: publisher.publisherIsPublishing
+      };
+    }
+  }, [liveChat, liveChat.connectionState, liveRoom, publisher.publisherIsPublishing]);
+
+  useEffect(() => {
+    if (!liveRoom || liveChat.connectionState !== "connected") {
+      return;
+    }
+
+    const nextStream = {
+      relayUrl: relayUrl,
+      namespace: liveRoom
+    };
+    const nextHost = {
+      id: authState.user?.id || "",
+      displayName: authState.user?.displayName || authState.user?.email || "",
+      avatarUrl: authState.user?.avatarUrl || ""
+    };
+    if (
+      liveChat.roomMeta.stream.relayUrl === nextStream.relayUrl
+      && liveChat.roomMeta.stream.namespace === nextStream.namespace
+      && liveChat.roomMeta.host.id === nextHost.id
+      && liveChat.roomMeta.host.displayName === nextHost.displayName
+      && liveChat.roomMeta.host.avatarUrl === nextHost.avatarUrl
+    ) {
+      return;
+    }
+
+    liveChat.sendEvent({
+      type: "room.updated",
+      roomMeta: {
+        stream: nextStream,
+        host: nextHost
+      }
+    });
+  }, [
+    authState.user?.avatarUrl,
+    authState.user?.displayName,
+    authState.user?.email,
+    authState.user?.id,
+    liveChat,
+    liveChat.connectionState,
+    liveChat.roomMeta.stream.namespace,
+    liveChat.roomMeta.stream.relayUrl,
+    liveChat.roomMeta.host.avatarUrl,
+    liveChat.roomMeta.host.displayName,
+    liveChat.roomMeta.host.id,
+    relayUrl,
+    liveRoom
+  ]);
 
   useEffect(() => {
     window.__moqTest = {
@@ -301,38 +458,92 @@ export function App() {
       <div class={`app-container${mobileWatchJoinedClass}`}>
         <header class="topbar">
           <div class="brand">
-            <h1>MoQ Live Deck</h1>
+            <h1>{siteTitle}</h1>
           </div>
 
           <div class="topbar-right">
             <DesktopNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
             <div class="auth-toolbar">
-              {authState.available ? (
-                authState.user ? (
-                  <>
-                    <span class="auth-toolbar-user" title={authState.user.email || authState.user.displayName}>
-                      {authState.user.displayName || authState.user.email || "已登录"}
-                    </span>
-                    <button type="button" class="secondary auth-toolbar-button" onClick={() => {
-                      void logout();
-                    }}
+              <div
+                ref={authMenuRef}
+                class="auth-menu-shell"
+                onMouseEnter={openAuthMenu}
+                onMouseLeave={scheduleCloseAuthMenu}
+                onFocusIn={openAuthMenu}
+                onFocusOut={(event) => {
+                  const nextTarget = event.relatedTarget;
+                  if (nextTarget instanceof Node && authMenuRef.current?.contains(nextTarget)) {
+                    return;
+                  }
+                  scheduleCloseAuthMenu();
+                }}
+              >
+                <button
+                  type="button"
+                  class="auth-avatar-button"
+                  aria-haspopup="menu"
+                  aria-expanded={authMenuOpen ? "true" : "false"}
+                  aria-label={authState.user ? `账户菜单：${avatarLabel}` : "账户菜单：匿名用户"}
+                  title={avatarTitle}
+                  onClick={() => {
+                    setAuthMenuOpen((current) => !current);
+                  }}
+                >
+                  <UserAvatar
+                    avatarUrl={authState.user?.avatarUrl}
+                    displayName={authState.user?.displayName}
+                    email={authState.user?.email}
+                    className={`auth-avatar${avatarStateClass}`}
+                    imgAlt={authState.user?.displayName || "用户头像"}
+                    loading={authState.loading}
+                    loadingClassName="auth-avatar-spinner"
+                    iconClassName="auth-avatar-icon"
+                  />
+                </button>
+
+                <div class={`auth-menu-dropdown${authMenuOpen ? " is-open" : ""}`} role="menu" aria-label="账户">
+                  {authState.user ? (
+                    <>
+                      <button
+                        type="button"
+                        class="auth-menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                          closeAuthMenu();
+                          selectPage("settings", { updateAutorun: false });
+                        }}
+                      >
+                        个人中心
+                      </button>
+                      <button
+                        type="button"
+                        class="auth-menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                          closeAuthMenu();
+                          void logout();
+                        }}
+                      >
+                        退出登录
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      class="auth-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        closeAuthMenu();
+                        startMicrosoftLogin();
+                      }}
+                      disabled={authState.loading || !authState.available}
+                      title={!authState.available ? "Auth API 未连接" : undefined}
                     >
-                      退出
+                      立即登录
                     </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    class="secondary auth-toolbar-button"
-                    onClick={startMicrosoftLogin}
-                    disabled={authState.loading}
-                  >
-                    {authState.loading ? "鉴权检查中" : "登录"}
-                  </button>
-                )
-              ) : (
-                <span class="auth-toolbar-note">Auth API 未连接</span>
-              )}
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </header>

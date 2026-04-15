@@ -10,6 +10,7 @@ const VIDEO_TARGET_WIDTH = 1280;
 const VIDEO_TARGET_HEIGHT = 720;
 const VIDEO_TARGET_FRAMERATE = 30;
 const VIDEO_TARGET_BITRATE = 2_500_000;
+const H264_BASELINE_LEVEL_31 = "avc1.42E01F";
 const DEFAULT_PREVIEW_SOURCE = "camera";
 
 function hasUsableMediaStream(stream) {
@@ -498,7 +499,7 @@ export function usePublisherController({
       const width = makeEven(previewVideo?.videoWidth || 640);
       const height = makeEven(previewVideo?.videoHeight || 360);
       publisherOptions.video = {
-        codec: "avc1.42E01E",
+        codec: H264_BASELINE_LEVEL_31,
         width,
         height,
         bitrate: VIDEO_TARGET_BITRATE,
@@ -592,14 +593,18 @@ export function usePublisherController({
     setPublishStatus("正在启动合成推流。");
 
     const syntheticMedia = createSyntheticMedia(namespace);
+    const syntheticVideoTrack = syntheticMedia.mediaStream.getVideoTracks()[0];
+    const syntheticSettings = syntheticVideoTrack?.getSettings?.() ?? {};
+    const syntheticWidth = Math.floor((syntheticSettings.width || VIDEO_TARGET_WIDTH) / 2) * 2;
+    const syntheticHeight = Math.floor((syntheticSettings.height || VIDEO_TARGET_HEIGHT) / 2) * 2;
     const publisher = new PublisherApi({
       url: nextRelayUrl,
       namespace: [namespace],
       media: syntheticMedia.mediaStream,
       video: {
-        codec: "avc1.42E01E",
-        width: VIDEO_TARGET_WIDTH,
-        height: VIDEO_TARGET_HEIGHT,
+        codec: H264_BASELINE_LEVEL_31,
+        width: syntheticWidth,
+        height: syntheticHeight,
         bitrate: VIDEO_TARGET_BITRATE,
         framerate: VIDEO_TARGET_FRAMERATE,
       },

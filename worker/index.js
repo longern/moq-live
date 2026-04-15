@@ -229,6 +229,7 @@ async function handleChatWebSocket(env, request) {
 
   const url = new URL(request.url);
   const room = decodeURIComponent(url.pathname.split("/")[3] ?? "").trim();
+  const role = url.searchParams.get("role") === "broadcaster" ? "broadcaster" : "viewer";
   if (!/^[a-z0-9-]{3,80}$/i.test(room)) {
     return json({ ok: false, error: "Invalid room id" }, { status: 400 });
   }
@@ -237,6 +238,7 @@ async function handleChatWebSocket(env, request) {
   const stub = env.CHAT_ROOM.get(env.CHAT_ROOM.idFromName(room));
   const headers = new Headers(request.headers);
   headers.set("x-chat-room", room);
+  headers.set("x-chat-role", role);
   headers.set("x-chat-read-only", session?.user ? "0" : "1");
   if (session?.user) {
     headers.set("x-chat-user", encodeURIComponent(JSON.stringify(session.user)));

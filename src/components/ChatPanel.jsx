@@ -1,13 +1,5 @@
 import { useEffect, useRef } from "preact/hooks";
-
-function getInitials(name) {
-  const source = String(name || "").trim();
-  if (!source) {
-    return "聊";
-  }
-
-  return source.slice(0, 2).toUpperCase();
-}
+import { UserAvatar } from "./UserAvatar.jsx";
 
 function getConnectionLabel(state) {
   if (state === "connected") {
@@ -79,13 +71,15 @@ export function ChatPanel({
       <div ref={listRef} class="chat-message-list" aria-live="polite">
         {messages.length ? messages.map((message) => (
           <article key={message.id} class="chat-message-card">
-            <div class="chat-avatar">
-              {message.user?.avatarUrl ? (
-                <img src={message.user.avatarUrl} alt={message.user?.displayName || "用户头像"} />
-              ) : (
-                <span>{getInitials(message.user?.displayName || message.user?.email)}</span>
-              )}
-            </div>
+            <UserAvatar
+              avatarUrl={message.user?.avatarUrl}
+              displayName={message.user?.displayName}
+              email={message.user?.email}
+              className="chat-avatar"
+              imgAlt={message.user?.displayName || "用户头像"}
+              initialsLength={2}
+              placeholderClassName="is-placeholder"
+            />
             <div class="chat-message-body">
               <p>
                 <strong>{message.user?.displayName || message.user?.email || "匿名用户"}</strong>

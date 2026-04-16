@@ -19,7 +19,7 @@ import {
   revokeSession,
   sanitizeRedirectTo,
   shouldUseSecureCookies,
-  updateUserDisplayName,
+  updateUserProfile,
   upsertMicrosoftUser,
   verifyMicrosoftIdToken
 } from "./auth.js";
@@ -107,7 +107,10 @@ async function handleProfileUpdate(env, request) {
     return json({ ok: false, error: "Invalid JSON body", code: "invalid_json" }, { status: 400 });
   }
 
-  const user = await updateUserDisplayName(db, session.user.id, payload.displayName);
+  const user = await updateUserProfile(db, session.user.id, {
+    ...(Object.hasOwn(payload, "displayName") ? { displayName: payload.displayName } : {}),
+    ...(Object.hasOwn(payload, "handle") ? { handle: payload.handle } : {})
+  });
   return json({
     ok: true,
     user

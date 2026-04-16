@@ -106,7 +106,8 @@ export function App() {
     authState,
     startMicrosoftLogin,
     logout,
-    updateDisplayName
+    updateDisplayName,
+    updateHandle
   } = useAuthController({
     log,
     onAuthenticated: () => {
@@ -189,6 +190,16 @@ export function App() {
     pendingProtectedPageRef.current = null;
     selectPage("settings", options);
     setSettingsLoginPanelRequestKey((current) => current + 1);
+  }
+
+  function returnToWatchHome() {
+    pendingProtectedPageRef.current = null;
+    autorunRef.current = false;
+    setLoginPromptOpen(false);
+    closeAuthMenu();
+    setWatchRoomValue("");
+    selectPage("watch", { updateAutorun: false });
+    void player.stopPlayer();
   }
 
   function closeAuthMenu() {
@@ -457,9 +468,14 @@ export function App() {
     <>
       <div class={`app-container${mobileWatchJoinedClass}`}>
         <header class="topbar">
-          <div class="brand">
-            <h1>{siteTitle}</h1>
-          </div>
+          <button
+            type="button"
+            class="brand brand-button"
+            onClick={returnToWatchHome}
+            aria-label={`返回${siteTitle}收看页`}
+          >
+            <span class="brand-title">{siteTitle}</span>
+          </button>
 
           <div class="topbar-right">
             <DesktopNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
@@ -739,6 +755,7 @@ export function App() {
               void logout();
             }}
             onUpdateDisplayName={(displayName) => updateDisplayName(displayName)}
+            onUpdateHandle={(handle) => updateHandle(handle)}
             onRelayUrlInput={(event) => {
               autorunRef.current = false;
               setRelayUrlValue(event.currentTarget.value);

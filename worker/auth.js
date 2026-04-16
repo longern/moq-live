@@ -5,10 +5,19 @@ const MICROSOFT_OAUTH_COOKIE_NAME = "moq_oauth_microsoft";
 const DEFAULT_SESSION_TTL_DAYS = 30;
 const MICROSOFT_OPENID_CONFIG_URL = "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration";
 const NICKNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const HANDLE_CHANGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 const MIN_NICKNAME_LENGTH = 2;
 const MAX_NICKNAME_LENGTH = 32;
+const MIN_HANDLE_LENGTH = 6;
+const MAX_HANDLE_LENGTH = 24;
+const DEFAULT_HANDLE_PREFIX = "pid_";
+const DEFAULT_HANDLE_SUFFIX_LENGTH = 8;
+const HANDLE_PATTERN = /^(?!\d+$)[a-z0-9](?:[a-z0-9_]{4,22}[a-z0-9])?$/;
+const DEFAULT_HANDLE_PATTERN = /^pid_[a-z0-9]{8}$/;
+const HANDLE_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const TABLES = {
   users: "moq_users",
+  rooms: "moq_rooms",
   userIdentities: "moq_user_identities",
   sessions: "moq_sessions"
 };
@@ -253,6 +262,8 @@ export async function getSessionUser(db, request) {
     `SELECT
       sessions.id AS session_id,
       sessions.user_id AS user_id,
+      users.handle AS handle,
+      users.handle_changed_at AS handle_changed_at,
       users.display_name AS display_name,
       users.display_name_changed_at AS display_name_changed_at,
       sessions.expires_at AS session_expires_at,
@@ -270,11 +281,16 @@ export async function getSessionUser(db, request) {
     return null;
   }
 
+  const handle = await ensureUserHandle(db, row.user_id, row.handle);
+  await ensureUserRoom(db, row.user_id);
   await db.prepare(`UPDATE ${TABLES.sessions} SET last_seen_at = ? WHERE id = ?`).bind(now, row.session_id).run();
 
   return {
     token: sessionToken,
-    user: buildUserPayload(row)
+    user: buildUserPayload({
+      ...row,
+      handle
+    })
   };
 }
 
@@ -416,97 +432,184 @@ export async function upsertMicrosoftUser(db, claims) {
       ).bind(claims.tid ?? null, claims.oid ?? null, email, profile, now, "microsoft", claims.sub)
     ]);
 
+    await ensureUserHandle(db, existingIdentity.user_id);
+    await ensureUserRoom(db, existingIdentity.user_id);
     return existingIdentity.user_id;
   }
 
-  const userId = crypto.randomUUID();
-  const identityId = crypto.randomUUID();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const userId = crypto.randomUUID();
+    const identityId = crypto.randomUUID();
+    const handle = await generateAvailableDefaultHandle(db);
 
-  await db.batch([
-    db.prepare(
-      `INSERT INTO ${TABLES.users} (
-        id,
-        display_name,
-        display_name_changed_at,
-        avatar_url,
-        primary_email,
-        created_at,
-        updated_at,
-        last_login_at
-      ) VALUES (?, ?, NULL, NULL, ?, ?, ?, ?)`
-    ).bind(userId, displayName, email, now, now, now),
-    db.prepare(
-      `INSERT INTO ${TABLES.userIdentities} (
-        id,
-        user_id,
-        provider,
-        provider_subject,
-        tenant_id,
-        provider_oid,
-        email,
-        raw_profile_json,
-        created_at,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      identityId,
-      userId,
-      "microsoft",
-      claims.sub,
-      claims.tid ?? null,
-      claims.oid ?? null,
-      email,
-      profile,
-      now,
-      now
-    )
-  ]);
+    try {
+      await db.batch([
+        db.prepare(
+          `INSERT INTO ${TABLES.users} (
+            id,
+            handle,
+            handle_changed_at,
+            display_name,
+            display_name_changed_at,
+            avatar_url,
+            primary_email,
+            created_at,
+            updated_at,
+            last_login_at
+          ) VALUES (?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)`
+        ).bind(userId, handle, displayName, email, now, now, now),
+        db.prepare(
+          `INSERT INTO ${TABLES.rooms} (
+            id,
+            host_user_id,
+            title,
+            cover_url,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?)`
+        ).bind(
+          crypto.randomUUID(),
+          userId,
+          "",
+          "",
+          now,
+          now
+        ),
+        db.prepare(
+          `INSERT INTO ${TABLES.userIdentities} (
+            id,
+            user_id,
+            provider,
+            provider_subject,
+            tenant_id,
+            provider_oid,
+            email,
+            raw_profile_json,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          identityId,
+          userId,
+          "microsoft",
+          claims.sub,
+          claims.tid ?? null,
+          claims.oid ?? null,
+          email,
+          profile,
+          now,
+          now
+        )
+      ]);
 
-  return userId;
+      return userId;
+    } catch (error) {
+      if (String(error?.message || error).toLowerCase().includes("handle")) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error("Failed to allocate unique handle");
 }
 
-export async function updateUserDisplayName(db, userId, nextDisplayNameValue) {
-  const displayName = sanitizeDisplayName(nextDisplayNameValue);
+export async function updateUserProfile(db, userId, nextProfile = {}) {
   const currentUser = await getUserRowById(db, userId);
 
   if (!currentUser) {
     throw createHttpError(404, "User not found", "user_not_found");
   }
 
-  const normalizedCurrentDisplayName = normalizeDisplayName(currentUser.display_name || "");
-  if (normalizedCurrentDisplayName === displayName.normalized) {
+  const hasDisplayNameUpdate = Object.hasOwn(nextProfile, "displayName");
+  const hasHandleUpdate = Object.hasOwn(nextProfile, "handle");
+
+  if (!hasDisplayNameUpdate && !hasHandleUpdate) {
+    throw createHttpError(400, "No profile fields provided", "invalid_profile_update");
+  }
+
+  let nextDisplayName = currentUser.display_name;
+  let nextDisplayNameChangedAt = currentUser.display_name_changed_at;
+  let nextHandle = currentUser.handle;
+  let nextHandleChangedAt = currentUser.handle_changed_at;
+  let changed = false;
+
+  if (hasDisplayNameUpdate) {
+    const displayName = sanitizeDisplayName(nextProfile.displayName);
+    const normalizedCurrentDisplayName = normalizeDisplayName(currentUser.display_name || "");
+    if (normalizedCurrentDisplayName !== displayName.normalized) {
+      const nextChangeAt = getDisplayNameNextChangeAt(currentUser.display_name_changed_at);
+      if (nextChangeAt && Date.parse(nextChangeAt) > Date.now()) {
+        throw createHttpError(
+          429,
+          "显示名 7 天内只能修改一次",
+          "display_name_change_cooldown",
+          { nextDisplayNameChangeAt: nextChangeAt }
+        );
+      }
+
+      const existingUser = await db.prepare(
+        `SELECT id
+         FROM ${TABLES.users}
+         WHERE id <> ?
+           AND display_name IS NOT NULL
+           AND lower(trim(display_name)) = ?
+         LIMIT 1`
+      ).bind(userId, displayName.normalized).first();
+
+      if (existingUser) {
+        throw createHttpError(409, "显示名已被占用", "display_name_taken");
+      }
+
+      nextDisplayName = displayName.value;
+      nextDisplayNameChangedAt = new Date().toISOString();
+      changed = true;
+    }
+  }
+
+  if (hasHandleUpdate) {
+    const handle = sanitizeHandle(nextProfile.handle);
+    if ((currentUser.handle || "") !== handle) {
+      if (!isDefaultGeneratedHandle(currentUser.handle)) {
+        const nextHandleChangeAt = getHandleNextChangeAt(currentUser.handle_changed_at);
+        if (nextHandleChangeAt && Date.parse(nextHandleChangeAt) > Date.now()) {
+          throw createHttpError(
+            429,
+            "自定义 Handle 30 天内只能修改一次",
+            "handle_change_cooldown",
+            { nextHandleChangeAt }
+          );
+        }
+      }
+
+      const existingUser = await db.prepare(
+        `SELECT id
+         FROM ${TABLES.users}
+         WHERE id <> ?
+           AND handle = ?
+         LIMIT 1`
+      ).bind(userId, handle).first();
+
+      if (existingUser) {
+        throw createHttpError(409, "Handle 已被占用", "handle_taken");
+      }
+
+      nextHandle = handle;
+      nextHandleChangedAt = new Date().toISOString();
+      changed = true;
+    }
+  }
+
+  if (!changed) {
     return buildUserPayload(currentUser);
-  }
-
-  const nextChangeAt = getDisplayNameNextChangeAt(currentUser.display_name_changed_at);
-  if (nextChangeAt && Date.parse(nextChangeAt) > Date.now()) {
-    throw createHttpError(
-      429,
-      "显示名 7 天内只能修改一次",
-      "display_name_change_cooldown",
-      { nextDisplayNameChangeAt: nextChangeAt }
-    );
-  }
-
-  const existingUser = await db.prepare(
-    `SELECT id
-     FROM ${TABLES.users}
-     WHERE id <> ?
-       AND display_name IS NOT NULL
-       AND lower(trim(display_name)) = ?
-     LIMIT 1`
-  ).bind(userId, displayName.normalized).first();
-
-  if (existingUser) {
-    throw createHttpError(409, "显示名已被占用", "display_name_taken");
   }
 
   const now = new Date().toISOString();
   await db.prepare(
     `UPDATE ${TABLES.users}
-     SET display_name = ?, display_name_changed_at = ?, updated_at = ?
+     SET handle = ?, handle_changed_at = ?, display_name = ?, display_name_changed_at = ?, updated_at = ?
      WHERE id = ?`
-  ).bind(displayName.value, now, now, userId).run();
+  ).bind(nextHandle, nextHandleChangedAt, nextDisplayName, nextDisplayNameChangedAt, now, userId).run();
 
   const updatedUser = await getUserRowById(db, userId);
   if (!updatedUser) {
@@ -544,6 +647,9 @@ function buildUserPayload(row) {
   const effectiveDisplayName = row.display_name || row.primary_email || "匿名用户";
   return {
     id: row.user_id,
+    handle: row.handle || "",
+    handleChangedAt: row.handle_changed_at,
+    nextHandleChangeAt: getHandleNextChangeAt(row.handle_changed_at),
     displayName: effectiveDisplayName,
     displayNameChangedAt: row.display_name_changed_at,
     nextDisplayNameChangeAt: getDisplayNameNextChangeAt(row.display_name_changed_at),
@@ -556,6 +662,8 @@ async function getUserRowById(db, userId) {
   return db.prepare(
     `SELECT
       id AS user_id,
+      handle,
+      handle_changed_at,
       display_name,
       display_name_changed_at,
       primary_email,
@@ -586,8 +694,146 @@ function sanitizeDisplayName(value) {
   };
 }
 
+function sanitizeHandle(value) {
+  if (typeof value !== "string") {
+    throw createHttpError(400, "Handle 不能为空", "invalid_handle");
+  }
+
+  const handle = value.trim();
+  if (!HANDLE_PATTERN.test(handle)) {
+    throw createHttpError(
+      400,
+      `Handle 只能包含小写字母、数字、下划线，长度需在 ${MIN_HANDLE_LENGTH}-${MAX_HANDLE_LENGTH} 个字符之间，不能为纯数字，且不能以下划线开头或结尾`,
+      "invalid_handle"
+    );
+  }
+
+  return handle;
+}
+
+function isDefaultGeneratedHandle(value) {
+  return typeof value === "string" && DEFAULT_HANDLE_PATTERN.test(value);
+}
+
 function normalizeDisplayName(value) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
+async function ensureUserHandle(db, userId, currentHandle = undefined) {
+  if (currentHandle) {
+    return currentHandle;
+  }
+
+  if (currentHandle === undefined) {
+    const row = await db.prepare(
+      `SELECT handle
+       FROM ${TABLES.users}
+       WHERE id = ?
+       LIMIT 1`
+    ).bind(userId).first();
+    if (row?.handle) {
+      return row.handle;
+    }
+  }
+
+  const handle = await generateAvailableDefaultHandle(db);
+  await db.prepare(
+    `UPDATE ${TABLES.users}
+     SET handle = ?, updated_at = ?
+     WHERE id = ? AND (handle IS NULL OR handle = '')`
+  ).bind(handle, new Date().toISOString(), userId).run();
+
+  const updatedRow = await db.prepare(
+    `SELECT handle
+     FROM ${TABLES.users}
+     WHERE id = ?
+     LIMIT 1`
+  ).bind(userId).first();
+
+  if (!updatedRow?.handle) {
+    throw new Error("Failed to persist user handle");
+  }
+
+  return updatedRow.handle;
+}
+
+function getHandleNextChangeAt(changedAt) {
+  if (!changedAt) {
+    return null;
+  }
+
+  const changedAtMs = Date.parse(changedAt);
+  if (!Number.isFinite(changedAtMs)) {
+    return null;
+  }
+
+  return new Date(changedAtMs + HANDLE_CHANGE_COOLDOWN_MS).toISOString();
+}
+
+async function generateAvailableDefaultHandle(db) {
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const handle = `${DEFAULT_HANDLE_PREFIX}${randomHandleSuffix(DEFAULT_HANDLE_SUFFIX_LENGTH)}`;
+    const existingUser = await db.prepare(
+      `SELECT id
+       FROM ${TABLES.users}
+       WHERE handle = ?
+       LIMIT 1`
+    ).bind(handle).first();
+    if (!existingUser) {
+      return handle;
+    }
+  }
+
+  throw new Error("Failed to generate unique handle");
+}
+
+function randomHandleSuffix(length) {
+  let result = "";
+  const values = new Uint8Array(length);
+  crypto.getRandomValues(values);
+  for (const value of values) {
+    result += HANDLE_ALPHABET[value % HANDLE_ALPHABET.length];
+  }
+  return result;
+}
+
+async function ensureUserRoom(db, userId) {
+  const existingRoom = await db.prepare(
+    `SELECT id
+     FROM ${TABLES.rooms}
+     WHERE host_user_id = ?
+     LIMIT 1`
+  ).bind(userId).first();
+
+  if (existingRoom?.id) {
+    return existingRoom.id;
+  }
+
+  const now = new Date().toISOString();
+  const roomId = crypto.randomUUID();
+  await db.prepare(
+    `INSERT OR IGNORE INTO ${TABLES.rooms} (
+      id,
+      host_user_id,
+      title,
+      cover_url,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)`
+  ).bind(roomId, userId, "", "", now, now).run();
+
+  const room = await db.prepare(
+    `SELECT id
+     FROM ${TABLES.rooms}
+     WHERE host_user_id = ?
+     LIMIT 1`
+  ).bind(userId).first();
+
+  if (!room?.id) {
+    throw new Error("Failed to ensure user room");
+  }
+
+  return room.id;
 }
 
 function getDisplayNameNextChangeAt(changedAt) {

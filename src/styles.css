@@ -48,6 +48,17 @@ input,
 select,
 textarea {
   font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a,
+button,
+input,
+select,
+textarea,
+label,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
 }
 
 h1,
@@ -2928,6 +2939,10 @@ pre {
     );
   }
 
+  .app-container-watch-joined .page[data-page="watch"][data-joined="true"] {
+    height: 100svh;
+  }
+
   .watch-layout,
   .live-layout {
     width: 100%;
@@ -2963,6 +2978,10 @@ pre {
     min-height: 0;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .app-container-watch-joined .watch-layout .control-column {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }
 
   .watch-layout .stage-column,
@@ -3119,7 +3138,8 @@ pre {
   }
 
   .chat-panel-live-mobile .chat-composer-floating input {
-    min-height: 42px;
+    min-height: 36px;
+    height: 36px;
     border: 0;
     border-radius: 999px;
     background: rgba(15, 24, 34, 0.84);
@@ -3129,7 +3149,8 @@ pre {
   .chat-panel-live-mobile .chat-composer-floating button {
     width: auto;
     min-width: 64px;
-    min-height: 42px;
+    min-height: 36px;
+    height: 36px;
     padding: 0 16px;
     border-radius: 999px;
   }
@@ -3484,7 +3505,7 @@ pre {
     flex-direction: column;
     gap: 12px;
     margin: 0;
-    padding: 16px 16px 12px;
+    padding: 16px 0 12px;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -3493,14 +3514,14 @@ pre {
 
   .watch-layout .control-column[data-joined="true"] .chat-panel-head {
     padding-bottom: 0;
+    margin-inline: 16px;
   }
 
   .watch-layout .control-column[data-joined="true"] .chat-message-list {
     flex: 1 1 auto;
     min-height: 0;
     max-height: none;
-    padding-right: 0;
-    padding-bottom: 6px;
+    padding: 0 16px 6px;
   }
 
   .watch-layout .control-column[data-joined="true"] .chat-composer,
@@ -3508,12 +3529,14 @@ pre {
   .watch-layout .control-column[data-joined="true"] .chat-panel-note,
   .watch-layout .control-column[data-joined="true"] .inline-warning {
     flex: 0 0 auto;
+    margin-inline: 16px;
   }
 
   .watch-layout .control-column[data-joined="true"] .chat-empty-state {
     min-height: 0;
     height: 100%;
     border-radius: 18px;
+    margin-inline: 16px;
   }
 
   .control-head {
@@ -3578,6 +3601,32 @@ pre {
     width: 100%;
     min-height: 44px;
     font-weight: 650;
+  }
+
+  .chat-composer,
+  .chat-composer-floating {
+    gap: 8px;
+  }
+
+  .chat-composer input,
+  .chat-composer button,
+  .chat-composer-floating input,
+  .chat-composer-floating button {
+    min-height: 36px;
+    height: 36px;
+  }
+
+  .chat-composer input,
+  .chat-composer-floating input {
+    padding-top: 0;
+    padding-bottom: 0;
+    border-radius: 999px;
+  }
+
+  .chat-composer button,
+  .chat-composer-floating button {
+    width: auto;
+    padding: 0 14px;
   }
 
   .mobile-nav {
@@ -3655,6 +3704,10 @@ pre {
     will-change: transform, opacity;
   }
 
+  .app-container-watch-joined .watch-mobile-more-panel {
+    bottom: calc(env(safe-area-inset-bottom) + 12px);
+  }
+
   .watch-mobile-more-panel.is-open {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -3706,6 +3759,8 @@ pre {
     gap: 8px;
     padding: 0 72px 8px 0;
     overflow: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
     -webkit-mask-image: linear-gradient(
       180deg,
       transparent 0,
@@ -3722,6 +3777,10 @@ pre {
       #000 calc(100% - 8px),
       transparent 100%
     );
+  }
+
+  .chat-panel-watch-overlay .chat-message-list::-webkit-scrollbar {
+    display: none;
   }
 
   .chat-panel-watch-overlay .chat-message-card {
@@ -3755,7 +3814,8 @@ pre {
   }
 
   .chat-panel-watch-overlay .chat-composer-floating input {
-    min-height: 40px;
+    min-height: 36px;
+    height: 36px;
     border: 0;
     border-radius: 999px;
     background: rgba(15, 24, 34, 0.78);
@@ -3766,7 +3826,8 @@ pre {
   .chat-panel-watch-overlay .chat-composer-floating button {
     width: auto;
     min-width: 60px;
-    min-height: 40px;
+    min-height: 36px;
+    height: 36px;
     padding: 0 14px;
     border-radius: 999px;
     box-shadow: 0 12px 24px rgba(255, 114, 64, 0.22);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { LoginPromptModal } from "./components/LoginPromptModal.jsx";
 import { DesktopNavigation, MobileNavigation } from "./components/Navigation.jsx";
+import { LoginDrawer } from "./components/LoginDrawer.jsx";
 import { UserAvatar } from "./components/UserAvatar.jsx";
 import { LivePage } from "./components/LivePage.jsx";
 import { SettingsPage } from "./components/SettingsPage.jsx";
@@ -10,7 +10,7 @@ import { useChatController } from "./hooks/useChatController.js";
 import { usePlayerController } from "./hooks/usePlayerController.js";
 import { usePublisherController } from "./hooks/usePublisherController.js";
 import { useRouteController } from "./hooks/useRouteController.js";
-import { buildWatchLink, generateRoomId, getRelayHostValue } from "./lib/routeState.js";
+import { buildWatchLink, generateRoomId, getRelayHostValue, writeRoute } from "./lib/routeState.js";
 import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from "./lib/watchHistory.js";
 import { describePlayerState, describePublishState } from "./lib/status.js";
 import { getPublishBlockReason, isPublishBlocked } from "./lib/roomPolicy.js";
@@ -74,11 +74,21 @@ export function App() {
   const [settingsLoginPanelRequestKey, setSettingsLoginPanelRequestKey] = useState(0);
   const [watchHistoryItems, setWatchHistoryItems] = useState(() => readWatchHistory());
   const [authMenuOpen, setAuthMenuOpen] = useState(false);
+  const [watchRouteCommitted, setWatchRouteCommitted] = useState(() => Boolean(new URLSearchParams(window.location.search).get("r")?.trim()));
   const logRef = useRef(null);
   const authMenuRef = useRef(null);
   const authMenuCloseTimerRef = useRef(null);
   const announcedLiveStateRef = useRef({ room: "", isLive: null });
   const pendingProtectedPageRef = useRef(null);
+  const previousRouteRef = useRef({
+    page: new URLSearchParams(window.location.search).get("p") === "l"
+      ? "live"
+      : new URLSearchParams(window.location.search).get("p") === "s"
+        ? "settings"
+        : "watch",
+    watchRoom: new URLSearchParams(window.location.search).get("r")?.trim() ?? "",
+    watchRouteCommitted: Boolean(new URLSearchParams(window.location.search).get("r")?.trim())
+  });
 
   function log(message) {
     const line = `[${new Date().toLocaleTimeString()}] ${message}`;
@@ -108,12 +118,7 @@ export function App() {
     logout,
     updateDisplayName,
     updateHandle
-  } = useAuthController({
-    log,
-    onAuthenticated: () => {
-      setLoginPromptOpen(false);
-    }
-  });
+  } = useAuthController({ log });
 
   const publisher = usePublisherController({
     page,
@@ -167,7 +172,8 @@ export function App() {
     publisher.cameraEnabled
   );
   const buildLabel = `Build ${__BUILD_HASH__}`;
-  const mobileWatchJoinedClass = page === "watch" && Boolean(player.playerSession) ? " app-container-watch-joined" : "";
+  const mobileWatchSessionActive = page === "watch" && Boolean(player.playerSession);
+  const mobileWatchJoinedClass = mobileWatchSessionActive ? " app-container-watch-joined" : "";
   const requireLoginForLive = import.meta.env.PROD;
   const avatarLabel = getAvatarLabel(authState);
   const avatarStateClass = authState.loading
@@ -197,6 +203,7 @@ export function App() {
     autorunRef.current = false;
     setLoginPromptOpen(false);
     closeAuthMenu();
+    setWatchRouteCommitted(false);
     setWatchRoomValue("");
     selectPage("watch", { updateAutorun: false });
     void player.stopPlayer();
@@ -302,6 +309,54 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (authState.user) {
+      setLoginPromptOpen(false);
+    }
+  }, [authState.user]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const routeRoom = new URLSearchParams(window.location.search).get("r")?.trim() ?? "";
+      setWatchRouteCommitted(Boolean(routeRoom));
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const routeWatchRoom = page === "watch" && watchRouteCommitted ? watchRoom.trim() : "";
+    const previousRoute = previousRouteRef.current;
+    const historyMode = page === "watch"
+      && watchRouteCommitted
+      && Boolean(routeWatchRoom)
+      && (
+        previousRoute.page !== "watch"
+        || !previousRoute.watchRouteCommitted
+        || !previousRoute.watchRoom
+      )
+      ? "push"
+      : "replace";
+
+    writeRoute(
+      {
+        page,
+        watchRoom: routeWatchRoom,
+        liveRoom
+      },
+      { historyMode }
+    );
+
+    previousRouteRef.current = {
+      page,
+      watchRoom: routeWatchRoom,
+      watchRouteCommitted
+    };
+  }, [liveRoom, page, watchRoom, watchRouteCommitted]);
+
+  useEffect(() => {
     if (!initialAutorun) {
       return;
     }
@@ -327,6 +382,18 @@ export function App() {
 
     openSettingsLogin({ updateAutorun: false });
   }, [authState.loading, authState.user, page, requireLoginForLive]);
+
+  useEffect(() => {
+    if (!player.playerSession) {
+      return;
+    }
+
+    if (page === "watch" && watchRoom) {
+      return;
+    }
+
+    void player.stopPlayer();
+  }, [page, player.playerSession, watchRoom]);
 
   useEffect(() => {
     if (page !== "watch" || !watchRoom || !chat.roomStateReady) {
@@ -458,6 +525,7 @@ export function App() {
 
   function openWatchHistoryItem(item) {
     autorunRef.current = true;
+    setWatchRouteCommitted(true);
     setRelayUrlValue(item.relayUrl || relayUrl);
     setWatchRoomValue(item.room);
     selectPage("watch", { updateAutorun: false });
@@ -581,11 +649,13 @@ export function App() {
             }}
             onStart={() => {
               autorunRef.current = true;
+              setWatchRouteCommitted(true);
               selectPageWithGuard("watch", { updateAutorun: false });
               void player.startPlayer();
             }}
             onStop={() => {
               autorunRef.current = false;
+              setWatchRouteCommitted(false);
               setWatchRoomValue("");
               selectPageWithGuard("watch", { updateAutorun: false });
               void player.stopPlayer();
@@ -772,16 +842,19 @@ export function App() {
         </main>
       </div>
 
-      <MobileNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
-      <LoginPromptModal
-        open={loginPromptOpen}
-        authAvailable={authState.available}
-        authLoading={authState.loading}
-        onClose={() => {
-          setLoginPromptOpen(false);
-        }}
-        onLogin={startMicrosoftLogin}
-      />
+      {mobileWatchSessionActive ? null : (
+        <MobileNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
+      )}
+      {loginPromptOpen ? (
+        <LoginDrawer
+          authAvailable={authState.available}
+          authLoading={authState.loading}
+          onClose={() => {
+            setLoginPromptOpen(false);
+          }}
+          onMicrosoftLogin={startMicrosoftLogin}
+        />
+      ) : null}
     </>
   );
 }

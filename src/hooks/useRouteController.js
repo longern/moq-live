@@ -3,7 +3,6 @@ import {
   getOrCreateLiveRoom,
   getInitialViewState,
   persistLiveRoom,
-  writeRoute
 } from "../lib/routeState.js";
 
 export function useRouteController() {
@@ -58,8 +57,24 @@ export function useRouteController() {
   }
 
   useEffect(() => {
-    writeRoute({ page, watchRoom, liveRoom });
-  }, [page, watchRoom, liveRoom]);
+    const handlePopState = () => {
+      const next = getInitialViewState();
+      autorunRef.current = next.autorun;
+      pageRef.current = next.page;
+      relayUrlRef.current = next.relayUrl;
+      watchRoomRef.current = next.watchRoom;
+      liveRoomRef.current = next.liveRoom;
+      setPage(next.page);
+      setRelayUrl(next.relayUrl);
+      setWatchRoom(next.watchRoom);
+      setLiveRoom(next.liveRoom);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   return {
     initialAutorun: initial.autorun,
@@ -75,6 +90,6 @@ export function useRouteController() {
     setWatchRoomValue,
     setLiveRoomValue,
     setRelayUrlValue,
-    selectPage
+    selectPage,
   };
 }

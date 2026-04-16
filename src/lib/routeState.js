@@ -4,7 +4,11 @@ const LIVE_ROOM_STORAGE_KEY = "moq-live.live-room-id";
 export function generateRoomId() {
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
-  const suffix = Array.from(bytes, (value) => value.toString(36).padStart(2, "0")).join("").slice(0, 10);
+  const suffix = Array.from(bytes, (value) =>
+    value.toString(36).padStart(2, "0"),
+  )
+    .join("")
+    .slice(0, 10);
   return `puptv-${suffix}`;
 }
 
@@ -41,7 +45,8 @@ export function getInitialViewState() {
   const requestedPage = params.get("p");
   const routeRoom = params.get("r") ?? "";
   const storedLiveRoom = readStoredLiveRoom();
-  let page = requestedPage === "l" || requestedPage === "s" ? requestedPage : "w";
+  let page =
+    requestedPage === "l" || requestedPage === "s" ? requestedPage : "w";
   let watchRoom = "";
   let liveRoom = "";
 
@@ -60,7 +65,7 @@ export function getInitialViewState() {
     watchRoom,
     liveRoom,
     relayUrl: DEFAULT_RELAY_URL,
-    autorun: page === "w" && Boolean(watchRoom)
+    autorun: page === "w" && Boolean(watchRoom),
   };
 }
 
@@ -84,7 +89,10 @@ export function getRelayHostValue(relayUrl) {
   }
 }
 
-export function writeRoute({ page, watchRoom, liveRoom }) {
+export function writeRoute(
+  { page, watchRoom, liveRoom },
+  { historyMode = "replace" } = {},
+) {
   const next = new URL(window.location.href);
   next.search = "";
 
@@ -98,7 +106,13 @@ export function writeRoute({ page, watchRoom, liveRoom }) {
     next.searchParams.set("p", "s");
   }
 
-  history.replaceState({}, "", next);
+  const nextHref = `${next.pathname}${next.search}${next.hash}`;
+  const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextHref === currentHref) {
+    return;
+  }
+
+  history[historyMode === "push" ? "pushState" : "replaceState"]({}, "", next);
 }
 
 export { DEFAULT_RELAY_URL };

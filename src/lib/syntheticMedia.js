@@ -1,11 +1,34 @@
-const SYNTHETIC_WIDTH = 1280;
-const SYNTHETIC_HEIGHT = 720;
-const SYNTHETIC_MARKER = {
-  x: SYNTHETIC_WIDTH * 0.7625,
-  y: SYNTHETIC_HEIGHT * 0.1,
-  width: SYNTHETIC_WIDTH * 0.15,
-  height: SYNTHETIC_WIDTH * 0.15
-};
+const LANDSCAPE_WIDTH = 1280;
+const LANDSCAPE_HEIGHT = 720;
+const PORTRAIT_WIDTH = 720;
+const PORTRAIT_HEIGHT = 1280;
+const MARKER_X_RATIO = 0.7625;
+const MARKER_Y_RATIO = 0.1;
+const MARKER_SIZE_RATIO = 0.15;
+
+function getSyntheticDimensions(orientation = "landscape") {
+  if (orientation === "portrait") {
+    return {
+      width: PORTRAIT_WIDTH,
+      height: PORTRAIT_HEIGHT
+    };
+  }
+
+  return {
+    width: LANDSCAPE_WIDTH,
+    height: LANDSCAPE_HEIGHT
+  };
+}
+
+function getMarkerRect(width, height) {
+  const size = Math.min(width, height) * MARKER_SIZE_RATIO;
+  return {
+    x: width * MARKER_X_RATIO,
+    y: height * MARKER_Y_RATIO,
+    width: size,
+    height: size
+  };
+}
 
 function hashString(value) {
   let hash = 2166136261;
@@ -26,11 +49,29 @@ function createMarkerPalette(namespace) {
   ];
 }
 
-export function createSyntheticMedia(namespace) {
-  const width = SYNTHETIC_WIDTH;
-  const height = SYNTHETIC_HEIGHT;
+export function createSyntheticMedia(namespace, options = {}) {
+  const orientation = options.orientation === "portrait" ? "portrait" : "landscape";
+  const { width, height } = getSyntheticDimensions(orientation);
   const fps = 30;
   const markerPalette = createMarkerPalette(namespace);
+  const markerRect = getMarkerRect(width, height);
+  const isPortrait = height > width;
+  const frameInset = isPortrait ? 40 : 48;
+  const barCount = isPortrait ? 8 : 16;
+  const barWidth = isPortrait ? Math.max(24, Math.round(width * 0.06)) : 36;
+  const gap = isPortrait ? Math.max(18, Math.round(width * 0.035)) : 32;
+  const contentWidth = barCount * barWidth + (barCount - 1) * gap;
+  const barStartX = Math.max(40, Math.round((width - contentWidth) / 2));
+  const barMinHeight = isPortrait ? 72 : 48;
+  const barMaxHeight = Math.max(
+    barMinHeight + 24,
+    height - (isPortrait ? 520 : 280)
+  );
+  const titleFont = isPortrait ? 42 : 56;
+  const metaFont = isPortrait ? 24 : 36;
+  const titleX = isPortrait ? 56 : 76;
+  const titleY = isPortrait ? 126 : 144;
+  const metaLineHeight = isPortrait ? 42 : 52;
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -55,55 +96,57 @@ export function createSyntheticMedia(namespace) {
     ctx.fillRect(0, 0, width, height);
 
     ctx.fillStyle = "rgba(15, 23, 32, 0.72)";
-    ctx.fillRect(48, 48, width - 96, height - 96);
+    ctx.fillRect(frameInset, frameInset, width - frameInset * 2, height - frameInset * 2);
 
-    for (let i = 0; i < 16; i += 1) {
+    for (let i = 0; i < barCount; i += 1) {
       const phase = t * 2.4 + i * 0.35;
-      const barHeight = 48 + ((Math.sin(phase) + 1) / 2) * (height - 280);
-      const barWidth = 36;
-      const gap = 32;
-      const x = 80 + i * (barWidth + gap);
+      const barHeight = barMinHeight + ((Math.sin(phase) + 1) / 2) * barMaxHeight;
+      const x = barStartX + i * (barWidth + gap);
       const y = height - 72 - barHeight;
       ctx.fillStyle = i % 2 === 0 ? "#f8fafc" : "#fde68a";
       ctx.fillRect(x, y, barWidth, barHeight);
     }
 
     ctx.fillStyle = "#f8fafc";
-    ctx.font = '700 56px "SF Mono", Menlo, monospace';
-    ctx.fillText("MOQ SYNTHETIC LIVE", 76, 144);
-    ctx.font = '500 36px "SF Mono", Menlo, monospace';
-    ctx.fillText(new Date().toISOString(), 76, 204);
-    ctx.fillText(`namespace=${namespace || "unset"}`, 76, 256);
+    ctx.font = `700 ${titleFont}px "SF Mono", Menlo, monospace`;
+    ctx.fillText("MOQ SYNTHETIC LIVE", titleX, titleY);
+    ctx.font = `500 ${metaFont}px "SF Mono", Menlo, monospace`;
+    ctx.fillText(new Date().toISOString(), titleX, titleY + metaLineHeight + 18);
+    ctx.fillText(
+      `namespace=${namespace || "unset"}`,
+      titleX,
+      titleY + metaLineHeight * 2 + 30
+    );
 
-    const cellWidth = SYNTHETIC_MARKER.width / 2;
-    const cellHeight = SYNTHETIC_MARKER.height / 2;
+    const cellWidth = markerRect.width / 2;
+    const cellHeight = markerRect.height / 2;
     ctx.fillStyle = "rgba(15, 23, 32, 0.2)";
     ctx.fillRect(
-      SYNTHETIC_MARKER.x - 12,
-      SYNTHETIC_MARKER.y - 12,
-      SYNTHETIC_MARKER.width + 24,
-      SYNTHETIC_MARKER.height + 24
+      markerRect.x - 12,
+      markerRect.y - 12,
+      markerRect.width + 24,
+      markerRect.height + 24
     );
     markerPalette.forEach(([r, g, b], index) => {
       const col = index % 2;
       const row = Math.floor(index / 2);
       ctx.fillStyle = `rgb(${r} ${g} ${b})`;
       ctx.fillRect(
-        SYNTHETIC_MARKER.x + col * cellWidth,
-        SYNTHETIC_MARKER.y + row * cellHeight,
+        markerRect.x + col * cellWidth,
+        markerRect.y + row * cellHeight,
         cellWidth,
         cellHeight
       );
     });
     ctx.strokeStyle = "#0f1720";
     ctx.lineWidth = 8;
-    ctx.strokeRect(SYNTHETIC_MARKER.x, SYNTHETIC_MARKER.y, SYNTHETIC_MARKER.width, SYNTHETIC_MARKER.height);
+    ctx.strokeRect(markerRect.x, markerRect.y, markerRect.width, markerRect.height);
 
-    const orbX = width * 0.78 + Math.sin(t * 1.7) * 112;
-    const orbY = height * 0.52 + Math.cos(t * 1.3) * 92;
+    const orbX = width * (isPortrait ? 0.5 : 0.78) + Math.sin(t * 1.7) * (isPortrait ? 86 : 112);
+    const orbY = height * (isPortrait ? 0.72 : 0.52) + Math.cos(t * 1.3) * (isPortrait ? 140 : 92);
     ctx.beginPath();
     ctx.fillStyle = "#fb7185";
-    ctx.arc(orbX, orbY, 52, 0, Math.PI * 2);
+    ctx.arc(orbX, orbY, isPortrait ? 44 : 52, 0, Math.PI * 2);
     ctx.fill();
 
     rafId = window.requestAnimationFrame(renderFrame);
@@ -153,6 +196,7 @@ export function createSyntheticMedia(namespace) {
   return {
     canvas,
     markerPalette,
+    orientation,
     mediaStream,
     async stop() {
       window.cancelAnimationFrame(rafId);
@@ -194,14 +238,15 @@ export function sampleCanvasMarkerSignature(canvas) {
     return null;
   }
 
-  const cellWidth = SYNTHETIC_MARKER.width / 2;
-  const cellHeight = SYNTHETIC_MARKER.height / 2;
+  const markerRect = getMarkerRect(canvas.width, canvas.height);
+  const cellWidth = markerRect.width / 2;
+  const cellHeight = markerRect.height / 2;
   return Array.from({ length: 4 }, (_, index) => {
     const col = index % 2;
     const row = Math.floor(index / 2);
-    const x = (SYNTHETIC_MARKER.x + col * cellWidth + cellWidth / 2) / SYNTHETIC_WIDTH;
-    const y = (SYNTHETIC_MARKER.y + row * cellHeight + cellHeight / 2) / SYNTHETIC_HEIGHT;
-    return samplePatch(ctx, canvas, canvas.width * x, canvas.height * y);
+    const x = markerRect.x + col * cellWidth + cellWidth / 2;
+    const y = markerRect.y + row * cellHeight + cellHeight / 2;
+    return samplePatch(ctx, canvas, x, y);
   });
 }
 

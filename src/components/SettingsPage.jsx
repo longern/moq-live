@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
+import { LoginDrawer } from "./LoginDrawer.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 
 function formatHistoryTime(value) {
@@ -66,17 +67,6 @@ function EditIcon() {
     <svg viewBox="0 0 24 24">
       <path d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20z" />
       <path d="M12.5 7l4.5 4.5" />
-    </svg>
-  );
-}
-
-function MicrosoftIcon() {
-  return (
-    <svg viewBox="0 0 24 24">
-      <rect x="2" y="2" width="9" height="9" fill="#f25022" />
-      <rect x="13" y="2" width="9" height="9" fill="#7fba00" />
-      <rect x="2" y="13" width="9" height="9" fill="#00a4ef" />
-      <rect x="13" y="13" width="9" height="9" fill="#ffb900" />
     </svg>
   );
 }
@@ -479,41 +469,6 @@ function AccountDrawer({
           </button>
         </div>
       </div>
-    </PanelShell>
-  );
-}
-
-function LoginDrawer({ authAvailable, authLoading, onClose, onMicrosoftLogin }) {
-  return (
-    <PanelShell
-      backdropClassName="auth-panel-backdrop"
-      backdropLabel="关闭登录页面"
-      bodyClassName="auth-panel-body auth-panel-login-body"
-      closeLabel="返回"
-      closeButtonClassName="auth-panel-close"
-      headClassName="auth-panel-head auth-panel-login-head"
-      onClose={onClose}
-      panelClassName="auth-panel auth-panel-login"
-      panelLabel="登录页面"
-      title="登录"
-    >
-      <div class="auth-panel-copy auth-panel-login-copy">
-        <h2>登录账号</h2>
-      </div>
-
-      <button
-        type="button"
-        class="login-provider-button"
-        onClick={onMicrosoftLogin}
-        disabled={!authAvailable || authLoading}
-      >
-        <span class="login-provider-icon" aria-hidden="true">
-          <MicrosoftIcon />
-        </span>
-        <span>{authLoading ? "鉴权检查中" : "继续登录"}</span>
-      </button>
-
-      {!authAvailable ? <p class="inline-warning">Auth API 未连接，当前环境无法完成登录。</p> : null}
     </PanelShell>
   );
 }

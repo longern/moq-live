@@ -469,7 +469,13 @@ export function LivePage({
                       </div>
                       <div class="summary-item live-desktop-summary">
                         <strong>预览源</strong>
-                        <span>{previewSourceType === "screen" ? "当前预览来自屏幕共享" : "当前预览来自摄像头"}</span>
+                        <span>
+                          {previewSourceType === "screen"
+                            ? "当前预览来自屏幕共享"
+                            : previewSourceType === "synthetic"
+                              ? "当前预览来自合成源"
+                              : "当前预览来自摄像头"}
+                        </span>
                       </div>
                     </>
                   ) : null}

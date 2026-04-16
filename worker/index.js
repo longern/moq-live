@@ -11,6 +11,7 @@ import {
   getMicrosoftLoginUrl,
   getMicrosoftOAuthCookieName,
   getSessionCookieName,
+  ensureUserRoom,
   getSessionUser,
   json,
   parseCookies,
@@ -39,6 +40,15 @@ export default {
     try {
       if (url.pathname === "/api/me" && request.method === "GET") {
         return await handleMe(env, request);
+      }
+      if (url.pathname === "/api/me/room" && request.method === "GET") {
+        return await handleMyRoom(env, request);
+      }
+      if (url.pathname === "/api/rooms" && request.method === "GET") {
+        return await handleRooms(env);
+      }
+      if (url.pathname === "/api/rooms/resolve" && request.method === "GET") {
+        return await handleRoomResolve(env, request);
       }
       if (url.pathname === "/api/me/profile" && request.method === "POST") {
         return await handleProfileUpdate(env, request);
@@ -92,6 +102,100 @@ async function handleMe(env, request) {
     authenticated: true,
     loginUrl: getMicrosoftLoginUrl(request),
     user: session.user
+  });
+}
+
+async function handleMyRoom(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const roomId = await ensureUserRoom(db, session.user.id);
+  return json({
+    ok: true,
+    room: {
+      id: roomId
+    }
+  });
+}
+
+async function handleRooms(env) {
+  const db = getDb(env);
+  const result = await db.prepare(
+    `SELECT
+      rooms.id AS room_id,
+      rooms.title AS room_title,
+      rooms.cover_url AS room_cover_url,
+      rooms.updated_at AS room_updated_at,
+      users.handle AS host_handle,
+      users.display_name AS host_display_name,
+      users.primary_email AS host_email,
+      users.avatar_url AS host_avatar_url
+    FROM moq_rooms AS rooms
+    INNER JOIN moq_users AS users
+      ON users.id = rooms.host_user_id
+    ORDER BY rooms.updated_at DESC, rooms.created_at DESC`
+  ).all();
+
+  const rows = Array.isArray(result?.results) ? result.results : [];
+
+  return json({
+    ok: true,
+    rooms: rows.map((row) => ({
+      id: row.room_id,
+      title: row.room_title || "",
+      coverUrl: row.room_cover_url || "",
+      updatedAt: row.room_updated_at || "",
+      host: {
+        handle: row.host_handle || "",
+        displayName: row.host_display_name || "",
+        email: row.host_email || "",
+        avatarUrl: row.host_avatar_url || ""
+      }
+    }))
+  });
+}
+
+async function handleRoomResolve(env, request) {
+  const db = getDb(env);
+  const url = new URL(request.url);
+  const rawHandle = (url.searchParams.get("handle") || "").trim().replace(/^@+/, "").toLowerCase();
+  if (!rawHandle) {
+    return json({ ok: false, error: "Missing handle" }, { status: 400 });
+  }
+
+  const row = await db.prepare(
+    `SELECT
+      rooms.id AS room_id,
+      rooms.title AS room_title,
+      users.handle AS host_handle,
+      users.display_name AS host_display_name,
+      users.primary_email AS host_email
+    FROM moq_rooms AS rooms
+    INNER JOIN moq_users AS users
+      ON users.id = rooms.host_user_id
+    WHERE lower(users.handle) = ?
+    LIMIT 1`
+  ).bind(rawHandle).first();
+
+  if (!row?.room_id) {
+    return json({ ok: false, error: "Room not found", code: "room_not_found" }, { status: 404 });
+  }
+
+  return json({
+    ok: true,
+    room: {
+      id: row.room_id,
+      title: row.room_title || "",
+      host: {
+        handle: row.host_handle || "",
+        displayName: row.host_display_name || "",
+        email: row.host_email || ""
+      }
+    }
   });
 }
 

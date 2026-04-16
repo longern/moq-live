@@ -67,6 +67,22 @@ function getAvatarLabel(authState) {
   return authState.user.displayName || authState.user.email || "用户";
 }
 
+function isNamespaceWatchTarget(value) {
+  return value.trim().toLowerCase().startsWith("ns:");
+}
+
+function getNamespaceWatchValue(value) {
+  if (!isNamespaceWatchTarget(value)) {
+    return "";
+  }
+
+  return value.trim().slice(3).trim();
+}
+
+function getHandleWatchValue(value) {
+  return value.trim().replace(/^@+/, "").toLowerCase();
+}
+
 export function App() {
   const siteTitle = __APP_TITLE__;
   const [logText, setLogText] = useState("");
@@ -79,6 +95,8 @@ export function App() {
   const authMenuRef = useRef(null);
   const authMenuCloseTimerRef = useRef(null);
   const announcedLiveStateRef = useRef({ room: "", isLive: null });
+  const handledWatchStreamStartRef = useRef({ roomId: "", startedAt: "" });
+  const watchLiveSeenRef = useRef({ roomId: "", hasBeenLive: false });
   const pendingProtectedPageRef = useRef(null);
   const previousRouteRef = useRef({
     page: new URLSearchParams(window.location.search).get("p") === "l"
@@ -120,6 +138,30 @@ export function App() {
     updateHandle
   } = useAuthController({ log });
 
+  const [watchRoomResolution, setWatchRoomResolution] = useState({
+    loading: false,
+    error: "",
+    roomId: "",
+    hostHandle: "",
+    hostDisplayName: "",
+    title: ""
+  });
+  const [liveChatRoomResolution, setLiveChatRoomResolution] = useState({
+    loading: false,
+    error: "",
+    roomId: ""
+  });
+  const [watchStreamEnded, setWatchStreamEnded] = useState(false);
+
+  const watchPlaybackRelayUrlRef = useRef("");
+  const watchPlaybackNamespaceRef = useRef("");
+
+  const normalizedWatchInput = watchRoom.trim();
+  const watchingNamespace = isNamespaceWatchTarget(normalizedWatchInput);
+  const directWatchNamespace = getNamespaceWatchValue(normalizedWatchInput);
+  const watchHandle = watchingNamespace ? "" : getHandleWatchValue(normalizedWatchInput);
+  const resolvedWatchRoomId = watchingNamespace ? "" : watchRoomResolution.roomId;
+
   const publisher = usePublisherController({
     page,
     pageRef,
@@ -130,30 +172,86 @@ export function App() {
   });
 
   const player = usePlayerController({
-    initialAutorun,
-    relayUrlRef,
-    roomRef: watchRoomRef,
+    initialAutorun: false,
+    relayUrlRef: watchPlaybackRelayUrlRef,
+    roomRef: watchPlaybackNamespaceRef,
     setLogText,
     log,
     syntheticSessionRef: publisher.syntheticSessionRef
   });
+  const liveChatRoomId = authState.user?.id
+    ? liveChatRoomResolution.roomId
+    : liveRoom;
 
   const chat = useChatController({
-    room: watchRoom,
-    enabled: page === "watch" && Boolean(watchRoom),
+    room: resolvedWatchRoomId,
+    enabled: page === "watch" && !watchingNamespace && Boolean(resolvedWatchRoomId),
     authKey: authState.user?.id ?? "anonymous",
     role: "viewer",
     log
   });
   const liveChat = useChatController({
-    room: liveRoom,
-    enabled: page === "live" && Boolean(liveRoom),
+    room: liveChatRoomId,
+    enabled: page === "live" && Boolean(liveChatRoomId),
     authKey: authState.user?.id ?? "anonymous",
     role: "broadcaster",
     log
   });
 
-  const watchRoomLabel = chat.roomMeta.host.displayName || watchRoom || "等待输入房间 ID";
+  const resolvedWatchRelayUrl = watchingNamespace
+    ? relayUrl
+    : chat.roomMeta.stream.relayUrl || "";
+  const resolvedWatchNamespace = watchingNamespace
+    ? directWatchNamespace
+    : chat.roomMeta.stream.namespace || "";
+  const watchJoined = page === "watch" && watchRouteCommitted && Boolean(normalizedWatchInput);
+  const watchChatRoom = resolvedWatchRoomId || "";
+  const watchStageMessage = watchingNamespace
+    ? (directWatchNamespace ? "正在连接公共 namespace。" : "等待输入 namespace。")
+    : watchRoomResolution.loading
+      ? "正在进入直播间。"
+      : watchRoomResolution.error
+        ? `进入失败：${watchRoomResolution.error}`
+        : resolvedWatchRoomId
+          ? (watchStreamEnded ? "直播已结束" : "直播暂未开始")
+          : "正在解析直播间。";
+
+  watchPlaybackRelayUrlRef.current = resolvedWatchRelayUrl;
+  watchPlaybackNamespaceRef.current = resolvedWatchNamespace;
+
+  const watchRoomLabel = watchingNamespace
+    ? (directWatchNamespace || "等待输入 namespace")
+    : chat.roomMeta.host.displayName
+      || watchRoomResolution.hostDisplayName
+      || chat.roomMeta.host.handle
+      || watchRoomResolution.hostHandle
+      || chat.roomMeta.title
+      || watchRoomResolution.title
+      || watchHandle
+      || watchRoom
+      || "等待输入房间 ID";
+  const watchChatRoomLabel = watchingNamespace
+    ? (directWatchNamespace || "")
+    : chat.roomMeta.host.displayName
+      || watchRoomResolution.hostDisplayName
+      || chat.roomMeta.host.handle
+      || watchRoomResolution.hostHandle
+      || watchHandle
+      || "";
+  const watchRoomTitle = watchingNamespace
+    ? (directWatchNamespace || "公共 namespace")
+    : chat.roomMeta.title
+      || watchRoomResolution.title
+      || (watchChatRoomLabel ? `${watchChatRoomLabel}的直播间` : watchRoomLabel);
+  const watchHostDisplayName = watchingNamespace
+    ? ""
+    : chat.roomMeta.host.displayName
+      || watchRoomResolution.hostDisplayName
+      || chat.roomMeta.host.handle
+      || watchRoomResolution.hostHandle
+      || watchHandle
+      || "";
+  const watchHostAvatarUrl = watchingNamespace ? "" : chat.roomMeta.host.avatarUrl || "";
   const liveRoomLabel = liveChat.roomMeta.host.displayName
     || authState.user?.displayName
     || authState.user?.email
@@ -254,6 +352,33 @@ export function App() {
 
     pendingProtectedPageRef.current = null;
     selectPage(nextPage, options);
+  }
+
+  function beginWatch(nextWatchTarget = watchRoom) {
+    const normalizedTarget = nextWatchTarget.trim();
+    if (!normalizedTarget) {
+      return;
+    }
+
+    if (isNamespaceWatchTarget(normalizedTarget)) {
+      if (!getNamespaceWatchValue(normalizedTarget)) {
+        return;
+      }
+    } else if (!getHandleWatchValue(normalizedTarget)) {
+      return;
+    }
+
+    if (nextWatchTarget !== watchRoom) {
+      setWatchRoomValue(normalizedTarget);
+    }
+
+    autorunRef.current = true;
+    setWatchRouteCommitted(true);
+    selectPageWithGuard("watch", { updateAutorun: false });
+
+    if (!isNamespaceWatchTarget(normalizedTarget)) {
+      void player.stopPlayer();
+    }
   }
 
   async function copyWatchLink() {
@@ -366,6 +491,182 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (page !== "watch" || !watchRouteCommitted || watchingNamespace || !watchHandle) {
+      setWatchRoomResolution({
+        loading: false,
+        error: "",
+        roomId: "",
+        hostHandle: "",
+        hostDisplayName: "",
+        title: ""
+      });
+      return;
+    }
+
+    let cancelled = false;
+
+    async function resolveWatchRoom() {
+      setWatchRoomResolution({
+        loading: true,
+        error: "",
+        roomId: "",
+        hostHandle: "",
+        hostDisplayName: "",
+        title: ""
+      });
+
+      try {
+        const response = await fetch(`/api/rooms/resolve?handle=${encodeURIComponent(watchHandle)}`, {
+          credentials: "same-origin"
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(payload.error || `room resolve failed with ${response.status}`);
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setWatchRoomResolution({
+          loading: false,
+          error: "",
+          roomId: payload.room?.id || "",
+          hostHandle: payload.room?.host?.handle || watchHandle,
+          hostDisplayName: payload.room?.host?.displayName || "",
+          title: payload.room?.title || ""
+        });
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+        setWatchRoomResolution({
+          loading: false,
+          error: message,
+          roomId: "",
+          hostHandle: "",
+          hostDisplayName: "",
+          title: ""
+        });
+        log(`watch resolve failed: ${message}`);
+      }
+    }
+
+    void resolveWatchRoom();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page, watchHandle, watchRouteCommitted, watchingNamespace]);
+
+  useEffect(() => {
+    if (page !== "watch" || !watchRouteCommitted || watchingNamespace || !resolvedWatchRoomId) {
+      watchLiveSeenRef.current = { roomId: "", hasBeenLive: false };
+      setWatchStreamEnded(false);
+      return;
+    }
+
+    watchLiveSeenRef.current = { roomId: resolvedWatchRoomId, hasBeenLive: false };
+    setWatchStreamEnded(false);
+  }, [page, resolvedWatchRoomId, watchRouteCommitted, watchingNamespace]);
+
+  useEffect(() => {
+    if (
+      page !== "watch"
+      || !watchRouteCommitted
+      || watchingNamespace
+      || !resolvedWatchRoomId
+      || !chat.roomStateReady
+    ) {
+      return;
+    }
+
+    if (chat.streamState.isLive) {
+      watchLiveSeenRef.current = {
+        roomId: resolvedWatchRoomId,
+        hasBeenLive: true
+      };
+      setWatchStreamEnded(false);
+      return;
+    }
+
+    const current = watchLiveSeenRef.current;
+    if (current.roomId === resolvedWatchRoomId && current.hasBeenLive) {
+      setWatchStreamEnded(true);
+    }
+  }, [
+    chat.roomStateReady,
+    chat.streamState.isLive,
+    page,
+    resolvedWatchRoomId,
+    watchRouteCommitted,
+    watchingNamespace
+  ]);
+
+  useEffect(() => {
+    if (page !== "live" || !authState.user?.id) {
+      setLiveChatRoomResolution({
+        loading: false,
+        error: "",
+        roomId: ""
+      });
+      return;
+    }
+
+    let cancelled = false;
+
+    async function resolveLiveChatRoom() {
+      setLiveChatRoomResolution({
+        loading: true,
+        error: "",
+        roomId: ""
+      });
+
+      try {
+        const response = await fetch("/api/me/room", {
+          credentials: "same-origin"
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(payload.error || `my room endpoint returned ${response.status}`);
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setLiveChatRoomResolution({
+          loading: false,
+          error: "",
+          roomId: payload.room?.id || ""
+        });
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+        setLiveChatRoomResolution({
+          loading: false,
+          error: message,
+          roomId: ""
+        });
+        log(`live room resolve failed: ${message}`);
+      }
+    }
+
+    void resolveLiveChatRoom();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authState.user?.id, page]);
+
+  useEffect(() => {
     if (!requireLoginForLive || authState.loading || !pendingProtectedPageRef.current) {
       return;
     }
@@ -396,16 +697,127 @@ export function App() {
   }, [page, player.playerSession, watchRoom]);
 
   useEffect(() => {
-    if (page !== "watch" || !watchRoom || !chat.roomStateReady) {
+    if (
+      page !== "watch"
+      || !watchRouteCommitted
+      || !watchingNamespace
+      || !directWatchNamespace
+    ) {
       return;
     }
 
-    if (chat.streamState.isLive) {
-      if (!player.playerSession) {
-        void player.startPlayer();
-      }
+    if (
+      !player.playerSession
+      || player.playerSession.relayUrl !== resolvedWatchRelayUrl
+      || player.playerSession.namespace !== resolvedWatchNamespace
+    ) {
+      void player.startPlayer();
     }
-  }, [chat.roomStateReady, chat.streamState.isLive, page, player.playerSession, watchRoom]);
+  }, [
+    directWatchNamespace,
+    page,
+    player.playerSession,
+    resolvedWatchNamespace,
+    resolvedWatchRelayUrl,
+    watchRouteCommitted,
+    watchingNamespace
+  ]);
+
+  useEffect(() => {
+    if (
+      page !== "watch"
+      || !watchRouteCommitted
+      || watchingNamespace
+      || !resolvedWatchRoomId
+      || !chat.roomStateReady
+      || !chat.streamState.isLive
+      || !chat.roomMeta.stream.relayUrl
+      || !chat.roomMeta.stream.namespace
+    ) {
+      return;
+    }
+
+    if (
+      !player.playerSession
+      || player.playerSession.relayUrl !== chat.roomMeta.stream.relayUrl
+      || player.playerSession.namespace !== chat.roomMeta.stream.namespace
+    ) {
+      void player.startPlayer();
+    }
+  }, [
+    chat.roomMeta.stream.namespace,
+    chat.roomMeta.stream.relayUrl,
+    chat.roomStateReady,
+    chat.streamState.isLive,
+    page,
+    player.playerSession,
+    resolvedWatchRoomId,
+    watchRouteCommitted,
+    watchingNamespace
+  ]);
+
+  useEffect(() => {
+    if (
+      page !== "watch"
+      || !watchRouteCommitted
+      || watchingNamespace
+      || !resolvedWatchRoomId
+      || !chat.streamState.isLive
+      || !chat.roomMeta.stream.relayUrl
+      || !chat.roomMeta.stream.namespace
+    ) {
+      return;
+    }
+
+    const startedAt = chat.streamState.startedAt || "__live__";
+    const current = handledWatchStreamStartRef.current;
+    if (current.roomId === resolvedWatchRoomId && current.startedAt === startedAt) {
+      return;
+    }
+
+    handledWatchStreamStartRef.current = {
+      roomId: resolvedWatchRoomId,
+      startedAt
+    };
+    void player.startPlayer();
+  }, [
+    chat.roomMeta.stream.namespace,
+    chat.roomMeta.stream.relayUrl,
+    chat.streamState.isLive,
+    chat.streamState.startedAt,
+    page,
+    resolvedWatchRoomId,
+    watchRouteCommitted,
+    watchingNamespace
+  ]);
+
+  useEffect(() => {
+    if (
+      page !== "watch"
+      || !watchRouteCommitted
+      || watchingNamespace
+      || !resolvedWatchRoomId
+      || !chat.roomStateReady
+      || chat.streamState.isLive
+      || !player.playerSession
+    ) {
+      return;
+    }
+
+    handledWatchStreamStartRef.current = { roomId: "", startedAt: "" };
+    void player.stopPlayer({
+      finalStatus: "直播已结束",
+      logMessage: "stopped player because stream ended",
+    });
+  }, [
+    chat.roomStateReady,
+    chat.streamState.isLive,
+    page,
+    player.playerSession,
+    resolvedWatchRoomId,
+    watchRouteCommitted,
+    watchingNamespace
+  ]);
 
   useEffect(() => {
     if (!liveRoom) {
@@ -511,25 +923,21 @@ export function App() {
   }, [player.playerStatus, publisher.publishStatus, watchRoom, liveRoom]);
 
   useEffect(() => {
-    const room = player.playerSession?.namespace?.trim();
-    if (!room) {
+    const watchTarget = watchRoom.trim();
+    if (!player.playerSession?.namespace?.trim() || !watchTarget) {
       return;
     }
 
     setWatchHistoryItems(persistWatchHistoryEntry({
-      room,
+      room: watchTarget,
       relayUrl,
       relayHost
     }));
-  }, [player.playerSession?.key, relayUrl, relayHost]);
+  }, [player.playerSession?.key, relayUrl, relayHost, watchRoom]);
 
   function openWatchHistoryItem(item) {
-    autorunRef.current = true;
-    setWatchRouteCommitted(true);
     setRelayUrlValue(item.relayUrl || relayUrl);
-    setWatchRoomValue(item.room);
-    selectPage("watch", { updateAutorun: false });
-    void player.startPlayer();
+    beginWatch(item.room);
   }
 
   return (
@@ -635,8 +1043,15 @@ export function App() {
         <main class="page-shell">
           <WatchPage
             hidden={page !== "watch"}
+            watchJoined={watchJoined}
             roomLabel={watchRoomLabel}
+            roomTitle={watchRoomTitle}
+            hostDisplayName={watchHostDisplayName}
+            hostAvatarUrl={watchHostAvatarUrl}
             watchLink={watchPageLink}
+            stageMessage={watchStageMessage}
+            chatRoom={watchChatRoom}
+            chatRoomLabel={watchChatRoomLabel}
             playerStatus={player.playerStatus}
             playerBadge={playerBadge}
             fullscreenActive={player.fullscreenActive}
@@ -648,10 +1063,10 @@ export function App() {
               setWatchRoomValue(event.currentTarget.value);
             }}
             onStart={() => {
-              autorunRef.current = true;
-              setWatchRouteCommitted(true);
-              selectPageWithGuard("watch", { updateAutorun: false });
-              void player.startPlayer();
+              beginWatch();
+            }}
+            onOpenRoom={(nextRoom) => {
+              beginWatch(nextRoom);
             }}
             onStop={() => {
               autorunRef.current = false;

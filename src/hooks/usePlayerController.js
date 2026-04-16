@@ -199,7 +199,12 @@ export function usePlayerController({
 
   playerSessionStateRef.current = playerSession;
 
-  async function stopPlayer(token = ++playbackTokenRef.current) {
+  async function stopPlayer(options = {}) {
+    const {
+      token = ++playbackTokenRef.current,
+      finalStatus = "已离开直播间。",
+      logMessage = "stopped player",
+    } = options;
     const current = sessionRef.current;
     const currentPlayer = current?.player ?? playerRef.current;
     const hadPlayer = Boolean(current || playerSessionStateRef.current);
@@ -251,14 +256,18 @@ export function usePlayerController({
     await Promise.resolve();
 
     if (token === playbackTokenRef.current) {
-      setPlayerStatus("已离开直播间。");
-      log("stopped player");
+      setPlayerStatus(finalStatus);
+      log(logMessage);
     }
   }
 
   async function startPlayer() {
     const token = ++playbackTokenRef.current;
-    await stopPlayer(token);
+    await stopPlayer({
+      token,
+      finalStatus: "等待开始。",
+      logMessage: "reset player before restart",
+    });
     setLogText("");
 
     let nextSession;

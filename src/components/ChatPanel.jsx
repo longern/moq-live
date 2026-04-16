@@ -22,6 +22,7 @@ function getConnectionLabel(state) {
 
 export function ChatPanel({
   room,
+  roomLabel = "",
   authAvailable,
   authLoading,
   authUser,
@@ -60,8 +61,9 @@ export function ChatPanel({
   ].filter(Boolean).join(" ");
   const showWelcomeMessage =
     showWelcome && connectionState === "connected" && messages.length === 0;
-  const welcomeText = room
-    ? `欢迎来到 ${room} 的直播间`
+  const welcomeName = roomLabel || room;
+  const welcomeText = welcomeName
+    ? `欢迎来到 ${welcomeName} 的直播间`
     : "欢迎来到直播间";
 
   return (

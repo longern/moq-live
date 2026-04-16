@@ -836,6 +836,8 @@ async function ensureUserRoom(db, userId) {
   return room.id;
 }
 
+export { ensureUserRoom };
+
 function getDisplayNameNextChangeAt(changedAt) {
   if (!changedAt) {
     return null;

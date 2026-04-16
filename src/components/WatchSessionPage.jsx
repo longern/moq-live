@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { ChatPanel } from "./ChatPanel.jsx";
 import { StatusPill } from "./StatusPill.jsx";
+import { UserAvatar } from "./UserAvatar.jsx";
 
 export function WatchSessionPage({
   hidden,
   roomLabel,
+  roomTitle,
+  hostDisplayName,
+  hostAvatarUrl,
   watchLink,
+  stageMessage,
+  chatRoom,
+  chatRoomLabel,
   playerStatus,
   playerBadge,
   fullscreenActive,
@@ -223,12 +230,18 @@ export function WatchSessionPage({
             onClick={handleStageClick}
           >
             <div id="playerMount">
-              <video-moq
-                ref={playerRef}
-                class="player-moq"
-                src={playerSession.relayUrl}
-                namespace={playerSession.namespace}
-              />
+              {playerSession ? (
+                <video-moq
+                  ref={playerRef}
+                  class="player-moq"
+                  src={playerSession.relayUrl}
+                  namespace={playerSession.namespace}
+                />
+              ) : (
+                <div class="placeholder">
+                  <p>{stageMessage}</p>
+                </div>
+              )}
             </div>
             {playerBadge.state === "error" ? (
               <div class="stage-error">
@@ -239,7 +252,8 @@ export function WatchSessionPage({
             {playerOrientation === "portrait" ? (
               <div class="watch-portrait-chat-overlay">
                 <ChatPanel
-                  room={playerSession?.namespace || ""}
+                  room={chatRoom}
+                  roomLabel={chatRoomLabel}
                   authAvailable={authAvailable}
                   authLoading={authLoading}
                   authUser={authUser}
@@ -346,7 +360,21 @@ export function WatchSessionPage({
           </div>
           <div class="info-strip">
             <div class="info-item">
-              <strong data-room-label>{roomLabel}</strong>
+              <div class="watch-desktop-room-meta">
+                <UserAvatar
+                  avatarUrl={hostAvatarUrl}
+                  displayName={hostDisplayName}
+                  className="watch-desktop-room-avatar"
+                  imgAlt={hostDisplayName || "主播头像"}
+                  monogramClassName="is-monogram"
+                  placeholderClassName="is-placeholder"
+                  iconClassName="watch-desktop-room-avatar-icon"
+                />
+                <div class="watch-desktop-room-copy">
+                  <strong data-room-label>{roomTitle || roomLabel}</strong>
+                  <p>{hostDisplayName || roomLabel}</p>
+                </div>
+              </div>
             </div>
             <div class="info-item info-item-pill">
               <StatusPill id="playerBadgeInline" label={playerBadge.label} state={playerBadge.state} />
@@ -375,7 +403,8 @@ export function WatchSessionPage({
             </div>
           </section>
           <ChatPanel
-            room={playerSession?.namespace || ""}
+            room={chatRoom}
+            roomLabel={chatRoomLabel}
             authAvailable={authAvailable}
             authLoading={authLoading}
             authUser={authUser}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import {
   compareSignatures,
   sampleCanvasMarkerSignature,
-  sampleImageMarkerSignature
+  sampleImageMarkerSignature,
 } from "../lib/syntheticMedia.js";
 
 const playerModuleState = { promise: null };
@@ -101,7 +101,10 @@ function syncContainedCanvasLayout(playerEl) {
   const shadowRoot = playerEl?.shadowRoot;
   const baseEl = shadowRoot?.querySelector("#base");
   const canvasEl = shadowRoot?.querySelector("canvas#canvas");
-  if (!(baseEl instanceof HTMLElement) || !(canvasEl instanceof HTMLCanvasElement)) {
+  if (
+    !(baseEl instanceof HTMLElement) ||
+    !(canvasEl instanceof HTMLCanvasElement)
+  ) {
     return null;
   }
 
@@ -146,18 +149,42 @@ function getPlayerStatusFromMessage(message = "") {
   return `失败：${message}`;
 }
 
+function isPlayerAudioSupported() {
+  return (
+    globalThis.crossOriginIsolated === true &&
+    typeof globalThis.SharedArrayBuffer !== "undefined" &&
+    typeof globalThis.AudioWorkletNode === "function"
+  );
+}
+
+function getPlayerAudioSupportReason() {
+  const reasons = [];
+
+  if (globalThis.crossOriginIsolated !== true) {
+    reasons.push("crossOriginIsolated=false");
+  } else if (typeof globalThis.SharedArrayBuffer === "undefined") {
+    reasons.push("SharedArrayBuffer 不可用");
+  }
+  if (typeof globalThis.AudioWorkletNode !== "function") {
+    reasons.push("AudioWorkletNode 不可用");
+  }
+
+  return reasons.join("，");
+}
+
 export function usePlayerController({
   initialAutorun,
   relayUrlRef,
   roomRef,
   setLogText,
   log,
-  syntheticSessionRef
+  syntheticSessionRef,
 }) {
+  const audioPlaybackSupported = isPlayerAudioSupported();
   const [playerStatus, setPlayerStatus] = useState("等待开始。");
   const [fullscreenActive, setFullscreenActive] = useState(false);
   const [playerPaused, setPlayerPaused] = useState(false);
-  const [playerMuted, setPlayerMuted] = useState(false);
+  const [playerMuted, setPlayerMuted] = useState(!audioPlaybackSupported);
   const [playerSession, setPlayerSession] = useState(null);
   const [playerOrientation, setPlayerOrientation] = useState("landscape");
   const [fullscreenRotate, setFullscreenRotate] = useState(false);
@@ -168,6 +195,7 @@ export function usePlayerController({
   const sessionRef = useRef(null);
   const playerSessionStateRef = useRef(null);
   const orientationLockedRef = useRef(false);
+  const audioFallbackLoggedRef = useRef(false);
 
   playerSessionStateRef.current = playerSession;
 
@@ -184,7 +212,7 @@ export function usePlayerController({
       setFullscreenActive(false);
       setFullscreenRotate(false);
       setPlayerPaused(false);
-      setPlayerMuted(false);
+      setPlayerMuted(!audioPlaybackSupported);
       return;
     }
 
@@ -202,11 +230,16 @@ export function usePlayerController({
       try {
         if (typeof currentPlayer.destroy === "function") {
           await withTimeout(currentPlayer.destroy(), 1200);
-        } else if (currentPlayer.player && typeof currentPlayer.player.close === "function") {
+        } else if (
+          currentPlayer.player &&
+          typeof currentPlayer.player.close === "function"
+        ) {
           await withTimeout(currentPlayer.player.close(), 1200);
         }
       } catch (error) {
-        log(`stop warning: ${error instanceof Error ? error.message : String(error)}`);
+        log(
+          `stop warning: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
@@ -214,7 +247,7 @@ export function usePlayerController({
     setFullscreenActive(false);
     setFullscreenRotate(false);
     setPlayerPaused(false);
-    setPlayerMuted(false);
+    setPlayerMuted(!audioPlaybackSupported);
     await Promise.resolve();
 
     if (token === playbackTokenRef.current) {
@@ -240,12 +273,14 @@ export function usePlayerController({
         key: `${namespace}-${token}`,
         token,
         relayUrl: nextRelayUrl,
-        namespace
+        namespace,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setPlayerStatus(`失败：${message}`);
-      log(`失败：${error instanceof Error ? error.stack ?? error.message : message}`);
+      log(
+        `失败：${error instanceof Error ? (error.stack ?? error.message) : message}`,
+      );
       return;
     }
 
@@ -253,9 +288,17 @@ export function usePlayerController({
     setFullscreenActive(false);
     setFullscreenRotate(false);
     setPlayerPaused(false);
-    setPlayerMuted(false);
+    setPlayerMuted(!audioPlaybackSupported);
+    if (!audioPlaybackSupported && !audioFallbackLoggedRef.current) {
+      log(
+        `audio playback disabled: ${getPlayerAudioSupportReason()}; auto-muted player`,
+      );
+      audioFallbackLoggedRef.current = true;
+    }
     setPlayerStatus("播放器已创建，正在连接 relay。");
-    log(`created video-moq player: url=${nextSession.relayUrl} namespace=${nextSession.namespace}`);
+    log(
+      `created video-moq player: url=${nextSession.relayUrl} namespace=${nextSession.namespace}`,
+    );
   }
 
   async function togglePlayerPlayback() {
@@ -278,6 +321,20 @@ export function usePlayerController({
   async function togglePlayerMute() {
     const playerEl = playerRef.current;
     if (!playerEl) {
+      return;
+    }
+
+    if (!audioPlaybackSupported) {
+      setPlayerMuted(true);
+      if ("muted" in playerEl) {
+        playerEl.muted = true;
+      }
+      if (typeof playerEl.mute === "function") {
+        await playerEl.mute();
+      }
+      log(
+        `audio playback unavailable: ${getPlayerAudioSupportReason()}; keep muted`,
+      );
       return;
     }
 
@@ -328,7 +385,9 @@ export function usePlayerController({
   }
 
   async function compareSyntheticPlaybackFromDataUrl(dataUrl) {
-    const source = sampleCanvasMarkerSignature(syntheticSessionRef.current?.syntheticMedia?.canvas ?? null);
+    const source = sampleCanvasMarkerSignature(
+      syntheticSessionRef.current?.syntheticMedia?.canvas ?? null,
+    );
     const player = await sampleImageMarkerSignature(dataUrl);
     return compareSignatures(source, player);
   }
@@ -338,7 +397,11 @@ export function usePlayerController({
       const active = Boolean(document.fullscreenElement);
       setFullscreenActive(active);
 
-      if (!active && orientationLockedRef.current && screen.orientation?.unlock) {
+      if (
+        !active &&
+        orientationLockedRef.current &&
+        screen.orientation?.unlock
+      ) {
         screen.orientation.unlock();
         orientationLockedRef.current = false;
       }
@@ -355,7 +418,11 @@ export function usePlayerController({
 
   useEffect(() => {
     const playerEl = playerRef.current;
-    if (!playerSession || !playerEl || playerSession.token !== playbackTokenRef.current) {
+    if (
+      !playerSession ||
+      !playerEl ||
+      playerSession.token !== playbackTokenRef.current
+    ) {
       return;
     }
 
@@ -369,23 +436,28 @@ export function usePlayerController({
 
     ensureContainedPlayerStyles(playerEl);
     updateCanvasLayout();
+    if (!audioPlaybackSupported && "muted" in playerEl) {
+      playerEl.muted = true;
+    }
 
-    const resizeObserver = typeof ResizeObserver === "function"
-      ? new ResizeObserver(() => {
-          updateCanvasLayout();
-        })
-      : null;
+    const resizeObserver =
+      typeof ResizeObserver === "function"
+        ? new ResizeObserver(() => {
+            updateCanvasLayout();
+          })
+        : null;
     resizeObserver?.observe(playerEl);
 
     const canvasEl = playerEl.shadowRoot?.querySelector("canvas#canvas");
-    const canvasObserver = canvasEl instanceof HTMLCanvasElement
-      ? new MutationObserver(() => {
-          updateCanvasLayout();
-        })
-      : null;
+    const canvasObserver =
+      canvasEl instanceof HTMLCanvasElement
+        ? new MutationObserver(() => {
+            updateCanvasLayout();
+          })
+        : null;
     canvasObserver?.observe(canvasEl, {
       attributes: true,
-      attributeFilter: ["width", "height", "style", "class"]
+      attributeFilter: ["width", "height", "style", "class"],
     });
 
     const canvasSyncTicker = window.setInterval(() => {
@@ -399,7 +471,7 @@ export function usePlayerController({
       tickerId: null,
       lastTime: 0,
       lastAdvanceAt: Date.now(),
-      started: false
+      started: false,
     };
     sessionRef.current = ctx;
     window.player = ctx.player;
@@ -422,9 +494,14 @@ export function usePlayerController({
         return;
       }
       const detail = event?.detail;
-      const err = detail instanceof Error ? detail : new Error(String(detail ?? "unknown player error"));
+      const err =
+        detail instanceof Error
+          ? detail
+          : new Error(String(detail ?? "unknown player error"));
       setPlayerStatus(getPlayerStatusFromMessage(err.message));
-      log(`${isNoCatalogDataMessage(err.message) ? "未开播" : "失败"}：${err.stack ?? err.message}`);
+      log(
+        `${isNoCatalogDataMessage(err.message) ? "未开播" : "失败"}：${err.stack ?? err.message}`,
+      );
     });
 
     const shadowErrorEl = playerEl.shadowRoot?.querySelector?.("#error");
@@ -440,9 +517,15 @@ export function usePlayerController({
           return;
         }
         setPlayerStatus(getPlayerStatusFromMessage(message));
-        log(`${isNoCatalogDataMessage(message) ? "未开播" : "播放器错误"}：${message}`);
+        log(
+          `${isNoCatalogDataMessage(message) ? "未开播" : "播放器错误"}：${message}`,
+        );
       });
-      shadowErrorObserver.observe(shadowErrorEl, { childList: true, subtree: true, characterData: true });
+      shadowErrorObserver.observe(shadowErrorEl, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
     }
 
     ctx.tickerId = window.setInterval(() => {
@@ -489,10 +572,13 @@ export function usePlayerController({
     void startPlayer();
   }, []);
 
-  useEffect(() => () => {
-    setPlayerOrientation("landscape");
-    void stopPlayer();
-  }, []);
+  useEffect(
+    () => () => {
+      setPlayerOrientation("landscape");
+      void stopPlayer();
+    },
+    [],
+  );
 
   return {
     playerStatus,
@@ -509,6 +595,6 @@ export function usePlayerController({
     togglePlayerPlayback,
     togglePlayerMute,
     fullscreenPlayer,
-    compareSyntheticPlaybackFromDataUrl
+    compareSyntheticPlaybackFromDataUrl,
   };
 }

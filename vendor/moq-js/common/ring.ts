@@ -9,14 +9,48 @@ enum STATE {
 interface FrameCopyToOptions {
 	frameCount?: number
 	frameOffset?: number
+	format?: string
 	planeIndex: number
 }
 
 // This is implemented by AudioData in WebCodecs, but we don't import it because it's a DOM type.
 interface Frame {
+	format?: string
 	numberOfFrames: number
 	numberOfChannels: number
 	copyTo(dst: Float32Array, options: FrameCopyToOptions): void
+}
+
+function isInterleavedFrame(frame: Frame) {
+	return typeof frame.format === "string" && !frame.format.endsWith("-planar")
+}
+
+function copyInterleavedToChannel(
+	frame: Frame,
+	dst: Float32Array,
+	startIndex: number,
+	capacity: number,
+	channelIndex: number,
+	frameCount: number,
+) {
+	const interleaved = new Float32Array(frameCount * frame.numberOfChannels)
+
+	try {
+		frame.copyTo(interleaved, {
+			planeIndex: 0,
+			frameCount,
+			format: "f32",
+		})
+	} catch {
+		frame.copyTo(interleaved, {
+			planeIndex: 0,
+			frameCount,
+		})
+	}
+
+	for (let i = 0; i < frameCount; i += 1) {
+		dst[(startIndex + i) % capacity] = interleaved[i * frame.numberOfChannels + channelIndex]
+	}
 }
 
 // No prototype to make this easier to send via postMessage
@@ -82,6 +116,22 @@ export class Ring {
 
 			// If the AudioData doesn't have enough channels, duplicate it.
 			const planeIndex = Math.min(i, frame.numberOfChannels - 1)
+
+			if (isInterleavedFrame(frame)) {
+				const frameCount = startIndex < endIndex
+					? endIndex - startIndex
+					: this.capacity - startIndex + endIndex
+
+				copyInterleavedToChannel(
+					frame,
+					channel,
+					startIndex,
+					this.capacity,
+					planeIndex,
+					frameCount,
+				)
+				continue
+			}
 
 			if (startIndex < endIndex) {
 				// One continuous range to copy.

@@ -7,11 +7,15 @@ import { BroadcastConfig } from "./broadcast"
 import * as Audio from "./audio"
 import * as Video from "./video"
 
+const AUDIO_SEGMENT_DURATION_US = 200_000
+
 export class Track {
 	name: string
 
 	#init?: Uint8Array
 	#segments: Segment[] = []
+	#isAudioTrack = false
+	#segmentStartTimestamp = 0
 
 	#offset = 0 // number of segments removed from the front of the queue
 	#closed = false
@@ -20,6 +24,7 @@ export class Track {
 
 	constructor(media: MediaStreamTrack, config: BroadcastConfig) {
 		this.name = media.kind
+		this.#isAudioTrack = media.kind === "audio"
 
 		// We need to split based on type because Typescript is hard
 		if (isAudioTrack(media)) {
@@ -78,13 +83,19 @@ export class Track {
 		}
 
 		let current = this.#segments.at(-1)
-		if (!current || chunk.type === "key") {
+		const shouldStartAudioSegment = this.#isAudioTrack && (
+			!current ||
+			chunk.timestamp - this.#segmentStartTimestamp >= AUDIO_SEGMENT_DURATION_US
+		)
+		const shouldStartVideoSegment = !this.#isAudioTrack && chunk.type === "key"
+		if (!current || shouldStartAudioSegment || shouldStartVideoSegment) {
 			if (current) {
 				await current.input.close()
 			}
 
 			const segment = new Segment(this.#offset + this.#segments.length)
 			this.#segments.push(segment)
+			this.#segmentStartTimestamp = chunk.timestamp
 
 			this.#notify.wake()
 

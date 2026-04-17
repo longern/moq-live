@@ -44,6 +44,27 @@ function shouldRetryDisplayMediaRequest(error) {
   return name !== "AbortError" && name !== "NotAllowedError";
 }
 
+function buildSharedAudioConstraints() {
+  const supported =
+    navigator.mediaDevices?.getSupportedConstraints?.() ?? {};
+  const constraints = {};
+
+  if (supported.echoCancellation) {
+    constraints.echoCancellation = false;
+  }
+  if (supported.noiseSuppression) {
+    constraints.noiseSuppression = false;
+  }
+  if (supported.autoGainControl) {
+    constraints.autoGainControl = false;
+  }
+  if (supported.suppressLocalAudioPlayback) {
+    constraints.suppressLocalAudioPlayback = false;
+  }
+
+  return Object.keys(constraints).length > 0 ? constraints : true;
+}
+
 export function usePublisherController({
   page,
   pageRef,
@@ -115,6 +136,25 @@ export function usePublisherController({
 
   function isCurrentPreviewRequest(requestId) {
     return liveSessionManagerRef.current.isCurrentRequest(requestId);
+  }
+
+  async function relaxSharedAudioTrack(track) {
+    if (!track?.applyConstraints) {
+      return;
+    }
+
+    const constraints = buildSharedAudioConstraints();
+    if (constraints === true) {
+      return;
+    }
+
+    try {
+      await track.applyConstraints(constraints);
+    } catch (error) {
+      log(
+        `shared audio constraints warning: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   function updatePreviewState(stream, sourceType) {
@@ -399,7 +439,7 @@ export function usePublisherController({
           width: { ideal: VIDEO_TARGET_WIDTH },
           height: { ideal: VIDEO_TARGET_HEIGHT },
         },
-        audio: true,
+        audio: buildSharedAudioConstraints(),
       },
       {
         video: {
@@ -441,6 +481,10 @@ export function usePublisherController({
     const videoTrack = displayStream.getVideoTracks()[0] ?? null;
     let audioTrack = displayStream.getAudioTracks()[0] ?? null;
     let microphoneTrack = null;
+
+    if (audioTrack) {
+      await relaxSharedAudioTrack(audioTrack);
+    }
 
     if (microphoneEnabled) {
       try {

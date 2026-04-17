@@ -152,8 +152,8 @@ export function WatchIdlePage({
             <input
               id="namespace"
               value={room}
-              placeholder="输入房间 ID"
-              aria-label="房间 ID"
+              placeholder="输入主播 handle"
+              aria-label="主播 handle"
               onInput={onRoomInput}
             />
             <button type="button" id="start" aria-label="加入直播间" onClick={onStart} disabled={!room.trim()}>

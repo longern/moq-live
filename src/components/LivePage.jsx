@@ -107,12 +107,17 @@ function MoreIcon() {
   );
 }
 
-function renderPreview(previewVideoRef, previewActive, previewHasVideo) {
+function renderPreview(
+  previewVideoRef,
+  previewActive,
+  previewHasVideo,
+  mirrorPreview = false,
+) {
   return (
     <div class="publisher-host" id="publisherHost">
       <video
         ref={previewVideoRef}
-        class="publisher-preview"
+        class={`publisher-preview${mirrorPreview ? " is-mirrored" : ""}`}
         id="publisherPreview"
         autoplay
         playsinline
@@ -136,6 +141,7 @@ export function LivePage({
   hidden,
   room,
   roomLabel,
+  shareTarget,
   watchLink,
   publishBlocked,
   publishBlockedReason,
@@ -164,7 +170,6 @@ export function LivePage({
   onStartPublish,
   onStopPublish,
   onRegenerateRoom,
-  onCopyWatchLink,
   onShare,
   onStartScreenShare,
   onStopScreenShare,
@@ -186,6 +191,8 @@ export function LivePage({
   const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 760px)").matches);
   const [moreOpen, setMoreOpen] = useState(false);
   const [openPanel, setOpenPanel] = useState("");
+  const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 760px)");
@@ -231,7 +238,7 @@ export function LivePage({
             <StatusPill id="publishBadgeOverlay" label={publishBadge.label} state={publishBadge.state} />
           </div>
           <div class="stage-frame live-stage-frame live-stage-frame-mobile">
-            {renderPreview(previewVideoRef, previewActive, previewHasVideo)}
+            {renderPreview(previewVideoRef, previewActive, previewHasVideo, mirrorPreview)}
             <div class="live-mobile-chat-overlay">
               <ChatPanel
                 room={room}
@@ -288,7 +295,8 @@ export function LivePage({
                 type="button"
                 class="live-fab"
                 onClick={onShare}
-                aria-label="复制观看链接"
+                aria-label="分享直播间"
+                disabled={!shareSupported || !watchLink}
               >
                 <ShareIcon />
               </button>
@@ -345,11 +353,12 @@ export function LivePage({
                   type="button"
                   class="secondary"
                   onClick={() => {
-                    onCopyWatchLink();
+                    onShare();
                     setMoreOpen(false);
                   }}
+                  disabled={!shareSupported || !watchLink}
                 >
-                  复制观看链接
+                  分享直播间
                 </button>
               </div>
             </>
@@ -364,7 +373,7 @@ export function LivePage({
       <div class="page-grid live-layout">
         <section class="stage-column">
           <div class="stage-frame live-stage-frame">
-            {renderPreview(previewVideoRef, previewActive, previewHasVideo)}
+            {renderPreview(previewVideoRef, previewActive, previewHasVideo, mirrorPreview)}
           </div>
           <div class="live-desktop-overlay">
             {openPanel ? (
@@ -484,18 +493,25 @@ export function LivePage({
                     <>
                       <div class="live-desktop-panel-head">
                         <strong>直播链接</strong>
-                        <span>{watchLink === "等待生成观看链接" ? "等待生成" : "可直接分享"}</span>
+                        <span>{watchLink ? "可直接分享" : "等待生成"}</span>
                       </div>
                       <label>
-                        房间 ID
-                        <input id="liveRoomId" value={room} readonly />
+                        主播 handle
+                        <input id="liveRoomId" value={shareTarget} readonly />
                       </label>
                       <label>
                         观看链接
-                        <input id="watchLinkInput" value={watchLink === "等待生成观看链接" ? "" : watchLink} readonly />
+                        <input id="watchLinkInput" value={watchLink} readonly />
                       </label>
                       <div class="action-row">
-                        <button type="button" id="copyRoomLink" onClick={onCopyWatchLink}>复制观看链接</button>
+                        <button
+                          type="button"
+                          id="copyRoomLink"
+                          onClick={onShare}
+                          disabled={!shareSupported || !watchLink}
+                        >
+                          分享直播间
+                        </button>
                         <button type="button" id="regenRoom" class="secondary" onClick={onRegenerateRoom}>重新生成房间</button>
                       </div>
                     </>
@@ -601,8 +617,9 @@ export function LivePage({
                   type="button"
                   class="live-dock-button"
                   onClick={onShare}
-                  aria-label="复制观看链接"
-                  title="复制观看链接"
+                  aria-label="分享直播间"
+                  title="分享直播间"
+                  disabled={!shareSupported || !watchLink}
                 >
                   <ShareIcon />
                 </button>

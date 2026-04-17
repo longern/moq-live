@@ -229,7 +229,7 @@ export function App() {
       || watchRoomResolution.title
       || watchHandle
       || watchRoom
-      || "等待输入房间 ID";
+      || "等待输入主播 handle";
   const watchChatRoomLabel = watchingNamespace
     ? (directWatchNamespace || "")
     : chat.roomMeta.host.displayName
@@ -257,11 +257,15 @@ export function App() {
     || authState.user?.email
     || liveRoom
     || "等待生成频道号";
-  const watchPageLink = buildWatchLink(relayUrl, watchRoom);
-  const liveWatchLink = buildWatchLink(relayUrl, liveRoom);
+  const watchShareTarget = watchingNamespace
+    ? directWatchNamespace
+    : watchRoomResolution.hostHandle || watchHandle || watchRoom;
+  const liveShareTarget = authState.user?.handle?.trim() || "";
+  const watchPageLink = buildWatchLink(relayUrl, watchShareTarget);
+  const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
   const relayHost = getRelayHostValue(relayUrl);
-  const playerBadge = describePlayerState(player.playerStatus);
-  const publishBadge = describePublishState(publisher.publishStatus);
+  const playerBadge = describePlayerState(player.playerStatusKind);
+  const publishBadge = describePublishState(publisher.publishStatusKind);
   const publishBlocked = isPublishBlocked(liveRoom);
   const publishBlockedReason = getPublishBlockReason(liveRoom);
   const cameraMode = getCameraMode(
@@ -381,13 +385,28 @@ export function App() {
     }
   }
 
-  async function copyWatchLink() {
-    if (!liveWatchLink || liveWatchLink === "等待生成观看链接") {
+  async function shareLiveRoom() {
+    if (!liveWatchLink) {
       return;
     }
 
-    await navigator.clipboard.writeText(liveWatchLink);
-    log("watch link copied");
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      throw new Error("当前浏览器不支持系统分享");
+    }
+
+    try {
+      await navigator.share({
+        title: `${liveRoomLabel}的直播间`,
+        text: `${liveRoomLabel}正在直播`,
+        url: liveWatchLink
+      });
+      log("live room shared");
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+      throw error;
+    }
   }
 
   function cycleCameraMode() {
@@ -807,6 +826,7 @@ export function App() {
     handledWatchStreamStartRef.current = { roomId: "", startedAt: "" };
     void player.stopPlayer({
       finalStatus: "直播已结束",
+      finalKind: "ended",
       logMessage: "stopped player because stream ended",
     });
   }, [
@@ -1057,6 +1077,7 @@ export function App() {
             fullscreenActive={player.fullscreenActive}
             playerPaused={player.playerPaused}
             playerMuted={player.playerMuted}
+            showTapToUnmute={player.showTapToUnmute}
             playerOrientation={player.playerOrientation}
             room={watchRoom}
             onRoomInput={(event) => {
@@ -1083,6 +1104,11 @@ export function App() {
             onToggleMute={() => {
               void player.togglePlayerMute().catch((error) => {
                 log(`toggle mute failed: ${error instanceof Error ? error.message : String(error)}`);
+              });
+            }}
+            onDismissTapToUnmute={() => {
+              void player.dismissTapToUnmute().catch((error) => {
+                log(`tap to unmute failed: ${error instanceof Error ? error.message : String(error)}`);
               });
             }}
             onFullscreen={() => {
@@ -1117,6 +1143,7 @@ export function App() {
             hidden={page !== "live"}
             room={liveRoom}
             roomLabel={liveRoomLabel}
+            shareTarget={liveShareTarget}
             watchLink={liveWatchLink}
             publishBlocked={publishBlocked}
             publishBlockedReason={publishBlockedReason}
@@ -1168,18 +1195,13 @@ export function App() {
               void publisher.stopCameraPublish();
             }}
             onShare={() => {
-              void copyWatchLink().catch((error) => {
-                log(`copy failed: ${error instanceof Error ? error.message : String(error)}`);
+              void shareLiveRoom().catch((error) => {
+                log(`share failed: ${error instanceof Error ? error.message : String(error)}`);
               });
             }}
             onRegenerateRoom={() => {
               autorunRef.current = false;
               setLiveRoomValue(generateRoomId());
-            }}
-            onCopyWatchLink={() => {
-              void copyWatchLink().catch((error) => {
-                log(`copy failed: ${error instanceof Error ? error.message : String(error)}`);
-              });
             }}
             onStartSynthetic={() => {
               selectPageWithGuard("live");

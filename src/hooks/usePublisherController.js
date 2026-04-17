@@ -39,6 +39,11 @@ function getStreamVideoDimensions(stream, videoElement = null) {
   return { width, height };
 }
 
+function shouldRetryDisplayMediaRequest(error) {
+  const name = error?.name ?? "";
+  return name !== "AbortError" && name !== "NotAllowedError";
+}
+
 export function usePublisherController({
   page,
   pageRef,
@@ -48,6 +53,7 @@ export function usePublisherController({
   log,
 }) {
   const [publishStatus, setPublishStatus] = useState("等待推流。");
+  const [publishStatusKind, setPublishStatusKind] = useState("idle");
   const [publisherIsPublishing, setPublisherIsPublishing] = useState(false);
   const [cameraOptions, setCameraOptions] = useState([]);
   const [microphoneOptions, setMicrophoneOptions] = useState([]);
@@ -80,6 +86,11 @@ export function usePublisherController({
   publisherIsPublishingRef.current = publisherIsPublishing;
   previewSourceTypeRef.current = previewSourceType;
 
+  function updatePublishStatus(kind, message) {
+    setPublishStatusKind(kind);
+    setPublishStatus(message);
+  }
+
   function ensureRoomId(force = false) {
     const currentRoom = roomRef.current;
     const nextRoom = force || !currentRoom ? generateRoomId() : currentRoom;
@@ -89,7 +100,7 @@ export function usePublisherController({
   function assertPublishAllowed(room) {
     const reason = getPublishBlockReason(room);
     if (reason) {
-      setPublishStatus(`失败：${reason}`);
+      updatePublishStatus("error", `失败：${reason}`);
       throw new Error(reason);
     }
   }
@@ -362,7 +373,7 @@ export function usePublisherController({
           void startLivePreview().catch((error) => {
             const message =
               error instanceof Error ? error.message : String(error);
-            setPublishStatus(`预览失败：${message}`);
+            updatePublishStatus("error", `预览失败：${message}`);
             log(`preview track restore failed: ${message}`);
           });
         },
@@ -406,6 +417,9 @@ export function usePublisherController({
         break;
       } catch (error) {
         lastDisplayError = error;
+        if (!shouldRetryDisplayMediaRequest(error)) {
+          break;
+        }
       }
     }
 
@@ -444,10 +458,9 @@ export function usePublisherController({
       }
     }
 
-    if (microphoneTrack) {
-      if (audioTrack && audioTrack !== microphoneTrack) {
-        audioTrack.stop();
-      }
+    // Prefer shared-tab/system audio when available.
+    // Fall back to microphone only when the browser did not provide display audio.
+    if (!audioTrack && microphoneTrack) {
       audioTrack = microphoneTrack;
     }
 
@@ -500,14 +513,14 @@ export function usePublisherController({
           stopLivePreview({ resetSource: true });
           if (publisherIsPublishingRef.current) {
             void stopCameraPublish();
-            setPublishStatus("屏幕共享已结束，请重新开始直播。");
+            updatePublishStatus("error", "屏幕共享已结束，请重新开始直播。");
             return;
           }
 
           void startLivePreview().catch((error) => {
             const message =
               error instanceof Error ? error.message : String(error);
-            setPublishStatus(`预览失败：${message}`);
+            updatePublishStatus("error", `预览失败：${message}`);
             log(`screen share restore failed: ${message}`);
           });
         },
@@ -515,7 +528,7 @@ export function usePublisherController({
       );
     }
 
-    setPublishStatus("屏幕共享已就绪。");
+    updatePublishStatus("idle", "屏幕共享已就绪。");
     await refreshMediaDevices(stream);
   }
 
@@ -595,7 +608,7 @@ export function usePublisherController({
     const previewVideo = previewVideoRef.current;
     const makeEven = (value) => Math.floor(value / 2) * 2;
 
-    setPublishStatus("正在启动直播。");
+    updatePublishStatus("preparing", "正在启动直播。");
 
     const publisherOptions = {
       url: nextRelayUrl,
@@ -642,12 +655,13 @@ export function usePublisherController({
       publishStream.getAudioTracks().forEach((track) => {
         track.enabled = microphoneEnabled;
       });
-      setPublishStatus(`直播已启动：${namespace}`);
+      updatePublishStatus("live", `直播已启动：${namespace}`);
       log(`camera publish started: url=${nextRelayUrl} namespace=${namespace}`);
     } catch (error) {
       publishMediaStreamRef.current = null;
       publishStream.getTracks().forEach((track) => track.stop());
-      setPublishStatus(
+      updatePublishStatus(
+        "error",
         `失败：${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
@@ -669,15 +683,15 @@ export function usePublisherController({
 
     publisherIsPublishingRef.current = false;
     setPublisherIsPublishing(false);
-    setPublishStatus("正在停止直播。");
+    updatePublishStatus("preparing", "正在停止直播。");
 
     try {
       await publisher.stop();
-      setPublishStatus("直播已停止。");
+      updatePublishStatus("idle", "直播已停止。");
       log(`camera publish stopped: namespace=${roomRef.current || "unset"}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setPublishStatus(`失败：${message}`);
+      updatePublishStatus("error", `失败：${message}`);
       log(`camera stop warning: ${message}`);
     } finally {
       if (publishStream) {
@@ -698,7 +712,7 @@ export function usePublisherController({
       throw new Error("Namespace 不能为空");
     }
 
-    setPublishStatus("正在启动合成推流。");
+    updatePublishStatus("preparing", "正在启动合成推流。");
 
     const usePortraitSyntheticPreview = shouldUsePortraitSyntheticPreview();
     const shouldPreviewSynthetic =
@@ -745,11 +759,12 @@ export function usePublisherController({
         syntheticMedia.mediaStream,
         PREVIEW_SOURCE_SYNTHETIC,
       );
-      setPublishStatus(
+      updatePublishStatus(
+        "live",
         `合成推流已启动：${namespace}（预览已切换为${usePortraitSyntheticPreview ? "竖屏" : "横屏"}合成源）`,
       );
     } else {
-      setPublishStatus(`合成推流已启动：${namespace}`);
+      updatePublishStatus("live", `合成推流已启动：${namespace}`);
     }
     log(
       `synthetic publish started: url=${nextRelayUrl} namespace=${namespace} orientation=${syntheticMedia.orientation}`,
@@ -766,11 +781,11 @@ export function usePublisherController({
     setSyntheticPublishing(false);
 
     if (!current) {
-      setPublishStatus("等待推流。");
+      updatePublishStatus("idle", "等待推流。");
       return;
     }
 
-    setPublishStatus("正在停止合成推流。");
+    updatePublishStatus("preparing", "正在停止合成推流。");
     try {
       await current.publisher.stop();
     } catch (error) {
@@ -780,7 +795,7 @@ export function usePublisherController({
     }
 
     await current.syntheticMedia.stop();
-    setPublishStatus("合成推流已停止。");
+    updatePublishStatus("idle", "合成推流已停止。");
     log(`synthetic publish stopped: namespace=${current.namespace}`);
 
     if (wasPreviewingSynthetic) {
@@ -814,7 +829,7 @@ export function usePublisherController({
         void startLivePreview().catch((error) => {
           const message =
             error instanceof Error ? error.message : String(error);
-          setPublishStatus(`预览失败：${message}`);
+          updatePublishStatus("error", `预览失败：${message}`);
           log(`preview failed: ${message}`);
         });
       }
@@ -875,7 +890,7 @@ export function usePublisherController({
           void startLivePreview().catch((error) => {
             const message =
               error instanceof Error ? error.message : String(error);
-            setPublishStatus(`预览失败：${message}`);
+            updatePublishStatus("error", `预览失败：${message}`);
             log(`preview resume failed: ${message}`);
           });
         }
@@ -908,6 +923,7 @@ export function usePublisherController({
 
   return {
     publishStatus,
+    publishStatusKind,
     publisherIsPublishing,
     cameraOptions,
     microphoneOptions,

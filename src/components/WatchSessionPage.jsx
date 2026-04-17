@@ -18,10 +18,12 @@ export function WatchSessionPage({
   fullscreenActive,
   playerPaused,
   playerMuted,
+  showTapToUnmute,
   playerOrientation,
   onStop,
   onTogglePlayback,
   onToggleMute,
+  onDismissTapToUnmute,
   onFullscreen,
   stageRef,
   playerSession,
@@ -39,6 +41,7 @@ export function WatchSessionPage({
   onChatSend,
   onChatRequireLogin
 }) {
+  const watchLinkText = watchLink || "等待生成观看链接";
   const [controlsVisible, setControlsVisible] = useState(false);
   const [moreMounted, setMoreMounted] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
@@ -248,6 +251,19 @@ export function WatchSessionPage({
                 <p>{playerStatus}</p>
               </div>
             ) : null}
+            {showTapToUnmute && playerSession && playerBadge.state !== "error" ? (
+              <button
+                type="button"
+                class="stage-unmute-prompt"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDismissTapToUnmute();
+                  revealControls();
+                }}
+              >
+                点按以取消静音
+              </button>
+            ) : null}
             {playerOrientation === "portrait" ? renderMobileHud("stage-mobile-hud-overlay", true) : null}
             {playerOrientation === "portrait" ? (
               <div class="watch-portrait-chat-overlay">
@@ -399,7 +415,7 @@ export function WatchSessionPage({
           <section class="control-block watch-link-block">
             <div class="summary-item">
               <strong>观看链接</strong>
-              <span data-watch-link>{watchLink}</span>
+              <span data-watch-link>{watchLinkText}</span>
             </div>
           </section>
           <ChatPanel
@@ -435,12 +451,16 @@ export function WatchSessionPage({
             </div>
             <div class="summary-item">
               <strong>观看链接</strong>
-              <span data-watch-link>{watchLink}</span>
+              <span data-watch-link>{watchLinkText}</span>
             </div>
             <button
               type="button"
               class="secondary"
               onClick={async () => {
+                if (!watchLink) {
+                  closeMoreSheet();
+                  return;
+                }
                 try {
                   await navigator.clipboard.writeText(watchLink);
                   closeMoreSheet();
@@ -448,6 +468,7 @@ export function WatchSessionPage({
                   closeMoreSheet();
                 }
               }}
+              disabled={!watchLink}
             >
               复制观看链接
             </button>

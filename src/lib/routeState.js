@@ -71,7 +71,7 @@ export function getInitialViewState() {
 
 export function buildWatchLink(relayUrl, room) {
   if (!room) {
-    return "等待生成观看链接";
+    return "";
   }
 
   return `${window.location.origin}${window.location.pathname}?r=${encodeURIComponent(room)}`;

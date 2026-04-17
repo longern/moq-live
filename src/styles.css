@@ -475,7 +475,11 @@ pre {
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(13, 23, 34, 0.92), rgba(8, 15, 24, 0.94)),
-    radial-gradient(circle at top left, rgba(16, 196, 182, 0.06), transparent 38%);
+    radial-gradient(
+      circle at top left,
+      rgba(16, 196, 182, 0.06),
+      transparent 38%
+    );
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
   color: inherit;
   text-align: left;
@@ -493,7 +497,11 @@ pre {
   border-color: rgba(255, 255, 255, 0.14);
   background:
     linear-gradient(180deg, rgba(15, 26, 39, 0.96), rgba(9, 16, 27, 0.98)),
-    radial-gradient(circle at top left, rgba(16, 196, 182, 0.08), transparent 40%);
+    radial-gradient(
+      circle at top left,
+      rgba(16, 196, 182, 0.08),
+      transparent 40%
+    );
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
   outline: none;
 }
@@ -520,7 +528,11 @@ pre {
   border-radius: 0;
   margin: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.02),
+      rgba(255, 255, 255, 0.01)
+    ),
     rgba(255, 255, 255, 0.015);
 }
 
@@ -1727,6 +1739,10 @@ publisher-moq {
   object-position: center;
 }
 
+.publisher-preview.is-mirrored {
+  transform: scaleX(-1);
+}
+
 .placeholder,
 .publisher-placeholder,
 .stage-error {
@@ -1804,6 +1820,32 @@ publisher-moq {
 .stage-controls-right {
   display: flex;
   gap: 8px;
+}
+
+.stage-unmute-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: min(360px, calc(100% - 28px));
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(3, 8, 14, 0.88);
+  color: var(--text);
+  text-align: center;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  transform: translateX(-50%);
+}
+
+.stage-unmute-prompt:hover,
+.stage-unmute-prompt:focus-visible {
+  background: rgba(10, 18, 28, 0.96);
 }
 
 .stage-mobile-hud {
@@ -3646,6 +3688,12 @@ pre {
     flex: 0 0 auto;
   }
 
+  .stage-unmute-prompt {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: fit-content;
+    max-width: calc(100% - 24px);
+  }
+
   .stage-mobile-hud-actions > .state-pill {
     flex: 0 0 auto;
   }
@@ -4033,14 +4081,20 @@ pre {
     -webkit-mask-image: linear-gradient(
       0deg,
       #000 0,
-      #000 calc(var(--watch-chat-list-max-height) - var(--watch-chat-list-fade-size)),
+      #000
+        calc(
+          var(--watch-chat-list-max-height) - var(--watch-chat-list-fade-size)
+        ),
       rgba(0, 0, 0, 0.42) calc(var(--watch-chat-list-max-height) - 12px),
       transparent var(--watch-chat-list-max-height)
     );
     mask-image: linear-gradient(
       0deg,
       #000 0,
-      #000 calc(var(--watch-chat-list-max-height) - var(--watch-chat-list-fade-size)),
+      #000
+        calc(
+          var(--watch-chat-list-max-height) - var(--watch-chat-list-fade-size)
+        ),
       rgba(0, 0, 0, 0.42) calc(var(--watch-chat-list-max-height) - 12px),
       transparent var(--watch-chat-list-max-height)
     );

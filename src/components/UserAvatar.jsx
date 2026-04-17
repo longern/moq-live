@@ -14,6 +14,8 @@ export function UserAvatar({
   email,
   className = "",
   imgAlt = "用户头像",
+  imgWidth,
+  imgHeight,
   initialsLength = 1,
   loading = false,
   loadingClassName = "",
@@ -34,7 +36,7 @@ export function UserAvatar({
       {loading ? (
         <span class={loadingClassName} />
       ) : avatarUrl ? (
-        <img src={avatarUrl} alt={imgAlt} />
+        <img src={avatarUrl} alt={imgAlt} width={imgWidth} height={imgHeight} />
       ) : initials ? (
         <span>{initials}</span>
       ) : (

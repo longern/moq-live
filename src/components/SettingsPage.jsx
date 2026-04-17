@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { LoginDrawer } from "./LoginDrawer.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 
@@ -69,6 +69,65 @@ function EditIcon() {
       <path d="M12.5 7l4.5 4.5" />
     </svg>
   );
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("头像图片无法读取"));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("头像图片处理失败"));
+        return;
+      }
+      resolve(blob);
+    }, type, quality);
+  });
+}
+
+async function resizeAvatarFile(file, size = 192) {
+  const image = await loadImageFromFile(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("浏览器不支持头像缩放");
+  }
+
+  const sourceSize = Math.min(image.naturalWidth || image.width, image.naturalHeight || image.height);
+  const sourceX = Math.max(0, ((image.naturalWidth || image.width) - sourceSize) / 2);
+  const sourceY = Math.max(0, ((image.naturalHeight || image.height) - sourceSize) / 2);
+
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    size,
+    size
+  );
+
+  const blob = await canvasToBlob(canvas, "image/webp", 0.9);
+  return new File([blob], "avatar.webp", { type: "image/webp" });
 }
 
 function ProfileAvatar({ authUser }) {
@@ -323,6 +382,10 @@ function AccountEditableField({
 
 function AccountDrawer({
   authUser,
+  avatarError,
+  avatarInputRef,
+  avatarSaving,
+  avatarStatus,
   cancelDisplayNameEditing,
   cancelHandleEditing,
   displayNameCooldownActive,
@@ -342,6 +405,8 @@ function AccountDrawer({
   handleUnchanged,
   onClose,
   onLogout,
+  onOpenAvatarPicker,
+  onSelectAvatar,
   setDisplayNameError,
   setDisplayNameInput,
   setDisplayNameStatus,
@@ -362,14 +427,25 @@ function AccountDrawer({
     ? `显示名 7 天内只能修改一次，下次可修改时间：${new Date(authUser.nextDisplayNameChangeAt).toLocaleString()}`
     : "显示名需要唯一，且 7 天内只能修改一次。";
 
+  function handleAvatarItemKeyDown(event) {
+    if (avatarSaving) {
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onOpenAvatarPicker();
+    }
+  }
+
   return (
     <PanelShell
       backdropClassName="auth-panel-backdrop"
       backdropLabel="关闭账号页面"
-      bodyClassName="auth-panel-body"
+      bodyClassName="account-panel-body"
       closeLabel="返回"
-      closeButtonClassName="auth-panel-close"
-      headClassName="auth-panel-head auth-panel-account-head"
+      closeButtonClassName="account-panel-close"
+      headClassName="account-panel-head"
       onClose={onClose}
       panelClassName="auth-panel auth-panel-account"
       panelLabel="账号页面"
@@ -377,11 +453,35 @@ function AccountDrawer({
     >
       <div class="my-account-form">
         <div class="account-panel-list">
-          <div class="account-list-item account-list-item-avatar">
+          <div
+            class="account-list-item account-list-item-avatar account-list-item-button"
+            role="button"
+            tabIndex={avatarSaving ? -1 : 0}
+            aria-disabled={avatarSaving}
+            aria-label="上传新头像"
+            onClick={() => {
+              if (!avatarSaving) {
+                onOpenAvatarPicker();
+              }
+            }}
+            onKeyDown={handleAvatarItemKeyDown}
+          >
             <span class="account-list-label">头像</span>
-            <span class="account-list-value account-list-avatar">
-              <ProfileAvatar authUser={authUser} />
-            </span>
+            <div class="account-list-value account-list-avatar">
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                class="account-avatar-input"
+                onChange={onSelectAvatar}
+              />
+              <div class="account-list-avatar-editable">
+                <ProfileAvatar authUser={authUser} />
+              </div>
+              <span class="account-list-chevron" aria-hidden="true">
+                <ChevronIcon />
+              </span>
+            </div>
           </div>
 
           <div class="account-list-item">
@@ -451,22 +551,26 @@ function AccountDrawer({
           />
         </div>
 
-        {handleError ? <p class="inline-warning">{handleError}</p> : null}
-        {handleStatus ? <p class="status">{handleStatus}</p> : null}
-        {displayNameError ? <p class="inline-warning">{displayNameError}</p> : null}
-        {displayNameStatus ? <p class="status">{displayNameStatus}</p> : null}
+        <div class="my-account-form-content">
+          {handleError ? <p class="inline-warning">{handleError}</p> : null}
+          {handleStatus ? <p class="status">{handleStatus}</p> : null}
+          {displayNameError ? <p class="inline-warning">{displayNameError}</p> : null}
+          {displayNameStatus ? <p class="status">{displayNameStatus}</p> : null}
+          {avatarError ? <p class="inline-warning">{avatarError}</p> : null}
+          {avatarStatus ? <p class="status">{avatarStatus}</p> : null}
 
-        <div class="my-actions">
-          <button
-            type="button"
-            class="secondary"
-            onClick={() => {
-              onClose();
-              onLogout();
-            }}
-          >
-            退出登录
-          </button>
+          <div class="my-actions">
+            <button
+              type="button"
+              class="secondary"
+              onClick={() => {
+                onClose();
+                onLogout();
+              }}
+            >
+              退出登录
+            </button>
+          </div>
         </div>
       </div>
     </PanelShell>
@@ -485,6 +589,7 @@ export function SettingsPage({
   onLogout,
   onUpdateDisplayName,
   onUpdateHandle,
+  onUpdateAvatar,
   onRelayUrlInput,
   watchHistoryItems,
   onOpenWatchHistoryItem,
@@ -506,6 +611,10 @@ export function SettingsPage({
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [loginPanelOpen, setLoginPanelOpen] = useState(false);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [avatarStatus, setAvatarStatus] = useState("");
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const avatarInputRef = useRef(null);
   const authPending = authLoading;
 
   useEffect(() => {
@@ -520,6 +629,9 @@ export function SettingsPage({
       setDisplayNameStatus("");
       setDisplayNameSaving(false);
       setDisplayNameEditing(false);
+      setAvatarError("");
+      setAvatarStatus("");
+      setAvatarSaving(false);
       setAccountPanelOpen(false);
       return;
     }
@@ -534,6 +646,9 @@ export function SettingsPage({
     setDisplayNameStatus("");
     setDisplayNameSaving(false);
     setDisplayNameEditing(false);
+    setAvatarError("");
+    setAvatarStatus("");
+    setAvatarSaving(false);
     setLoginPanelOpen(false);
   }, [authUser?.id]);
 
@@ -670,6 +785,33 @@ export function SettingsPage({
     setDisplayNameEditing(false);
   }
 
+  function openAvatarPicker() {
+    avatarInputRef.current?.click();
+  }
+
+  async function submitAvatarFile(event) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+
+    if (!file || !onUpdateAvatar) {
+      return;
+    }
+
+    setAvatarSaving(true);
+    setAvatarError("");
+    setAvatarStatus("");
+
+    try {
+      const resizedFile = await resizeAvatarFile(file, 192);
+      await onUpdateAvatar(resizedFile);
+      setAvatarStatus("头像已更新");
+    } catch (error) {
+      setAvatarError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAvatarSaving(false);
+    }
+  }
+
   return (
     <section class="page" data-page="settings" hidden={hidden}>
       <div class="page-grid settings-layout">
@@ -729,6 +871,10 @@ export function SettingsPage({
         {accountPanelOpen && authUser ? (
           <AccountDrawer
             authUser={authUser}
+            avatarError={avatarError}
+            avatarInputRef={avatarInputRef}
+            avatarSaving={avatarSaving}
+            avatarStatus={avatarStatus}
             cancelDisplayNameEditing={cancelDisplayNameEditing}
             cancelHandleEditing={cancelHandleEditing}
             displayNameCooldownActive={displayNameCooldownActive}
@@ -750,6 +896,10 @@ export function SettingsPage({
               setAccountPanelOpen(false);
             }}
             onLogout={onLogout}
+            onOpenAvatarPicker={openAvatarPicker}
+            onSelectAvatar={(event) => {
+              void submitAvatarFile(event);
+            }}
             setDisplayNameError={setDisplayNameError}
             setDisplayNameInput={setDisplayNameInput}
             setDisplayNameStatus={setDisplayNameStatus}

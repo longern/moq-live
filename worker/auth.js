@@ -15,6 +15,14 @@ const DEFAULT_HANDLE_SUFFIX_LENGTH = 8;
 const HANDLE_PATTERN = /^(?!\d+$)[a-z0-9](?:[a-z0-9_]{4,22}[a-z0-9])?$/;
 const DEFAULT_HANDLE_PATTERN = /^pid_[a-z0-9]{8}$/;
 const HANDLE_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+const MAX_ROOM_COVER_BYTES = 5 * 1024 * 1024;
+const ROOM_COVER_TYPES = {
+  "image/avif": "avif",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp"
+};
+const USER_AVATAR_TYPES = ROOM_COVER_TYPES;
 const TABLES = {
   users: "moq_users",
   rooms: "moq_rooms",
@@ -619,6 +627,101 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
   return buildUserPayload(updatedUser);
 }
 
+export async function updateUserAvatar(env, db, request, userId) {
+  const bucket = getMediaBucket(env);
+  const currentUser = await getUserRowById(db, userId);
+
+  if (!currentUser) {
+    throw createHttpError(404, "User not found", "user_not_found");
+  }
+
+  const formData = await request.formData().catch(() => null);
+  const file = formData?.get("avatar");
+
+  if (!(file instanceof File)) {
+    throw createHttpError(400, "缺少头像文件", "missing_avatar_file");
+  }
+
+  const contentType = String(file.type || "").toLowerCase();
+  const extension = USER_AVATAR_TYPES[contentType];
+  if (!extension) {
+    throw createHttpError(400, "仅支持 JPG、PNG、WebP、AVIF 格式", "invalid_avatar_type");
+  }
+
+  if (!file.size) {
+    throw createHttpError(400, "头像文件为空", "empty_avatar_file");
+  }
+
+  if (file.size > MAX_ROOM_COVER_BYTES) {
+    throw createHttpError(413, "头像文件不能超过 5MB", "avatar_file_too_large");
+  }
+
+  const objectKey = buildUserAvatarObjectKey(userId, extension);
+  const avatarUrl = buildUserAvatarUrl(request, objectKey);
+  const previousObjectKey = getMediaObjectKeyFromUrl(currentUser.avatar_url, request.url, "/media/user-avatars/");
+  const body = await file.arrayBuffer();
+
+  await bucket.put(objectKey, body, {
+    httpMetadata: {
+      contentType,
+      cacheControl: "public, max-age=31536000, immutable"
+    },
+    customMetadata: {
+      userId,
+      uploadedBy: userId
+    }
+  });
+
+  try {
+    await db.prepare(
+      `UPDATE ${TABLES.users}
+       SET avatar_url = ?, updated_at = ?
+       WHERE id = ?`
+    ).bind(avatarUrl, new Date().toISOString(), userId).run();
+  } catch (error) {
+    await bucket.delete(objectKey).catch(() => {});
+    throw error;
+  }
+
+  if (previousObjectKey && previousObjectKey !== objectKey) {
+    await bucket.delete(previousObjectKey).catch(() => {});
+  }
+
+  const updatedUser = await getUserRowById(db, userId);
+  if (!updatedUser) {
+    throw createHttpError(404, "User not found", "user_not_found");
+  }
+
+  return buildUserPayload(updatedUser);
+}
+
+export async function removeUserAvatar(env, db, userId) {
+  const bucket = getMediaBucket(env);
+  const currentUser = await getUserRowById(db, userId);
+
+  if (!currentUser) {
+    throw createHttpError(404, "User not found", "user_not_found");
+  }
+
+  const previousObjectKey = getMediaObjectKeyFromUrl(currentUser.avatar_url, "https://moq.local/", "/media/user-avatars/");
+  await db.prepare(
+    `UPDATE ${TABLES.users}
+     SET avatar_url = NULL, updated_at = ?
+     WHERE id = ?`
+  ).bind(new Date().toISOString(), userId).run();
+
+  if (previousObjectKey) {
+    await bucket.delete(previousObjectKey).catch(() => {});
+  }
+
+  const updatedUser = await getUserRowById(db, userId);
+  if (!updatedUser) {
+    throw createHttpError(404, "User not found", "user_not_found");
+  }
+
+  return buildUserPayload(updatedUser);
+}
+
 export function buildSessionCookie(token, expiresAt, secure = true) {
   const expires = new Date(expiresAt);
   const maxAge = Math.max(0, Math.floor((expires.getTime() - Date.now()) / 1000));
@@ -672,6 +775,39 @@ async function getUserRowById(db, userId) {
      WHERE id = ?
      LIMIT 1`
   ).bind(userId).first();
+}
+
+async function getRoomRowByHostUserId(db, userId) {
+  return db.prepare(
+    `SELECT
+      id,
+      host_user_id,
+      title,
+      cover_url,
+      created_at,
+      updated_at
+     FROM ${TABLES.rooms}
+     WHERE host_user_id = ?
+     LIMIT 1`
+  ).bind(userId).first();
+}
+
+async function requireUserRoomRow(db, userId) {
+  await ensureUserRoom(db, userId);
+  const room = await getRoomRowByHostUserId(db, userId);
+  if (!room?.id) {
+    throw createHttpError(404, "Room not found", "room_not_found");
+  }
+  return room;
+}
+
+function buildRoomPayload(row) {
+  return {
+    id: row.id,
+    title: row.title || "",
+    coverUrl: row.cover_url || "",
+    updatedAt: row.updated_at || ""
+  };
 }
 
 function sanitizeDisplayName(value) {
@@ -838,6 +974,89 @@ async function ensureUserRoom(db, userId) {
 
 export { ensureUserRoom };
 
+export async function getUserRoom(db, userId) {
+  const room = await requireUserRoomRow(db, userId);
+  return buildRoomPayload(room);
+}
+
+export async function updateUserRoomCover(env, db, request, userId) {
+  const bucket = getMediaBucket(env);
+  const currentRoom = await requireUserRoomRow(db, userId);
+  const formData = await request.formData().catch(() => null);
+  const file = formData?.get("cover");
+
+  if (!(file instanceof File)) {
+    throw createHttpError(400, "缺少封面文件", "missing_cover_file");
+  }
+
+  const contentType = String(file.type || "").toLowerCase();
+  const extension = ROOM_COVER_TYPES[contentType];
+  if (!extension) {
+    throw createHttpError(400, "仅支持 JPG、PNG、WebP、AVIF 格式", "invalid_cover_type");
+  }
+
+  if (!file.size) {
+    throw createHttpError(400, "封面文件为空", "empty_cover_file");
+  }
+
+  if (file.size > MAX_ROOM_COVER_BYTES) {
+    throw createHttpError(413, "封面文件不能超过 5MB", "cover_file_too_large");
+  }
+
+  const objectKey = buildRoomCoverObjectKey(currentRoom.id, extension);
+  const coverUrl = buildRoomCoverUrl(request, objectKey);
+  const previousObjectKey = getMediaObjectKeyFromUrl(currentRoom.cover_url, request.url, "/media/room-covers/");
+  const body = await file.arrayBuffer();
+
+  await bucket.put(objectKey, body, {
+    httpMetadata: {
+      contentType,
+      cacheControl: "public, max-age=31536000, immutable"
+    },
+    customMetadata: {
+      roomId: currentRoom.id,
+      uploadedBy: userId
+    }
+  });
+
+  try {
+    await db.prepare(
+      `UPDATE ${TABLES.rooms}
+       SET cover_url = ?, updated_at = ?
+       WHERE id = ?`
+    ).bind(coverUrl, new Date().toISOString(), currentRoom.id).run();
+  } catch (error) {
+    await bucket.delete(objectKey).catch(() => {});
+    throw error;
+  }
+
+  if (previousObjectKey && previousObjectKey !== objectKey) {
+    await bucket.delete(previousObjectKey).catch(() => {});
+  }
+
+  const updatedRoom = await requireUserRoomRow(db, userId);
+  return buildRoomPayload(updatedRoom);
+}
+
+export async function removeUserRoomCover(env, db, userId) {
+  const bucket = getMediaBucket(env);
+  const currentRoom = await requireUserRoomRow(db, userId);
+  const previousObjectKey = getMediaObjectKeyFromUrl(currentRoom.cover_url, "https://moq.local/", "/media/room-covers/");
+
+  await db.prepare(
+    `UPDATE ${TABLES.rooms}
+     SET cover_url = '', updated_at = ?
+     WHERE id = ?`
+  ).bind(new Date().toISOString(), currentRoom.id).run();
+
+  if (previousObjectKey) {
+    await bucket.delete(previousObjectKey).catch(() => {});
+  }
+
+  const updatedRoom = await requireUserRoomRow(db, userId);
+  return buildRoomPayload(updatedRoom);
+}
+
 function getDisplayNameNextChangeAt(changedAt) {
   if (!changedAt) {
     return null;
@@ -857,6 +1076,48 @@ function createHttpError(status, message, code, details = undefined) {
   error.code = code;
   error.details = details;
   return error;
+}
+
+function getMediaBucket(env) {
+  if (!env.APP_MEDIA) {
+    throw createHttpError(500, "Missing APP_MEDIA binding", "missing_app_media_binding");
+  }
+
+  return env.APP_MEDIA;
+}
+
+function buildRoomCoverObjectKey(roomId, extension) {
+  return `rooms/${roomId}/cover/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+}
+
+function buildRoomCoverUrl(request, objectKey) {
+  const url = new URL(request.url);
+  return `${url.origin}/media/room-covers/${encodeURIComponent(objectKey)}`;
+}
+
+function buildUserAvatarObjectKey(userId, extension) {
+  return `users/${userId}/avatar/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+}
+
+function buildUserAvatarUrl(request, objectKey) {
+  const url = new URL(request.url);
+  return `${url.origin}/media/user-avatars/${encodeURIComponent(objectKey)}`;
+}
+
+function getMediaObjectKeyFromUrl(mediaUrl, fallbackBase, prefix) {
+  if (!mediaUrl) {
+    return "";
+  }
+
+  try {
+    const url = new URL(mediaUrl, fallbackBase);
+    if (!url.pathname.startsWith(prefix)) {
+      return "";
+    }
+    return decodeURIComponent(url.pathname.slice(prefix.length)).trim();
+  } catch {
+    return "";
+  }
 }
 
 async function sha256Hex(input) {

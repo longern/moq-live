@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { lazy, Suspense } from "preact/compat";
 import { DesktopNavigation, MobileNavigation } from "./components/Navigation.jsx";
 import { LoginDrawer } from "./components/LoginDrawer.jsx";
 import { UserAvatar } from "./components/UserAvatar.jsx";
-import { LivePage } from "./components/LivePage.jsx";
 import { SettingsPage } from "./components/SettingsPage.jsx";
 import { WatchPage } from "./components/WatchPage.jsx";
 import { useAuthController } from "./hooks/useAuthController.js";
@@ -14,6 +14,10 @@ import { buildWatchLink, generateRoomId, getRelayHostValue, writeRoute } from ".
 import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from "./lib/watchHistory.js";
 import { describePlayerState, describePublishState } from "./lib/status.js";
 import { getPublishBlockReason, isPublishBlocked } from "./lib/roomPolicy.js";
+
+const LivePage = lazy(() =>
+  import("./components/LivePage.jsx").then((module) => ({ default: module.LivePage }))
+);
 
 function splitCameraOptions(cameraOptions) {
   const front = [];
@@ -83,6 +87,20 @@ function getHandleWatchValue(value) {
   return value.trim().replace(/^@+/, "").toLowerCase();
 }
 
+function LivePageFallback({ hidden }) {
+  return (
+    <section class="page" data-page="live" hidden={hidden}>
+      <div class="page-grid live-layout">
+        <section class="control-column" aria-busy="true">
+          <div class="placeholder">
+            <p>正在加载开播页。</p>
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
 export function App() {
   const siteTitle = __APP_TITLE__;
   const [logText, setLogText] = useState("");
@@ -90,6 +108,9 @@ export function App() {
   const [settingsLoginPanelRequestKey, setSettingsLoginPanelRequestKey] = useState(0);
   const [watchHistoryItems, setWatchHistoryItems] = useState(() => readWatchHistory());
   const [authMenuOpen, setAuthMenuOpen] = useState(false);
+  const [livePageMounted, setLivePageMounted] = useState(
+    () => new URLSearchParams(window.location.search).get("p") === "l"
+  );
   const [watchRouteCommitted, setWatchRouteCommitted] = useState(() => Boolean(new URLSearchParams(window.location.search).get("r")?.trim()));
   const logRef = useRef(null);
   const authMenuRef = useRef(null);
@@ -135,7 +156,8 @@ export function App() {
     startMicrosoftLogin,
     logout,
     updateDisplayName,
-    updateHandle
+    updateHandle,
+    updateAvatar
   } = useAuthController({ log });
 
   const [watchRoomResolution, setWatchRoomResolution] = useState({
@@ -161,6 +183,7 @@ export function App() {
   const directWatchNamespace = getNamespaceWatchValue(normalizedWatchInput);
   const watchHandle = watchingNamespace ? "" : getHandleWatchValue(normalizedWatchInput);
   const resolvedWatchRoomId = watchingNamespace ? "" : watchRoomResolution.roomId;
+  const watchChatRoom = watchingNamespace ? directWatchNamespace : resolvedWatchRoomId;
 
   const publisher = usePublisherController({
     page,
@@ -184,8 +207,8 @@ export function App() {
     : liveRoom;
 
   const chat = useChatController({
-    room: resolvedWatchRoomId,
-    enabled: page === "watch" && !watchingNamespace && Boolean(resolvedWatchRoomId),
+    room: watchChatRoom,
+    enabled: page === "watch" && Boolean(watchChatRoom),
     authKey: authState.user?.id ?? "anonymous",
     role: "viewer",
     log
@@ -205,7 +228,6 @@ export function App() {
     ? directWatchNamespace
     : chat.roomMeta.stream.namespace || "";
   const watchJoined = page === "watch" && watchRouteCommitted && Boolean(normalizedWatchInput);
-  const watchChatRoom = resolvedWatchRoomId || "";
   const watchStageMessage = watchingNamespace
     ? (directWatchNamespace ? "正在连接公共 namespace。" : "等待输入 namespace。")
     : watchRoomResolution.loading
@@ -258,7 +280,7 @@ export function App() {
     || liveRoom
     || "等待生成频道号";
   const watchShareTarget = watchingNamespace
-    ? directWatchNamespace
+    ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
     : watchRoomResolution.hostHandle || watchHandle || watchRoom;
   const liveShareTarget = authState.user?.handle?.trim() || "";
   const watchPageLink = buildWatchLink(relayUrl, watchShareTarget);
@@ -292,6 +314,12 @@ export function App() {
       : !authState.available
         ? "Auth API 未连接"
         : "匿名用户";
+
+  useEffect(() => {
+    if (page === "live") {
+      setLivePageMounted(true);
+    }
+  }, [page]);
 
   function openSettingsLogin(options) {
     setAuthMenuOpen(false);
@@ -1007,6 +1035,8 @@ export function App() {
                     email={authState.user?.email}
                     className={`auth-avatar${avatarStateClass}`}
                     imgAlt={authState.user?.displayName || "用户头像"}
+                    imgWidth={40}
+                    imgHeight={40}
                     loading={authState.loading}
                     loadingClassName="auth-avatar-spinner"
                     iconClassName="auth-avatar-icon"
@@ -1139,115 +1169,119 @@ export function App() {
             }}
           />
 
-          <LivePage
-            hidden={page !== "live"}
-            room={liveRoom}
-            roomLabel={liveRoomLabel}
-            shareTarget={liveShareTarget}
-            watchLink={liveWatchLink}
-            publishBlocked={publishBlocked}
-            publishBlockedReason={publishBlockedReason}
-            publishStatus={publisher.publishStatus}
-            publishBadge={publishBadge}
-            cameraOptions={publisher.cameraOptions}
-            microphoneOptions={publisher.microphoneOptions}
-            selectedCameraId={publisher.selectedCameraId}
-            selectedMicrophoneId={publisher.selectedMicrophoneId}
-            cameraEnabled={publisher.cameraEnabled}
-            microphoneEnabled={publisher.microphoneEnabled}
-            cameraMode={cameraMode}
-            isPublishing={publisher.publisherIsPublishing}
-            previewActive={publisher.previewActive}
-            previewHasVideo={publisher.previewHasVideo}
-            syntheticPublishing={publisher.syntheticPublishing}
-            previewVideoRef={publisher.previewVideoRef}
-            onCameraChange={(event) => {
-              publisher.setSelectedCameraId(event.currentTarget.value);
-              publisher.setCameraEnabled(true);
-            }}
-            onMicrophoneChange={(event) => {
-              publisher.setSelectedMicrophoneId(event.currentTarget.value);
-              publisher.setMicrophoneEnabled(true);
-            }}
-            onCycleCamera={() => {
-              cycleCameraMode();
-            }}
-            onToggleMicrophone={() => {
-              publisher.setMicrophoneEnabled(!publisher.microphoneEnabled);
-            }}
-            onTogglePublish={() => {
-              if (publisher.publisherIsPublishing) {
-                void publisher.stopCameraPublish();
-                return;
-              }
-              void publisher.startCameraPublish().catch((error) => {
-                const message = error instanceof Error ? error.message : String(error);
-                log(`camera publish failed: ${message}`);
-              });
-            }}
-            onStartPublish={() => {
-              void publisher.startCameraPublish().catch((error) => {
-                const message = error instanceof Error ? error.message : String(error);
-                log(`camera publish failed: ${message}`);
-              });
-            }}
-            onStopPublish={() => {
-              void publisher.stopCameraPublish();
-            }}
-            onShare={() => {
-              void shareLiveRoom().catch((error) => {
-                log(`share failed: ${error instanceof Error ? error.message : String(error)}`);
-              });
-            }}
-            onRegenerateRoom={() => {
-              autorunRef.current = false;
-              setLiveRoomValue(generateRoomId());
-            }}
-            onStartSynthetic={() => {
-              selectPageWithGuard("live");
-              void publisher.startSyntheticPublish().catch((error) => {
-                const message = error instanceof Error ? error.message : String(error);
-                log(`synthetic publish failed: ${message}`);
-              });
-            }}
-            onStopSynthetic={() => {
-              selectPageWithGuard("live");
-              void publisher.stopSyntheticPublish();
-            }}
-            screenShareSupported={publisher.screenShareSupported}
-            screenShareActive={publisher.screenShareActive}
-            previewSourceType={publisher.previewSourceType}
-            onStartScreenShare={() => {
-              void publisher.startScreenShare().catch((error) => {
-                const message = error instanceof Error ? error.message : String(error);
-                log(`screen share failed: ${message}`);
-              });
-            }}
-            onStopScreenShare={() => {
-              void publisher.stopScreenShare().catch((error) => {
-                const message = error instanceof Error ? error.message : String(error);
-                log(`screen share stop failed: ${message}`);
-              });
-            }}
-            chatMessages={liveChat.messages}
-            chatDraft={liveChat.draft}
-            chatConnectionState={liveChat.connectionState}
-            chatOnlineCount={liveChat.onlineCount}
-            chatReadOnly={liveChat.readOnly}
-            chatError={liveChat.chatError}
-            authAvailable={authState.available}
-            authLoading={authState.loading}
-            authUser={authState.user}
-            onChatDraftChange={(event) => {
-              liveChat.setDraft(event.currentTarget.value);
-            }}
-            onChatSend={() => {
-              liveChat.sendMessage();
-            }}
-            onChatRequireLogin={() => {
-              setLoginPromptOpen(true);
-            }}
-          />
+          {livePageMounted ? (
+            <Suspense fallback={<LivePageFallback hidden={page !== "live"} />}>
+              <LivePage
+                hidden={page !== "live"}
+                room={liveRoom}
+                roomLabel={liveRoomLabel}
+                shareTarget={liveShareTarget}
+                watchLink={liveWatchLink}
+                publishBlocked={publishBlocked}
+                publishBlockedReason={publishBlockedReason}
+                publishStatus={publisher.publishStatus}
+                publishBadge={publishBadge}
+                cameraOptions={publisher.cameraOptions}
+                microphoneOptions={publisher.microphoneOptions}
+                selectedCameraId={publisher.selectedCameraId}
+                selectedMicrophoneId={publisher.selectedMicrophoneId}
+                cameraEnabled={publisher.cameraEnabled}
+                microphoneEnabled={publisher.microphoneEnabled}
+                cameraMode={cameraMode}
+                isPublishing={publisher.publisherIsPublishing}
+                previewActive={publisher.previewActive}
+                previewHasVideo={publisher.previewHasVideo}
+                syntheticPublishing={publisher.syntheticPublishing}
+                previewVideoRef={publisher.previewVideoRef}
+                onCameraChange={(event) => {
+                  publisher.setSelectedCameraId(event.currentTarget.value);
+                  publisher.setCameraEnabled(true);
+                }}
+                onMicrophoneChange={(event) => {
+                  publisher.setSelectedMicrophoneId(event.currentTarget.value);
+                  publisher.setMicrophoneEnabled(true);
+                }}
+                onCycleCamera={() => {
+                  cycleCameraMode();
+                }}
+                onToggleMicrophone={() => {
+                  publisher.setMicrophoneEnabled(!publisher.microphoneEnabled);
+                }}
+                onTogglePublish={() => {
+                  if (publisher.publisherIsPublishing) {
+                    void publisher.stopCameraPublish();
+                    return;
+                  }
+                  void publisher.startCameraPublish().catch((error) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    log(`camera publish failed: ${message}`);
+                  });
+                }}
+                onStartPublish={() => {
+                  void publisher.startCameraPublish().catch((error) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    log(`camera publish failed: ${message}`);
+                  });
+                }}
+                onStopPublish={() => {
+                  void publisher.stopCameraPublish();
+                }}
+                onShare={() => {
+                  void shareLiveRoom().catch((error) => {
+                    log(`share failed: ${error instanceof Error ? error.message : String(error)}`);
+                  });
+                }}
+                onRegenerateRoom={() => {
+                  autorunRef.current = false;
+                  setLiveRoomValue(generateRoomId());
+                }}
+                onStartSynthetic={() => {
+                  selectPageWithGuard("live");
+                  void publisher.startSyntheticPublish().catch((error) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    log(`synthetic publish failed: ${message}`);
+                  });
+                }}
+                onStopSynthetic={() => {
+                  selectPageWithGuard("live");
+                  void publisher.stopSyntheticPublish();
+                }}
+                screenShareSupported={publisher.screenShareSupported}
+                screenShareActive={publisher.screenShareActive}
+                previewSourceType={publisher.previewSourceType}
+                onStartScreenShare={() => {
+                  void publisher.startScreenShare().catch((error) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    log(`screen share failed: ${message}`);
+                  });
+                }}
+                onStopScreenShare={() => {
+                  void publisher.stopScreenShare().catch((error) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    log(`screen share stop failed: ${message}`);
+                  });
+                }}
+                chatMessages={liveChat.messages}
+                chatDraft={liveChat.draft}
+                chatConnectionState={liveChat.connectionState}
+                chatOnlineCount={liveChat.onlineCount}
+                chatReadOnly={liveChat.readOnly}
+                chatError={liveChat.chatError}
+                authAvailable={authState.available}
+                authLoading={authState.loading}
+                authUser={authState.user}
+                onChatDraftChange={(event) => {
+                  liveChat.setDraft(event.currentTarget.value);
+                }}
+                onChatSend={() => {
+                  liveChat.sendMessage();
+                }}
+                onChatRequireLogin={() => {
+                  setLoginPromptOpen(true);
+                }}
+              />
+            </Suspense>
+          ) : null}
 
           <SettingsPage
             hidden={page !== "settings"}
@@ -1263,6 +1297,7 @@ export function App() {
             }}
             onUpdateDisplayName={(displayName) => updateDisplayName(displayName)}
             onUpdateHandle={(handle) => updateHandle(handle)}
+            onUpdateAvatar={(file) => updateAvatar(file)}
             onRelayUrlInput={(event) => {
               autorunRef.current = false;
               setRelayUrlValue(event.currentTarget.value);

@@ -10,17 +10,21 @@ import {
   getDb,
   getMicrosoftLoginUrl,
   getMicrosoftOAuthCookieName,
+  getUserRoom,
   getSessionCookieName,
-  ensureUserRoom,
   getSessionUser,
   json,
   parseCookies,
+  removeUserAvatar,
+  removeUserRoomCover,
   readMicrosoftOAuthState,
   redirect,
   revokeSession,
   sanitizeRedirectTo,
   shouldUseSecureCookies,
+  updateUserAvatar,
   updateUserProfile,
+  updateUserRoomCover,
   upsertMicrosoftUser,
   verifyMicrosoftIdToken
 } from "./auth.js";
@@ -29,6 +33,13 @@ import { ChatRoomDO } from "./chat-room.js";
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname.startsWith("/media/room-covers/")) {
+      return await handleRoomCoverMedia(env, request);
+    }
+    if (request.method === "GET" && url.pathname.startsWith("/media/user-avatars/")) {
+      return await handleUserAvatarMedia(env, request);
+    }
 
     if (!url.pathname.startsWith("/api/")) {
       if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
@@ -44,6 +55,12 @@ export default {
       if (url.pathname === "/api/me/room" && request.method === "GET") {
         return await handleMyRoom(env, request);
       }
+      if (url.pathname === "/api/me/room/cover" && request.method === "POST") {
+        return await handleMyRoomCoverUpload(env, request);
+      }
+      if (url.pathname === "/api/me/room/cover" && request.method === "DELETE") {
+        return await handleMyRoomCoverDelete(env, request);
+      }
       if (url.pathname === "/api/rooms" && request.method === "GET") {
         return await handleRooms(env);
       }
@@ -52,6 +69,12 @@ export default {
       }
       if (url.pathname === "/api/me/profile" && request.method === "POST") {
         return await handleProfileUpdate(env, request);
+      }
+      if (url.pathname === "/api/me/avatar" && request.method === "POST") {
+        return await handleMyAvatarUpload(env, request);
+      }
+      if (url.pathname === "/api/me/avatar" && request.method === "DELETE") {
+        return await handleMyAvatarDelete(env, request);
       }
       if (url.pathname === "/api/auth/microsoft/start" && request.method === "GET") {
         return await handleMicrosoftStart(env, request);
@@ -113,13 +136,115 @@ async function handleMyRoom(env, request) {
     return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
   }
 
-  const roomId = await ensureUserRoom(db, session.user.id);
+  const room = await getUserRoom(db, session.user.id);
   return json({
     ok: true,
-    room: {
-      id: roomId
-    }
+    room
   });
+}
+
+async function handleMyRoomCoverUpload(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const room = await updateUserRoomCover(env, db, request, session.user.id);
+  return json({ ok: true, room });
+}
+
+async function handleMyRoomCoverDelete(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const room = await removeUserRoomCover(env, db, session.user.id);
+  return json({ ok: true, room });
+}
+
+async function handleRoomCoverMedia(env, request) {
+  if (!env.APP_MEDIA) {
+    return new Response("Missing APP_MEDIA binding.", { status: 500 });
+  }
+
+  const url = new URL(request.url);
+  const objectKey = decodeURIComponent(url.pathname.slice("/media/room-covers/".length)).trim();
+  if (!objectKey) {
+    return new Response("Missing room cover key.", { status: 400 });
+  }
+
+  const object = await env.APP_MEDIA.get(objectKey);
+  if (!object) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag);
+  if (!headers.has("cache-control")) {
+    headers.set("cache-control", "public, max-age=31536000, immutable");
+  }
+
+  return new Response(object.body, {
+    headers
+  });
+}
+
+async function handleUserAvatarMedia(env, request) {
+  if (!env.APP_MEDIA) {
+    return new Response("Missing APP_MEDIA binding.", { status: 500 });
+  }
+
+  const url = new URL(request.url);
+  const objectKey = decodeURIComponent(url.pathname.slice("/media/user-avatars/".length)).trim();
+  if (!objectKey) {
+    return new Response("Missing user avatar key.", { status: 400 });
+  }
+
+  const object = await env.APP_MEDIA.get(objectKey);
+  if (!object) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag);
+  if (!headers.has("cache-control")) {
+    headers.set("cache-control", "public, max-age=31536000, immutable");
+  }
+
+  return new Response(object.body, {
+    headers
+  });
+}
+
+async function handleMyAvatarUpload(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const user = await updateUserAvatar(env, db, request, session.user.id);
+  return json({ ok: true, user });
+}
+
+async function handleMyAvatarDelete(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const user = await removeUserAvatar(env, db, session.user.id);
+  return json({ ok: true, user });
 }
 
 async function handleRooms(env) {

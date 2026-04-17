@@ -148,18 +148,27 @@ export function WatchIdlePage({
     <section class="page page-immersive watch-idle-page" data-page="watch" data-joined="false" hidden={hidden}>
       <div class="watch-idle-shell">
         <div class="watch-idle-panel">
-          <div class="watch-idle-form">
+          <form
+            class="watch-idle-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onStart();
+            }}
+          >
             <input
               id="namespace"
               value={room}
               placeholder="输入主播 handle"
               aria-label="主播 handle"
+              enterKeyHint="go"
+              autoCapitalize="off"
+              autoCorrect="off"
               onInput={onRoomInput}
             />
-            <button type="button" id="start" aria-label="加入直播间" onClick={onStart} disabled={!room.trim()}>
+            <button type="submit" id="start" aria-label="加入直播间" disabled={!room.trim()}>
               <JoinIcon />
             </button>
-          </div>
+          </form>
           <section class={`watch-room-section${roomsState.items.length ? "" : " is-empty"}`}>
             {roomsState.loading ? (
               <div class="watch-room-state">正在加载直播间…</div>

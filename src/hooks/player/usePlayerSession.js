@@ -44,6 +44,12 @@ export function usePlayerSession({
     setPlayerStatus(message);
   }
 
+  function syncPlayerMutedState(nextMuted) {
+    const targetMuted = !audioPlaybackSupported || nextMuted;
+    desiredPlayerMutedRef.current = targetMuted;
+    setPlayerMutedState(targetMuted);
+  }
+
   async function stopPlayer(options = {}) {
     const {
       token = ++playbackTokenRef.current,
@@ -110,7 +116,11 @@ export function usePlayerSession({
     }
   }
 
-  async function startPlayer() {
+  async function startPlayer(options = {}) {
+    const {
+      initialMuted = !audioPlaybackSupported,
+    } = options;
+    const targetMuted = !audioPlaybackSupported || initialMuted;
     const token = ++playbackTokenRef.current;
     await stopPlayer({
       token,
@@ -147,8 +157,8 @@ export function usePlayerSession({
     setFullscreenActive(false);
     setFullscreenRotate(false);
     setPlayerPaused(false);
-    desiredPlayerMutedRef.current = !audioPlaybackSupported;
-    setPlayerMutedState(!audioPlaybackSupported);
+    desiredPlayerMutedRef.current = targetMuted;
+    setPlayerMutedState(targetMuted);
     if (!audioPlaybackSupported && !audioFallbackLoggedRef.current) {
       logRef.current?.(
         `audio playback disabled: ${getPlayerAudioSupportReason()}; auto-muted player`,
@@ -174,18 +184,9 @@ export function usePlayerSession({
   }
 
   async function resumePlayer() {
-    const playerEl = playerRef.current;
-    if (!playerEl) {
-      if (!playerSessionStateRef.current) {
-        await startPlayer();
-      }
-      return;
-    }
-
-    if (typeof playerEl.play === "function") {
-      await playerEl.play();
-    }
-    setPlayerPaused(false);
+    await startPlayer({
+      initialMuted: desiredPlayerMutedRef.current,
+    });
   }
 
   async function setPlayerMute(nextMuted, { logFailure = true } = {}) {
@@ -201,11 +202,7 @@ export function usePlayerSession({
           }
 
           const targetMuted = !audioPlaybackSupported || desiredPlayerMutedRef.current;
-          setPlayerMutedState(targetMuted);
-          if ("muted" in playerEl) {
-            playerEl.muted = targetMuted;
-          }
-
+          syncPlayerMutedState(targetMuted);
           if (!audioPlaybackSupported) {
             if (typeof playerEl.mute === "function") {
               await playerEl.mute();
@@ -218,12 +215,16 @@ export function usePlayerSession({
           } else if (targetMuted) {
             if (typeof playerEl.mute === "function") {
               await playerEl.mute();
+            } else if ("muted" in playerEl) {
+              playerEl.muted = true;
             }
           } else if (typeof playerEl.unmute === "function") {
             await playerEl.unmute();
+          } else if ("muted" in playerEl) {
+            playerEl.muted = false;
           }
 
-          setPlayerMutedState(targetMuted);
+          syncPlayerMutedState("muted" in playerEl ? Boolean(playerEl.muted) : targetMuted);
           if ((!audioPlaybackSupported || desiredPlayerMutedRef.current) === targetMuted) {
             return;
           }
@@ -234,9 +235,7 @@ export function usePlayerSession({
   }
 
   function setPlayerMutedStateOnly(nextMuted) {
-    const targetMuted = !audioPlaybackSupported || nextMuted;
-    desiredPlayerMutedRef.current = targetMuted;
-    setPlayerMutedState(targetMuted);
+    syncPlayerMutedState(nextMuted);
   }
 
   async function togglePlayerMute() {
@@ -325,9 +324,41 @@ export function usePlayerSession({
       ctx.started = true;
       ctx.lastAdvanceAt = Date.now();
       setPlayerPaused(false);
+      syncPlayerMutedState(Boolean(ctx.player.muted));
       updatePlayerStatus("live", "播放中（moq-js WebCodecs 路径）。");
       setPlaybackStartToken((current) => current + 1);
       logRef.current?.("playback started");
+    });
+
+    attach(ctx, ctx.player, "play", () => {
+      if (sessionRef.current !== ctx) {
+        return;
+      }
+      setPlayerPaused(false);
+      if (ctx.started) {
+        updatePlayerStatus("live", "播放中（moq-js WebCodecs 路径）。");
+      }
+    });
+
+    attach(ctx, ctx.player, "pause", () => {
+      if (sessionRef.current !== ctx) {
+        return;
+      }
+      setPlayerPaused(true);
+      if (ctx.started) {
+        setPlayerStatus("已暂停");
+      }
+    });
+
+    attach(ctx, ctx.player, "volumechange", (event) => {
+      if (sessionRef.current !== ctx) {
+        return;
+      }
+      const mutedFromDetail = event?.detail?.muted;
+      const muted = typeof mutedFromDetail === "boolean"
+        ? mutedFromDetail
+        : Boolean(ctx.player.muted);
+      syncPlayerMutedState(muted);
     });
 
     attach(ctx, ctx.player, "error", (event) => {

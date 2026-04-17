@@ -62,6 +62,7 @@ const buildHash = computeBuildHash();
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, rootDir, "");
   const siteTitle = env.VITE_SITE_TITLE?.trim() || "MoQ Live Deck";
+  const backendProxyTarget = env.BACKEND_PROXY_TARGET?.trim() || "";
 
   return {
     plugins: [injectSiteTitle(siteTitle), preact()],
@@ -71,6 +72,17 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       headers: isolationHeaders,
+      ...(backendProxyTarget
+        ? {
+            proxy: {
+              "/api": {
+                target: backendProxyTarget,
+                changeOrigin: true,
+                ws: true,
+              },
+            },
+          }
+        : {}),
     },
     preview: {
       headers: isolationHeaders,

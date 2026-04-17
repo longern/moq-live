@@ -27,10 +27,10 @@ export function LoginDrawer({ authAvailable, authLoading, onClose, onMicrosoftLo
         onClick={onClose}
       />
       <aside class="auth-panel auth-panel-login" aria-label="登录页面">
-        <div class="auth-panel-head auth-panel-login-head">
+        <div class="login-panel-head">
           <button
             type="button"
-            class="auth-panel-close"
+            class="login-panel-close"
             aria-label="返回"
             onClick={onClose}
           >
@@ -39,8 +39,8 @@ export function LoginDrawer({ authAvailable, authLoading, onClose, onMicrosoftLo
           <strong>登录</strong>
           <span class="panel-head-spacer" aria-hidden="true" />
         </div>
-        <div class="auth-panel-body auth-panel-login-body">
-          <div class="auth-panel-copy auth-panel-login-copy">
+        <div class="login-panel-body">
+          <div class="login-panel-copy">
             <h2>登录账号</h2>
           </div>
 

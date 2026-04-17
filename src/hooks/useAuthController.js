@@ -99,6 +99,58 @@ export function useAuthController({ log, onAuthenticated }) {
     return updateProfile({ handle });
   }
 
+  async function updateAvatar(file) {
+    const formData = new FormData();
+    formData.set("avatar", file);
+
+    const response = await fetch("/api/me/avatar", {
+      method: "POST",
+      credentials: "same-origin",
+      body: formData
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload.error || `avatar upload failed with ${response.status}`);
+    }
+
+    if (payload.user) {
+      setAuthState((current) => ({
+        ...current,
+        available: true,
+        loading: false,
+        user: payload.user
+      }));
+      onAuthenticatedRef.current?.(payload.user);
+    }
+
+    return payload;
+  }
+
+  async function removeAvatar() {
+    const response = await fetch("/api/me/avatar", {
+      method: "DELETE",
+      credentials: "same-origin"
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload.error || `avatar delete failed with ${response.status}`);
+    }
+
+    if (payload.user) {
+      setAuthState((current) => ({
+        ...current,
+        available: true,
+        loading: false,
+        user: payload.user
+      }));
+      onAuthenticatedRef.current?.(payload.user);
+    }
+
+    return payload;
+  }
+
   useEffect(() => {
     const url = new URL(window.location.href);
     const authError = url.searchParams.get("auth_error");
@@ -117,6 +169,8 @@ export function useAuthController({ log, onAuthenticated }) {
     startMicrosoftLogin,
     logout,
     updateDisplayName,
-    updateHandle
+    updateHandle,
+    updateAvatar,
+    removeAvatar
   };
 }

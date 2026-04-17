@@ -31,6 +31,7 @@ export class ChatRoomDO {
 
     const room = request.headers.get("x-chat-room") ?? "";
     const role = request.headers.get("x-chat-role") === "broadcaster" ? "broadcaster" : "viewer";
+    const isRoomOwner = request.headers.get("x-chat-room-owner") === "1";
     const readOnly = request.headers.get("x-chat-read-only") !== "0";
     const user = parseUserHeader(request.headers.get("x-chat-user"));
     const pair = new WebSocketPair();
@@ -41,6 +42,7 @@ export class ChatRoomDO {
     server.serializeAttachment({
       room,
       role,
+      isRoomOwner,
       readOnly,
       user,
       sentAt: []
@@ -94,17 +96,17 @@ export class ChatRoomDO {
     }
 
     if (payload?.type === "stream.started") {
-      await this.handleStreamStarted(payload);
+      await this.handleStreamStarted(ws, session, payload);
       return;
     }
 
     if (payload?.type === "stream.stopped") {
-      await this.handleStreamStopped();
+      await this.handleStreamStopped(ws, session);
       return;
     }
 
     if (payload?.type === "room.updated") {
-      await this.handleRoomUpdated(payload);
+      await this.handleRoomUpdated(ws, session, payload);
       return;
     }
 
@@ -257,7 +259,16 @@ export class ChatRoomDO {
     });
   }
 
-  async handleStreamStarted(payload) {
+  async handleStreamStarted(ws, session, payload) {
+    if (!session.isRoomOwner) {
+      this.send(ws, {
+        type: "error",
+        code: "forbidden",
+        message: "仅房主可更新直播状态"
+      });
+      return;
+    }
+
     const nextStream = {
       isLive: true,
       startedAt: sanitizeIsoTimestamp(payload.stream?.startedAt) ?? new Date().toISOString()
@@ -273,7 +284,16 @@ export class ChatRoomDO {
     });
   }
 
-  async handleStreamStopped() {
+  async handleStreamStopped(ws, session) {
+    if (!session.isRoomOwner) {
+      this.send(ws, {
+        type: "error",
+        code: "forbidden",
+        message: "仅房主可更新直播状态"
+      });
+      return;
+    }
+
     this.roomState = {
       ...this.roomState,
       stream: getDefaultRoomState().stream
@@ -285,7 +305,16 @@ export class ChatRoomDO {
     });
   }
 
-  async handleRoomUpdated(payload) {
+  async handleRoomUpdated(ws, session, payload) {
+    if (!session.isRoomOwner) {
+      this.send(ws, {
+        type: "error",
+        code: "forbidden",
+        message: "仅房主可更新直播间信息"
+      });
+      return;
+    }
+
     const nextRoomMeta = {
       title: sanitizeRoomTitle(payload.roomMeta?.title),
       stream: {
@@ -360,6 +389,7 @@ function normalizeAttachment(attachment) {
   return {
     room: typeof attachment.room === "string" ? attachment.room : "",
     role: attachment.role === "broadcaster" ? "broadcaster" : "viewer",
+    isRoomOwner: attachment.isRoomOwner === true,
     readOnly: attachment.readOnly !== false ? true : false,
     user: attachment.user && typeof attachment.user === "object" ? attachment.user : null,
     sentAt: Array.isArray(attachment.sentAt) ? attachment.sentAt.filter((value) => typeof value === "number") : []

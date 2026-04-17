@@ -2673,6 +2673,12 @@ button.tertiary {
   align-items: center;
 }
 
+.watch-layout .control-column .chat-panel-block .chat-panel-head {
+  flex: 0 0 auto;
+  margin: 0;
+  padding-inline: 16px;
+}
+
 .chat-panel-title-row {
   display: flex;
   align-items: baseline;
@@ -2737,6 +2743,13 @@ button.tertiary {
   min-height: 220px;
   padding-right: 4px;
   overflow: auto;
+}
+
+.watch-layout .control-column .chat-panel-block .chat-message-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  padding: 0 16px 6px;
 }
 
 .chat-message-card {
@@ -2827,6 +2840,21 @@ button.tertiary {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
+}
+
+.watch-layout .control-column .chat-panel-block .chat-composer,
+.watch-layout .control-column .chat-panel-block .chat-composer-readonly,
+.watch-layout .control-column .chat-panel-block .chat-panel-note,
+.watch-layout .control-column .chat-panel-block .inline-warning {
+  flex: 0 0 auto;
+  margin-inline: 16px;
+}
+
+.watch-layout .control-column .chat-panel-block .chat-empty-state {
+  min-height: 0;
+  height: 100%;
+  border-radius: 18px;
+  margin-inline: 16px;
 }
 
 .chat-composer input {
@@ -2934,36 +2962,16 @@ pre {
     padding: 18px;
   }
 
-  .watch-layout .chat-panel-block {
+  .watch-layout .control-column .chat-panel-block {
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    padding: 18px 0 18px 18px;
+    padding: 18px 0;
   }
 
   .watch-layout .control-column > .control-block:first-child {
     margin-top: 18px;
-  }
-
-  .watch-layout .chat-message-list {
-    flex: 1 1 auto;
-    max-height: none;
-    min-height: 0;
-  }
-
-  .watch-layout .chat-panel-head,
-  .watch-layout .chat-composer,
-  .watch-layout .chat-composer-readonly,
-  .watch-layout .chat-panel-note,
-  .watch-layout .inline-warning {
-    flex: 0 0 auto;
-    margin-right: 18px;
-  }
-
-  .watch-layout .chat-message-card,
-  .watch-layout .chat-empty-state {
-    margin-right: 18px;
   }
 
   .live-layout {
@@ -3199,12 +3207,12 @@ pre {
 
   .account-panel-head {
     min-height: calc(60px + env(safe-area-inset-top));
-    padding: env(safe-area-inset-top) 10px 0;
+    padding: env(safe-area-inset-top) 8px 0;
   }
 
   .login-panel-head {
     min-height: calc(60px + env(safe-area-inset-top));
-    padding: env(safe-area-inset-top) 10px 0;
+    padding: env(safe-area-inset-top) 8px 0;
   }
 
   .auth-panel-login {
@@ -4084,33 +4092,6 @@ pre {
     border-radius: 0;
     background: transparent;
     backdrop-filter: none;
-  }
-
-  .watch-layout .control-column[data-joined="true"] .chat-panel-head {
-    padding-bottom: 0;
-    margin-inline: 16px;
-  }
-
-  .watch-layout .control-column[data-joined="true"] .chat-message-list {
-    flex: 1 1 auto;
-    min-height: 0;
-    max-height: none;
-    padding: 0 16px 6px;
-  }
-
-  .watch-layout .control-column[data-joined="true"] .chat-composer,
-  .watch-layout .control-column[data-joined="true"] .chat-composer-readonly,
-  .watch-layout .control-column[data-joined="true"] .chat-panel-note,
-  .watch-layout .control-column[data-joined="true"] .inline-warning {
-    flex: 0 0 auto;
-    margin-inline: 16px;
-  }
-
-  .watch-layout .control-column[data-joined="true"] .chat-empty-state {
-    min-height: 0;
-    height: 100%;
-    border-radius: 18px;
-    margin-inline: 16px;
   }
 
   .control-head {

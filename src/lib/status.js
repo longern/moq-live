@@ -1,9 +1,9 @@
 const PLAYER_BADGES = {
-  idle: { label: "待收看", state: "idle" },
+  idle: { label: "未开播", state: "idle" },
   connecting: { label: "连接中", state: "warm" },
-  live: { label: "正在收看", state: "live" },
-  buffering: { label: "连接中", state: "warm" },
-  offair: { label: "未开播", state: "idle" },
+  live: { label: "直播中", state: "live" },
+  buffering: { label: "缓冲中", state: "warm" },
+  offair: { label: "未推流", state: "idle" },
   ended: { label: "已下播", state: "idle" },
   left: { label: "已离开", state: "idle" },
   error: { label: "收看异常", state: "error" },

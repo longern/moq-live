@@ -461,16 +461,21 @@ async function handleChatWebSocket(env, request) {
 
   const url = new URL(request.url);
   const room = decodeURIComponent(url.pathname.split("/")[3] ?? "").trim();
-  const role = url.searchParams.get("role") === "broadcaster" ? "broadcaster" : "viewer";
+  const requestedBroadcaster = url.searchParams.get("role") === "broadcaster";
   if (!/^[a-z0-9-]{3,80}$/i.test(room)) {
     return json({ ok: false, error: "Invalid room id" }, { status: 400 });
   }
 
   const session = await getOptionalSessionUser(env, request);
+  const isRoomOwner = session?.user?.id
+    ? await isChatRoomOwner(env, room, session.user.id)
+    : false;
+  const role = requestedBroadcaster && isRoomOwner ? "broadcaster" : "viewer";
   const stub = env.CHAT_ROOM.get(env.CHAT_ROOM.idFromName(room));
   const headers = new Headers(request.headers);
   headers.set("x-chat-room", room);
   headers.set("x-chat-role", role);
+  headers.set("x-chat-room-owner", isRoomOwner ? "1" : "0");
   headers.set("x-chat-read-only", session?.user ? "0" : "1");
   if (session?.user) {
     headers.set("x-chat-user", encodeURIComponent(JSON.stringify(session.user)));
@@ -493,4 +498,20 @@ async function getOptionalSessionUser(env, request) {
   } catch {
     return null;
   }
+}
+
+async function isChatRoomOwner(env, roomId, userId) {
+  if (!env.APP_DB || !roomId || !userId) {
+    return false;
+  }
+
+  const db = getDb(env);
+  const row = await db.prepare(
+    `SELECT 1
+     FROM moq_rooms
+     WHERE id = ? AND host_user_id = ?
+     LIMIT 1`
+  ).bind(roomId, userId).first();
+
+  return Boolean(row);
 }

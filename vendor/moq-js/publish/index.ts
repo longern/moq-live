@@ -1,11 +1,12 @@
 import { Client } from "../transport/client"
-import { Broadcast, BroadcastConfig } from "../contribute"
+import { Broadcast, BroadcastConfig, FrameTrackSource } from "../contribute"
 import { Connection } from "../transport/connection"
 
 export interface PublisherOptions {
 	url: string
 	namespace: string[]
-	media: MediaStream
+	media?: MediaStream
+	sources?: FrameTrackSource[]
 	video?: VideoEncoderConfig
 	audio?: AudioEncoderConfig
 	fingerprintUrl?: string
@@ -34,6 +35,7 @@ export class PublisherApi {
 			connection: this.connection,
 			namespace: this.opts.namespace,
 			media: this.opts.media,
+			sources: this.opts.sources,
 			video: this.opts.video,
 			audio: this.opts.audio,
 		}

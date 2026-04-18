@@ -2,6 +2,7 @@ import { Connection, SubscribeRecv } from "../transport"
 import { asError } from "../common/error"
 import { Segment } from "./segment"
 import { Track } from "./track"
+import { FrameTrackSource, isFrameTrackSource } from "./source"
 import * as Catalog from "../media/catalog"
 
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
@@ -10,7 +11,8 @@ import { sleep } from "../transport/utils"
 export interface BroadcastConfig {
 	namespace: string[]
 	connection: Connection
-	media: MediaStream
+	media?: MediaStream
+	sources?: FrameTrackSource[]
 
 	audio?: AudioEncoderConfig
 	video?: VideoEncoderConfig
@@ -39,14 +41,19 @@ export class Broadcast {
 
 		const tracks: Catalog.Track[] = []
 
-		const mediaTracks = this.config.media.getTracks()
+		const mediaTracks = [
+			...(this.config.media?.getTracks() ?? []),
+			...(this.config.sources ?? []),
+		]
 		for (const media of mediaTracks) {
 			const track = new Track(media, config)
 			this.#tracks.set(track.name, track)
 
-			const settings = media.getSettings()
+			const settings = isFrameTrackSource(media)
+				? { ...media.settings }
+				: media.getSettings()
 
-			if (media.kind === "audio") {
+			if (media.kind === "audio" && !isFrameTrackSource(media)) {
 				const audioContext = new AudioContext();
 				audioContext.createMediaStreamSource(new MediaStream([media]))
 				const sampleRate = audioContext.sampleRate
@@ -238,13 +245,13 @@ export class Broadcast {
 
 	// Attach the captured video stream to the given video element.
 	attach(video: HTMLVideoElement) {
-		video.srcObject = this.config.media
+		video.srcObject = this.config.media ?? null
 	}
 
 	close() {
 		if (this.#isClosed) return
 		this.#isClosed = true
-		this.config.media.getTracks().forEach((track) => track.stop())
+		this.config.media?.getTracks().forEach((track) => track.stop())
 		this.connection.close()
 	}
 

@@ -3,6 +3,7 @@ import { Notify } from "../common/async"
 import { Chunk } from "./chunk"
 import { Container } from "./container"
 import { BroadcastConfig } from "./broadcast"
+import { FrameTrackSource, isFrameTrackSource } from "./source"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
@@ -22,12 +23,22 @@ export class Track {
 	#error?: Error
 	#notify = new Notify()
 
-	constructor(media: MediaStreamTrack, config: BroadcastConfig) {
-		this.name = media.kind
+	constructor(media: MediaStreamTrack | FrameTrackSource, config: BroadcastConfig) {
+		this.name = media.name ?? media.kind
 		this.#isAudioTrack = media.kind === "audio"
 
 		// We need to split based on type because Typescript is hard
-		if (isAudioTrack(media)) {
+		if (isFrameTrackSource(media)) {
+			if (media.kind === "audio") {
+				if (!config.audio) throw new Error("no audio config")
+				this.#runAudioFrames(media.readable, config.audio).catch((err) => this.#close(err))
+			} else if (media.kind === "video") {
+				if (!config.video) throw new Error("no video config")
+				this.#runVideoFrames(media.readable, config.video).catch((err) => this.#close(err))
+			} else {
+				throw new Error(`unknown track type: ${media.kind}`)
+			}
+		} else if (isAudioTrack(media)) {
 			if (!config.audio) throw new Error("no audio config")
 			this.#runAudio(media, config.audio).catch((err) => this.#close(err))
 		} else if (isVideoTrack(media)) {
@@ -40,6 +51,10 @@ export class Track {
 
 	async #runAudio(track: MediaStreamAudioTrack, config: AudioEncoderConfig) {
 		const source = new MediaStreamTrackProcessor({ track })
+		return this.#runAudioFrames(source.readable, config)
+	}
+
+	async #runAudioFrames(source: ReadableStream<AudioData>, config: AudioEncoderConfig) {
 		const encoder = new Audio.Encoder(config)
 		const container = new Container()
 
@@ -50,7 +65,7 @@ export class Track {
 			abort: (e) => this.#close(e),
 		})
 
-		return source.readable
+		return source
 			.pipeThrough(encoder.frames)
 			.pipeThrough(container.encode)
 			.pipeTo(segments)
@@ -62,6 +77,10 @@ export class Track {
 
 	async #runVideo(track: MediaStreamVideoTrack, config: VideoEncoderConfig) {
 		const source = new MediaStreamTrackProcessor({ track })
+		return this.#runVideoFrames(source.readable, config)
+	}
+
+	async #runVideoFrames(source: ReadableStream<VideoFrame>, config: VideoEncoderConfig) {
 		const encoder = new Video.Encoder(config)
 		const container = new Container()
 
@@ -72,7 +91,7 @@ export class Track {
 			abort: (e) => this.#close(e),
 		})
 
-		return source.readable.pipeThrough(encoder.frames).pipeThrough(container.encode).pipeTo(segments)
+		return source.pipeThrough(encoder.frames).pipeThrough(container.encode).pipeTo(segments)
 	}
 
 	async #write(chunk: Chunk) {

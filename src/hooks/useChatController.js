@@ -1,4 +1,22 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { getChatErrorMessage } from "../lib/chatErrors.js";
+
+const RECONNECT_DELAYS_MS = [
+  1_000,
+  2_000,
+  3_000,
+  15_000,
+  30_000,
+  60_000,
+  2 * 60_000,
+  5 * 60_000,
+  10 * 60_000,
+  20 * 60_000,
+  40 * 60_000,
+  60 * 60_000,
+  2 * 60 * 60_000,
+  4 * 60 * 60_000
+];
 
 function upsertMessages(currentMessages, incomingMessages) {
   const deduped = new Map(currentMessages.map((message) => [message.id, message]));
@@ -33,6 +51,10 @@ function getDefaultRoomMeta() {
       avatarUrl: ""
     }
   };
+}
+
+function getReconnectDelayMs(attempt) {
+  return RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
 }
 
 export function useChatController({
@@ -110,7 +132,7 @@ export function useChatController({
         try {
           payload = JSON.parse(event.data);
         } catch {
-          setChatError("聊天室返回了无法解析的数据");
+          setChatError(getChatErrorMessage({ code: "socket_payload_invalid" }));
           return;
         }
 
@@ -179,9 +201,9 @@ export function useChatController({
         }
 
         if (payload.type === "error") {
-          const message = payload.message || "聊天室出现错误";
+          const message = getChatErrorMessage(payload);
           setChatError(message);
-          logRef.current?.(`chat warning: ${message}`);
+          logRef.current?.(`chat warning: ${payload.code || "unknown"}: ${message}`);
         }
       });
 
@@ -193,8 +215,11 @@ export function useChatController({
           return;
         }
         setConnectionState("closed");
-        const delay = Math.min(5_000, 1_000 * (reconnectAttemptRef.current + 1));
-        reconnectAttemptRef.current += 1;
+        const attempt = reconnectAttemptRef.current;
+        const delay = getReconnectDelayMs(attempt);
+        reconnectAttemptRef.current = attempt + 1;
+        setChatError(getChatErrorMessage({ code: "socket_closed_retrying" }));
+        logRef.current?.(`chat reconnect scheduled in ${delay}ms (attempt ${attempt + 1})`);
         clearReconnectTimer();
         reconnectTimerRef.current = window.setTimeout(() => {
           if (!cancelled) {
@@ -204,7 +229,7 @@ export function useChatController({
       });
 
       socket.addEventListener("error", () => {
-        setChatError("聊天室连接异常，正在重试");
+        setChatError(getChatErrorMessage({ code: "socket_error_waiting" }));
       });
     };
 

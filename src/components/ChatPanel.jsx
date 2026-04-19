@@ -20,8 +20,34 @@ function getConnectionLabel(state) {
   return "未连接";
 }
 
+function getComposerState({ authAvailable, authLoading, authUser, connectionState, draft, readOnly }) {
+  if (!authUser) {
+    return {
+      mode: "guest",
+      inputDisabled: true,
+      inputPlaceholder: authLoading ? "加载中" : authAvailable ? "登录后参与聊天" : "登录服务未连接",
+      buttonDisabled: !authAvailable || authLoading,
+      buttonDisabledReason: !authAvailable || authLoading ? "blocked" : "guest",
+      buttonLabel: "登录"
+    };
+  }
+
+  const isLoading = connectionState !== "connected";
+  const isBlocked = readOnly;
+  const canInteract = !isLoading && !isBlocked;
+  const hasDraft = draft.trim().length > 0;
+
+  return {
+    mode: "member",
+    inputDisabled: !canInteract,
+    inputPlaceholder: isLoading ? "加载中" : isBlocked ? "不可发送消息" : "输入聊天内容",
+    buttonDisabled: !canInteract || !hasDraft,
+    buttonDisabledReason: !canInteract ? "blocked" : !hasDraft ? "empty" : "ready",
+    buttonLabel: "发送"
+  };
+}
+
 export function ChatPanel({
-  room,
   roomLabel = "",
   authAvailable,
   authLoading,
@@ -40,7 +66,6 @@ export function ChatPanel({
   title = "聊天室",
   showComposer = true,
   showWelcome = true,
-  emptyText = "还没有聊天消息，来发第一条。"
 }) {
   const listRef = useRef(null);
 
@@ -51,8 +76,14 @@ export function ChatPanel({
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
 
-  const disabled = connectionState !== "connected" || readOnly;
-  const canSend = !disabled && draft.trim().length > 0;
+  const composerState = getComposerState({
+    authAvailable,
+    authLoading,
+    authUser,
+    connectionState,
+    draft,
+    readOnly
+  });
   const floating = variant === "floating";
   const panelClassName = [
     "chat-panel-block",
@@ -61,9 +92,8 @@ export function ChatPanel({
   ].filter(Boolean).join(" ");
   const showWelcomeMessage =
     showWelcome && connectionState === "connected" && messages.length === 0;
-  const welcomeName = roomLabel || room;
-  const welcomeText = welcomeName
-    ? `欢迎来到 ${welcomeName} 的直播间`
+  const welcomeText = roomLabel
+    ? `欢迎来到 ${roomLabel} 的直播间`
     : "欢迎来到直播间";
 
   return (
@@ -114,12 +144,12 @@ export function ChatPanel({
       {chatError ? <p class={`inline-warning${floating ? " chat-floating-warning" : ""}`}>{chatError}</p> : null}
 
       {showComposer ? (
-        !authUser ? (
+        composerState.mode === "guest" ? (
           <div class={`chat-composer chat-composer-readonly${floating ? " chat-composer-floating" : ""}`}>
             <input
               value=""
               readOnly
-              placeholder={authAvailable ? (authLoading ? "鉴权检查中" : "登录后参与聊天") : "登录服务未连接"}
+              placeholder={composerState.inputPlaceholder}
               onClick={() => {
                 if (authAvailable && !authLoading) {
                   onRequireLogin();
@@ -132,8 +162,14 @@ export function ChatPanel({
                 }
               }}
             />
-            <button type="button" class="secondary" onClick={onRequireLogin} disabled={!authAvailable || authLoading}>
-              登录
+            <button
+              type="button"
+              class="secondary"
+              onClick={onRequireLogin}
+              disabled={composerState.buttonDisabled}
+              data-disabled-reason={composerState.buttonDisabledReason}
+            >
+              {composerState.buttonLabel}
             </button>
           </div>
         ) : (
@@ -146,12 +182,18 @@ export function ChatPanel({
           >
             <input
               value={draft}
-              placeholder={disabled ? "聊天室连接中或当前只读" : "输入聊天内容"}
+              placeholder={composerState.inputPlaceholder}
               maxLength={280}
               onInput={onDraftChange}
-              disabled={disabled}
+              disabled={composerState.inputDisabled}
             />
-            <button type="submit" disabled={!canSend}>{readOnly ? "只读" : "发送"}</button>
+            <button
+              type="submit"
+              disabled={composerState.buttonDisabled}
+              data-disabled-reason={composerState.buttonDisabledReason}
+            >
+              {composerState.buttonLabel}
+            </button>
           </form>
         )
       ) : null}

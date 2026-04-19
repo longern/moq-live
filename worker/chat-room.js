@@ -4,6 +4,7 @@ const MESSAGE_TTL_MS = 24 * 60 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 5_000;
 const RATE_LIMIT_MAX_MESSAGES = 4;
 const MAX_ROOM_TITLE_LENGTH = 80;
+const DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE = "Exceeded allowed rows written in Durable Objects free tier.";
 
 export class ChatRoomDO {
   constructor(ctx) {
@@ -18,7 +19,14 @@ export class ChatRoomDO {
 
   async fetch(request) {
     await this.ready;
-    await this.persistPrunedMessages();
+    try {
+      await this.persistPrunedMessages();
+    } catch (error) {
+      if (!isDurableObjectWriteLimitError(error)) {
+        throw error;
+      }
+      console.warn("Skipped pruning chat messages because Durable Object write quota was exceeded.");
+    }
     const url = new URL(request.url);
 
     if (!url.pathname.endsWith("/ws")) {
@@ -70,11 +78,7 @@ export class ChatRoomDO {
     this.pruneRecentMessages();
     const session = normalizeAttachment(ws.deserializeAttachment());
     if (!session) {
-      this.send(ws, {
-        type: "error",
-        code: "session_missing",
-        message: "聊天室会话不存在"
-      });
+      this.sendError(ws, "session_missing");
       return;
     }
 
@@ -82,11 +86,7 @@ export class ChatRoomDO {
     try {
       payload = JSON.parse(typeof rawData === "string" ? rawData : new TextDecoder().decode(rawData));
     } catch {
-      this.send(ws, {
-        type: "error",
-        code: "invalid_json",
-        message: "消息格式无效"
-      });
+      this.sendError(ws, "invalid_json");
       return;
     }
 
@@ -110,10 +110,8 @@ export class ChatRoomDO {
       return;
     }
 
-    this.send(ws, {
-      type: "error",
-      code: "unsupported_event",
-      message: "不支持的事件类型"
+    this.sendError(ws, "unsupported_event", {
+      eventType: typeof payload?.type === "string" ? payload.type : ""
     });
   }
 
@@ -165,6 +163,17 @@ export class ChatRoomDO {
     socket.send(JSON.stringify(payload));
   }
 
+  sendError(socket, code, details = undefined) {
+    const payload = {
+      type: "error",
+      code
+    };
+    if (details !== undefined) {
+      payload.details = details;
+    }
+    this.send(socket, payload);
+  }
+
   pruneRecentMessages(now = Date.now()) {
     const nextMessages = this.recentMessages
       .filter((message) => isMessageFresh(message, now))
@@ -187,29 +196,19 @@ export class ChatRoomDO {
 
   async handleMessageSend(ws, session, payload) {
     if (session.readOnly || !session.user?.id) {
-      this.send(ws, {
-        type: "error",
-        code: "auth_required",
-        message: "登录后才可发言"
-      });
+      this.sendError(ws, "auth_required");
       return;
     }
 
     const text = sanitizeMessage(payload.text);
     if (!text) {
-      this.send(ws, {
-        type: "error",
-        code: "empty_message",
-        message: "消息不能为空"
-      });
+      this.sendError(ws, "empty_message");
       return;
     }
 
     if (text.length > MAX_MESSAGE_LENGTH) {
-      this.send(ws, {
-        type: "error",
-        code: "message_too_long",
-        message: `单条消息最多 ${MAX_MESSAGE_LENGTH} 字`
+      this.sendError(ws, "message_too_long", {
+        maxLength: MAX_MESSAGE_LENGTH
       });
       return;
     }
@@ -220,11 +219,7 @@ export class ChatRoomDO {
       : [];
 
     if (sentAt.length >= RATE_LIMIT_MAX_MESSAGES) {
-      this.send(ws, {
-        type: "error",
-        code: "rate_limited",
-        message: "发送过快，请稍后再试"
-      });
+      this.sendError(ws, "rate_limited");
       return;
     }
 
@@ -247,11 +242,12 @@ export class ChatRoomDO {
       }
     };
 
-    this.recentMessages.push(message);
-    if (this.recentMessages.length > MAX_RECENT_MESSAGES) {
-      this.recentMessages.splice(0, this.recentMessages.length - MAX_RECENT_MESSAGES);
+    const nextMessages = this.recentMessages.concat(message).slice(-MAX_RECENT_MESSAGES);
+    const persisted = await this.persistStorageOrNotify(ws, "recentMessages", nextMessages);
+    if (!persisted) {
+      return;
     }
-    await this.ctx.storage.put("recentMessages", this.recentMessages);
+    this.recentMessages = nextMessages;
 
     this.broadcast({
       type: "message.created",
@@ -261,11 +257,7 @@ export class ChatRoomDO {
 
   async handleStreamStarted(ws, session, payload) {
     if (!session.isRoomOwner) {
-      this.send(ws, {
-        type: "error",
-        code: "forbidden",
-        message: "仅房主可更新直播状态"
-      });
+      this.sendError(ws, "forbidden_stream_update");
       return;
     }
 
@@ -273,11 +265,15 @@ export class ChatRoomDO {
       isLive: true,
       startedAt: sanitizeIsoTimestamp(payload.stream?.startedAt) ?? new Date().toISOString()
     };
-    this.roomState = {
+    const nextRoomState = {
       ...this.roomState,
       stream: nextStream
     };
-    await this.ctx.storage.put("roomState", this.roomState);
+    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    if (!persisted) {
+      return;
+    }
+    this.roomState = nextRoomState;
     this.broadcast({
       type: "stream.started",
       stream: nextStream
@@ -286,19 +282,19 @@ export class ChatRoomDO {
 
   async handleStreamStopped(ws, session) {
     if (!session.isRoomOwner) {
-      this.send(ws, {
-        type: "error",
-        code: "forbidden",
-        message: "仅房主可更新直播状态"
-      });
+      this.sendError(ws, "forbidden_stream_update");
       return;
     }
 
-    this.roomState = {
+    const nextRoomState = {
       ...this.roomState,
       stream: getDefaultRoomState().stream
     };
-    await this.ctx.storage.put("roomState", this.roomState);
+    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    if (!persisted) {
+      return;
+    }
+    this.roomState = nextRoomState;
     this.broadcast({
       type: "stream.stopped",
       stream: this.roomState.stream
@@ -307,11 +303,7 @@ export class ChatRoomDO {
 
   async handleRoomUpdated(ws, session, payload) {
     if (!session.isRoomOwner) {
-      this.send(ws, {
-        type: "error",
-        code: "forbidden",
-        message: "仅房主可更新直播间信息"
-      });
+      this.sendError(ws, "forbidden_room_update");
       return;
     }
 
@@ -327,15 +319,34 @@ export class ChatRoomDO {
         avatarUrl: sanitizeUrl(payload.roomMeta?.host?.avatarUrl)
       }
     };
-    this.roomState = {
+    const nextRoomState = {
       ...this.roomState,
       roomMeta: nextRoomMeta
     };
-    await this.ctx.storage.put("roomState", this.roomState);
+    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    if (!persisted) {
+      return;
+    }
+    this.roomState = nextRoomState;
     this.broadcast({
       type: "room.updated",
       roomMeta: nextRoomMeta
     });
+  }
+
+  async persistStorageOrNotify(ws, key, value) {
+    try {
+      await this.ctx.storage.put(key, value);
+      return true;
+    } catch (error) {
+      if (!isDurableObjectWriteLimitError(error)) {
+        throw error;
+      }
+
+      this.sendError(ws, "storage_write_limited");
+      console.warn(`Skipped Durable Object write for ${key} because free tier row quota was exceeded.`);
+      return false;
+    }
   }
 }
 
@@ -463,4 +474,10 @@ function isMessageFresh(message, now) {
 
   const sentAt = Date.parse(message.sentAt);
   return Number.isFinite(sentAt) && now - sentAt < MESSAGE_TTL_MS;
+}
+
+function isDurableObjectWriteLimitError(error) {
+  return (error instanceof Error ? error.message : String(error ?? "")).includes(
+    DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE
+  );
 }

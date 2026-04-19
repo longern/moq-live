@@ -202,20 +202,22 @@ export function App() {
     log,
     syntheticSessionRef: publisher.syntheticSessionRef
   });
+  const watchChatEnabled = page === "watch" && Boolean(watchChatRoom) && !authState.loading;
+  const liveChatEnabled = Boolean(authState.user?.id) && page === "live";
   const liveChatRoomId = authState.user?.id
     ? liveChatRoomResolution.roomId
-    : liveRoom;
+    : "";
 
   const chat = useChatController({
     room: watchChatRoom,
-    enabled: page === "watch" && Boolean(watchChatRoom),
+    enabled: watchChatEnabled,
     authKey: authState.user?.id ?? "anonymous",
     role: "viewer",
     log
   });
   const liveChat = useChatController({
     room: liveChatRoomId,
-    enabled: page === "live" && Boolean(liveChatRoomId),
+    enabled: liveChatEnabled && Boolean(liveChatRoomId),
     authKey: authState.user?.id ?? "anonymous",
     role: "broadcaster",
     log
@@ -282,12 +284,13 @@ export function App() {
   const watchShareTarget = watchingNamespace
     ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
     : watchRoomResolution.hostHandle || watchHandle || watchRoom;
-  const liveShareTarget = authState.user?.handle?.trim() || "";
+  const liveShareTarget = authState.user?.handle?.trim() || (liveRoom ? `ns:${liveRoom}` : "");
   const watchPageLink = buildWatchLink(relayUrl, watchShareTarget);
   const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
   const relayHost = getRelayHostValue(relayUrl);
   const playerBadge = describePlayerState(player.playerStatusKind);
   const publishBadge = describePublishState(publisher.publishStatusKind);
+  const liveStreamActive = publisher.publisherIsPublishing || publisher.syntheticPublishing;
   const publishBlocked = isPublishBlocked(liveRoom);
   const publishBlockedReason = getPublishBlockReason(liveRoom);
   const cameraMode = getCameraMode(
@@ -298,7 +301,7 @@ export function App() {
   const buildLabel = `Build ${__BUILD_HASH__}`;
   const mobileWatchSessionActive = page === "watch" && Boolean(player.playerSession);
   const mobileWatchJoinedClass = mobileWatchSessionActive ? " app-container-watch-joined" : "";
-  const requireLoginForLive = import.meta.env.PROD;
+  const requireLoginForLive = false;
   const avatarLabel = getAvatarLabel(authState);
   const avatarStateClass = authState.loading
     ? " is-loading"
@@ -878,13 +881,13 @@ export function App() {
     }
 
     const current = announcedLiveStateRef.current;
-    if (current.room === liveRoom && current.isLive === publisher.publisherIsPublishing) {
+    if (current.room === liveRoom && current.isLive === liveStreamActive) {
       return;
     }
 
     const sent = liveChat.sendEvent({
-      type: publisher.publisherIsPublishing ? "stream.started" : "stream.stopped",
-      stream: publisher.publisherIsPublishing
+      type: liveStreamActive ? "stream.started" : "stream.stopped",
+      stream: liveStreamActive
         ? { startedAt: new Date().toISOString() }
         : undefined
     });
@@ -892,10 +895,10 @@ export function App() {
     if (sent) {
       announcedLiveStateRef.current = {
         room: liveRoom,
-        isLive: publisher.publisherIsPublishing
+        isLive: liveStreamActive
       };
     }
-  }, [liveChat, liveChat.connectionState, liveRoom, publisher.publisherIsPublishing]);
+  }, [liveChat, liveChat.connectionState, liveRoom, liveStreamActive]);
 
   useEffect(() => {
     if (!liveRoom || liveChat.connectionState !== "connected") {
@@ -1263,10 +1266,10 @@ export function App() {
                 }}
                 chatMessages={liveChat.messages}
                 chatDraft={liveChat.draft}
-                chatConnectionState={liveChat.connectionState}
+                chatConnectionState={liveChatEnabled ? liveChat.connectionState : "closed"}
                 chatOnlineCount={liveChat.onlineCount}
                 chatReadOnly={liveChat.readOnly}
-                chatError={liveChat.chatError}
+                chatError={liveChatEnabled ? liveChat.chatError : ""}
                 authAvailable={authState.available}
                 authLoading={authState.loading}
                 authUser={authState.user}

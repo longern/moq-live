@@ -268,7 +268,6 @@ export function WatchSessionPage({
             {playerOrientation === "portrait" ? (
               <div class="watch-portrait-chat-overlay">
                 <ChatPanel
-                  room={chatRoom}
                   roomLabel={chatRoomLabel}
                   authAvailable={authAvailable}
                   authLoading={authLoading}
@@ -419,7 +418,6 @@ export function WatchSessionPage({
             </div>
           </section>
           <ChatPanel
-            room={chatRoom}
             roomLabel={chatRoomLabel}
             authAvailable={authAvailable}
             authLoading={authLoading}

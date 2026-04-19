@@ -179,7 +179,6 @@ export function LiveMobilePage(props) {
           />
           <div class="live-mobile-chat-overlay">
             <ChatPanel
-              room={room}
               authAvailable={authAvailable}
               authLoading={authLoading}
               authUser={authUser}
@@ -197,7 +196,6 @@ export function LiveMobilePage(props) {
               title="评论"
               showComposer={false}
               showWelcome={false}
-              emptyText="还没有评论，开播后等观众来互动。"
             />
           </div>
           {publishBlocked ? (

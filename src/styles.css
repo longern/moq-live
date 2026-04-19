@@ -2861,6 +2861,24 @@ button.tertiary {
   min-width: 0;
 }
 
+.chat-composer input:disabled,
+.chat-composer-floating input:disabled {
+  color: rgba(216, 230, 244, 0.58);
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: not-allowed;
+}
+
+.chat-composer button:disabled[data-disabled-reason="blocked"],
+.chat-composer-floating button:disabled[data-disabled-reason="blocked"],
+.chat-composer-readonly button:disabled[data-disabled-reason="blocked"] {
+  color: rgba(244, 248, 252, 0.54);
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 .chat-composer-readonly input {
   cursor: pointer;
 }

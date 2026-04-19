@@ -51,6 +51,7 @@ function LiveDesktopPanel(props) {
     onPickCover,
     onOpenCoverPicker
   } = props;
+  const sharingNamespace = shareTarget.startsWith("ns:");
 
   if (!openPanel) {
     return null;
@@ -148,7 +149,7 @@ function LiveDesktopPanel(props) {
             <span>{watchLink ? "可直接分享" : "等待生成"}</span>
           </div>
           <label>
-            主播 handle
+            {sharingNamespace ? "直播 namespace" : "主播 handle"}
             <input id="liveRoomId" value={shareTarget} readonly />
           </label>
           <label>
@@ -436,7 +437,6 @@ export function LiveDesktopPage(props) {
 
         <aside class="control-column live-chat-column">
           <ChatPanel
-            room={room}
             authAvailable={authAvailable}
             authLoading={authLoading}
             authUser={authUser}
@@ -452,7 +452,6 @@ export function LiveDesktopPage(props) {
             title="评论"
             showComposer={false}
             showWelcome={false}
-            emptyText="还没有评论，开播后等观众来互动。"
           />
         </aside>
       </div>

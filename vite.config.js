@@ -52,6 +52,10 @@ function optimizeMoqPlayerCanvas() {
     'const[n,a]=s.stream.release();this.#bt.segment({init:t.initTrack,kind:e,header:s.header,buffer:n,stream:a})';
   const optimizedSegmentDispatchSnippet =
     'const[n,a]=s.stream.release();this.#bt.segment({init:t.initTrack,kind:e,header:s.header,buffer:n,stream:a})';
+  const setVolumeSnippet =
+    'async setVolume(t){this.#bt.setVolume(t),0!=t||this.#Tt?t>0&&this.#Tt&&await this.mute(!1):await this.mute(!0)}';
+  const optimizedSetVolumeSnippet =
+    'async setVolume(t){this.#bt.setVolume(t),super.dispatchEvent(new CustomEvent("volumechange",{detail:{muted:t<=.001,volume:t}}))}';
 
   return {
     name: "optimize-moq-player-canvas",
@@ -72,6 +76,7 @@ function optimizeMoqPlayerCanvas() {
         [audioWorkletProcessorSnippet, optimizedAudioWorkletProcessorSnippet],
         [segmentQueueSnippet, optimizedSegmentQueueSnippet],
         [segmentDispatchSnippet, optimizedSegmentDispatchSnippet],
+        [setVolumeSnippet, optimizedSetVolumeSnippet],
       ];
 
       for (const [from, to] of replacements) {

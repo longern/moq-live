@@ -5,20 +5,20 @@ export function usePlayerAutoplayPrompt({
   audioPlaybackSupported,
   playerSession,
   playbackStartToken,
-  setPlayerMutedStateOnly,
+  setPlayerMute,
   requestAudiblePlayback,
   log,
 }) {
   const [showTapToUnmute, setShowTapToUnmute] = useState(false);
 
   const logRef = useRef(log);
-  const setPlayerMutedStateOnlyRef = useRef(setPlayerMutedStateOnly);
+  const setPlayerMuteRef = useRef(setPlayerMute);
   const requestAudiblePlaybackRef = useRef(requestAudiblePlayback);
   const lastStartWasUserInitiatedRef = useRef(false);
   const autoplayPromptTokenRef = useRef(0);
 
   logRef.current = log;
-  setPlayerMutedStateOnlyRef.current = setPlayerMutedStateOnly;
+  setPlayerMuteRef.current = setPlayerMute;
   requestAudiblePlaybackRef.current = requestAudiblePlayback;
 
   function invalidatePrompt() {
@@ -77,7 +77,7 @@ export function usePlayerAutoplayPrompt({
       }
 
       setShowTapToUnmute(true);
-      setPlayerMutedStateOnlyRef.current(true);
+      await setPlayerMuteRef.current(true, { logFailure: false });
       logRef.current?.("autoplay started muted until user interaction");
     })();
 

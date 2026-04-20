@@ -37,13 +37,13 @@ export function usePlayerController({
     audioPlaybackSupported,
     playerSession: session.playerSession,
     playbackStartToken: session.playbackStartToken,
-    setPlayerMutedStateOnly: session.setPlayerMutedStateOnly,
+    setPlayerMute: session.setPlayerMute,
     requestAudiblePlayback: async () => {
       if (session.playerSession) {
         if (session.playerPaused) {
           await session.resumePlayer();
         }
-        await session.setPlayerMute(false);
+        await session.requestAudiblePlayback();
         return;
       }
 

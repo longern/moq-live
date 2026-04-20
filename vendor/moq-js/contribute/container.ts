@@ -33,6 +33,14 @@ export class Container {
 		})
 	}
 
+	#releaseFragmentBox(box: MP4.Box) {
+		const boxes = this.#mp4.boxes
+		const index = boxes.indexOf(box)
+		if (index >= 0) {
+			boxes.splice(index, 1)
+		}
+	}
+
 	#init(frame: DecoderConfig, controller: TransformStreamDefaultController<Chunk>) {
 		if (this.#track) throw new Error("duplicate decoder config")
 
@@ -114,7 +122,7 @@ export class Container {
 		if (!this.#track) throw new Error("missing decoder config")
 
 		// Add the sample to the container
-		this.#mp4.addSample(this.#track, buffer, {
+		const sample = this.#mp4.addSample(this.#track, buffer, {
 			duration,
 			dts: this.#frame.timestamp,
 			cts: this.#frame.timestamp,
@@ -123,8 +131,9 @@ export class Container {
 
 		const stream = new MP4.Stream(undefined, 0, MP4.Stream.BIG_ENDIAN)
 
-		// Moof and mdat atoms are written in pairs.
-		// TODO remove the moof/mdat from the Box to reclaim memory once everything works
+		// MP4Box appends every generated fragment to the ISOFile box list.
+		// For live publishing we serialize each moof/mdat immediately, so keeping
+		// historical fragment boxes around causes the container graph to grow forever.
 		for (; ;) {
 			const moof = this.#mp4.moofs.shift()
 			const mdat = this.#mp4.mdats.shift()
@@ -135,10 +144,17 @@ export class Container {
 
 			moof.write(stream)
 			mdat.write(stream)
+			this.#releaseFragmentBox(moof)
+			this.#releaseFragmentBox(mdat)
 		}
 
 		// TODO avoid this extra copy by writing to the buffer provided in copyTo
 		const data = new Uint8Array(stream.buffer)
+
+		// MP4Box retains written sample payloads unless they are released explicitly.
+		// Live publishing continuously appends samples, so without this the publisher
+		// heap grows over time on long-running mobile streams.
+		this.#mp4.releaseUsedSamples(this.#track, sample.number + 1)
 
 		controller.enqueue({
 			type: this.#frame.type,

@@ -204,15 +204,19 @@ export class Broadcast {
 		await sleep(500);
 
 		const segments = track.segments().getReader()
+		try {
+			for (; ;) {
+				const { value: segment, done } = await segments.read()
+				if (done) break
 
-		for (; ;) {
-			const { value: segment, done } = await segments.read()
-			if (done) break
-
-			// Keep subgroup creation serialized per subscribed track.
-			// Unbounded parallel segment sends can exhaust the relay's stream budget,
-			// leaving viewers stuck in the "connecting" state while send-stream creation fails.
-			await this.#serveSegment(subscriber, segment)
+				// Keep subgroup creation serialized per subscribed track.
+				// Unbounded parallel segment sends can exhaust the relay's stream budget,
+				// leaving viewers stuck in the "connecting" state while send-stream creation fails.
+				await this.#serveSegment(subscriber, segment)
+			}
+		} finally {
+			await segments.cancel("subscription ended").catch(() => {})
+			segments.releaseLock()
 		}
 	}
 
@@ -228,19 +232,24 @@ export class Broadcast {
 
 		// Pipe the segment to the stream.
 		const chunks = segment.chunks().getReader()
-		for (; ;) {
-			const { value, done } = await chunks.read()
-			if (done) break
+		try {
+			for (; ;) {
+				const { value, done } = await chunks.read()
+				if (done) break
 
-			await stream.write({
-				object_id: object,
-				object_payload: value,
-			})
+				await stream.write({
+					object_id: object,
+					object_payload: value,
+				})
 
-			object += 1
+				object += 1
+			}
+
+			await stream.close()
+		} finally {
+			await chunks.cancel("segment send ended").catch(() => {})
+			chunks.releaseLock()
 		}
-
-		await stream.close()
 	}
 
 	// Attach the captured video stream to the given video element.

@@ -78,6 +78,7 @@ export class Publisher {
 		if (!namespace) {
 			throw new Error(`publish namespace OK for unknown announce: ${msg.id}`)
 		}
+		this.#waitingPublishNamespaceRequests.delete(msg.id)
 		const publishNamespaceSend = this.#publishedNamespaces.get(namespace)
 		if (!publishNamespaceSend) {
 			throw new Error(`no active published namespace: ${namespace}`)
@@ -92,6 +93,7 @@ export class Publisher {
 		if (!namespace) {
 			throw new Error(`publish namespace error for unknown announce: ${msg.id}`)
 		}
+		this.#waitingPublishNamespaceRequests.delete(msg.id)
 		const publishNamespaceSend = this.#publishedNamespaces.get(namespace)
 		if (!publishNamespaceSend) {
 			// TODO debug this
@@ -109,7 +111,9 @@ export class Publisher {
 			}
 
 			const trackAlias = this.#nextTrackAlias++
-			const subscribe = new SubscribeRecv(this.#control, this.#objects, msg, trackAlias)
+			const subscribe = new SubscribeRecv(this.#control, this.#objects, msg, trackAlias, () => {
+				this.#subscribe.delete(msg.id)
+			})
 			this.#subscribe.set(msg.id, subscribe)
 			await this.#subscribeQueue.push(subscribe)
 		} catch (e: any) {
@@ -131,7 +135,6 @@ export class Publisher {
 			throw new Error(`unsubscribe for unknown subscribe: ${msg.id}`)
 		}
 		subscribe.close({ unsubscribe: false })
-		this.#subscribe.delete(msg.id)
 	}
 }
 
@@ -198,6 +201,7 @@ export class SubscribeRecv {
 	#id: bigint
 	#trackAlias: bigint // Publisher-specified in draft-14
 	#subscriberPriority: number
+	#onClose?: () => void
 	groupOrder: Control.GroupOrder
 
 	readonly namespace: string[]
@@ -206,7 +210,13 @@ export class SubscribeRecv {
 	// The current state of the subscription.
 	#state: "init" | "ack" | "closed" = "init"
 
-	constructor(control: ControlStream, objects: Objects, msg: Control.Subscribe, trackAlias: bigint) {
+	constructor(
+		control: ControlStream,
+		objects: Objects,
+		msg: Control.Subscribe,
+		trackAlias: bigint,
+		onClose?: () => void,
+	) {
 		this.#control = control // so we can send messages
 		this.#objects = objects // so we can send objects
 		this.#id = msg.id
@@ -215,6 +225,7 @@ export class SubscribeRecv {
 		this.track = msg.name
 		this.#subscriberPriority = msg.subscriber_priority
 		this.groupOrder = msg.group_order
+		this.#onClose = onClose
 	}
 
 	// Acknowledge the subscription as valid.
@@ -245,17 +256,21 @@ export class SubscribeRecv {
 		const acked = this.#state === "ack"
 		this.#state = "closed"
 
-		if (!acked) {
-			return this.#control.send({
-				type: Control.ControlMessageType.SubscribeError,
-				message: { id: this.#id, code, reason }
-			})
-		}
-		if (unsubscribe) {
-			return this.#control.send({
-				type: Control.ControlMessageType.Unsubscribe,
-				message: { id: this.#id }
-			})
+		try {
+			if (!acked) {
+				return await this.#control.send({
+					type: Control.ControlMessageType.SubscribeError,
+					message: { id: this.#id, code, reason }
+				})
+			}
+			if (unsubscribe) {
+				return await this.#control.send({
+					type: Control.ControlMessageType.Unsubscribe,
+					message: { id: this.#id }
+				})
+			}
+		} finally {
+			this.#onClose?.()
 		}
 	}
 

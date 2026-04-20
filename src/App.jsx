@@ -253,7 +253,7 @@ export function App() {
       || watchRoomResolution.title
       || watchHandle
       || watchRoom
-      || "等待输入主播 handle";
+      || "等待输入主播号";
   const watchChatRoomLabel = watchingNamespace
     ? (directWatchNamespace || "")
     : chat.roomMeta.host.displayName
@@ -1233,10 +1233,6 @@ export function App() {
                   void shareLiveRoom().catch((error) => {
                     log(`share failed: ${error instanceof Error ? error.message : String(error)}`);
                   });
-                }}
-                onRegenerateRoom={() => {
-                  autorunRef.current = false;
-                  setLiveRoomValue(generateRoomId());
                 }}
                 onStartSynthetic={() => {
                   selectPageWithGuard("live");

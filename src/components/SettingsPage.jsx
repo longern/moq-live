@@ -419,7 +419,7 @@ function AccountDrawer({
   submitHandle
 }) {
   const handleNote = handleIsDefault
-    ? "默认 handle 可随时设置一次专属地址。"
+    ? "默认主播号可随时设置一次专属地址。"
     : handleCooldownActive
       ? `自定义后 30 天内只能修改一次，下次可修改时间：${new Date(authUser.nextHandleChangeAt).toLocaleString()}`
       : "自定义后 30 天内只能修改一次。";
@@ -492,11 +492,11 @@ function AccountDrawer({
           </div>
 
           <AccountEditableField
-            cancelAriaLabel="取消编辑 handle"
-            editAriaLabel="编辑 handle"
+            cancelAriaLabel="取消编辑主播号"
+            editAriaLabel="编辑主播号"
             editing={handleEditing}
             inputValue={handleInput}
-            label="Handle"
+            label="主播号"
             maxLength={24}
             note={(
               <>
@@ -515,8 +515,8 @@ function AccountDrawer({
               void submitHandle();
             }}
             onStartEditing={startHandleEditing}
-            placeholder="输入唯一 handle"
-            saveAriaLabel="保存 handle"
+            placeholder="输入唯一主播号"
+            saveAriaLabel="保存主播号"
             saveDisabled={handleSaving || !handleInput.trim() || handleUnchanged}
             value={authUser.handle || "未设置"}
           />
@@ -717,7 +717,7 @@ export function SettingsPage({
       const payload = await onUpdateHandle(handleInput.trim().toLocaleLowerCase());
       const nextValue = payload.user?.handle || handleInput.trim().toLocaleLowerCase();
       setHandleInput(nextValue);
-      setHandleStatus("Handle 已更新");
+      setHandleStatus("主播号已更新");
       setHandleEditing(false);
     } catch (error) {
       setHandleError(error instanceof Error ? error.message : String(error));

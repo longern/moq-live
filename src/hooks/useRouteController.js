@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import {
-  getOrCreateLiveRoom,
-  getInitialViewState,
-  persistLiveRoom,
-} from "../lib/routeState.js";
+import { generateRoomId, getInitialViewState } from "../lib/routeState.js";
 
 export function useRouteController() {
   const initial = useRef(getInitialViewState()).current;
@@ -31,10 +27,10 @@ export function useRouteController() {
   }
 
   function setLiveRoomValue(nextRoom) {
-    const persistedRoom = persistLiveRoom(nextRoom);
-    liveRoomRef.current = persistedRoom;
-    setLiveRoom(persistedRoom);
-    return persistedRoom;
+    const normalizedRoom = String(nextRoom ?? "").trim();
+    liveRoomRef.current = normalizedRoom;
+    setLiveRoom(normalizedRoom);
+    return normalizedRoom;
   }
 
   function setRelayUrlValue(nextRelayUrl) {
@@ -44,9 +40,10 @@ export function useRouteController() {
   }
 
   function selectPage(nextPage, { updateAutorun = true } = {}) {
+    const previousPage = pageRef.current;
     pageRef.current = nextPage;
-    if (nextPage === "live" && !liveRoomRef.current) {
-      setLiveRoomValue(getOrCreateLiveRoom());
+    if (nextPage === "live" && (previousPage !== "live" || !liveRoomRef.current)) {
+      setLiveRoomValue(generateRoomId());
     }
 
     if (updateAutorun) {

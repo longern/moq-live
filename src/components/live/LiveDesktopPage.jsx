@@ -36,7 +36,6 @@ function LiveDesktopPanel(props) {
     shareTarget,
     onShare,
     shareSupported,
-    onRegenerateRoom,
     syntheticPublishing,
     publishBlocked,
     publishStatus,
@@ -149,7 +148,7 @@ function LiveDesktopPanel(props) {
             <span>{watchLink ? "可直接分享" : "等待生成"}</span>
           </div>
           <label>
-            {sharingNamespace ? "直播 namespace" : "主播 handle"}
+            {sharingNamespace ? "直播 namespace" : "主播号"}
             <input id="liveRoomId" value={shareTarget} readonly />
           </label>
           <label>
@@ -160,7 +159,6 @@ function LiveDesktopPanel(props) {
             <button type="button" id="copyRoomLink" onClick={onShare} disabled={!shareSupported || !watchLink}>
               分享直播间
             </button>
-            <button type="button" id="regenRoom" class="secondary" onClick={onRegenerateRoom}>重新生成房间</button>
           </div>
         </>
       ) : null}
@@ -239,7 +237,6 @@ export function LiveDesktopPage(props) {
     onCycleCamera,
     onToggleMicrophone,
     onTogglePublish,
-    onRegenerateRoom,
     onShare,
     onStartScreenShare,
     onStopScreenShare,
@@ -339,7 +336,6 @@ export function LiveDesktopPage(props) {
                 shareTarget={shareTarget}
                 onShare={onShare}
                 shareSupported={shareSupported}
-                onRegenerateRoom={onRegenerateRoom}
                 syntheticPublishing={syntheticPublishing}
                 publishBlocked={publishBlocked}
                 publishStatus={publishStatus}

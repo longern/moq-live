@@ -4,13 +4,11 @@ import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
 
 export function LivePage({
   hidden,
-  room,
   roomLabel,
   shareTarget,
   watchLink,
   publishBlocked,
   publishBlockedReason,
-  publishStatus,
   publishBadge,
   cameraOptions,
   microphoneOptions,
@@ -34,7 +32,6 @@ export function LivePage({
   onTogglePublish,
   onStartPublish,
   onStopPublish,
-  onRegenerateRoom,
   onShare,
   onStartScreenShare,
   onStopScreenShare,
@@ -167,13 +164,11 @@ export function LivePage({
 
   const pageProps = {
     hidden,
-    room,
     roomLabel,
     shareTarget,
     watchLink,
     publishBlocked,
     publishBlockedReason,
-    publishStatus,
     publishBadge,
     cameraOptions,
     microphoneOptions,
@@ -198,7 +193,6 @@ export function LivePage({
     onTogglePublish,
     onStartPublish,
     onStopPublish,
-    onRegenerateRoom,
     onShare,
     onStartScreenShare,
     onStopScreenShare,

@@ -158,8 +158,8 @@ export function WatchIdlePage({
             <input
               id="namespace"
               value={room}
-              placeholder="输入主播 handle"
-              aria-label="主播 handle"
+              placeholder="输入主播号"
+              aria-label="主播号"
               enterKeyHint="go"
               autoCapitalize="off"
               autoCorrect="off"

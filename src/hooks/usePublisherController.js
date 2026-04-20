@@ -784,7 +784,7 @@ export function usePublisherController({
       throw new Error("未获取到摄像头预览");
     }
 
-    const namespace = ensureRoomId();
+    const namespace = ensureRoomId(true);
     assertPublishAllowed(namespace);
     const nextRelayUrl = new URL(relayUrlRef.current).toString();
     const previewVideoTrack = stream.getVideoTracks()[0];
@@ -916,7 +916,7 @@ export function usePublisherController({
       return syntheticSessionRef.current.namespace;
     }
 
-    const namespace = ensureRoomId();
+    const namespace = ensureRoomId(true);
     assertPublishAllowed(namespace);
     const nextRelayUrl = new URL(relayUrlRef.current).toString();
     if (!namespace) {

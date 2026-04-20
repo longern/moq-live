@@ -25,9 +25,7 @@ export function LiveMobilePage(props) {
   });
   const {
     hidden,
-    room,
     roomLabel,
-    publishStatus,
     publishBlocked,
     publishBlockedReason,
     publishBadge,
@@ -44,7 +42,6 @@ export function LiveMobilePage(props) {
     onShare,
     shareSupported,
     watchLink,
-    onRegenerateRoom,
     syntheticPublishing,
     onStartSynthetic,
     onStopSynthetic,
@@ -280,10 +277,6 @@ export function LiveMobilePage(props) {
                 <span class="live-mobile-drawer-indicator" />
               </div>
               <div class="live-mobile-more-panel">
-                <div class="live-mobile-more-header">
-                  <strong>{room}</strong>
-                  <span>{publishStatus}</span>
-                </div>
                 <LiveCoverManager
                   roomCoverUrl={roomCoverUrl}
                   roomCoverLoading={roomCoverLoading}
@@ -294,17 +287,6 @@ export function LiveMobilePage(props) {
                   onPickCover={onPickCover}
                   onOpenPicker={onOpenCoverPicker}
                 />
-                <button
-                  type="button"
-                  class="secondary"
-                  onClick={() => {
-                    onRegenerateRoom();
-                    setMoreOpen(false);
-                    closeMoreSheet();
-                  }}
-                >
-                  重新生成房间号
-                </button>
                 <button
                   type="button"
                   class={syntheticPublishing ? "secondary" : "tertiary"}

@@ -191,22 +191,16 @@ export class SubgroupReader {
             extHeaders = await KeyValuePairs.deserialize_with_reader(this.stream)
         }
 
-        console.log("subgroup header", object_id, extHeaders, this.stream)
-
         let obj_payload_len = await this.stream.getNumberVarInt()
 
         let object_payload: Uint8Array | undefined
         let status: Status | undefined
-
-        console.log("subgroup read", object_id, obj_payload_len)
 
         if (obj_payload_len == 0) {
             status = Status.try_from(await this.stream.getNumberVarInt())
         } else {
             object_payload = await this.stream.read(obj_payload_len)
         }
-
-        console.log("read success??", object_id, status, extHeaders, object_payload)
         return {
             object_id,
             status,

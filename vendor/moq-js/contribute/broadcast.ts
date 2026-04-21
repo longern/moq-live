@@ -1,5 +1,6 @@
 import { Connection, SubscribeRecv } from "../transport"
-import { asError } from "../common/error"
+import { Status } from "../transport/objects"
+import { SubgroupType } from "../transport/subgroup"
 import { Segment } from "./segment"
 import { Track } from "./track"
 import { FrameTrackSource, isFrameTrackSource } from "./source"
@@ -25,7 +26,11 @@ export interface BroadcastConfigTrack {
 
 export class Broadcast {
 	#tracks = new Map<string, Track>()
+	#trackKinds = new Map<string, "audio" | "video">()
 	#isClosed = false
+	#pendingAsyncSubgroupCloses = new Set<Promise<void>>()
+
+	static readonly MAX_PENDING_ASYNC_SUBGROUP_CLOSES = 2
 
 	readonly config: BroadcastConfig
 	readonly catalog: Catalog.Root
@@ -48,6 +53,7 @@ export class Broadcast {
 		for (const media of mediaTracks) {
 			const track = new Track(media, config)
 			this.#tracks.set(track.name, track)
+			this.#trackKinds.set(track.name, media.kind)
 
 			const settings = isFrameTrackSource(media)
 				? { ...media.settings }
@@ -196,6 +202,8 @@ export class Broadcast {
 	async #serveTrack(subscriber: SubscribeRecv, name: string) {
 		const track = this.#tracks.get(name)
 		if (!track) throw new Error(`no track with name ${subscriber.track}`)
+		const kind = this.#trackKinds.get(name)
+		if (!kind) throw new Error(`no track kind for ${subscriber.track}`)
 
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()
@@ -212,7 +220,7 @@ export class Broadcast {
 				// Keep subgroup creation serialized per subscribed track.
 				// Unbounded parallel segment sends can exhaust the relay's stream budget,
 				// leaving viewers stuck in the "connecting" state while send-stream creation fails.
-				await this.#serveSegment(subscriber, segment)
+				await this.#serveSegment(subscriber, segment, kind)
 			}
 		} finally {
 			await segments.cancel("subscription ended").catch(() => {})
@@ -220,19 +228,65 @@ export class Broadcast {
 		}
 	}
 
-	async #serveSegment(subscriber: SubscribeRecv, segment: Segment) {
+	async #closeSubgroup(stream: { close(): Promise<void> }, allowBoundedWait: boolean) {
+		const closePromise = stream.close().catch(() => {})
+
+		if (!allowBoundedWait) {
+			await closePromise
+			return
+		}
+
+		this.#pendingAsyncSubgroupCloses.add(closePromise)
+		void closePromise.finally(() => {
+			this.#pendingAsyncSubgroupCloses.delete(closePromise)
+		})
+
+		while (
+			this.#pendingAsyncSubgroupCloses.size >
+			Broadcast.MAX_PENDING_ASYNC_SUBGROUP_CLOSES
+		) {
+			await Promise.race(this.#pendingAsyncSubgroupCloses)
+		}
+	}
+
+	async #serveSegment(subscriber: SubscribeRecv, segment: Segment, kind: "audio" | "video") {
 		// Create a new stream for each segment.
 		const stream = await subscriber.subgroup({
 			group: segment.id,
 			subgroup: 0, // @todo: figure out the right way to do this
 			priority: 127, // TODO,default to mid value, see: https://github.com/moq-wg/moq-transport/issues/504
+			endOfGroup: true,
 		})
 
 		let object = 0
+		const isAudioTrack = kind === "audio"
 
 		// Pipe the segment to the stream.
 		const chunks = segment.chunks().getReader()
 		try {
+			if (isAudioTrack) {
+				const parts: Uint8Array[] = []
+				let totalLength = 0
+				for (; ;) {
+					const { value, done } = await chunks.read()
+					if (done) break
+					parts.push(value)
+					totalLength += value.byteLength
+				}
+
+				const payload = new Uint8Array(totalLength)
+				let offset = 0
+				for (const part of parts) {
+					payload.set(part, offset)
+					offset += part.byteLength
+				}
+
+				await stream.write({
+					object_id: object,
+					object_payload: payload,
+				})
+				object += 1
+			} else {
 			for (; ;) {
 				const { value, done } = await chunks.read()
 				if (done) break
@@ -244,8 +298,9 @@ export class Broadcast {
 
 				object += 1
 			}
+			}
 
-			await stream.close()
+			await this.#closeSubgroup(stream, true)
 		} finally {
 			await chunks.cancel("segment send ended").catch(() => {})
 			chunks.releaseLock()

@@ -162,7 +162,14 @@ export function usePlayerSession({
 
     if (currentPlayer) {
       try {
-        if (typeof currentPlayer.destroy === "function") {
+        const isVideoMoqElement =
+          typeof HTMLElement !== "undefined" &&
+          currentPlayer instanceof HTMLElement &&
+          currentPlayer.localName === "video-moq";
+
+        // <video-moq> already destroys itself in disconnectedCallback.
+        // Calling destroy() here as well double-closes the underlying player.
+        if (!isVideoMoqElement && typeof currentPlayer.destroy === "function") {
           await withTimeout(currentPlayer.destroy(), 1200);
         } else if (
           currentPlayer.player &&
@@ -305,6 +312,25 @@ export function usePlayerSession({
     }
 
     try {
+      const playerStillMuted =
+        playerEl.muted === true || playerEl.player?.muted === true;
+      const audioContextState =
+        typeof playerEl.player?.getAudioContextState === "function"
+          ? playerEl.player.getAudioContextState()
+          : "unknown";
+
+      if (!playerStillMuted && audioContextState === "running") {
+        return true;
+      }
+
+      if (
+        !playerStillMuted &&
+        typeof playerEl.player?.resumeAudioContext === "function"
+      ) {
+        await playerEl.player.resumeAudioContext();
+        return true;
+      }
+
       if (typeof playerEl.unmute === "function") {
         await playerEl.unmute();
         return true;
@@ -415,7 +441,26 @@ export function usePlayerSession({
       ctx.started = true;
       ctx.lastAdvanceAt = Date.now();
       setPlayerPaused(false);
-      void applyDesiredPlayerMute({ logFailure: false });
+      void (async () => {
+        await applyDesiredPlayerMute({ logFailure: false });
+        if (!desiredPlayerMutedRef.current && audioPlaybackSupported) {
+          const playerEl = playerRef.current;
+          if (playerEl && inferPlayerMuted(playerEl, false)) {
+            try {
+              if (typeof playerEl.unmute === "function") {
+                await playerEl.unmute();
+              } else if (typeof playerEl.player?.mute === "function") {
+                await playerEl.player.mute(false);
+              }
+            } catch (error) {
+              logRef.current?.(
+                `loadeddata unmute warning: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            }
+          }
+          setPlayerMutedStateOnly(inferPlayerMuted(playerEl, false));
+        }
+      })();
       updatePlayerStatus("live", "播放中（moq-js WebCodecs 路径）。");
       setPlaybackStartToken((current) => current + 1);
       logRef.current?.("playback started");

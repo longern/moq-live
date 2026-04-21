@@ -940,6 +940,7 @@ export function usePublisherController({
       url: nextRelayUrl,
       namespace: [namespace],
       media: syntheticMedia.mediaStream,
+      sources: [syntheticMedia.audioSource],
       video: {
         codec: H264_BASELINE_LEVEL_31,
         width: syntheticWidth,

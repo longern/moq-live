@@ -8,7 +8,7 @@ import { FrameTrackSource, isFrameTrackSource } from "./source"
 import * as Audio from "./audio"
 import * as Video from "./video"
 
-const AUDIO_SEGMENT_DURATION_US = 200_000
+const AUDIO_SEGMENT_DURATION_US = 500_000
 
 export class Track {
 	name: string

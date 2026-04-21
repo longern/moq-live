@@ -49,6 +49,12 @@ function createMarkerPalette(namespace) {
   ];
 }
 
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 export function createSyntheticMedia(namespace, options = {}) {
   const orientation = options.orientation === "portrait" ? "portrait" : "landscape";
   const { width, height } = getSyntheticDimensions(orientation);
@@ -159,52 +165,125 @@ export function createSyntheticMedia(namespace, options = {}) {
     throw new Error("无法创建合成视频轨");
   }
 
-  const audioContext = new AudioContext({ sampleRate: 48_000 });
-  const destination = audioContext.createMediaStreamDestination();
-  const masterGain = audioContext.createGain();
-  masterGain.gain.value = 0.08;
-  masterGain.connect(destination);
-
-  const oscillatorA = audioContext.createOscillator();
-  oscillatorA.type = "sine";
-  oscillatorA.frequency.value = 220;
-  oscillatorA.connect(masterGain);
-  oscillatorA.start();
-
-  const oscillatorB = audioContext.createOscillator();
-  oscillatorB.type = "triangle";
-  oscillatorB.frequency.value = 330;
-  oscillatorB.connect(masterGain);
-  oscillatorB.start();
-
-  const lfo = audioContext.createOscillator();
-  const lfoGain = audioContext.createGain();
-  lfo.type = "sine";
-  lfo.frequency.value = 0.8;
-  lfoGain.gain.value = 110;
-  lfo.connect(lfoGain);
-  lfoGain.connect(oscillatorA.frequency);
-  lfo.start();
-
-  const audioTrack = destination.stream.getAudioTracks()[0];
-  if (!audioTrack) {
-    throw new Error("无法创建合成音频轨");
+  const AudioDataCtor = globalThis.AudioData;
+  if (typeof AudioDataCtor !== "function") {
+    throw new Error("当前浏览器不支持基于帧生成的合成音频源");
   }
 
-  const mediaStream = new MediaStream([videoTrack, audioTrack]);
+  const sampleRate = 48_000;
+  const numberOfChannels = 2;
+  const frameCount = 960;
+  const frameDurationMs = (frameCount / sampleRate) * 1000;
+  const amplitude = 0.08;
+  let audioFrameIndex = 0;
+  let stopped = false;
+  let audioControllerClosed = false;
+  let audioController = null;
+  let audioClockStartMs = performance.now();
+
+  const createAudioFrame = () => {
+    const timestamp = Math.round((audioFrameIndex * frameCount * 1_000_000) / sampleRate);
+    const data = new Float32Array(frameCount * numberOfChannels);
+
+    for (let i = 0; i < frameCount; i += 1) {
+      const sampleIndex = audioFrameIndex * frameCount + i;
+      const time = sampleIndex / sampleRate;
+      const sweep = Math.sin(time * Math.PI * 2 * 0.35);
+      const left = amplitude * (
+        Math.sin(Math.PI * 2 * 220 * time + sweep * 0.9) * 0.72 +
+        Math.sin(Math.PI * 2 * 330 * time) * 0.28
+      );
+      const right = amplitude * (
+        Math.sin(Math.PI * 2 * 247 * time - sweep * 0.8) * 0.64 +
+        Math.sin(Math.PI * 2 * 392 * time) * 0.36
+      );
+      data[i] = left;
+      data[frameCount + i] = right;
+    }
+
+    audioFrameIndex += 1;
+
+    return new AudioDataCtor({
+      format: "f32-planar",
+      sampleRate,
+      numberOfFrames: frameCount,
+      numberOfChannels,
+      timestamp,
+      data,
+    });
+  };
+
+  const audioReadable = new ReadableStream(
+    {
+      start(controller) {
+        audioController = controller;
+      },
+      async pull(controller) {
+        if (stopped) {
+          if (!audioControllerClosed) {
+            audioControllerClosed = true;
+            controller.close();
+          }
+          return;
+        }
+
+        // Pace synthetic frames against wall-clock time so the source behaves
+        // like a real-time audio input instead of flooding the encoder loop.
+        const targetElapsedMs = audioFrameIndex * frameDurationMs;
+        const elapsedMs = performance.now() - audioClockStartMs;
+        const waitMs = targetElapsedMs - elapsedMs;
+        if (waitMs > 1) {
+          await wait(waitMs);
+        } else if (waitMs < -2_000) {
+          // Large negative drift means the page was throttled or stalled.
+          // Re-anchor the synthetic clock instead of trying to catch up by
+          // generating a burst of stale frames.
+          audioClockStartMs = performance.now() - targetElapsedMs;
+        }
+
+        if (stopped) {
+          if (!audioControllerClosed) {
+            audioControllerClosed = true;
+            controller.close();
+          }
+          return;
+        }
+        controller.enqueue(createAudioFrame());
+      },
+      cancel() {
+        stopped = true;
+      },
+    },
+    { highWaterMark: 4 },
+  );
+  const mediaStream = new MediaStream([videoTrack]);
 
   return {
     canvas,
     markerPalette,
     orientation,
     mediaStream,
+    audioSource: {
+      name: "audio",
+      kind: "audio",
+      settings: {
+        sampleRate,
+        channelCount: numberOfChannels,
+      },
+      readable: audioReadable,
+    },
     async stop() {
+      stopped = true;
       window.cancelAnimationFrame(rafId);
       mediaStream.getTracks().forEach((track) => track.stop());
-      oscillatorA.stop();
-      oscillatorB.stop();
-      lfo.stop();
-      await audioContext.close();
+      if (!audioControllerClosed) {
+        audioControllerClosed = true;
+        try {
+          audioController?.close?.();
+        } catch {
+          // Ignore close failures after the stream has been closed.
+        }
+      }
     }
   };
 }

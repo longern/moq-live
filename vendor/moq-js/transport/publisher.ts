@@ -289,12 +289,12 @@ export class SubscribeRecv {
 	}
 
 	// Create a writable data stream for a subgroup within the track
-	async subgroup(props: { group: number; subgroup: number; priority?: number }): Promise<SubgroupWriter> {
+	async subgroup(props: { group: number; subgroup: number; priority?: number; endOfGroup?: boolean }): Promise<SubgroupWriter> {
 		if (this.#state === "closed") {
 			throw new Error("subscribe closed")
 		}
 		return this.#objects.send({
-			type: SubgroupType.Type0x10, // Basic subgroup without extensions
+			type: props.endOfGroup ? SubgroupType.Type0x18 : SubgroupType.Type0x10,
 			track_alias: this.#trackAlias,
 			group_id: props.group,
 			subgroup_id: props.subgroup,

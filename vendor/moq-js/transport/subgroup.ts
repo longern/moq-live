@@ -172,6 +172,10 @@ export class SubgroupWriter {
     async close() {
         return this.stream.close()
     }
+
+    async abort(reason?: unknown) {
+        return this.stream.abort(reason)
+    }
 }
 export class SubgroupReader {
     constructor(

@@ -27,6 +27,7 @@ export interface Writer {
   flush(): Promise<void>;
   clear(): void;
   close(): Promise<void>;
+  abort(reason?: unknown): Promise<void>;
   release():
     | [Uint8Array, WritableStream<Uint8Array>]
     | [Uint8Array, ReadableStream<Uint8Array>];
@@ -473,6 +474,14 @@ export class WritableStreamBuffer implements Writer {
     }
   }
 
+  async abort(reason?: unknown) {
+    try {
+      await this.writer.abort(reason);
+    } finally {
+      this.writer.releaseLock();
+    }
+  }
+
   async flush() {
     await this.write(this.buffer.Uint8Array);
     this.clear();
@@ -573,6 +582,10 @@ export class ReadableWritableStreamBuffer implements Reader, Writer {
   async close() {
     this.readStreamBuffer.close();
     this.writeStreamBuffer.close();
+  }
+  async abort(reason?: unknown) {
+    this.readStreamBuffer.close();
+    await this.writeStreamBuffer.abort(reason);
   }
   async flush(): Promise<void> {
     return this.writeStreamBuffer.flush();

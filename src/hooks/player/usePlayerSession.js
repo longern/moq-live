@@ -9,6 +9,46 @@ import {
   withTimeout,
 } from "./playerControllerUtils.js";
 
+function formatAudioRenderStats(stats, now) {
+  if (!stats || typeof stats !== "object") {
+    return "audioStats=none";
+  }
+
+  const at =
+    Number.isFinite(stats.at) && Number.isFinite(now)
+      ? Math.max(0, Math.round(now - stats.at))
+      : null;
+
+  return [
+    `audioStats.read=${Number(stats.read ?? 0)}`,
+    `audioStats.size=${Number(stats.size ?? 0)}`,
+    `audioStats.required=${Number(stats.required ?? 0)}`,
+    `audioStats.capacity=${Number(stats.capacity ?? 0)}`,
+    `audioStats.level=${Number(stats.level ?? 0).toFixed(4)}`,
+    `audioStats.buffering=${stats.buffering === true}`,
+    `audioStats.started=${stats.started === true}`,
+    `audioStats.dropped=${Number(stats.dropped ?? 0)}`,
+    `audioStats.ageMs=${at ?? "na"}`,
+  ].join(" ");
+}
+
+function formatVideoFrameStats(stats, now) {
+  if (!stats || typeof stats !== "object") {
+    return "videoStats=none";
+  }
+
+  const at =
+    Number.isFinite(stats.at) && Number.isFinite(now)
+      ? Math.max(0, Math.round(now - stats.at))
+      : null;
+
+  return [
+    `videoStats.width=${Number(stats.width ?? 0)}`,
+    `videoStats.height=${Number(stats.height ?? 0)}`,
+    `videoStats.ageMs=${at ?? "na"}`,
+  ].join(" ");
+}
+
 export function usePlayerSession({
   relayUrlRef,
   roomRef,
@@ -427,9 +467,12 @@ export function usePlayerSession({
       player: playerEl,
       listeners: [],
       tickerId: null,
-      lastTime: 0,
-      lastAdvanceAt: Date.now(),
       started: false,
+      stallState: {
+        active: false,
+        signature: "",
+        loggedAt: 0,
+      },
     };
     sessionRef.current = ctx;
     window.player = ctx.player;
@@ -439,7 +482,6 @@ export function usePlayerSession({
         return;
       }
       ctx.started = true;
-      ctx.lastAdvanceAt = Date.now();
       setPlayerPaused(false);
       void (async () => {
         await applyDesiredPlayerMute({ logFailure: false });
@@ -544,17 +586,92 @@ export function usePlayerSession({
       if (sessionRef.current !== ctx) {
         return;
       }
-      const currentTime = Number(ctx.player.currentTime ?? 0);
-      if (Number.isFinite(currentTime) && currentTime > ctx.lastTime + 0.05) {
-        ctx.lastTime = currentTime;
-        ctx.lastAdvanceAt = Date.now();
-        if (ctx.started) {
-          updatePlayerStatus("live", "播放中（moq-js WebCodecs 路径）。");
+      const now = Date.now();
+      const playerMuted = inferPlayerMuted(ctx.player, desiredPlayerMutedRef.current);
+      const audioContextState =
+        typeof ctx.player.player?.getAudioContextState === "function"
+          ? ctx.player.player.getAudioContextState()
+          : "unknown";
+      const audioRenderStats =
+        typeof ctx.player.player?.getAudioRenderStats === "function"
+          ? ctx.player.player.getAudioRenderStats()
+          : null;
+      const videoFrameStats =
+        typeof ctx.player.player?.getVideoFrameStats === "function"
+          ? ctx.player.player.getVideoFrameStats()
+          : null;
+      const audioAgeMs = Number.isFinite(audioRenderStats?.at)
+        ? Math.max(0, now - audioRenderStats.at)
+        : null;
+      const videoAgeMs = Number.isFinite(videoFrameStats?.at)
+        ? Math.max(0, now - videoFrameStats.at)
+        : null;
+      const audioStalled =
+        !playerMuted &&
+        audioContextState === "running" &&
+        audioRenderStats?.started === true &&
+        Number.isFinite(audioAgeMs) &&
+        audioAgeMs > 3000;
+      const videoStalled =
+        Number.isFinite(videoAgeMs) &&
+        videoAgeMs > 3000;
+      const stalled = ctx.started && (audioStalled || videoStalled);
+
+      if (stalled) {
+        updatePlayerStatus("buffering", "缓冲中（等待稳定缓冲）。");
+        const signature = [
+          playerMuted,
+          audioContextState,
+          audioAgeMs ?? "na",
+          videoAgeMs ?? "na",
+          audioRenderStats?.size ?? "na",
+          audioRenderStats?.required ?? "na",
+          audioRenderStats?.buffering ?? "na",
+          audioRenderStats?.started ?? "na",
+          videoFrameStats?.width ?? "na",
+          videoFrameStats?.height ?? "na",
+        ].join("|");
+
+        if (
+          !ctx.stallState.active ||
+          ctx.stallState.signature !== signature ||
+          now - ctx.stallState.loggedAt >= 5000
+        ) {
+          logRef.current?.(
+            [
+              "[Player] suspected playback stall",
+              `muted=${playerMuted}`,
+              `audioContext=${audioContextState}`,
+              `audioStalled=${audioStalled}`,
+              `videoStalled=${videoStalled}`,
+              formatAudioRenderStats(audioRenderStats, now),
+              formatVideoFrameStats(videoFrameStats, now),
+            ].join(" "),
+          );
+          ctx.stallState.active = true;
+          ctx.stallState.signature = signature;
+          ctx.stallState.loggedAt = now;
         }
         return;
       }
-      if (ctx.started && Date.now() - ctx.lastAdvanceAt > 2500) {
-        updatePlayerStatus("buffering", "缓冲中（等待稳定缓冲）。");
+
+      if (ctx.stallState.active) {
+        logRef.current?.(
+          [
+            "[Player] playback recovered",
+            `muted=${playerMuted}`,
+            `audioContext=${audioContextState}`,
+            formatAudioRenderStats(audioRenderStats, now),
+            formatVideoFrameStats(videoFrameStats, now),
+          ].join(" "),
+        );
+        ctx.stallState.active = false;
+        ctx.stallState.signature = "";
+        ctx.stallState.loggedAt = 0;
+      }
+
+      if (ctx.started) {
+        updatePlayerStatus("live", "播放中（moq-js WebCodecs 路径）。");
       }
     }, 1000);
 

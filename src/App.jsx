@@ -134,6 +134,29 @@ export function App() {
     setLogText((current) => `${current}${line}\n`);
   }
 
+  useEffect(() => {
+    window.__MOQ_APP_LOG__ = (message) => {
+      log(String(message));
+    };
+
+    return () => {
+      if (window.__MOQ_APP_LOG__ === log) {
+        delete window.__MOQ_APP_LOG__;
+      } else {
+        delete window.__MOQ_APP_LOG__;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    window.__MOQ_APP_LOG__ = log;
+    return () => {
+      if (window.__MOQ_APP_LOG__ === log) {
+        delete window.__MOQ_APP_LOG__;
+      }
+    };
+  }, []);
+
   const {
     initialAutorun,
     page,

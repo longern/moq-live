@@ -6,6 +6,18 @@ function postMessageSafe(message) {
   self.postMessage(message);
 }
 
+function postWorkerLog(level, message, details = undefined) {
+  postMessageSafe({
+    type: "log",
+    level,
+    message: details ? `${message} ${JSON.stringify(details)}` : message,
+  });
+}
+
+globalThis.__MOQ_PUBLISHER_LOG__ = ({ level = "log", message, details } = {}) => {
+  postWorkerLog(level, message || "publisher worker log", details);
+};
+
 function toErrorPayload(error) {
   if (error instanceof Error) {
     return {
@@ -37,11 +49,10 @@ async function closeCurrentSession(reason = "stopped") {
   try {
     await session.publisher.stop();
   } catch (error) {
-    postMessageSafe({
-      type: "log",
-      level: "warn",
-      message: `worker stop warning: ${error instanceof Error ? error.message : String(error)}`,
-    });
+    postWorkerLog(
+      "warn",
+      `worker stop warning: ${error instanceof Error ? error.message : String(error)}`,
+    );
   } finally {
     stopOwnedTracks(session);
   }
@@ -50,11 +61,10 @@ async function closeCurrentSession(reason = "stopped") {
 }
 
 function setTrackEnabled(kind, enabled) {
-  postMessageSafe({
-    type: "log",
-    level: "warn",
-    message: `set-track-enabled ignored for ${kind}=${enabled}; publish tracks are controlled on the main thread`,
-  });
+  postWorkerLog(
+    "warn",
+    `set-track-enabled ignored for ${kind}=${enabled}; publish tracks are controlled on the main thread`,
+  );
 }
 
 async function startPublish({

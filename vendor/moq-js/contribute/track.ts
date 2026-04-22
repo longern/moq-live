@@ -8,7 +8,7 @@ import { FrameTrackSource, isFrameTrackSource } from "./source"
 import * as Audio from "./audio"
 import * as Video from "./video"
 
-const AUDIO_SEGMENT_DURATION_US = 500_000
+const AUDIO_SEGMENT_DURATION_US = 200_000
 
 export class Track {
 	name: string
@@ -163,6 +163,11 @@ export class Track {
 		}
 
 		return this.#init
+	}
+
+	latestSegmentId(): number | undefined {
+		const latest = this.#segments.at(-1)
+		return latest?.id
 	}
 
 	// TODO generize this

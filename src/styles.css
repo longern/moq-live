@@ -315,7 +315,8 @@ pre {
   cursor: not-allowed;
 }
 
-.nav-button {
+.nav-button,
+a.nav-button {
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -327,6 +328,12 @@ pre {
     color 140ms ease,
     background 140ms ease,
     transform 140ms ease;
+}
+
+a.nav-button {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 .nav-button:hover {

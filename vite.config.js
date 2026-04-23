@@ -23,7 +23,7 @@ function patchMoqWatchCatalogFormats() {
   const patchedBroadcastFetchSnippet =
     'const o = r === "hang" ? "catalog.json" : r === ".catalog" ? ".catalog" : "catalog", a = i.subscribe(o, ee.catalog);\n    e.cleanup(() => a.close());\n    const c = r === "hang" ? async () => ms(a) : r === ".catalog" ? async () => {\n      const u = await __moqWatchFetchMoqJsCatalog(a);\n      return u ? await __moqWatchMoqJsCatalogToHang(u, i, e) : void 0;\n    } : async () => {\n      const u = await er(a);\n      return u ? rr(u) : void 0;\n    };';
   const converterInsertAfter =
-    'async function er(t) {\n  const e = await t.readFrame();\n  if (e)\n    return Qi(e);\n}\n';
+    "async function er(t) {\n  const e = await t.readFrame();\n  if (e)\n    return Qi(e);\n}\n";
   const moqJsCatalogConverter = `${converterInsertAfter}function __moqWatchBytes(t) {
   if (t instanceof Uint8Array) return t;
   if (t instanceof ArrayBuffer) return new Uint8Array(t);
@@ -133,13 +133,23 @@ async function __moqWatchMoqJsCatalogToHang(t, e, n) {
       ) {
         let nextCode = code;
         if (!nextCode.includes(converterInsertAfter)) {
-          throw new Error("Missing @moq/watch broadcast converter insert target");
+          throw new Error(
+            "Missing @moq/watch broadcast converter insert target",
+          );
         }
-        nextCode = nextCode.replace(converterInsertAfter, moqJsCatalogConverter);
+        nextCode = nextCode.replace(
+          converterInsertAfter,
+          moqJsCatalogConverter,
+        );
         if (!nextCode.includes(broadcastFetchSnippet)) {
-          throw new Error("Missing @moq/watch broadcast catalog fetch patch target");
+          throw new Error(
+            "Missing @moq/watch broadcast catalog fetch patch target",
+          );
         }
-        nextCode = nextCode.replace(broadcastFetchSnippet, patchedBroadcastFetchSnippet);
+        nextCode = nextCode.replace(
+          broadcastFetchSnippet,
+          patchedBroadcastFetchSnippet,
+        );
         return nextCode === code ? null : { code: nextCode, map: null };
       }
 
@@ -262,6 +272,7 @@ export default defineConfig(({ mode }) => {
       __BUILD_HASH__: JSON.stringify(buildHash),
     },
     server: {
+      port: 3047,
       headers: isolationHeaders,
       ...(backendProxyTarget
         ? {

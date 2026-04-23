@@ -262,7 +262,7 @@ export function usePlayerSession({
 
   async function startPlayer(options = {}) {
     const {
-      initialMuted = true,
+      initialMuted = false,
     } = options;
     const targetMuted = !audioPlaybackSupported || initialMuted;
     const token = ++playbackTokenRef.current;

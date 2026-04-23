@@ -57,11 +57,41 @@ function NavButton({ item, currentPage, onSelect, mobile = false }) {
   );
 }
 
+function getNavHref(pageId) {
+  const url = new URL(window.location.href);
+  url.search = "";
+  if (pageId === "live") {
+    url.searchParams.set("p", "l");
+  } else if (pageId === "settings") {
+    url.searchParams.set("p", "s");
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+function NavLink({ item, currentPage, onSelect }) {
+  const active = currentPage === item.id;
+
+  return (
+    <a
+      href={getNavHref(item.id)}
+      class={`nav-button${active ? " is-active" : ""}`}
+      data-nav-target={item.id}
+      aria-current={active ? "page" : undefined}
+      onClick={(event) => {
+        event.preventDefault();
+        onSelect(item.id);
+      }}
+    >
+      {item.label}
+    </a>
+  );
+}
+
 export function DesktopNavigation({ currentPage, onSelect }) {
   return (
     <nav class="desktop-nav" aria-label="Primary">
       {navItems.filter((item) => item.id !== "settings").map((item) => (
-        <NavButton key={item.id} item={item} currentPage={currentPage} onSelect={onSelect} />
+        <NavLink key={item.id} item={item} currentPage={currentPage} onSelect={onSelect} />
       ))}
     </nav>
   );

@@ -463,12 +463,26 @@ export function App() {
     }
   }
 
-  function cycleCameraMode() {
+  async function changeCamera(cameraId) {
     if (publisher.publisherIsPublishing) {
-      publisher.setCameraEnabled(!publisher.cameraEnabled);
+      try {
+        const switched = await publisher.switchPublishCamera(cameraId);
+        if (switched) {
+          publisher.setSelectedCameraId(cameraId);
+          publisher.setCameraEnabled(true);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log(`camera switch failed: ${message}`);
+      }
       return;
     }
 
+    publisher.setSelectedCameraId(cameraId);
+    publisher.setCameraEnabled(true);
+  }
+
+  function cycleCameraMode() {
     const { front, rear } = splitCameraOptions(publisher.cameraOptions);
     const currentMode = getCameraMode(
       publisher.cameraOptions,
@@ -479,15 +493,18 @@ export function App() {
     if (currentMode === "off") {
       const nextCamera = front ?? rear;
       if (nextCamera) {
-        publisher.setSelectedCameraId(nextCamera.value);
-        publisher.setCameraEnabled(true);
+        void changeCamera(nextCamera.value);
       }
       return;
     }
 
     if (currentMode === "front" && rear) {
-      publisher.setSelectedCameraId(rear.value);
-      publisher.setCameraEnabled(true);
+      void changeCamera(rear.value);
+      return;
+    }
+
+    if (publisher.publisherIsPublishing && currentMode === "rear" && front) {
+      void changeCamera(front.value);
       return;
     }
 
@@ -1220,8 +1237,7 @@ export function App() {
                 syntheticPublishing={publisher.syntheticPublishing}
                 previewVideoRef={publisher.previewVideoRef}
                 onCameraChange={(event) => {
-                  publisher.setSelectedCameraId(event.currentTarget.value);
-                  publisher.setCameraEnabled(true);
+                  void changeCamera(event.currentTarget.value);
                 }}
                 onMicrophoneChange={(event) => {
                   publisher.setSelectedMicrophoneId(event.currentTarget.value);

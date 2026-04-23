@@ -129,8 +129,8 @@ export function usePublisherController({
     return liveSessionManagerRef.current.getActiveStream();
   }
 
-  function beginPreviewRequest() {
-    return liveSessionManagerRef.current.beginRequest();
+  function beginPreviewRequest(options) {
+    return liveSessionManagerRef.current.beginRequest(options);
   }
 
   function isCurrentPreviewRequest(requestId) {
@@ -402,6 +402,107 @@ export function usePublisherController({
     appliedMicrophoneIdRef.current = selectedMicrophoneId;
     appliedMicrophoneEnabledRef.current = microphoneEnabled;
     updatePreviewState(stream, sourceType);
+  }
+
+  async function switchPublishCamera(cameraId) {
+    const session = livePublisherRef.current;
+    if (!session || !publisherIsPublishingRef.current) {
+      return false;
+    }
+    if (previewSourceTypeRef.current !== PREVIEW_SOURCE_CAMERA) {
+      throw new Error("当前直播源不是摄像头");
+    }
+
+    const requestId = beginPreviewRequest({ stopActive: false });
+    const constraints = {
+      video: cameraId
+        ? {
+            deviceId: { exact: cameraId },
+            width: { ideal: VIDEO_TARGET_WIDTH },
+            height: { ideal: VIDEO_TARGET_HEIGHT },
+            frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
+          }
+        : {
+            width: { ideal: VIDEO_TARGET_WIDTH },
+            height: { ideal: VIDEO_TARGET_HEIGHT },
+            frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
+          },
+      audio: false,
+    };
+
+    updatePublishStatus("preparing", "正在切换摄像头。");
+
+    let newStream = null;
+    try {
+      newStream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (
+        !isCurrentPreviewRequest(requestId) ||
+        livePublisherRef.current !== session ||
+        !publisherIsPublishingRef.current
+      ) {
+        stopMediaStream(newStream);
+        return false;
+      }
+
+      const newPreviewTrack = newStream.getVideoTracks()[0] ?? null;
+      if (!newPreviewTrack) {
+        throw new Error("无法获取新摄像头画面");
+      }
+
+      const newPublishTrack = newPreviewTrack.clone();
+      newPublishTrack.enabled = true;
+      const oldPublishTracks = session.publishTracks.filter(
+        (track) => track.kind === "video",
+      );
+      session.broadcast.video.source.set(newPublishTrack);
+      session.publishTracks = [
+        ...session.publishTracks.filter((track) => track.kind !== "video"),
+        newPublishTrack,
+      ];
+      for (const track of oldPublishTracks) {
+        try {
+          track.stop();
+        } catch {
+          // Ignore stale track cleanup failures after replacing the source.
+        }
+      }
+
+      const previewStream = getLiveMediaStream();
+      if (previewStream) {
+        for (const track of previewStream.getVideoTracks()) {
+          previewStream.removeTrack(track);
+          try {
+            track.stop();
+          } catch {
+            // Ignore stale preview track cleanup failures.
+          }
+        }
+        previewStream.addTrack(newPreviewTrack);
+        stopMediaStream(new MediaStream(newStream.getAudioTracks()));
+        updatePreviewState(previewStream, PREVIEW_SOURCE_CAMERA);
+        newStream = null;
+      } else {
+        liveSessionManagerRef.current.adoptStream(requestId, newStream);
+        updatePreviewState(newStream, PREVIEW_SOURCE_CAMERA);
+        newStream = null;
+      }
+
+      setCameraEnabledState(true);
+      setPreviewHasVideo(true);
+      appliedCameraIdRef.current = cameraId;
+      updatePublishStatus("live", `直播已启动：${roomRef.current || "unset"}`);
+      log(`switched publish camera to ${cameraId || "default"}`);
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      updatePublishStatus("error", `切换摄像头失败：${message}`);
+      log(`switch camera failed: ${message}`);
+      throw error;
+    } finally {
+      if (newStream) {
+        stopMediaStream(newStream);
+      }
+    }
   }
 
   async function requestPreferredMicrophoneTrack() {
@@ -1075,6 +1176,7 @@ export function usePublisherController({
     setSelectedMicrophoneId,
     setCameraEnabled,
     setMicrophoneEnabled,
+    switchPublishCamera,
     startCameraPublish,
     stopCameraPublish,
     startScreenShare,

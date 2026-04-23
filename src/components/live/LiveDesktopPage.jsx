@@ -66,7 +66,12 @@ function LiveDesktopPanel(props) {
           </div>
           <label>
             选择设备
-            <select id="cameraSelect" value={selectedCameraId} onChange={onCameraChange} disabled={isPublishing}>
+            <select
+              id="cameraSelect"
+              value={selectedCameraId}
+              onChange={onCameraChange}
+              disabled={isPublishing && previewSourceType !== "camera"}
+            >
               {cameraOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}

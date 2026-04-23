@@ -6,7 +6,8 @@ import preact from "@preact/preset-vite";
 import { defineConfig, loadEnv } from "vite";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
-const moqPlayerModulePath = "/vendor/moq-js/moq-player.esm.js";
+const moqWatchBroadcastModuleMarker = "/node_modules/@moq/watch/broadcast-";
+const moqLiteSubscribeModulePath = "/node_modules/@moq/lite/ietf/subscribe.js";
 const AUDIO_PREBUFFER_MS = 100;
 const AUDIO_RING_CAPACITY_MS = 2000;
 const AUDIO_TARGET_BUFFER_MS = 140;
@@ -16,122 +17,170 @@ const VIDEO_SEGMENT_READ_TIMEOUT_MS = 10000;
 const AUDIO_SUBGROUP_SWITCH_TIMEOUT_MS = 750;
 const VIDEO_SUBGROUP_SWITCH_TIMEOUT_MS = 2000;
 
-function optimizeMoqPlayerCanvas() {
-  const audioCapabilityExpression =
-    '"undefined"!=typeof SharedArrayBuffer&&"undefined"!=typeof AudioWorkletNode&&!0===globalThis.crossOriginIsolated';
-  const privateFieldSnippet = "#g;#y=!0;#_;#b=!1;constructor";
-  const optimizedPrivateFieldSnippet =
-    "#g;#y=!0;#_;#b=!1;#D;#W=0;#H=0;constructor";
-  const constructorSnippet =
-    "constructor(t,e){this.#f=t.canvas,this.#h=e,this.#_=!1,this.#m=new TransformStream({start:this.#l.bind(this),transform:this.#d.bind(this)}),this.#p().catch(console.error)}";
-  const optimizedConstructorSnippet =
-    'constructor(t,e){this.#f=t.canvas,this.#h=e,this.#_=!1,this.#D=this.#f.getContext("2d");if(!this.#D)throw new Error("failed to get canvas context");this.#m=new TransformStream({start:this.#l.bind(this),transform:this.#d.bind(this)}),this.#p().catch(console.error)}';
-  const frameRenderSnippet =
-    'self.requestAnimationFrame(()=>{this.#f.width=e.displayWidth,this.#f.height=e.displayHeight;const t=this.#f.getContext("2d");if(!t)throw new Error("failed to get canvas context");t.drawImage(e,0,0,e.displayWidth,e.displayHeight),e.close()})';
-  const optimizedFrameRenderSnippet =
-    'self.requestAnimationFrame(()=>{const t=e.displayWidth,i=e.displayHeight;(this.#W!==t||this.#H!==i)&&(this.#f.width=t,this.#f.height=i,this.#W=t,this.#H=i),this.#D.drawImage(e,0,0,t,i),this.__lastVideoFrameStats={at:Date.now(),width:t,height:i},e.close()})';
-  const audioRingWriteSnippetWorklet =
-    "const i=this.channels[t],r=Math.min(t,e.numberOfChannels-1);if(a<o){const t=i.subarray(a,o);e.copyTo(t,{planeIndex:r,frameCount:o-a})}else{const t=i.subarray(a),s=i.subarray(0,o);e.copyTo(t,{planeIndex:r,frameCount:t.length}),s.length&&e.copyTo(s,{planeIndex:r,frameOffset:t.length,frameCount:s.length})}}";
-  const optimizedAudioRingWriteSnippetWorklet =
-    'const i=this.channels[t],r=Math.min(t,e.numberOfChannels-1),h="string"==typeof e.format&&!e.format.endsWith("-planar");if(h){const t=a<o?o-a:this.capacity-a+o,u=new Float32Array(t*e.numberOfChannels);try{e.copyTo(u,{planeIndex:0,frameCount:t,format:"f32"})}catch{e.copyTo(u,{planeIndex:0,frameCount:t})}for(let o=0;o<t;o+=1)i[(a+o)%this.capacity]=u[o*e.numberOfChannels+r]}else if(a<o){const t=i.subarray(a,o);e.copyTo(t,{planeIndex:r,frameCount:o-a})}else{const t=i.subarray(a),s=i.subarray(0,o);e.copyTo(t,{planeIndex:r,frameCount:t.length}),s.length&&e.copyTo(s,{planeIndex:r,frameOffset:t.length,frameCount:s.length})}}';
-  const audioRingWriteSnippetWorker =
-    "const i=this.channels[e],r=Math.min(e,t.numberOfChannels-1);if(a<o){const e=i.subarray(a,o);t.copyTo(e,{planeIndex:r,frameCount:o-a})}else{const e=i.subarray(a),s=i.subarray(0,o);t.copyTo(e,{planeIndex:r,frameCount:e.length}),s.length&&t.copyTo(s,{planeIndex:r,frameOffset:e.length,frameCount:s.length})}}";
-  const optimizedAudioRingWriteSnippetWorker =
-    'const i=this.channels[e],r=Math.min(e,t.numberOfChannels-1),h="string"==typeof t.format&&!t.format.endsWith("-planar");if(h){const e=a<o?o-a:this.capacity-a+o,u=new Float32Array(e*t.numberOfChannels);try{t.copyTo(u,{planeIndex:0,frameCount:e,format:"f32"})}catch{t.copyTo(u,{planeIndex:0,frameCount:e})}for(let o=0;o<e;o+=1)i[(a+o)%this.capacity]=u[o*t.numberOfChannels+r]}else if(a<o){const e=i.subarray(a,o);t.copyTo(e,{planeIndex:r,frameCount:o-a})}else{const e=i.subarray(a),s=i.subarray(0,o);t.copyTo(e,{planeIndex:r,frameCount:e.length}),s.length&&t.copyTo(s,{planeIndex:r,frameOffset:e.length,frameCount:s.length})}e===this.channels.length-1&&t.close&&t.close()}';
-  const audioConfigSnippet =
-    "const s={};i&&r&&(s.audio={channels:r,sampleRate:i,ring:new v(2,i)},this.#P=new f(s.audio)),s.video={canvas:t.canvas},this.send({config:s},s.video.canvas)";
-  const optimizedAudioConfigSnippet = `const s={},n=${audioCapabilityExpression};i&&r&&n&&(s.audio={channels:r,sampleRate:i,ring:new v(2,Math.max(Math.round(i*${AUDIO_RING_CAPACITY_MS}/1e3),Math.round(i*${AUDIO_MAX_BUFFER_MS}/1e3)+256)),prebufferFrames:Math.max(128,Math.round(i*${AUDIO_PREBUFFER_MS}/1e3)),targetBufferFrames:Math.max(128,Math.round(i*${AUDIO_TARGET_BUFFER_MS}/1e3)),maxBufferFrames:Math.max(256,Math.round(i*${AUDIO_MAX_BUFFER_MS}/1e3))},this.#P=new f(s.audio)),s.video={canvas:t.canvas},this.send({config:s},s.video.canvas)`;
-  const playerConstructorSnippet =
-    'constructor(t,e,i,r){super(),this.#wt=t,this.#vt=e,this.#xt=new Map(e.tracks.map(t=>[t.name,t])),this.#Ut=i,this.#St=e.tracks.find(t=>a(t))?.name??"",this.#Et=e.tracks.find(t=>n(t))?.name??"",this.#Tt=!1,this.#Bt=!1,this.#bt=new x({canvas:r,catalog:e},this),';
-  const optimizedPlayerConstructorSnippet = `constructor(t,e,i,r){super(),this.#wt=t,this.#vt=e,this.#xt=new Map(e.tracks.map(t=>[t.name,t])),this.#Ut=i;const o=${audioCapabilityExpression};this.#St=o?e.tracks.find(t=>a(t))?.name??"":"",this.#Et=e.tracks.find(t=>n(t))?.name??"",this.#Tt=!o,this.#Bt=!1,this.#bt=new x({canvas:r,catalog:e},this),`;
-  const audioRendererClassSnippet =
-    'class f{context;worklet;volumeNode;constructor(t){this.context=new AudioContext({latencyHint:"interactive",sampleRate:t.sampleRate}),this.volumeNode=this.context.createGain(),this.volumeNode.gain.value=1,this.worklet=this.load(t)}async load(t){await p(this.context);this.context.createGain().gain.value=2;const e=new AudioWorkletNode(this.context,"renderer");return e.port.addEventListener("message",this.on.bind(this)),e.onprocessorerror=t=>{console.error("Audio worklet error:",t)},e.connect(this.volumeNode),this.volumeNode.connect(this.context.destination),e.port.postMessage({config:t}),e}on(t){}';
-  const optimizedAudioRendererClassSnippet =
-    'class f{context;worklet;volumeNode;lastRenderStats;constructor(t){this.context=new AudioContext({latencyHint:"interactive",sampleRate:t.sampleRate}),this.volumeNode=this.context.createGain(),this.volumeNode.gain.value=1,this.lastRenderStats=null,this.worklet=this.load(t)}async load(t){await p(this.context);this.context.createGain().gain.value=2;const e=new AudioWorkletNode(this.context,"renderer",{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[t.channels],channelCount:t.channels,channelCountMode:"explicit",channelInterpretation:"speakers"});return e.port.addEventListener("message",this.on.bind(this)),e.port.start&&e.port.start(),e.onprocessorerror=t=>{console.error("Audio worklet error:",t)},e.connect(this.volumeNode),this.volumeNode.connect(this.context.destination),e.port.postMessage({config:t}),e}on(t){}';
-  const audioControllerOnSnippet = "on(t){}";
-  const optimizedAudioControllerOnSnippet =
-    'on(t){const e=t?.data;if(!e)return;"render_stats"===e.type&&(this.lastRenderStats={at:Date.now(),...e.payload})}';
-  const audioWorkletProcessorSnippet =
-    'class i extends AudioWorkletProcessor{ring;base;constructor(){super(),this.base=0,this.port.onmessage=this.onMessage.bind(this)}onMessage(t){const e=t.data;e.config&&this.onConfig(e.config)}onConfig(t){this.ring=new e(t.ring)}process(t,e,i){if(!this.ring)return!0;if(1!=t.length&&1!=e.length)throw new Error("only a single track is supported");if(this.ring.size()==this.ring.capacity)return console.warn("resyncing ring buffer"),this.ring.clear(),!0;const r=e[0];return this.ring.read(r),r.length,!0}}';
-  const optimizedAudioWorkletProcessorSnippet =
-    'class i extends AudioWorkletProcessor{ring;base;prebufferFrames;rebufferFrames;targetBufferFrames;maxBufferFrames;buffering;started;statsCountdown;constructor(){super(),this.base=0,this.prebufferFrames=0,this.rebufferFrames=128,this.targetBufferFrames=128,this.maxBufferFrames=256,this.buffering=!1,this.started=!1,this.statsCountdown=0,this.port.onmessage=this.onMessage.bind(this)}onMessage(t){const e=t.data;e.config&&this.onConfig(e.config)}onConfig(t){this.ring=new e(t.ring),this.prebufferFrames=Math.max(0,Math.min(this.ring.capacity,Math.round(t.prebufferFrames??0))),this.rebufferFrames=Math.max(128,Math.min(this.ring.capacity,Math.round((t.prebufferFrames??0)/4)||128)),this.targetBufferFrames=Math.max(128,Math.min(this.ring.capacity,Math.round(t.targetBufferFrames??(this.prebufferFrames??128)))),this.maxBufferFrames=Math.max(this.targetBufferFrames,Math.min(this.ring.capacity,Math.round(t.maxBufferFrames??this.targetBufferFrames))),this.buffering=this.prebufferFrames>0,this.started=!1,this.statsCountdown=0}process(t,e,i){if(!this.ring)return!0;if(1!=t.length&&1!=e.length)throw new Error("only a single track is supported");if(this.ring.size()==this.ring.capacity)return this.ring.clear(),this.buffering=this.started,this.started=!1,!0;const r=e[0],s=r[0]?.length??0;for(const t of r)t.fill(0);let n=this.ring.size(),o=0;if(this.started&&n>this.maxBufferFrames){const t=Atomics.load(this.ring.state,1),e=Math.max(0,t-this.targetBufferFrames),i=Atomics.load(this.ring.state,0);e>i&&(Atomics.store(this.ring.state,0,e),o=e-i,n=this.ring.size())}const a=this.started?Math.max(this.rebufferFrames,s):Math.max(this.prebufferFrames,s);if(this.buffering&&n<a)return this.statsCountdown<=0&&(this.statsCountdown=120,this.port.postMessage({type:"render_stats",payload:{read:0,size:n,required:a,capacity:this.ring.capacity,started:this.started,buffering:this.buffering,level:0,dropped:o}})),this.statsCountdown-=1,!0;this.buffering=!1;const h=this.ring.read(r),u=this.ring.size();let c=0;if(h>0){for(const t of r)for(let e=0;e<h;e+=1){const i=t[e];c+=i*i}c=Math.sqrt(c/(h*Math.max(1,r.length)))}return this.statsCountdown<=0&&(this.statsCountdown=120,this.port.postMessage({type:"render_stats",payload:{read:h,size:u,required:s,capacity:this.ring.capacity,started:this.started,buffering:this.buffering,level:c,dropped:o}})),this.statsCountdown-=1,h>0&&(this.started=!0),h<s&&(this.buffering=!0),!0}}';
-  const segmentQueueSnippet =
-    'class t{audio;video;constructor(){this.audio=new e,this.video=new e}}class e{#t;#s;frames;#e;constructor(){this.frames=new ReadableStream({pull:this.#i.bind(this),cancel:this.#r.bind(this)}),this.#e=new TransformStream({},{highWaterMark:100})}get segments(){return this.#e.writable}async#i(t){for(;;){if(!this.#t&&this.#s){this.#t=this.#s,this.#s=void 0}const e=this.#e.readable.getReader();let i;if(this.#t){const t=this.#t.frames.getReader();i=await Promise.race([t.read(),e.read()]),t.releaseLock()}else i=await e.read();e.releaseLock();const{value:s,done:n}=i;if(n){if(this.#t){if(this.#t=void 0,this.#s){this.#t=this.#s,this.#s=void 0;continue}}else this.#s=void 0}else{if(!r(s))return void t.enqueue(s);if(this.#t){if(s.sequence<this.#t.sequence){await s.frames.cancel("skipping segment; too old");continue}if(this.#s){if(s.sequence<=this.#s.sequence){await s.frames.cancel("skipping segment; too old");continue}await this.#s.frames.cancel("skipping segment; superseded")}this.#s=s;continue}this.#t=s}}}async#r(t){this.#t&&await this.#t.frames.cancel(t),this.#s&&await this.#s.frames.cancel(t);const e=this.#e.readable.getReader();for(;;){const{value:i,done:r}=await e.read();if(r)break;await i.frames.cancel(t)}}}';
-  const optimizedSegmentQueueSnippet =
-    `class t{audio;video;constructor(){this.audio=new e("audio",${AUDIO_SUBGROUP_SWITCH_TIMEOUT_MS}),this.video=new e("video",${VIDEO_SUBGROUP_SWITCH_TIMEOUT_MS})}}class e{#t;#s;frames;#e;#n;#a;constructor(t,e){this.#n=t,this.#a=e,this.#s=[],this.frames=new ReadableStream({pull:this.#i.bind(this),cancel:this.#r.bind(this)}),this.#e=new TransformStream({},{highWaterMark:100})}#l(t,e){try{globalThis.__MOQ_APP_LOG__?.("[PlayerWorker] "+t+(e?" "+JSON.stringify(e):""))}catch{}}get segments(){return this.#e.writable}async#o(){const t=this.#s.pop();if(!t)return;for(const e of this.#s)await e.frames.cancel("skipping segment; superseded by newer queued subgroup");return this.#s.length=0,t}async#h(t){const e=this.#s.at(-1);if(e&&t.sequence<=e.sequence){await t.frames.cancel(t.sequence===e.sequence?"skipping segment; superseded":"skipping segment; too old");return}this.#s.push(t)}async#i(t){for(;;){if(this.#t){const e=this.#t.frames.getReader();let i;try{i=this.#s.length&&this.#a>0?await Promise.race([e.read(),new Promise(t=>setTimeout(()=>t("__timeout__"),this.#a))]):await e.read()}catch(t){throw e.releaseLock(),t}if("__timeout__"===i){this.#l("subgroup stalled; switching",{track:this.#n,queued:this.#s.length,timeoutMs:this.#a}),e.releaseLock(),await this.#t.frames.cancel(\`\${this.#n} subgroup stalled; switching to newer subgroup\`),this.#t=await this.#o();continue}const{value:s,done:r}=i;if(e.releaseLock(),r){this.#t=await this.#o();continue}t.enqueue(s);return}if(this.#s.length){this.#t=await this.#o();continue}const e=this.#e.readable.getReader(),{value:i,done:s}=await e.read();if(e.releaseLock(),s)return;if(!r(i)){t.enqueue(i);return}await this.#h(i)}}async#r(t){this.#t&&await this.#t.frames.cancel(t);for(const e of this.#s)await e.frames.cancel(t);this.#s.length=0;const e=this.#e.readable.getReader();for(;;){const{value:i,done:s}=await e.read();if(s)break;await i.frames.cancel(t)}}}`;
-  const segmentDispatchSnippet =
-    "const[n,a]=s.stream.release();this.#bt.segment({init:t.initTrack,kind:e,header:s.header,buffer:n,stream:a})";
-  const optimizedSegmentDispatchSnippet =
-    "const[n,a]=s.stream.release();this.#bt.segment({init:t.initTrack,kind:e,header:s.header,buffer:n,stream:a})";
-  const segmentHandlerSnippet =
-    "else if(e.segment)this.#A(e.segment).catch(console.warn);";
-  const optimizedSegmentHandlerSnippet =
-    "else if(e.segment)this.#A(e.segment).catch(console.warn);";
-  const segmentWriteSnippet =
-    'const i=new c(await e.promise),r="audio"===t.kind?this.#h.audio:this.#h.video,s=new L(t.header,new v(t.stream,t.buffer)),n=new TransformStream({}),a=n.writable.getWriter(),o=r.segments.getWriter();for(await o.write({sequence:t.header.group_id,frames:n.readable}),o.releaseLock();;){const t=await s.read();if(!t)break;if(!(t.object_payload instanceof Uint8Array))throw new Error(`invalid payload: ${t.object_payload}`);const e=i.decode(t.object_payload);for(const t of e)await a.write(t)}await a.close()}';
-  const optimizedSegmentWriteSnippet =
-    `const i=new c(await e.promise),r="audio"===t.kind?this.#h.audio:this.#h.video,s=new L(t.header,new v(t.stream,t.buffer)),n=new TransformStream({}),a=n.writable.getWriter(),o="audio"===t.kind?${AUDIO_SEGMENT_READ_TIMEOUT_MS}:"video"===t.kind?${VIDEO_SEGMENT_READ_TIMEOUT_MS}:0,h=t.header.group_id,l={payloads:0,frames:0,reason:"eof"};r._writeTask=(r._writeTask??Promise.resolve()).catch(()=>{}).then(async()=>{const e=r.segments.getWriter();try{await e.write({sequence:h,frames:n.readable})}finally{e.releaseLock()}});await r._writeTask;try{for(;;){const m=o>0?await Promise.race([s.read(),new Promise(e=>setTimeout(()=>e("__timeout__"),o))]):await s.read();if("__timeout__"===m){l.reason="timeout";try{globalThis.__MOQ_APP_LOG__?.("[PlayerWorker] segment read timeout "+JSON.stringify({track:t.kind,groupId:h,timeoutMs:o,payloads:l.payloads,frames:l.frames}))}catch{};break}if(!m){l.reason="eof";break}if(!(m.object_payload instanceof Uint8Array)){if(void 0!==m.status){l.reason=\`status:\${m.status}\`;break}throw new Error(\`invalid payload: \${m.object_payload}\`)}l.payloads+=1;const e=i.decode(m.object_payload);l.frames+=e.length;for(const t of e)await a.write(t)}}finally{void s.close().catch(()=>{});await a.close()}}`;
-  const audioDecodeChunkSnippet =
-    'const e=new EncodedAudioChunk({type:t.sample.is_sync?"key":"delta",timestamp:t.sample.dts/t.track.timescale,duration:t.sample.duration,data:t.sample.data});this.#c.decode(e)';
-  const optimizedAudioDecodeChunkSnippet =
-    'const e=Math.round(1e6*t.sample.dts/t.track.timescale),i=Math.max(1,Math.round(1e6*t.sample.duration/t.track.timescale)),r=new EncodedAudioChunk({type:t.sample.is_sync?"key":"delta",timestamp:e,duration:i,data:t.sample.data});this.#c.decode(r)';
-  const videoDecodeChunkSnippet =
-    'const e=new EncodedVideoChunk({type:t.sample.is_sync?"key":"delta",data:t.sample.data,timestamp:t.sample.dts/t.track.timescale});(()=>{})(`[VideoWorker] Decoding chunk, type: ${e.type}, size: ${e.byteLength}`);try{this.#c.decode(e)}catch(t){console.error("[VideoWorker] FAILED to decode chunk:",t)}}}';
-  const optimizedVideoDecodeChunkSnippet =
-    'const e=Math.round(1e6*t.sample.dts/t.track.timescale),i=t.sample.duration?Math.max(1,Math.round(1e6*t.sample.duration/t.track.timescale)):void 0,r=new EncodedVideoChunk({type:t.sample.is_sync?"key":"delta",data:t.sample.data,timestamp:e,duration:i});(()=>{})(`[VideoWorker] Decoding chunk, type: ${r.type}, size: ${r.byteLength}`);try{this.#c.decode(r)}catch(t){console.error("[VideoWorker] FAILED to decode chunk:",t)}}}';
-  const rendererVolumeSnippet =
-    "setVolume(t){this.#P?.setVolume(t)}getVolume(){return this.#P?this.#P.getVolume():0}async close(){this.#z.terminate(),await(this.#P?.context.close())}";
-  const optimizedRendererVolumeSnippet =
-    'setVolume(t){this.#P?.setVolume(t)}getVolume(){return this.#P?this.#P.getVolume():0}getAudioContextState(){return this.#P?.context?.state??"none"}getAudioRenderStats(){return this.#P?.lastRenderStats??null}getVideoFrameStats(){return this.__lastVideoFrameStats??null}async close(){this.#z.terminate(),await(this.#P?.context.close())}';
-  const playerMuteSnippet =
-    'async mute(t){this.#Tt=t,t?((()=>{})("Unsubscribing from audio track: ",this.#St),await this.unsubscribeFromTrack(this.#St),await this.#bt.mute()):((()=>{})("Subscribing to audio track: ",this.#St),this.subscribeFromTrackName(this.#St),await this.#bt.unmute()),super.dispatchEvent(new CustomEvent("volumechange",{detail:{muted:t}}))}async unsubscribeFromTrack(t){';
-  const optimizedPlayerMuteSnippet =
-    'async mute(t){this.#Tt=t,t?((()=>{})("Unsubscribing from audio track: ",this.#St),await this.unsubscribeFromTrack(this.#St),await this.#bt.mute()):((()=>{})("Subscribing to audio track: ",this.#St),this.subscribeFromTrackName(this.#St),await this.#bt.unmute()),super.dispatchEvent(new CustomEvent("volumechange",{detail:{muted:t}}))}getAudioContextState(){return this.#bt.getAudioContextState?.()??"none"}getAudioRenderStats(){return this.#bt.getAudioRenderStats?.()??null}getVideoFrameStats(){return this.#bt.getVideoFrameStats?.()??null}async resumeAudioContext(){await this.#bt.unmute()}async restartAudioTrack(){if(!this.#St)return;await this.unsubscribeFromTrack(this.#St),this.#Tt||(this.subscribeFromTrackName(this.#St),await this.#bt.unmute())}async unsubscribeFromTrack(t){';
-  const audioRendererLevelSnippet =
-    "setVolume(t){this.volumeNode.gain.setTargetAtTime(t,this.context.currentTime,.01)}getVolume(){return this.volumeNode.gain.value}}";
-  const optimizedAudioRendererLevelSnippet =
-    "setVolume(t){this.volumeNode.gain.setTargetAtTime(t,this.context.currentTime,.01)}getVolume(){return this.volumeNode.gain.value}}";
-  const setVolumeSnippet =
-    "async setVolume(t){this.#bt.setVolume(t),0!=t||this.#Tt?t>0&&this.#Tt&&await this.mute(!1):await this.mute(!0)}";
-  const optimizedSetVolumeSnippet =
-    'async setVolume(t){this.#bt.setVolume(t),super.dispatchEvent(new CustomEvent("volumechange",{detail:{muted:t<=.001,volume:t}}))}';
+function patchMoqWatchCatalogFormats() {
+  const broadcastFetchSnippet =
+    'const o = r === "hang" ? "catalog.json" : "catalog", a = i.subscribe(o, ee.catalog);\n    e.cleanup(() => a.close());\n    const c = r === "hang" ? async () => ms(a) : async () => {\n      const u = await er(a);\n      return u ? rr(u) : void 0;\n    };';
+  const patchedBroadcastFetchSnippet =
+    'const o = r === "hang" ? "catalog.json" : r === ".catalog" ? ".catalog" : "catalog", a = i.subscribe(o, ee.catalog);\n    e.cleanup(() => a.close());\n    const c = r === "hang" ? async () => ms(a) : r === ".catalog" ? async () => {\n      const u = await __moqWatchFetchMoqJsCatalog(a);\n      return u ? await __moqWatchMoqJsCatalogToHang(u, i, e) : void 0;\n    } : async () => {\n      const u = await er(a);\n      return u ? rr(u) : void 0;\n    };';
+  const converterInsertAfter =
+    'async function er(t) {\n  const e = await t.readFrame();\n  if (e)\n    return Qi(e);\n}\n';
+  const moqJsCatalogConverter = `${converterInsertAfter}function __moqWatchBytes(t) {
+  if (t instanceof Uint8Array) return t;
+  if (t instanceof ArrayBuffer) return new Uint8Array(t);
+  return new Uint8Array(t.buffer, t.byteOffset, t.byteLength);
+}
+
+function __moqWatchBase64ToBytes(t) {
+  try {
+    const e = atob(t), n = new Uint8Array(e.length);
+    for (let s = 0; s < e.length; s++) n[s] = e.charCodeAt(s);
+    return n;
+  } catch {
+    return;
+  }
+}
+function __moqWatchBase64ToHex(t) {
+  if (!t) return;
+  try {
+    return rt(__moqWatchBytes(__moqWatchBase64ToBytes(t) ?? new Uint8Array()));
+  } catch {
+    return;
+  }
+}
+function __moqWatchFlattenMoqJsTracks(t) {
+  const e = t?.commonTrackFields ?? {};
+  return (t?.tracks ?? []).map((n) => ({
+    ...e,
+    ...n,
+    selectionParams: {
+      ...(e.selectionParams ?? {}),
+      ...(n.selectionParams ?? {})
+    }
+  }));
+}
+function __moqWatchDecodeMoqJsCatalog(t) {
+  const e = new TextDecoder().decode(t);
+  try {
+    return JSON.parse(e);
+  } catch (n) {
+    console.warn("invalid .catalog payload", e);
+    throw n;
+  }
+}
+async function __moqWatchFetchMoqJsCatalog(t) {
+  const e = await t.readFrame();
+  if (e)
+    return __moqWatchDecodeMoqJsCatalog(e);
+}
+async function __moqWatchReadInitTrack(t, e, n) {
+  if (!t) return;
+  const s = e.subscribe(t, ee.catalog);
+  n.cleanup(() => s.close());
+  try {
+    const i = await s.readFrame();
+    if (!i) return;
+    return ri(i);
+  } catch (i) {
+    console.warn("failed to read .catalog init track", t, i);
+    return;
+  } finally {
+    s.close();
+  }
+}
+async function __moqWatchMoqJsCatalogToHang(t, e, n) {
+  const s = {}, i = {};
+  for (const l of __moqWatchFlattenMoqJsTracks(t)) {
+    const r = l.selectionParams ?? {}, o = l.name;
+    if (!o) continue;
+    const a = l.packaging === "cmaf" && l.initTrack ? await __moqWatchReadInitTrack(l.initTrack, e, n) : void 0;
+    const c = l.packaging === "cmaf" ? { kind: "cmaf", timescale: L(a?.timescale ?? 1e6), trackId: L(a?.trackId ?? 1) } : { kind: "legacy" };
+    const u = a?.description ? rt(a.description) : __moqWatchBase64ToHex(l.initData);
+    if (typeof r.width == "number" && typeof r.height == "number") {
+      s[o] = {
+        codec: r.codec ?? "",
+        container: c,
+        description: u,
+        codedWidth: L(r.width),
+        codedHeight: L(r.height),
+        framerate: r.framerate,
+        bitrate: r.bitrate != null ? L(r.bitrate) : void 0
+      };
+    } else if (typeof r.samplerate == "number" || typeof r.channelConfig == "string") {
+      const d = Number.parseInt(r.channelConfig ?? "2", 10);
+      i[o] = {
+        codec: r.codec ?? "opus",
+        container: c,
+        description: u,
+        sampleRate: L(r.samplerate ?? 48e3),
+        numberOfChannels: L(Number.isFinite(d) ? d : 2),
+        bitrate: r.bitrate != null ? L(r.bitrate) : void 0
+      };
+    }
+  }
+  const r = {};
+  return Object.keys(s).length > 0 && (r.video = { renditions: s }), Object.keys(i).length > 0 && (r.audio = { renditions: i }), r;
+}
+`;
 
   return {
-    name: "optimize-moq-player-canvas",
+    name: "patch-moq-watch-catalog-formats",
+    enforce: "pre",
     transform(code, id) {
-      if (!id.endsWith(moqPlayerModulePath)) {
+      const normalizedId = id.split("?")[0];
+      if (
+        normalizedId.includes(moqWatchBroadcastModuleMarker) &&
+        normalizedId.endsWith(".js")
+      ) {
+        let nextCode = code;
+        if (!nextCode.includes(converterInsertAfter)) {
+          throw new Error("Missing @moq/watch broadcast converter insert target");
+        }
+        nextCode = nextCode.replace(converterInsertAfter, moqJsCatalogConverter);
+        if (!nextCode.includes(broadcastFetchSnippet)) {
+          throw new Error("Missing @moq/watch broadcast catalog fetch patch target");
+        }
+        nextCode = nextCode.replace(broadcastFetchSnippet, patchedBroadcastFetchSnippet);
+        return nextCode === code ? null : { code: nextCode, map: null };
+      }
+
+      return null;
+    },
+  };
+}
+
+function patchMoqLiteCloudflareSubscribe() {
+  const groupOrderSnippet =
+    "// we only support Group Order descending\nconst GROUP_ORDER = 0x02;";
+  const patchedGroupOrderSnippet =
+    "// Cloudflare's draft-14 relay expects publisher order for public media tracks.\nconst GROUP_ORDER = 0x00;";
+  const draft14FilterSnippet =
+    "await w.u53(0x2); // filter type = LargestObject";
+  const patchedDraft14FilterSnippet =
+    "await w.u53(0x1); // filter type = NextGroupStart";
+  const paramsFilterSnippet =
+    "params.subscriptionFilter = 0x2; // LargestObject";
+  const patchedParamsFilterSnippet =
+    "params.subscriptionFilter = 0x1; // NextGroupStart";
+
+  return {
+    name: "patch-moq-lite-cloudflare-subscribe",
+    enforce: "pre",
+    transform(code, id) {
+      const normalizedId = id.split("?")[0];
+      if (!normalizedId.endsWith(moqLiteSubscribeModulePath)) {
         return null;
       }
 
       let nextCode = code;
       const replacements = [
-        [privateFieldSnippet, optimizedPrivateFieldSnippet],
-        [constructorSnippet, optimizedConstructorSnippet],
-        [frameRenderSnippet, optimizedFrameRenderSnippet],
-        [audioRingWriteSnippetWorklet, optimizedAudioRingWriteSnippetWorklet],
-        [audioRingWriteSnippetWorker, optimizedAudioRingWriteSnippetWorker],
-        [audioConfigSnippet, optimizedAudioConfigSnippet],
-        [playerConstructorSnippet, optimizedPlayerConstructorSnippet],
-        [audioRendererClassSnippet, optimizedAudioRendererClassSnippet],
-        [audioControllerOnSnippet, optimizedAudioControllerOnSnippet],
-        [audioWorkletProcessorSnippet, optimizedAudioWorkletProcessorSnippet],
-        [segmentQueueSnippet, optimizedSegmentQueueSnippet],
-        [segmentDispatchSnippet, optimizedSegmentDispatchSnippet],
-        [segmentHandlerSnippet, optimizedSegmentHandlerSnippet],
-        [segmentWriteSnippet, optimizedSegmentWriteSnippet],
-        [audioDecodeChunkSnippet, optimizedAudioDecodeChunkSnippet],
-        [videoDecodeChunkSnippet, optimizedVideoDecodeChunkSnippet],
-        [rendererVolumeSnippet, optimizedRendererVolumeSnippet],
-        [playerMuteSnippet, optimizedPlayerMuteSnippet],
-        [audioRendererLevelSnippet, optimizedAudioRendererLevelSnippet],
-        [setVolumeSnippet, optimizedSetVolumeSnippet],
+        [groupOrderSnippet, patchedGroupOrderSnippet],
+        [draft14FilterSnippet, patchedDraft14FilterSnippet],
+        [paramsFilterSnippet, patchedParamsFilterSnippet],
       ];
 
       for (const [from, to] of replacements) {
         if (!nextCode.includes(from)) {
-          throw new Error(
-            `Missing moq-player optimization target: ${from.slice(0, 48)}...`,
-          );
+          throw new Error(`Missing @moq/lite subscribe patch target: ${from}`);
         }
         nextCode = nextCode.replace(from, to);
       }
@@ -199,7 +248,15 @@ export default defineConfig(({ mode }) => {
   const backendProxyTarget = env.BACKEND_PROXY_TARGET?.trim() || "";
 
   return {
-    plugins: [injectSiteTitle(siteTitle), optimizeMoqPlayerCanvas(), preact()],
+    plugins: [
+      injectSiteTitle(siteTitle),
+      patchMoqWatchCatalogFormats(),
+      patchMoqLiteCloudflareSubscribe(),
+      preact(),
+    ],
+    optimizeDeps: {
+      exclude: ["@moq/lite", "@moq/watch"],
+    },
     define: {
       __APP_TITLE__: JSON.stringify(siteTitle),
       __BUILD_HASH__: JSON.stringify(buildHash),

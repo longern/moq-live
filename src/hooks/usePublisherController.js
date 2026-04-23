@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { PublisherApi } from "../../vendor/moq-js/publish/index.ts";
+import * as MoqPublish from "@moq/publish";
 import {
   createMediaSessionManager,
   stopMediaStream,
@@ -14,12 +14,11 @@ const VIDEO_TARGET_WIDTH = 1280;
 const VIDEO_TARGET_HEIGHT = 720;
 const VIDEO_TARGET_FRAMERATE = 30;
 const VIDEO_TARGET_BITRATE = 2_500_000;
-const H264_BASELINE_LEVEL_31 = "avc1.42E01F";
 const PREVIEW_SOURCE_CAMERA = "camera";
 const PREVIEW_SOURCE_SCREEN = "screen";
 const PREVIEW_SOURCE_SYNTHETIC = "synthetic";
 const DEFAULT_PREVIEW_SOURCE = PREVIEW_SOURCE_CAMERA;
-const WORKER_PUBLISH_STOP_TIMEOUT_MS = 3_000;
+const PUBLISH_CONNECT_TIMEOUT_MS = 10_000;
 
 function hasUsableMediaStream(stream) {
   if (!stream) {
@@ -138,7 +137,28 @@ export function usePublisherController({
     return liveSessionManagerRef.current.isCurrentRequest(requestId);
   }
 
-  function setWorkerPublishTrackEnabled(kind, enabled) {
+  function waitForSignalValue(signal, predicate, timeoutMs, timeoutMessage) {
+    if (predicate(signal.peek())) {
+      return Promise.resolve(signal.peek());
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        dispose();
+        reject(new Error(timeoutMessage));
+      }, timeoutMs);
+      const dispose = signal.watch((value) => {
+        if (!predicate(value)) {
+          return;
+        }
+        window.clearTimeout(timeoutId);
+        dispose();
+        resolve(value);
+      });
+    });
+  }
+
+  function setPublishTrackEnabled(kind, enabled) {
     const session = livePublisherRef.current;
     if (!session?.publishTracks?.length) {
       return;
@@ -151,144 +171,71 @@ export function usePublisherController({
     });
   }
 
-  function terminatePublishWorker(session = livePublisherRef.current) {
-    if (!session?.worker) {
-      if (livePublisherRef.current === session) {
-        livePublisherRef.current = null;
-      }
+  function createPublishSession({
+    relayUrl,
+    namespace,
+    videoTrack,
+    audioTrack,
+    maxPixels,
+    audioMuted = !microphoneEnabled,
+  }) {
+    const connection = new MoqPublish.Lite.Connection.Reload({
+      enabled: true,
+      url: new URL(relayUrl),
+    });
+    const broadcast = new MoqPublish.Broadcast({
+      connection: connection.established,
+      enabled: true,
+      name: MoqPublish.Lite.Path.from(namespace),
+      video: {
+        source: videoTrack || undefined,
+        hd: {
+          enabled: Boolean(videoTrack),
+          config: {
+            maxPixels,
+            maxBitrate: VIDEO_TARGET_BITRATE,
+            frameRate: VIDEO_TARGET_FRAMERATE,
+          },
+        },
+        sd: {
+          enabled: false,
+        },
+      },
+      audio: {
+        enabled: Boolean(audioTrack),
+        source: audioTrack || undefined,
+        muted: audioMuted,
+        volume: 1,
+      },
+    });
+
+    return {
+      connection,
+      broadcast,
+      publishTracks: [videoTrack, audioTrack].filter(Boolean),
+      cleanupPublishTracks: null,
+    };
+  }
+
+  function closePublishSession(session = livePublisherRef.current) {
+    if (!session) {
       return;
     }
 
-    session.worker.removeEventListener("message", session.handleMessage);
-    session.worker.removeEventListener("error", session.handleError);
-    session.worker.terminate();
+    try {
+      session.broadcast?.close?.();
+    } catch (error) {
+      log(`publish close warning: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    try {
+      session.connection?.close?.();
+    } catch (error) {
+      log(`connection close warning: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    session.cleanupPublishTracks?.();
     if (livePublisherRef.current === session) {
       livePublisherRef.current = null;
     }
-  }
-
-  async function waitForWorkerStop(session) {
-    const stopPromise = session.stopPromise ?? Promise.resolve();
-    await Promise.race([
-      stopPromise,
-      new Promise((resolve) => {
-        window.setTimeout(resolve, WORKER_PUBLISH_STOP_TIMEOUT_MS);
-      }),
-    ]);
-  }
-
-  function createPublishWorkerSession() {
-    const worker = new Worker(
-      new URL("../workers/publisherWorker.js", import.meta.url),
-      { type: "module" },
-    );
-
-    let started = false;
-    let resolveStart;
-    let rejectStart;
-    let resolveStop;
-    const startPromise = new Promise((resolve, reject) => {
-      resolveStart = resolve;
-      rejectStart = reject;
-    });
-    const stopPromise = new Promise((resolve) => {
-      resolveStop = resolve;
-    });
-
-    const session = {
-      worker,
-      startPromise,
-      stopPromise,
-      resolveStop,
-      cleanupPublishTracks: null,
-      publishTracks: [],
-      handleMessage: null,
-      handleError: null,
-    };
-
-    session.handleMessage = (event) => {
-      const { type, message, level, name, stack } = event.data ?? {};
-      if (type === "log") {
-        log(message || "publisher worker log");
-        return;
-      }
-
-      if (type === "started") {
-        started = true;
-        resolveStart();
-        return;
-      }
-
-      if (type === "stopped") {
-        resolveStop();
-        return;
-      }
-
-      if (type !== "error") {
-        return;
-      }
-
-      const nextError = new Error(message || "Publisher worker error");
-      nextError.name = name || nextError.name;
-      if (stack) {
-        nextError.stack = stack;
-      }
-      console.error("publisher worker error", {
-        name: nextError.name,
-        message: nextError.message,
-        stack: nextError.stack,
-        payload: event.data,
-      });
-      if (!started) {
-        rejectStart(nextError);
-        return;
-      }
-
-      updatePublishStatus("error", `失败：${nextError.message}`);
-      log(
-        `${level === "warn" ? "worker warning" : "worker error"}: ${nextError.message}`,
-      );
-    };
-
-    session.handleError = (event) => {
-      const nextError = event.error instanceof Error
-        ? event.error
-        : new Error(event.message || "Publisher worker crashed");
-      console.error("publisher worker crash", nextError);
-      rejectStart(nextError);
-      updatePublishStatus("error", `失败：${nextError.message}`);
-      log(`worker crash: ${nextError.message}`);
-    };
-
-    worker.addEventListener("message", session.handleMessage);
-    worker.addEventListener("error", session.handleError);
-    return session;
-  }
-
-  async function getTrackSampleRate(track) {
-    const settings = track?.getSettings?.() ?? {};
-    if (settings.sampleRate) {
-      return settings.sampleRate;
-    }
-
-    const context = new AudioContext();
-    try {
-      return context.sampleRate;
-    } finally {
-      await context.close().catch(() => {});
-    }
-  }
-
-  function createFrameTrackSource(track, settings = {}) {
-    const processor = new MediaStreamTrackProcessor({ track });
-    return {
-      kind: track.kind,
-      readable: processor.readable,
-      settings: {
-        ...track.getSettings(),
-        ...settings,
-      },
-    };
   }
 
   async function relaxSharedAudioTrack(track) {
@@ -371,7 +318,7 @@ export function usePublisherController({
       }
     }
 
-    setWorkerPublishTrackEnabled(
+    setPublishTrackEnabled(
       "video",
       previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN ? true : nextEnabled,
     );
@@ -388,7 +335,7 @@ export function usePublisherController({
       });
     }
 
-    setWorkerPublishTrackEnabled("audio", nextEnabled);
+    setPublishTrackEnabled("audio", nextEnabled);
   }
 
   async function refreshMediaDevices(preferredStream = null) {
@@ -797,54 +744,31 @@ export function usePublisherController({
     const publishVideoTrack = previewVideoTrack?.clone?.() ?? null;
     const publishAudioTrack =
       microphoneEnabled && previewAudioTrack?.clone ? previewAudioTrack.clone() : null;
+    const width = previewVideoTrack
+      ? makeEven(previewVideo?.videoWidth || previewVideoTrack.getSettings?.().width || 640)
+      : 0;
+    const height = previewVideoTrack
+      ? makeEven(previewVideo?.videoHeight || previewVideoTrack.getSettings?.().height || 360)
+      : 0;
 
     updatePublishStatus("preparing", "正在启动直播。");
 
-    const workerPayload = {
-      relayUrl: nextRelayUrl,
-      namespace,
-      videoSource: null,
-      audioSource: null,
-      videoConfig: null,
-      audioConfig: null,
-    };
-    if (previewVideoTrack) {
-      const width = makeEven(previewVideo?.videoWidth || 640);
-      const height = makeEven(previewVideo?.videoHeight || 360);
+    if (publishVideoTrack) {
       publishVideoTrack.enabled =
         previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN ? true : cameraEnabled;
-      workerPayload.videoConfig = {
-        codec: H264_BASELINE_LEVEL_31,
-        width,
-        height,
-        bitrate: VIDEO_TARGET_BITRATE,
-        framerate: VIDEO_TARGET_FRAMERATE,
-      };
-      workerPayload.videoSource = createFrameTrackSource(publishVideoTrack, {
-        width,
-        height,
-        frameRate: VIDEO_TARGET_FRAMERATE,
-      });
     }
 
     if (publishAudioTrack) {
       publishAudioTrack.enabled = microphoneEnabled;
-      const sampleRate = await getTrackSampleRate(publishAudioTrack);
-      const numberOfChannels = publishAudioTrack.getSettings().channelCount ?? 1;
-      workerPayload.audioConfig = {
-        codec: "opus",
-        sampleRate,
-        numberOfChannels,
-        bitrate: 64_000,
-      };
-      workerPayload.audioSource = createFrameTrackSource(publishAudioTrack, {
-        sampleRate,
-        channelCount: numberOfChannels,
-      });
     }
 
-    const session = createPublishWorkerSession();
-    session.publishTracks = [publishVideoTrack, publishAudioTrack].filter(Boolean);
+    const session = createPublishSession({
+      relayUrl: nextRelayUrl,
+      namespace,
+      videoTrack: publishVideoTrack,
+      audioTrack: publishAudioTrack,
+      maxPixels: width && height ? width * height : VIDEO_TARGET_WIDTH * VIDEO_TARGET_HEIGHT,
+    });
     session.cleanupPublishTracks = () => {
       session.publishTracks.forEach((track) => {
         try {
@@ -856,15 +780,12 @@ export function usePublisherController({
     };
 
     try {
-      const transfer = [
-        workerPayload.videoSource?.readable,
-        workerPayload.audioSource?.readable,
-      ].filter(Boolean);
-      session.worker.postMessage(
-        { type: "start", payload: workerPayload },
-        transfer,
+      await waitForSignalValue(
+        session.connection.status,
+        (status) => status === "connected",
+        PUBLISH_CONNECT_TIMEOUT_MS,
+        "连接 relay 超时",
       );
-      await session.startPromise;
       livePublisherRef.current = session;
       publisherIsPublishingRef.current = true;
       setPublisherIsPublishing(true);
@@ -872,8 +793,7 @@ export function usePublisherController({
       log(`camera publish started: url=${nextRelayUrl} namespace=${namespace}`);
     } catch (error) {
       console.error("camera publish start failed", error);
-      session.cleanupPublishTracks?.();
-      terminatePublishWorker(session);
+      closePublishSession(session);
       updatePublishStatus(
         "error",
         `失败：${error instanceof Error ? error.message : String(error)}`,
@@ -894,20 +814,13 @@ export function usePublisherController({
     updatePublishStatus("preparing", "正在停止直播。");
 
     try {
-      session.worker.postMessage({
-        type: "stop",
-        payload: { reason: "stopped by main thread" },
-      });
-      await waitForWorkerStop(session);
-      session.cleanupPublishTracks?.();
+      closePublishSession(session);
       updatePublishStatus("idle", "直播已停止。");
       log(`camera publish stopped: namespace=${roomRef.current || "unset"}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       updatePublishStatus("error", `失败：${message}`);
       log(`camera stop warning: ${message}`);
-    } finally {
-      terminatePublishWorker();
     }
   }
 
@@ -933,32 +846,39 @@ export function usePublisherController({
       orientation: usePortraitSyntheticPreview ? "portrait" : "landscape",
     });
     const syntheticVideoTrack = syntheticMedia.mediaStream.getVideoTracks()[0];
+    const syntheticAudioTrack = syntheticMedia.mediaStream.getAudioTracks()[0] ?? null;
     const syntheticSettings = syntheticVideoTrack?.getSettings?.() ?? {};
     const syntheticWidth = Math.floor((syntheticSettings.width || VIDEO_TARGET_WIDTH) / 2) * 2;
     const syntheticHeight = Math.floor((syntheticSettings.height || VIDEO_TARGET_HEIGHT) / 2) * 2;
-    const publisher = new PublisherApi({
-      url: nextRelayUrl,
-      namespace: [namespace],
-      media: syntheticMedia.mediaStream,
-      sources: [syntheticMedia.audioSource],
-      video: {
-        codec: H264_BASELINE_LEVEL_31,
-        width: syntheticWidth,
-        height: syntheticHeight,
-        bitrate: VIDEO_TARGET_BITRATE,
-        framerate: VIDEO_TARGET_FRAMERATE,
-      },
-      audio: {
-        codec: "opus",
-        sampleRate: 48_000,
-        numberOfChannels: 2,
-        bitrate: 64_000,
-      },
+    const publishVideoTrack = syntheticVideoTrack?.clone?.() ?? syntheticVideoTrack;
+    const publishAudioTrack = syntheticAudioTrack?.clone?.() ?? syntheticAudioTrack;
+    const publisher = createPublishSession({
+      relayUrl: nextRelayUrl,
+      namespace,
+      videoTrack: publishVideoTrack,
+      audioTrack: publishAudioTrack,
+      maxPixels: syntheticWidth * syntheticHeight,
+      audioMuted: false,
     });
+    publisher.cleanupPublishTracks = () => {
+      for (const track of publisher.publishTracks) {
+        try {
+          track.stop();
+        } catch {
+          // Ignore cleanup failures while stopping synthetic publish tracks.
+        }
+      }
+    };
 
     try {
-      await publisher.publish();
+      await waitForSignalValue(
+        publisher.connection.status,
+        (status) => status === "connected",
+        PUBLISH_CONNECT_TIMEOUT_MS,
+        "连接 relay 超时",
+      );
     } catch (error) {
+      closePublishSession(publisher);
       await syntheticMedia.stop();
       throw error;
     }
@@ -999,7 +919,7 @@ export function usePublisherController({
 
     updatePublishStatus("preparing", "正在停止合成推流。");
     try {
-      await current.publisher.stop();
+      closePublishSession(current.publisher);
     } catch (error) {
       log(
         `synthetic stop warning: ${error instanceof Error ? error.message : String(error)}`,

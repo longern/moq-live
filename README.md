@@ -1,6 +1,6 @@
 # moq-live
 
-一个基于 `moq-js` 的轻量直播站：
+一个基于 `@moq/watch` / `@moq/publish` JS API 的轻量直播站：
 
 - 观众端：进入直播间、播放 MoQ 流、聊天室互动
 - 主播端：摄像头/麦克风开播、屏幕共享、合成源、封面上传
@@ -10,7 +10,7 @@
 ## 技术栈
 
 - 前端：Preact + Vite
-- 播放/推流：vendored `moq-js`
+- 播放/推流：`@moq/watch` / `@moq/publish` JS API
 - 后端：Cloudflare Workers
 - 数据：
   - D1：用户、session、直播间

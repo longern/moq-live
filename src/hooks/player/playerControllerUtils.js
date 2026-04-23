@@ -1,12 +1,3 @@
-const playerModuleState = { promise: null };
-
-export async function ensurePlayerModule() {
-  if (!playerModuleState.promise) {
-    playerModuleState.promise = import("../../../vendor/moq-js/moq-player.esm.js");
-  }
-  await playerModuleState.promise;
-}
-
 export async function withTimeout(promise, ms) {
   let timer = null;
   const timeout = new Promise((resolve) => {

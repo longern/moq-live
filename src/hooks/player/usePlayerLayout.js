@@ -1,9 +1,4 @@
 import { useEffect, useState } from "preact/hooks";
-import {
-  ensureContainedPlayerStyles,
-  ensureInitialCanvasSize,
-  syncContainedCanvasLayout,
-} from "./playerControllerUtils.js";
 
 export function usePlayerLayout({
   playerRef,
@@ -18,16 +13,19 @@ export function usePlayerLayout({
       return;
     }
 
-    const updateCanvasLayout = () => {
-      ensureInitialCanvasSize(playerEl);
-      const nextOrientation = syncContainedCanvasLayout(playerEl);
-      if (nextOrientation) {
-        setPlayerOrientation(nextOrientation);
+    const updateMediaLayout = () => {
+      const mediaWidth = playerEl instanceof HTMLCanvasElement
+        ? playerEl.width
+        : playerEl.videoWidth || playerEl.clientWidth;
+      const mediaHeight = playerEl instanceof HTMLCanvasElement
+        ? playerEl.height
+        : playerEl.videoHeight || playerEl.clientHeight;
+      if (mediaWidth && mediaHeight) {
+        setPlayerOrientation(mediaHeight > mediaWidth ? "portrait" : "landscape");
       }
     };
 
-    ensureContainedPlayerStyles(playerEl);
-    updateCanvasLayout();
+    updateMediaLayout();
     if (!audioPlaybackSupported && "muted" in playerEl) {
       playerEl.muted = true;
     }
@@ -35,30 +33,22 @@ export function usePlayerLayout({
     const resizeObserver =
       typeof ResizeObserver === "function"
         ? new ResizeObserver(() => {
-            updateCanvasLayout();
+            updateMediaLayout();
           })
         : null;
     resizeObserver?.observe(playerEl);
 
-    const canvasEl = playerEl.shadowRoot?.querySelector("canvas#canvas");
-    const canvasObserver =
-      canvasEl instanceof HTMLCanvasElement
-        ? new MutationObserver(() => {
-            updateCanvasLayout();
-          })
-        : null;
-    canvasObserver?.observe(canvasEl, {
-      attributes: true,
-      attributeFilter: ["width", "height", "style", "class"],
-    });
+    playerEl.addEventListener("loadedmetadata", updateMediaLayout);
+    playerEl.addEventListener("resize", updateMediaLayout);
 
-    const canvasSyncTicker = window.setInterval(() => {
-      updateCanvasLayout();
+    const mediaSyncTicker = window.setInterval(() => {
+      updateMediaLayout();
     }, 250);
 
     return () => {
-      clearInterval(canvasSyncTicker);
-      canvasObserver?.disconnect();
+      clearInterval(mediaSyncTicker);
+      playerEl.removeEventListener("loadedmetadata", updateMediaLayout);
+      playerEl.removeEventListener("resize", updateMediaLayout);
       resizeObserver?.disconnect();
     };
   }, [audioPlaybackSupported, playerRef, playerSession]);

@@ -256,7 +256,21 @@ export function createSyntheticMedia(namespace, options = {}) {
     },
     { highWaterMark: 4 },
   );
-  const mediaStream = new MediaStream([videoTrack]);
+  const AudioContextCtor = globalThis.AudioContext || globalThis.webkitAudioContext;
+  const audioContext = typeof AudioContextCtor === "function" ? new AudioContextCtor({ sampleRate }) : null;
+  const destination = audioContext?.createMediaStreamDestination?.() ?? null;
+  const oscillator = audioContext?.createOscillator?.() ?? null;
+  const gain = audioContext?.createGain?.() ?? null;
+  if (oscillator && gain && destination) {
+    oscillator.frequency.value = 220;
+    gain.gain.value = 0.03;
+    oscillator.connect(gain);
+    gain.connect(destination);
+    oscillator.start();
+    void audioContext?.resume?.();
+  }
+  const audioTrack = destination?.stream?.getAudioTracks?.()[0] ?? null;
+  const mediaStream = new MediaStream([videoTrack, audioTrack].filter(Boolean));
 
   return {
     canvas,
@@ -276,6 +290,16 @@ export function createSyntheticMedia(namespace, options = {}) {
       stopped = true;
       window.cancelAnimationFrame(rafId);
       mediaStream.getTracks().forEach((track) => track.stop());
+      try {
+        oscillator?.stop?.();
+      } catch {
+        // Ignore if the oscillator was already stopped.
+      }
+      try {
+        await audioContext?.close?.();
+      } catch {
+        // Ignore audio context cleanup failures.
+      }
       if (!audioControllerClosed) {
         audioControllerClosed = true;
         try {

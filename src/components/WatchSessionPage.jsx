@@ -234,11 +234,12 @@ export function WatchSessionPage({
           >
             <div id="playerMount">
               {playerSession ? (
-                <video-moq
+                <canvas
                   ref={playerRef}
                   class="player-moq"
-                  src={playerSession.relayUrl}
-                  namespace={playerSession.namespace}
+                  width="1280"
+                  height="720"
+                  aria-label={`${playerSession.namespace} 直播画面`}
                 />
               ) : (
                 <div class="placeholder">

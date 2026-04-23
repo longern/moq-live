@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import * as MoqWatch from "@moq/watch";
 import {
   attach,
   detachAll,
-  ensurePlayerModule,
   getPlayerAudioSupportReason,
   getPlayerStatusFromMessage,
   isNoCatalogDataMessage,
   withTimeout,
 } from "./playerControllerUtils.js";
+
+const PLAYER_TARGET_LATENCY_MS = 600;
 
 function formatAudioRenderStats(stats, now) {
   if (!stats || typeof stats !== "object") {
@@ -97,6 +99,14 @@ export function usePlayerSession({
   }
 
   function getPlayerVolume(playerEl) {
+    const backend = sessionRef.current?.backend;
+    if (backend?.audio?.volume) {
+      const nextVolume = Number(backend.audio.volume.peek());
+      if (Number.isFinite(nextVolume)) {
+        return clampPlayerVolume(nextVolume);
+      }
+    }
+
     if (!playerEl) {
       return null;
     }
@@ -127,6 +137,21 @@ export function usePlayerSession({
 
   async function setPlayerVolume(playerEl, nextVolume) {
     const volume = clampPlayerVolume(nextVolume);
+    const backend = sessionRef.current?.backend;
+    if (backend?.audio?.volume) {
+      backend.audio.volume.set(volume);
+      backend.audio.muted.set(volume <= 0.001);
+      playerEl?.dispatchEvent?.(
+        new CustomEvent("volumechange", {
+          detail: {
+            muted: volume <= 0.001,
+            volume,
+          },
+        }),
+      );
+      return true;
+    }
+
     if (!playerEl) {
       return false;
     }
@@ -202,20 +227,17 @@ export function usePlayerSession({
 
     if (currentPlayer) {
       try {
-        const isVideoMoqElement =
-          typeof HTMLElement !== "undefined" &&
-          currentPlayer instanceof HTMLElement &&
-          currentPlayer.localName === "video-moq";
-
-        // <video-moq> already destroys itself in disconnectedCallback.
-        // Calling destroy() here as well double-closes the underlying player.
-        if (!isVideoMoqElement && typeof currentPlayer.destroy === "function") {
+        if (current?.backend) {
+          current.backend.close();
+        }
+        if (current?.broadcast) {
+          current.broadcast.close();
+        }
+        if (current?.connection) {
+          current.connection.close();
+        }
+        if (typeof currentPlayer.destroy === "function") {
           await withTimeout(currentPlayer.destroy(), 1200);
-        } else if (
-          currentPlayer.player &&
-          typeof currentPlayer.player.close === "function"
-        ) {
-          await withTimeout(currentPlayer.player.close(), 1200);
         }
       } catch (error) {
         logRef.current?.(
@@ -240,7 +262,7 @@ export function usePlayerSession({
 
   async function startPlayer(options = {}) {
     const {
-      initialMuted = !audioPlaybackSupported,
+      initialMuted = true,
     } = options;
     const targetMuted = !audioPlaybackSupported || initialMuted;
     const token = ++playbackTokenRef.current;
@@ -254,7 +276,6 @@ export function usePlayerSession({
 
     let nextSession;
     try {
-      await ensurePlayerModule();
       const nextRelayUrl = new URL(relayUrlRef.current).toString();
       const namespace = roomRef.current.trim();
       if (!namespace) {
@@ -289,7 +310,7 @@ export function usePlayerSession({
     }
     updatePlayerStatus("connecting", "播放器已创建，正在连接 relay。");
     logRef.current?.(
-      `created video-moq player: url=${nextSession.relayUrl} namespace=${nextSession.namespace}`,
+      `created @moq/watch player: url=${nextSession.relayUrl} namespace=${nextSession.namespace}`,
     );
   }
 
@@ -299,6 +320,9 @@ export function usePlayerSession({
       return;
     }
 
+    if (sessionRef.current?.backend?.paused) {
+      sessionRef.current.backend.paused.set(true);
+    }
     if (typeof playerEl.pause === "function") {
       await playerEl.pause();
     }
@@ -352,6 +376,13 @@ export function usePlayerSession({
     }
 
     try {
+      const backend = sessionRef.current?.backend;
+      if (backend?.audio?.muted) {
+        backend.audio.muted.set(false);
+        backend.audio.volume.set(1);
+        return true;
+      }
+
       const playerStillMuted =
         playerEl.muted === true || playerEl.player?.muted === true;
       const audioContextState =
@@ -462,10 +493,40 @@ export function usePlayerSession({
       return;
     }
 
+    const connection = new MoqWatch.Lite.Connection.Reload({
+      enabled: true,
+      url: new URL(playerSession.relayUrl),
+    });
+    const broadcast = new MoqWatch.Broadcast({
+      connection: connection.established,
+      announced: connection.announced,
+      enabled: true,
+      name: MoqWatch.Lite.Path.from(playerSession.namespace),
+      catalogFormat: "hang",
+    });
+    const rtt = new MoqWatch.Signals.Signal(undefined);
+    const signals = new MoqWatch.Signals.Effect();
+    signals.run((effect) => {
+      const established = effect.get(connection.established);
+      rtt.set(established?.rtt ? effect.get(established.rtt) : undefined);
+    });
+    const backend = new MoqWatch.MultiBackend({
+      element: playerEl,
+      broadcast,
+      rtt,
+      paused: false,
+      latency: PLAYER_TARGET_LATENCY_MS,
+    });
+
     const ctx = {
       ...playerSession,
       player: playerEl,
+      connection,
+      broadcast,
+      backend,
+      signals,
       listeners: [],
+      signalDisposers: [],
       tickerId: null,
       started: false,
       stallState: {
@@ -475,46 +536,30 @@ export function usePlayerSession({
       },
     };
     sessionRef.current = ctx;
-    window.player = ctx.player;
+    window.player = ctx;
+    void applyDesiredPlayerMute({ logFailure: false });
 
-    attach(ctx, ctx.player, "loadeddata", () => {
-      if (sessionRef.current !== ctx) {
+    const markStarted = () => {
+      if (sessionRef.current !== ctx || ctx.started) {
         return;
       }
       ctx.started = true;
       setPlayerPaused(false);
-      void (async () => {
-        await applyDesiredPlayerMute({ logFailure: false });
-        if (!desiredPlayerMutedRef.current && audioPlaybackSupported) {
-          const playerEl = playerRef.current;
-          if (playerEl && inferPlayerMuted(playerEl, false)) {
-            try {
-              if (typeof playerEl.unmute === "function") {
-                await playerEl.unmute();
-              } else if (typeof playerEl.player?.mute === "function") {
-                await playerEl.player.mute(false);
-              }
-            } catch (error) {
-              logRef.current?.(
-                `loadeddata unmute warning: ${error instanceof Error ? error.message : String(error)}`,
-              );
-            }
-          }
-          setPlayerMutedStateOnly(inferPlayerMuted(playerEl, false));
-        }
-      })();
-      updatePlayerStatus("live", "播放中（moq-js WebCodecs 路径）。");
+      updatePlayerStatus("live", "播放中（@moq/watch JS API）。");
       setPlaybackStartToken((current) => current + 1);
       logRef.current?.("playback started");
-    });
+    };
 
+    attach(ctx, ctx.player, "loadeddata", markStarted);
+    attach(ctx, ctx.player, "playing", markStarted);
     attach(ctx, ctx.player, "play", () => {
       if (sessionRef.current !== ctx) {
         return;
       }
+      backend.paused.set(false);
       setPlayerPaused(false);
       if (ctx.started) {
-        updatePlayerStatus("live", "播放中（moq-js WebCodecs 路径）。");
+        updatePlayerStatus("live", "播放中（@moq/watch JS API）。");
       }
     });
 
@@ -522,6 +567,7 @@ export function usePlayerSession({
       if (sessionRef.current !== ctx) {
         return;
       }
+      backend.paused.set(true);
       setPlayerPaused(true);
       if (ctx.started) {
         setPlayerStatus("已暂停");
@@ -535,21 +581,19 @@ export function usePlayerSession({
       const mutedFromDetail = event?.detail?.muted;
       const muted = typeof mutedFromDetail === "boolean"
         ? mutedFromDetail
-        : desiredPlayerMutedRef.current;
+        : backend.audio.muted.peek();
       syncPlayerMutedState(muted);
     });
-
-    void applyDesiredPlayerMute({ logFailure: false });
 
     attach(ctx, ctx.player, "error", (event) => {
       if (sessionRef.current !== ctx) {
         return;
       }
-      const detail = event?.detail;
+      const detail = event?.detail ?? ctx.player.error;
       const err =
         detail instanceof Error
           ? detail
-          : new Error(String(detail ?? "unknown player error"));
+          : new Error(detail?.message || String(detail ?? "unknown player error"));
       const nextStatus = getPlayerStatusFromMessage(err.message);
       updatePlayerStatus(nextStatus.kind, nextStatus.message);
       logRef.current?.(
@@ -557,30 +601,29 @@ export function usePlayerSession({
       );
     });
 
-    const shadowErrorEl = playerEl.shadowRoot?.querySelector?.("#error");
-    let shadowErrorObserver = null;
-    if (shadowErrorEl) {
-      shadowErrorEl.style.display = "none";
-      shadowErrorObserver = new MutationObserver(() => {
+    ctx.signalDisposers.push(
+      connection.status.watch((status) => {
         if (sessionRef.current !== ctx) {
           return;
         }
-        const message = shadowErrorEl.textContent?.trim();
-        if (!message) {
+        if (status === "connecting") {
+          updatePlayerStatus("connecting", "正在连接 relay。");
+        } else if (status === "disconnected" && !ctx.started) {
+          updatePlayerStatus("buffering", "等待 relay 连接。");
+        }
+      }),
+      broadcast.status.watch((status) => {
+        if (sessionRef.current !== ctx) {
           return;
         }
-        const nextStatus = getPlayerStatusFromMessage(message);
-        updatePlayerStatus(nextStatus.kind, nextStatus.message);
-        logRef.current?.(
-          `${isNoCatalogDataMessage(message) ? "未开播" : "播放器错误"}：${message}`,
-        );
-      });
-      shadowErrorObserver.observe(shadowErrorEl, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      });
-    }
+        if (status === "loading") {
+          updatePlayerStatus("connecting", "正在加载 catalog。");
+        } else if (status === "offline" && !ctx.started) {
+          updatePlayerStatus("offair", "直播暂未开始。");
+          logRef.current?.("未开播：catalog unavailable");
+        }
+      }),
+    );
 
     ctx.tickerId = window.setInterval(() => {
       if (sessionRef.current !== ctx) {
@@ -588,48 +631,46 @@ export function usePlayerSession({
       }
       const now = Date.now();
       const playerMuted = inferPlayerMuted(ctx.player, desiredPlayerMutedRef.current);
-      const audioContextState =
-        typeof ctx.player.player?.getAudioContextState === "function"
-          ? ctx.player.player.getAudioContextState()
-          : "unknown";
-      const audioRenderStats =
-        typeof ctx.player.player?.getAudioRenderStats === "function"
-          ? ctx.player.player.getAudioRenderStats()
-          : null;
-      const videoFrameStats =
-        typeof ctx.player.player?.getVideoFrameStats === "function"
-          ? ctx.player.player.getVideoFrameStats()
-          : null;
-      const audioAgeMs = Number.isFinite(audioRenderStats?.at)
-        ? Math.max(0, now - audioRenderStats.at)
+      const audioStats = backend.audio.stats.peek();
+      const videoStats = backend.video.stats.peek();
+      const videoTimestamp = backend.video.timestamp.peek();
+      const audioTimestamp = backend.sync.audio.peek();
+      const videoFrameStats = videoStats
+        ? {
+            at: Number.isFinite(videoTimestamp) ? performance.timeOrigin + videoTimestamp : now,
+            width: ctx.player.videoWidth || 0,
+            height: ctx.player.videoHeight || 0,
+          }
         : null;
-      const videoAgeMs = Number.isFinite(videoFrameStats?.at)
-        ? Math.max(0, now - videoFrameStats.at)
+      const audioRenderStats = audioStats
+        ? {
+            at: Number.isFinite(audioTimestamp) ? performance.timeOrigin + audioTimestamp : now,
+            read: audioStats.sampleCount,
+            size: audioStats.bytesReceived,
+            required: 0,
+            capacity: 0,
+            level: 0,
+            buffering: false,
+            started: audioStats.sampleCount > 0,
+            dropped: 0,
+          }
         : null;
-      const audioStalled =
-        !playerMuted &&
-        audioContextState === "running" &&
-        audioRenderStats?.started === true &&
-        Number.isFinite(audioAgeMs) &&
-        audioAgeMs > 3000;
-      const videoStalled =
-        Number.isFinite(videoAgeMs) &&
-        videoAgeMs > 3000;
-      const stalled = ctx.started && (audioStalled || videoStalled);
+      const stalled = ctx.started && backend.video.stalled.peek();
+
+      if (videoStats?.frameCount > 0) {
+        markStarted();
+      }
 
       if (stalled) {
         updatePlayerStatus("buffering", "缓冲中（等待稳定缓冲）。");
         const signature = [
           playerMuted,
-          audioContextState,
-          audioAgeMs ?? "na",
-          videoAgeMs ?? "na",
-          audioRenderStats?.size ?? "na",
-          audioRenderStats?.required ?? "na",
-          audioRenderStats?.buffering ?? "na",
-          audioRenderStats?.started ?? "na",
-          videoFrameStats?.width ?? "na",
-          videoFrameStats?.height ?? "na",
+          audioStats?.sampleCount ?? "na",
+          audioStats?.bytesReceived ?? "na",
+          videoStats?.frameCount ?? "na",
+          videoStats?.bytesReceived ?? "na",
+          ctx.player.videoWidth,
+          ctx.player.videoHeight,
         ].join("|");
 
         if (
@@ -641,9 +682,6 @@ export function usePlayerSession({
             [
               "[Player] suspected playback stall",
               `muted=${playerMuted}`,
-              `audioContext=${audioContextState}`,
-              `audioStalled=${audioStalled}`,
-              `videoStalled=${videoStalled}`,
               formatAudioRenderStats(audioRenderStats, now),
               formatVideoFrameStats(videoFrameStats, now),
             ].join(" "),
@@ -660,7 +698,6 @@ export function usePlayerSession({
           [
             "[Player] playback recovered",
             `muted=${playerMuted}`,
-            `audioContext=${audioContextState}`,
             formatAudioRenderStats(audioRenderStats, now),
             formatVideoFrameStats(videoFrameStats, now),
           ].join(" "),
@@ -671,20 +708,24 @@ export function usePlayerSession({
       }
 
       if (ctx.started) {
-        updatePlayerStatus("live", "播放中（moq-js WebCodecs 路径）。");
+        updatePlayerStatus("live", "播放中（@moq/watch JS API）。");
       }
     }, 1000);
 
     return () => {
-      shadowErrorObserver?.disconnect();
       if (ctx.tickerId) {
         clearInterval(ctx.tickerId);
       }
+      ctx.signalDisposers.forEach((dispose) => dispose());
       detachAll(ctx);
+      backend.close();
+      broadcast.close();
+      connection.close();
+      signals.close();
       if (sessionRef.current === ctx) {
         sessionRef.current = null;
       }
-      if (window.player === ctx.player) {
+      if (window.player === ctx) {
         window.player = null;
       }
     };

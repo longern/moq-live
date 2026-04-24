@@ -272,6 +272,12 @@ export function usePlayerSession({
     });
     setLogText("");
 
+    if (!globalThis.WebTransport) {
+      updatePlayerStatus("error", "浏览器版本过旧");
+      logRef.current?.("Browser does not support WebTransport");
+      return;
+    }
+
     let nextSession;
     try {
       const nextRelayUrl = new URL(relayUrlRef.current).toString();

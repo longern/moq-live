@@ -254,14 +254,18 @@ export function App() {
     : chat.roomMeta.stream.namespace || "";
   const watchJoined = page === "watch" && watchRouteCommitted && Boolean(normalizedWatchInput);
   const watchStageMessage = watchingNamespace
-    ? (directWatchNamespace ? "正在连接公共 namespace。" : "等待输入 namespace。")
+    ? (directWatchNamespace ? "正在连接公共频道。" : "等待输入公共频道号。")
     : watchRoomResolution.loading
-      ? "正在进入直播间。"
+      ? "加载中"
       : watchRoomResolution.error
         ? `进入失败：${watchRoomResolution.error}`
-        : resolvedWatchRoomId
-          ? (watchStreamEnded ? "直播已结束" : "直播暂未开始")
-          : "正在解析直播间。";
+        : !resolvedWatchRoomId ||!chat.roomStateReady
+          ? "加载中"
+            : chat.streamState.isLive
+              ? ""
+              : watchStreamEnded
+                ? "直播已结束"
+                : "直播暂未开始";
 
   watchPlaybackRelayUrlRef.current = resolvedWatchRelayUrl;
   watchPlaybackNamespaceRef.current = resolvedWatchNamespace;

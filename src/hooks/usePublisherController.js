@@ -182,6 +182,7 @@ export function usePublisherController({
     const connection = new MoqPublish.Lite.Connection.Reload({
       enabled: true,
       url: new URL(relayUrl),
+      websocket: { enabled: false },
     });
     const broadcast = new MoqPublish.Broadcast({
       connection: connection.established,

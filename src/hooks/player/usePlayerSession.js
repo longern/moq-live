@@ -261,9 +261,7 @@ export function usePlayerSession({
   }
 
   async function startPlayer(options = {}) {
-    const {
-      initialMuted = false,
-    } = options;
+    const { initialMuted = false } = options;
     const targetMuted = !audioPlaybackSupported || initialMuted;
     const token = ++playbackTokenRef.current;
     await stopPlayer({
@@ -341,7 +339,8 @@ export function usePlayerSession({
       return false;
     }
 
-    const targetMuted = !audioPlaybackSupported || desiredPlayerMutedRef.current;
+    const targetMuted =
+      !audioPlaybackSupported || desiredPlayerMutedRef.current;
     if (!audioPlaybackSupported) {
       if (logFailure) {
         logRef.current?.(
@@ -496,6 +495,7 @@ export function usePlayerSession({
     const connection = new MoqWatch.Lite.Connection.Reload({
       enabled: true,
       url: new URL(playerSession.relayUrl),
+      websocket: { enabled: false },
     });
     const broadcast = new MoqWatch.Broadcast({
       connection: connection.established,
@@ -579,9 +579,10 @@ export function usePlayerSession({
         return;
       }
       const mutedFromDetail = event?.detail?.muted;
-      const muted = typeof mutedFromDetail === "boolean"
-        ? mutedFromDetail
-        : backend.audio.muted.peek();
+      const muted =
+        typeof mutedFromDetail === "boolean"
+          ? mutedFromDetail
+          : backend.audio.muted.peek();
       syncPlayerMutedState(muted);
     });
 
@@ -593,7 +594,9 @@ export function usePlayerSession({
       const err =
         detail instanceof Error
           ? detail
-          : new Error(detail?.message || String(detail ?? "unknown player error"));
+          : new Error(
+              detail?.message || String(detail ?? "unknown player error"),
+            );
       const nextStatus = getPlayerStatusFromMessage(err.message);
       updatePlayerStatus(nextStatus.kind, nextStatus.message);
       logRef.current?.(
@@ -601,28 +604,32 @@ export function usePlayerSession({
       );
     });
 
+    const deriveAndUpdateStatus = () => {
+      if (sessionRef.current !== ctx) return;
+
+      if (ctx.started) {
+        updatePlayerStatus("live", "播放中（@moq/watch JS API）。");
+        return;
+      }
+
+      const connStatus = connection.status.peek();
+      const broadcastStatus = broadcast.status.peek();
+
+      if (connStatus === "connecting") {
+        updatePlayerStatus("connecting", "正在连接视频流。");
+      } else if (connStatus === "disconnected") {
+        updatePlayerStatus("buffering", "等待视频流连接。");
+      } else if (broadcastStatus === "loading") {
+        updatePlayerStatus("connecting", "正在加载 catalog。");
+      } else if (broadcastStatus === "offline") {
+        updatePlayerStatus("offair", "直播暂未开始。");
+        logRef.current?.("未开播：catalog unavailable");
+      }
+    };
+
     ctx.signalDisposers.push(
-      connection.status.watch((status) => {
-        if (sessionRef.current !== ctx) {
-          return;
-        }
-        if (status === "connecting") {
-          updatePlayerStatus("connecting", "正在连接 relay。");
-        } else if (status === "disconnected" && !ctx.started) {
-          updatePlayerStatus("buffering", "等待 relay 连接。");
-        }
-      }),
-      broadcast.status.watch((status) => {
-        if (sessionRef.current !== ctx) {
-          return;
-        }
-        if (status === "loading") {
-          updatePlayerStatus("connecting", "正在加载 catalog。");
-        } else if (status === "offline" && !ctx.started) {
-          updatePlayerStatus("offair", "直播暂未开始。");
-          logRef.current?.("未开播：catalog unavailable");
-        }
-      }),
+      connection.status.watch(deriveAndUpdateStatus),
+      broadcast.status.watch(deriveAndUpdateStatus),
     );
 
     ctx.tickerId = window.setInterval(() => {
@@ -630,21 +637,28 @@ export function usePlayerSession({
         return;
       }
       const now = Date.now();
-      const playerMuted = inferPlayerMuted(ctx.player, desiredPlayerMutedRef.current);
+      const playerMuted = inferPlayerMuted(
+        ctx.player,
+        desiredPlayerMutedRef.current,
+      );
       const audioStats = backend.audio.stats.peek();
       const videoStats = backend.video.stats.peek();
       const videoTimestamp = backend.video.timestamp.peek();
       const audioTimestamp = backend.sync.audio.peek();
       const videoFrameStats = videoStats
         ? {
-            at: Number.isFinite(videoTimestamp) ? performance.timeOrigin + videoTimestamp : now,
+            at: Number.isFinite(videoTimestamp)
+              ? performance.timeOrigin + videoTimestamp
+              : now,
             width: ctx.player.videoWidth || 0,
             height: ctx.player.videoHeight || 0,
           }
         : null;
       const audioRenderStats = audioStats
         ? {
-            at: Number.isFinite(audioTimestamp) ? performance.timeOrigin + audioTimestamp : now,
+            at: Number.isFinite(audioTimestamp)
+              ? performance.timeOrigin + audioTimestamp
+              : now,
             read: audioStats.sampleCount,
             size: audioStats.bytesReceived,
             required: 0,

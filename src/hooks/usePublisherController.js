@@ -65,6 +65,18 @@ function buildSharedAudioConstraints() {
   return Object.keys(constraints).length > 0 ? constraints : true;
 }
 
+function buildMicrophoneAudioConstraints(deviceId = "") {
+  const sharedConstraints = buildSharedAudioConstraints();
+  const constraints =
+    sharedConstraints === true ? {} : { ...sharedConstraints };
+
+  if (deviceId) {
+    constraints.deviceId = { exact: deviceId };
+  }
+
+  return Object.keys(constraints).length > 0 ? constraints : true;
+}
+
 export function usePublisherController({
   page,
   pageRef,
@@ -255,6 +267,98 @@ export function usePublisherController({
       log(
         `shared audio constraints warning: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+  }
+
+  async function createStableAudioPublishTrack(sourceTrack) {
+    if (!sourceTrack) {
+      return { track: null, cleanup: null };
+    }
+
+    const fallbackTrack = sourceTrack.clone?.() ?? sourceTrack;
+    const AudioContextCtor =
+      globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (typeof AudioContextCtor !== "function") {
+      return { track: fallbackTrack, cleanup: null };
+    }
+
+    const settings = sourceTrack.getSettings?.() ?? {};
+    let audioContext = null;
+    let sourceNode = null;
+    let microphoneGain = null;
+    let keepaliveOscillator = null;
+    let keepaliveGain = null;
+    let destination = null;
+
+    try {
+      audioContext = new AudioContextCtor({
+        latencyHint: "interactive",
+        sampleRate: settings.sampleRate || 48_000,
+      });
+      sourceNode = audioContext.createMediaStreamSource(
+        new MediaStream([sourceTrack]),
+      );
+      microphoneGain = audioContext.createGain();
+      microphoneGain.gain.value = 1;
+      destination = audioContext.createMediaStreamDestination();
+
+      sourceNode.connect(microphoneGain);
+      microphoneGain.connect(destination);
+
+      keepaliveOscillator = audioContext.createOscillator();
+      keepaliveGain = audioContext.createGain();
+      keepaliveOscillator.frequency.value = 440;
+      keepaliveGain.gain.value = 0.001;
+      keepaliveOscillator.connect(keepaliveGain);
+      keepaliveGain.connect(destination);
+      keepaliveOscillator.start();
+
+      await audioContext.resume?.();
+
+      const mixedTrack = destination.stream.getAudioTracks()[0] ?? null;
+      if (!mixedTrack) {
+        throw new Error("missing mixed audio track");
+      }
+
+      mixedTrack.enabled = sourceTrack.enabled;
+      return {
+        track: mixedTrack,
+        cleanup: () => {
+          try {
+            keepaliveOscillator?.stop?.();
+          } catch {
+            // Ignore oscillator cleanup after it has already stopped.
+          }
+          try {
+            sourceNode?.disconnect?.();
+            microphoneGain?.disconnect?.();
+            keepaliveGain?.disconnect?.();
+          } catch {
+            // Ignore disconnect races during teardown.
+          }
+          try {
+            mixedTrack.stop();
+          } catch {
+            // Ignore stale track cleanup failures.
+          }
+          void audioContext?.close?.().catch(() => {});
+        },
+      };
+    } catch (error) {
+      log(
+        `audio keepalive mixer warning: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      try {
+        keepaliveOscillator?.stop?.();
+      } catch {
+        // Ignore oscillator cleanup after failed setup.
+      }
+      try {
+        await audioContext?.close?.();
+      } catch {
+        // Ignore audio context cleanup failures.
+      }
+      return { track: fallbackTrack, cleanup: null };
     }
   }
 
@@ -511,9 +615,9 @@ export function usePublisherController({
       return null;
     }
 
-    const microphoneConstraints = selectedMicrophoneId
-      ? { audio: { deviceId: { exact: selectedMicrophoneId } } }
-      : { audio: true };
+    const microphoneConstraints = {
+      audio: buildMicrophoneAudioConstraints(selectedMicrophoneId),
+    };
     const microphoneStream =
       await navigator.mediaDevices.getUserMedia(microphoneConstraints);
     return microphoneStream.getAudioTracks()[0] ?? null;
@@ -554,9 +658,7 @@ export function usePublisherController({
           };
     const audioConstraints = !microphoneEnabled
       ? false
-      : selectedMicrophoneId
-        ? { deviceId: { exact: selectedMicrophoneId } }
-        : true;
+      : buildMicrophoneAudioConstraints(selectedMicrophoneId);
 
     let stream = null;
     let lastError = null;
@@ -844,8 +946,10 @@ export function usePublisherController({
     const previewVideo = previewVideoRef.current;
     const makeEven = (value) => Math.floor(value / 2) * 2;
     const publishVideoTrack = previewVideoTrack?.clone?.() ?? null;
-    const publishAudioTrack =
-      microphoneEnabled && previewAudioTrack?.clone ? previewAudioTrack.clone() : null;
+    const stableAudio = microphoneEnabled
+      ? await createStableAudioPublishTrack(previewAudioTrack)
+      : { track: null, cleanup: null };
+    const publishAudioTrack = stableAudio.track;
     const width = previewVideoTrack
       ? makeEven(previewVideo?.videoWidth || previewVideoTrack.getSettings?.().width || 640)
       : 0;
@@ -879,6 +983,7 @@ export function usePublisherController({
           // Ignore cleanup failures while tearing down publish clones.
         }
       });
+      stableAudio.cleanup?.();
     };
 
     try {

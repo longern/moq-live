@@ -45,10 +45,17 @@ export function WatchSessionPage({
   const [controlsVisible, setControlsVisible] = useState(false);
   const [moreMounted, setMoreMounted] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
+  const [shareMenuMounted, setShareMenuMounted] = useState(false);
+  const [shareMenuVisible, setShareMenuVisible] = useState(false);
+  const [shareMenuPosition, setShareMenuPosition] = useState({ left: 0, top: 0 });
   const hideTimerRef = useRef(null);
   const touchModeRef = useRef(false);
   const closeTimerRef = useRef(null);
   const openFrameRef = useRef(null);
+  const shareCloseTimerRef = useRef(null);
+  const shareOpenFrameRef = useRef(null);
+  const shareButtonRef = useRef(null);
+  const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   function clearHideTimer() {
     if (hideTimerRef.current) {
@@ -80,6 +87,12 @@ export function WatchSessionPage({
     }
     if (openFrameRef.current) {
       cancelAnimationFrame(openFrameRef.current);
+    }
+    if (shareCloseTimerRef.current) {
+      clearTimeout(shareCloseTimerRef.current);
+    }
+    if (shareOpenFrameRef.current) {
+      cancelAnimationFrame(shareOpenFrameRef.current);
     }
   }, []);
 
@@ -168,12 +181,120 @@ export function WatchSessionPage({
     }, 260);
   }
 
+  function positionShareMenu() {
+    const button = shareButtonRef.current;
+    if (!button) {
+      return;
+    }
+
+    const rect = button.getBoundingClientRect();
+    const panelWidth = 248;
+    const panelHeight = 150;
+    const gap = 8;
+    const margin = 12;
+    const left = Math.min(
+      Math.max(rect.right - panelWidth, margin),
+      window.innerWidth - panelWidth - margin
+    );
+    let top = rect.bottom + gap;
+    if (top + panelHeight > window.innerHeight - margin) {
+      top = rect.top - panelHeight - gap;
+    }
+    setShareMenuPosition({
+      left,
+      top: Math.max(margin, top)
+    });
+  }
+
+  function openShareMenu() {
+    if (shareCloseTimerRef.current) {
+      clearTimeout(shareCloseTimerRef.current);
+      shareCloseTimerRef.current = null;
+    }
+    if (shareOpenFrameRef.current) {
+      cancelAnimationFrame(shareOpenFrameRef.current);
+      shareOpenFrameRef.current = null;
+    }
+    positionShareMenu();
+    setShareMenuMounted(true);
+    setShareMenuVisible(false);
+    shareOpenFrameRef.current = requestAnimationFrame(() => {
+      positionShareMenu();
+      setShareMenuVisible(true);
+      shareOpenFrameRef.current = null;
+    });
+  }
+
+  function closeShareMenu() {
+    if (shareOpenFrameRef.current) {
+      cancelAnimationFrame(shareOpenFrameRef.current);
+      shareOpenFrameRef.current = null;
+    }
+    setShareMenuVisible(false);
+    if (shareCloseTimerRef.current) {
+      clearTimeout(shareCloseTimerRef.current);
+    }
+    shareCloseTimerRef.current = window.setTimeout(() => {
+      setShareMenuMounted(false);
+      shareCloseTimerRef.current = null;
+    }, 180);
+  }
+
+  async function copyWatchLink() {
+    if (!watchLink) {
+      closeShareMenu();
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(watchLink);
+    } finally {
+      closeShareMenu();
+    }
+  }
+
+  async function shareWatchLink() {
+    if (!watchLink || !shareSupported) {
+      closeShareMenu();
+      return;
+    }
+    try {
+      await navigator.share({
+        title: roomTitle || roomLabel,
+        text: `${hostDisplayName || roomLabel}的直播间`,
+        url: watchLink
+      });
+    } catch (error) {
+      if (!(error instanceof Error && error.name === "AbortError")) {
+        console.error("watch room share failed", error);
+      }
+    } finally {
+      closeShareMenu();
+    }
+  }
+
   useEffect(() => {
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
   }, [moreMounted]);
+
+  useEffect(() => {
+    if (!shareMenuMounted) {
+      return;
+    }
+
+    function updatePosition() {
+      positionShareMenu();
+    }
+
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [shareMenuMounted]);
 
   function renderMobileHud(className = "", persistent = false) {
     const visible = persistent || controlsVisible || playerBadge.state === "error";
@@ -392,7 +513,19 @@ export function WatchSessionPage({
                 </div>
               </div>
             </div>
-            <div class="info-item info-item-pill">
+            <div class="info-item info-item-pill watch-desktop-status-actions">
+              <button
+                ref={shareButtonRef}
+                type="button"
+                class="watch-desktop-share-button"
+                onClick={openShareMenu}
+                disabled={!watchLink}
+                aria-label="分享观看链接"
+                aria-haspopup="dialog"
+                aria-expanded={shareMenuMounted ? "true" : "false"}
+              >
+                <ShareIcon />
+              </button>
               <StatusPill id="playerBadgeInline" label={playerBadge.label} state={playerBadge.state} />
             </div>
           </div>
@@ -407,17 +540,6 @@ export function WatchSessionPage({
               <StatusPill id="playerBadgeInlineMobile" label={playerBadge.label} state={playerBadge.state} />
             </div>
           </div>
-          <section class="control-block watch-leave-block">
-            <div class="action-row">
-              <button type="button" class="secondary" id="stop" onClick={onStop}>离开直播间</button>
-            </div>
-          </section>
-          <section class="control-block watch-link-block">
-            <div class="summary-item">
-              <strong>观看链接</strong>
-              <span data-watch-link>{watchLinkText}</span>
-            </div>
-          </section>
           <ChatPanel
             roomLabel={chatRoomLabel}
             authAvailable={authAvailable}
@@ -474,6 +596,65 @@ export function WatchSessionPage({
           </section>
         </>
       ) : null}
+      {shareMenuMounted ? (
+        <>
+          <button
+            type="button"
+            class="watch-desktop-share-backdrop"
+            aria-label="关闭分享面板"
+            onClick={closeShareMenu}
+          />
+          <section
+            class={`watch-desktop-share-panel${shareMenuVisible ? " is-open" : ""}`}
+            style={{
+              left: `${shareMenuPosition.left}px`,
+              top: `${shareMenuPosition.top}px`
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="分享到"
+          >
+            <div class="watch-desktop-share-title">分享到</div>
+            <button
+              type="button"
+              class="watch-desktop-share-action"
+              onClick={copyWatchLink}
+              disabled={!watchLink}
+            >
+              <CopyIcon />
+              <span>复制链接</span>
+            </button>
+            <button
+              type="button"
+              class="watch-desktop-share-action"
+              onClick={shareWatchLink}
+              disabled={!watchLink || !shareSupported}
+            >
+              <ShareIcon />
+              <span>分享</span>
+            </button>
+          </section>
+        </>
+      ) : null}
     </section>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+      <path d="M12 16V4" />
+      <path d="m7 9 5-5 5 5" />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="8" y="8" width="12" height="12" rx="2" />
+      <path d="M4 16V6a2 2 0 0 1 2-2h10" />
+    </svg>
   );
 }

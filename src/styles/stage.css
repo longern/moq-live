@@ -1,0 +1,310 @@
+.stage-frame {
+  position: relative;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(16, 196, 182, 0.18),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(255, 114, 64, 0.18),
+      transparent 24%
+    ),
+    #040b11;
+}
+
+.page-immersive .stage-frame {
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.live-stage-frame,
+.watch-stage-frame {
+  border-radius: 0;
+}
+
+.watch-stage-frame {
+  aspect-ratio: 16 / 9;
+}
+
+.watch-stage-frame.is-portrait {
+  aspect-ratio: 9 / 16;
+}
+
+.page-immersive .placeholder,
+.page-immersive .publisher-placeholder {
+  padding: 0;
+}
+
+#playerMount,
+.publisher-host {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+
+.player-moq,
+.publisher-preview,
+publisher-moq {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  background: #040b11;
+}
+
+publisher-moq {
+  width: 100%;
+  height: 100%;
+}
+
+.player-moq {
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+}
+
+.publisher-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.publisher-preview.is-mirrored {
+  transform: scaleX(-1);
+}
+
+.placeholder,
+.publisher-placeholder,
+.stage-error {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.placeholder,
+.publisher-placeholder {
+  position: absolute;
+  inset: 0;
+  color: rgba(235, 244, 251, 0.8);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    radial-gradient(
+      circle at 18% 18%,
+      rgba(255, 114, 64, 0.32),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at 84% 18%,
+      rgba(16, 196, 182, 0.22),
+      transparent 30%
+    ),
+    #040b11;
+}
+
+.stage-error {
+  position: absolute;
+  inset: 0;
+  color: rgba(235, 244, 251, 0.88);
+  background: rgba(4, 11, 17, 0.82);
+}
+
+.stage-error p {
+  max-width: 420px;
+  line-height: 1.55;
+}
+
+.stage-controls {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  padding: 28px 14px 14px;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.stage-frame.controls-visible .stage-controls,
+.stage-controls.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.stage-controls-fade {
+  position: absolute;
+  inset: 0 0 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(4, 11, 17, 0.18) 34%,
+    rgba(4, 11, 17, 0.72) 100%
+  );
+  pointer-events: none;
+}
+
+.stage-controls-right {
+  display: flex;
+  gap: 8px;
+}
+
+.stage-unmute-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: min(360px, calc(100% - 28px));
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(3, 8, 14, 0.88);
+  color: var(--text);
+  text-align: center;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  transform: translateX(-50%);
+}
+
+.stage-unmute-prompt:hover,
+.stage-unmute-prompt:focus-visible {
+  background: rgba(10, 18, 28, 0.96);
+}
+
+.stage-mobile-hud {
+  display: none;
+}
+
+.stage-mobile-leave,
+.stage-mobile-hud-left {
+  display: none;
+}
+
+.stage-control-button {
+  position: relative;
+  z-index: 1;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(3, 8, 14, 0.72);
+  color: var(--text);
+  backdrop-filter: blur(10px);
+}
+
+.stage-control-button svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  margin: 0 auto;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.stage-control-primary {
+  width: 40px;
+  min-height: 40px;
+}
+
+.watch-stage-frame:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+}
+
+.watch-stage-frame:fullscreen #playerMount {
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.watch-stage-frame:fullscreen .stage-error,
+.watch-stage-frame:fullscreen .placeholder {
+  position: absolute;
+  inset: 0;
+}
+
+.placeholder p,
+.publisher-placeholder p {
+  max-width: 360px;
+  line-height: 1.55;
+}
+
+.stage-overlay {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: none;
+}
+
+.overlay-card {
+  max-width: min(100%, 460px);
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(3, 8, 14, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.overlay-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.overlay-value {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "IBM Plex Mono", "SF Mono", monospace;
+  font-size: 0.82rem;
+}
+
+.settings-stack {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.stage-column,
+.control-column {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+}

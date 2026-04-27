@@ -1,0 +1,260 @@
+.live-desktop-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 18px 0;
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.live-desktop-meta > * {
+  pointer-events: auto;
+}
+
+.live-desktop-room {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.live-desktop-room span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.live-desktop-room strong {
+  display: block;
+  font-size: 1rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.live-desktop-warning {
+  margin: 0;
+  max-width: min(100%, 520px);
+}
+
+.live-desktop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.live-desktop-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+  pointer-events: auto;
+}
+
+.live-desktop-dock {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  pointer-events: none;
+}
+
+.live-desktop-panel {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  width: min(100%, 420px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(9, 18, 29, 0.98), rgba(7, 15, 24, 0.96)),
+    radial-gradient(
+      circle at top right,
+      rgba(16, 196, 182, 0.1),
+      transparent 34%
+    );
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.live-desktop-panel-head {
+  display: grid;
+  gap: 4px;
+}
+
+.live-desktop-panel-head strong {
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.live-desktop-panel-head span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.live-desktop-summary {
+  margin: 0;
+}
+
+.live-cover-input {
+  display: none;
+}
+
+.live-cover-card {
+  display: grid;
+  gap: 10px;
+}
+
+.live-cover-card > strong {
+  font-size: 0.98rem;
+  line-height: 1.2;
+}
+
+.live-cover-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background:
+    linear-gradient(160deg, rgba(16, 196, 182, 0.14), rgba(255, 114, 64, 0.1)),
+    rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  text-align: center;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    background-color 160ms ease;
+}
+
+.live-cover-preview:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.live-cover-preview:focus-visible {
+  outline: 2px solid rgba(255, 114, 64, 0.55);
+  outline-offset: 2px;
+}
+
+.live-cover-preview.is-disabled {
+  cursor: default;
+}
+
+.live-cover-preview img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}
+
+.live-cover-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.live-cover-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.live-desktop-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  background: rgba(4, 11, 17, 0.74);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+}
+
+.live-dock-button {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  flex: 0 0 auto;
+}
+
+.live-dock-button:hover,
+.live-dock-button:focus-visible,
+.live-dock-button.is-active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.live-dock-button.is-muted {
+  color: #8ea4b8;
+}
+
+.live-dock-button-primary {
+  background: linear-gradient(180deg, #ff8055, #f35f31);
+  color: white;
+  box-shadow: 0 14px 32px rgba(243, 95, 49, 0.28);
+}
+
+.live-dock-button-primary.is-live {
+  background: linear-gradient(180deg, #ff5e76, #ef3d57);
+  box-shadow: 0 14px 32px rgba(239, 61, 87, 0.28);
+}
+
+.live-dock-button-primary:hover,
+.live-dock-button-primary:focus-visible,
+.live-dock-button-primary.is-active {
+  background: linear-gradient(180deg, #ff8f68, #f56d44);
+}
+
+.live-dock-button-primary.is-live:hover,
+.live-dock-button-primary.is-live:focus-visible,
+.live-dock-button-primary.is-live.is-active {
+  background: linear-gradient(180deg, #ff6f85, #f14e67);
+}
+
+.live-dock-button svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.live-chat-column {
+  min-height: 0;
+}

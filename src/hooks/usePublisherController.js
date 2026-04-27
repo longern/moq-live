@@ -83,6 +83,7 @@ export function usePublisherController({
   relayUrlRef,
   roomRef,
   generateRoomId,
+  syntheticSessionRef: externalSyntheticSessionRef,
   log,
 }) {
   const [publishStatus, setPublishStatus] = useState("等待推流。");
@@ -105,7 +106,8 @@ export function usePublisherController({
   );
 
   const previewVideoRef = useRef(null);
-  const syntheticSessionRef = useRef(null);
+  const internalSyntheticSessionRef = useRef(null);
+  const syntheticSessionRef = externalSyntheticSessionRef ?? internalSyntheticSessionRef;
   const livePublisherRef = useRef(null);
   const liveSessionManagerRef = useRef(createMediaSessionManager());
   const previewMediaStreamRef = useRef(null);

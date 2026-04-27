@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import * as MoqWatch from "@moq/watch";
 import {
   attach,
   detachAll,
@@ -66,10 +65,12 @@ export function usePlayerSession({
   const [playerSession, setPlayerSession] = useState(null);
   const [fullscreenRotate, setFullscreenRotate] = useState(false);
   const [playbackStartToken, setPlaybackStartToken] = useState(0);
+  const [moqWatchModule, setMoqWatchModule] = useState(null);
 
   const playerRef = useRef(null);
   const watchStageRef = useRef(null);
   const logRef = useRef(log);
+  const moqWatchModuleRef = useRef(null);
   const playbackTokenRef = useRef(0);
   const sessionRef = useRef(null);
   const playerSessionStateRef = useRef(null);
@@ -83,6 +84,17 @@ export function usePlayerSession({
   function updatePlayerStatus(kind, message) {
     setPlayerStatusKind(kind);
     setPlayerStatus(message);
+  }
+
+  async function loadMoqWatchModule() {
+    if (moqWatchModuleRef.current) {
+      return moqWatchModuleRef.current;
+    }
+
+    const module = await import("@moq/watch");
+    moqWatchModuleRef.current = module;
+    setMoqWatchModule(module);
+    return module;
   }
 
   function syncPlayerMutedState(nextMuted) {
@@ -300,6 +312,20 @@ export function usePlayerSession({
       return;
     }
 
+    try {
+      await loadMoqWatchModule();
+      if (token !== playbackTokenRef.current) {
+        return;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      updatePlayerStatus("error", `失败：${message}`);
+      logRef.current?.(
+        `failed to load @moq/watch: ${error instanceof Error ? (error.stack ?? error.message) : message}`,
+      );
+      return;
+    }
+
     setPlayerSession(nextSession);
     setFullscreenActive(false);
     setFullscreenRotate(false);
@@ -493,11 +519,13 @@ export function usePlayerSession({
     if (
       !playerSession ||
       !playerEl ||
+      !moqWatchModule ||
       playerSession.token !== playbackTokenRef.current
     ) {
       return;
     }
 
+    const MoqWatch = moqWatchModule;
     const connection = new MoqWatch.Lite.Connection.Reload({
       enabled: true,
       url: new URL(playerSession.relayUrl),
@@ -749,7 +777,7 @@ export function usePlayerSession({
         window.player = null;
       }
     };
-  }, [playerSession, audioPlaybackSupported]);
+  }, [playerSession, audioPlaybackSupported, moqWatchModule]);
 
   useEffect(
     () => () => {

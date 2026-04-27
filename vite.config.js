@@ -263,7 +263,10 @@ function createWebManifestPlugin(env, siteTitle) {
         }
 
         res.statusCode = 200;
-        res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+        res.setHeader(
+          "Content-Type",
+          "application/manifest+json; charset=utf-8",
+        );
         res.end(manifestJson);
       });
     },

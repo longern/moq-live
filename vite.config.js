@@ -217,6 +217,66 @@ function injectSiteTitle(siteTitle) {
   };
 }
 
+function readEnvValue(env, name, fallback) {
+  const value = env[name]?.trim();
+  return value || fallback;
+}
+
+function createWebManifest(env, siteTitle) {
+  const name = readEnvValue(env, "VITE_MANIFEST_NAME", siteTitle);
+  const shortName = readEnvValue(env, "VITE_MANIFEST_SHORT_NAME", name);
+
+  return {
+    name,
+    short_name: shortName,
+    start_url: "/",
+    scope: "/",
+    display: "standalone",
+    background_color: "#08131d",
+    theme_color: "#08131d",
+    icons: [
+      {
+        src: "/icons/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        src: "/icons/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+  };
+}
+
+function createWebManifestPlugin(env, siteTitle) {
+  const manifestJson = `${JSON.stringify(createWebManifest(env, siteTitle), null, 2)}\n`;
+
+  return {
+    name: "generate-web-manifest",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const pathname = req.url?.split("?")[0];
+        if (pathname !== "/manifest.webmanifest") {
+          next();
+          return;
+        }
+
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+        res.end(manifestJson);
+      });
+    },
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "manifest.webmanifest",
+        source: manifestJson,
+      });
+    },
+  };
+}
+
 const isolationHeaders = {
   "Cross-Origin-Embedder-Policy": "require-corp",
   "Cross-Origin-Opener-Policy": "same-origin",
@@ -260,6 +320,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       injectSiteTitle(siteTitle),
+      createWebManifestPlugin(env, siteTitle),
       patchMoqWatchCatalogFormats(),
       patchMoqLiteCloudflareSubscribe(),
       preact(),

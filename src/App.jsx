@@ -47,7 +47,7 @@ function LivePageFallback({ hidden }) {
       <div class="page-grid live-layout">
         <section class="control-column" aria-busy="true">
           <div class="placeholder">
-            <p>正在加载开播页。</p>
+            <span class="live-circular-progress" role="progressbar" aria-label="正在加载开播页" />
           </div>
         </section>
       </div>

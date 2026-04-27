@@ -258,3 +258,95 @@
 .live-chat-column {
   min-height: 0;
 }
+
+.live-circular-progress {
+  width: 34px;
+  height: 34px;
+  display: inline-block;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent-2);
+  border-radius: 50%;
+  animation: live-circular-progress-spin 760ms linear infinite;
+}
+
+@keyframes live-circular-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.live-activation-page {
+  min-height: 100%;
+}
+
+.live-activation-shell {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 42%),
+    #040b11;
+}
+
+.live-activation-panel {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(9, 18, 29, 0.94);
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.3);
+}
+
+.live-activation-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.live-activation-copy span {
+  color: var(--accent-2);
+  font-size: 0.78rem;
+}
+
+.live-activation-copy h2,
+.live-activation-copy p {
+  margin: 0;
+}
+
+.live-activation-copy h2 {
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.live-activation-copy p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.live-activation-copy .live-activation-error {
+  color: #ffb6a3;
+}
+
+.live-activation-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.live-activation-actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+}
+
+.live-activation-actions button:only-child {
+  grid-column: 1 / -1;
+}
+
+.live-activation-actions .live-activation-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  box-shadow: none;
+}

@@ -2,6 +2,7 @@ import {
   appendAuthError,
   buildMicrosoftAuthorizationUrl,
   buildSessionCookie,
+  createUserRoom,
   createDeleteCookie,
   createMicrosoftOAuthState,
   createSession,
@@ -54,6 +55,9 @@ export default {
       }
       if (url.pathname === "/api/me/room" && request.method === "GET") {
         return await handleMyRoom(env, request);
+      }
+      if (url.pathname === "/api/me/room" && request.method === "POST") {
+        return await handleMyRoomCreate(env, request);
       }
       if (url.pathname === "/api/me/room/cover" && request.method === "POST") {
         return await handleMyRoomCoverUpload(env, request);
@@ -141,6 +145,21 @@ async function handleMyRoom(env, request) {
     ok: true,
     room
   });
+}
+
+async function handleMyRoomCreate(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const room = await createUserRoom(db, session.user.id);
+  return json({
+    ok: true,
+    room
+  }, { status: 201 });
 }
 
 async function handleMyRoomCoverUpload(env, request) {

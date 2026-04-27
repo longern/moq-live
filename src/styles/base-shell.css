@@ -149,6 +149,8 @@ pre {
 
 .auth-menu-shell {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .auth-avatar-button {
@@ -157,6 +159,7 @@ pre {
   justify-content: center;
   width: 40px;
   height: 40px;
+  min-height: 40px;
   padding: 0;
   border: 0;
   border-radius: 999px;

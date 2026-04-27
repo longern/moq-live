@@ -4,6 +4,7 @@ import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
 
 export function LivePage({
   hidden,
+  roomDetails,
   roomLabel,
   shareTarget,
   watchLink,
@@ -48,7 +49,8 @@ export function LivePage({
   authUser,
   onChatDraftChange,
   onChatSend,
-  onChatRequireLogin
+  onChatRequireLogin,
+  onRoomDetailsChange
 }) {
   const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 760px)").matches);
   const [roomCoverUrl, setRoomCoverUrl] = useState("");
@@ -83,45 +85,10 @@ export function LivePage({
       return;
     }
 
-    let cancelled = false;
-
-    async function loadRoomCover() {
-      setRoomCoverLoading(true);
-      setRoomCoverError("");
-
-      try {
-        const response = await fetch("/api/me/room", {
-          credentials: "same-origin"
-        });
-        const payload = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(payload.error || `room endpoint returned ${response.status}`);
-        }
-
-        if (cancelled) {
-          return;
-        }
-
-        setRoomCoverUrl(payload.room?.coverUrl || "");
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-        setRoomCoverError(error instanceof Error ? error.message : String(error));
-      } finally {
-        if (!cancelled) {
-          setRoomCoverLoading(false);
-        }
-      }
-    }
-
-    void loadRoomCover();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser?.id, hidden]);
+    setRoomCoverUrl(roomDetails?.coverUrl || "");
+    setRoomCoverLoading(false);
+    setRoomCoverError("");
+  }, [authUser?.id, hidden, roomDetails?.coverUrl, roomDetails?.id]);
 
   function openRoomCoverPicker() {
     roomCoverInputRef.current?.click();
@@ -154,6 +121,7 @@ export function LivePage({
       }
 
       setRoomCoverUrl(payload.room?.coverUrl || "");
+      onRoomDetailsChange?.(payload.room || null);
       setRoomCoverStatus("直播封面已更新");
     } catch (error) {
       setRoomCoverError(error instanceof Error ? error.message : String(error));

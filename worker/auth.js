@@ -290,7 +290,6 @@ export async function getSessionUser(db, request) {
   }
 
   const handle = await ensureUserHandle(db, row.user_id, row.handle);
-  await ensureUserRoom(db, row.user_id);
   await db.prepare(`UPDATE ${TABLES.sessions} SET last_seen_at = ? WHERE id = ?`).bind(now, row.session_id).run();
 
   return {
@@ -441,7 +440,6 @@ export async function upsertMicrosoftUser(db, claims) {
     ]);
 
     await ensureUserHandle(db, existingIdentity.user_id);
-    await ensureUserRoom(db, existingIdentity.user_id);
     return existingIdentity.user_id;
   }
 
@@ -466,23 +464,6 @@ export async function upsertMicrosoftUser(db, claims) {
             last_login_at
           ) VALUES (?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)`
         ).bind(userId, handle, displayName, email, now, now, now),
-        db.prepare(
-          `INSERT INTO ${TABLES.rooms} (
-            id,
-            host_user_id,
-            title,
-            cover_url,
-            created_at,
-            updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?)`
-        ).bind(
-          crypto.randomUUID(),
-          userId,
-          "",
-          "",
-          now,
-          now
-        ),
         db.prepare(
           `INSERT INTO ${TABLES.userIdentities} (
             id,
@@ -793,7 +774,6 @@ async function getRoomRowByHostUserId(db, userId) {
 }
 
 async function requireUserRoomRow(db, userId) {
-  await ensureUserRoom(db, userId);
   const room = await getRoomRowByHostUserId(db, userId);
   if (!room?.id) {
     throw createHttpError(404, "Room not found", "room_not_found");
@@ -976,6 +956,15 @@ export { ensureUserRoom };
 
 export async function getUserRoom(db, userId) {
   const room = await requireUserRoomRow(db, userId);
+  return buildRoomPayload(room);
+}
+
+export async function createUserRoom(db, userId) {
+  const roomId = await ensureUserRoom(db, userId);
+  const room = await getRoomRowByHostUserId(db, userId);
+  if (!room?.id || room.id !== roomId) {
+    throw new Error("Failed to create user room");
+  }
   return buildRoomPayload(room);
 }
 

@@ -1,4 +1,22 @@
 const DEFAULT_RELAY_URL = "https://draft-14.cloudflare.mediaoverquic.com/";
+const RELAY_URL_STORAGE_KEY = "moq-live.relay-url";
+
+export function readStoredRelayUrl() {
+  try {
+    const storedRelayUrl = window.localStorage.getItem(RELAY_URL_STORAGE_KEY);
+    return storedRelayUrl === null ? DEFAULT_RELAY_URL : storedRelayUrl;
+  } catch {
+    return DEFAULT_RELAY_URL;
+  }
+}
+
+export function writeStoredRelayUrl(relayUrl) {
+  try {
+    window.localStorage.setItem(RELAY_URL_STORAGE_KEY, relayUrl);
+  } catch {
+    // Storage can be unavailable in private or restricted browsing contexts.
+  }
+}
 
 export function generateRoomId() {
   const bytes = new Uint8Array(6);
@@ -34,7 +52,7 @@ export function getInitialViewState() {
     page: page === "l" ? "live" : page === "s" ? "settings" : "watch",
     watchRoom,
     liveRoom,
-    relayUrl: DEFAULT_RELAY_URL,
+    relayUrl: readStoredRelayUrl(),
     autorun: page === "w" && Boolean(watchRoom),
   };
 }

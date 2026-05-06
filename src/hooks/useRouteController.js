@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { generateRoomId, getInitialViewState } from "../lib/routeState.js";
+import { generateRoomId, getInitialViewState, writeStoredRelayUrl } from "../lib/routeState.js";
 
 export function useRouteController() {
   const initial = useRef(getInitialViewState()).current;
@@ -36,6 +36,7 @@ export function useRouteController() {
   function setRelayUrlValue(nextRelayUrl) {
     relayUrlRef.current = nextRelayUrl;
     setRelayUrl(nextRelayUrl);
+    writeStoredRelayUrl(nextRelayUrl);
     return nextRelayUrl;
   }
 

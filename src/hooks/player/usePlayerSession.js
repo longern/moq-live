@@ -10,6 +10,43 @@ import {
 
 const PLAYER_TARGET_LATENCY_MS = 600;
 
+export function getAppleOsUpgradeMessage(navigatorLike = globalThis.navigator) {
+  if (!navigatorLike || typeof navigatorLike !== "object") {
+    return null;
+  }
+
+  const userAgent =
+    typeof navigatorLike.userAgent === "string" ? navigatorLike.userAgent : "";
+  const platform =
+    typeof navigatorLike.platform === "string" ? navigatorLike.platform : "";
+  const maxTouchPoints = Number(navigatorLike.maxTouchPoints ?? 0);
+
+  let osName = null;
+  if (/\biphone\b|\bipod\b/i.test(userAgent)) {
+    osName = "iOS";
+  } else if (/\bipad\b/i.test(userAgent)) {
+    osName = "iPadOS";
+  } else if (/\bvisionos\b|\bapple vision\b/i.test(userAgent)) {
+    osName = "visionOS";
+  } else if (/\bapple ?tv\b|\btvos\b/i.test(userAgent)) {
+    osName = "tvOS";
+  } else if (
+    /\bmacintosh\b|\bmac os x\b/i.test(userAgent) ||
+    /^mac/i.test(platform)
+  ) {
+    osName = "macOS";
+    if (osName === "macOS" && maxTouchPoints > 1) {
+      osName = "iPadOS";
+    }
+  } else if (/^ipad/i.test(platform)) {
+    osName = "iPadOS";
+  } else if (/^iphone|^ipod/i.test(platform)) {
+    osName = "iOS";
+  }
+
+  return osName ? `请升级到${osName} 26.4` : null;
+}
+
 function formatAudioRenderStats(stats, now) {
   if (!stats || typeof stats !== "object") {
     return "audioStats=none";
@@ -285,7 +322,10 @@ export function usePlayerSession({
     setLogText("");
 
     if (!globalThis.WebTransport) {
-      updatePlayerStatus("error", "浏览器版本过旧");
+      updatePlayerStatus(
+        "error",
+        getAppleOsUpgradeMessage() ?? "浏览器版本过旧",
+      );
       logRef.current?.("Browser does not support WebTransport");
       return;
     }

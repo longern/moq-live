@@ -1,0 +1,333 @@
+.account-panel-list {
+  --account-list-label-width: 72px;
+  --account-list-gap: 16px;
+  display: grid;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.account-list-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--account-list-label-width) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--account-list-gap);
+  padding: 16px 20px;
+}
+
+.account-panel-list > * + * {
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.account-list-label {
+  color: rgba(153, 174, 193, 0.86);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.account-list-value {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  color: var(--text);
+  text-align: right;
+}
+
+.account-list-value strong {
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.account-list-item-avatar {
+  align-items: center;
+}
+
+.account-list-item-button {
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.account-list-item-button:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.account-list-item-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.account-list-item-button[aria-disabled="true"] {
+  cursor: default;
+}
+
+.account-list-avatar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-content: flex-end;
+  column-gap: 12px;
+}
+
+.account-list-avatar .my-profile-avatar {
+  width: 48px;
+  height: 48px;
+}
+
+.account-list-avatar-editable {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.account-list-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: rgba(153, 174, 193, 0.86);
+}
+
+.account-list-chevron svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.account-avatar-input {
+  display: none;
+}
+
+.account-editable-row {
+  min-width: 0;
+  display: grid;
+  padding: 16px 20px;
+}
+
+.account-editable-row-main {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--account-list-label-width) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--account-list-gap);
+}
+
+.account-editable-value {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  color: var(--text);
+  text-align: right;
+}
+
+.account-editable-value strong {
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.account-editable-value-inline {
+  min-height: 32px;
+}
+
+.account-editable-value-editing {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.account-editable-value-editing input {
+  flex: 0 1 240px;
+  min-width: 0;
+  width: auto;
+}
+
+.account-editable-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 220ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 160ms ease;
+}
+
+.account-editable-collapse.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.account-editable-collapse-inner {
+  min-height: 0;
+  overflow: hidden;
+  margin-left: calc(var(--account-list-label-width) + var(--account-list-gap));
+}
+
+.account-editable-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.account-icon-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-icon-button {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.account-icon-button svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.account-icon-button:disabled {
+  opacity: 0.4;
+}
+
+.my-account-form {
+  display: grid;
+  gap: 18px;
+}
+
+.my-account-form-content {
+  display: grid;
+  gap: 18px;
+  padding: 0 20px;
+}
+
+.my-actions {
+  padding: 16px 18px 18px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.my-actions button {
+  flex: 1 1 180px;
+}
+
+.my-plain-login-button {
+  flex: 0 0 auto;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent-2);
+}
+
+.my-plain-login-button:disabled {
+  opacity: 0.64;
+}
+
+.my-history-row {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  box-shadow: none;
+}
+
+.my-history-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.my-history-copy strong {
+  display: block;
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-history-copy span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-history-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.my-row-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.my-empty-state {
+  min-height: 220px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  color: var(--muted);
+}
+
+.my-log-block {
+  display: grid;
+  gap: 10px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.my-log-block h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.my-log-block pre {
+  height: 260px;
+  margin: 0;
+}

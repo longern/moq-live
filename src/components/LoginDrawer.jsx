@@ -17,16 +17,24 @@ function MicrosoftIcon() {
   );
 }
 
-export function LoginDrawer({ authAvailable, authLoading, onClose, onMicrosoftLogin }) {
+export function LoginDrawer({
+  authAvailable,
+  authLoading,
+  onClose,
+  onMicrosoftLogin,
+  transitionClassName = ""
+}) {
+  const transitionSuffix = transitionClassName ? ` ${transitionClassName}` : "";
+
   return (
     <>
       <button
         type="button"
-        class="auth-panel-backdrop"
+        class={`auth-panel-backdrop${transitionSuffix}`}
         aria-label="关闭登录页面"
         onClick={onClose}
       />
-      <aside class="auth-panel auth-panel-login" aria-label="登录页面">
+      <aside class={`auth-panel auth-panel-login${transitionSuffix}`} aria-label="登录页面">
         <div class="login-panel-head">
           <button
             type="button"

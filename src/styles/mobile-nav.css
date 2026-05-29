@@ -1,0 +1,38 @@
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .mobile-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    padding: 0 0 env(safe-area-inset-bottom);
+    border-top: 1px solid var(--line);
+    background: rgba(7, 14, 22, 0.96);
+    backdrop-filter: blur(22px);
+  }
+
+  .mobile-nav .nav-button {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    padding: 6px 0;
+    color: #8ea4b8;
+    min-height: var(--mobile-nav-height);
+    border-radius: 0;
+    background: rgba(255, 255, 255, 0);
+  }
+
+  .mobile-nav .nav-button.is-active {
+    color: var(--primary-hover);
+    background: transparent;
+  }
+}

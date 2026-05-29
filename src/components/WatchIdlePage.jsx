@@ -31,18 +31,25 @@ function getRoomOpenTarget(room) {
   return room.host.handle || room.id;
 }
 
+function getRoomHref(room) {
+  const target = getRoomOpenTarget(room);
+  return target ? `?r=${encodeURIComponent(target)}` : "?";
+}
+
 function WatchRoomCard({ room, onOpenRoom }) {
   const [coverBroken, setCoverBroken] = useState(false);
   const roomTitle = getRoomTitle(room);
   const roomSubtitle = getRoomSubtitle(room);
   const hasCover = Boolean(room.coverUrl) && !coverBroken;
+  const openTarget = getRoomOpenTarget(room);
 
   return (
-    <button
-      type="button"
+    <a
+      href={getRoomHref(room)}
       class={`watch-room-row${hasCover ? "" : " is-no-cover"}`}
-      onClick={() => {
-        onOpenRoom?.(getRoomOpenTarget(room));
+      onClick={(event) => {
+        event.preventDefault();
+        onOpenRoom?.(openTarget);
       }}
     >
       <div class={`watch-room-cover${hasCover ? "" : " is-placeholder"}`}>
@@ -75,7 +82,7 @@ function WatchRoomCard({ room, onOpenRoom }) {
           <span>{roomSubtitle}</span>
         </div>
       </div>
-    </button>
+    </a>
   );
 }
 

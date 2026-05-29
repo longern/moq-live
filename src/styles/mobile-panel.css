@@ -1,0 +1,76 @@
+@media (max-width: 760px) {
+  .settings-panel-backdrop.mobile-panel-transition,
+  .auth-panel-backdrop.mobile-panel-transition {
+    animation: mobile-panel-backdrop-in 220ms ease both;
+    will-change: opacity;
+  }
+
+  .settings-panel-backdrop.mobile-panel-transition.is-closing,
+  .auth-panel-backdrop.mobile-panel-transition.is-closing {
+    animation: mobile-panel-backdrop-out 180ms ease both;
+  }
+
+  .settings-panel.mobile-panel-transition,
+  .auth-panel.mobile-panel-transition {
+    animation: mobile-panel-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: opacity, transform;
+  }
+
+  .settings-panel.mobile-panel-transition.is-closing,
+  .auth-panel.mobile-panel-transition.is-closing {
+    animation: mobile-panel-exit 220ms ease both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .settings-panel-backdrop.mobile-panel-transition,
+    .auth-panel-backdrop.mobile-panel-transition,
+    .settings-panel.mobile-panel-transition,
+    .auth-panel.mobile-panel-transition {
+      animation: none;
+    }
+  }
+}
+
+@keyframes mobile-panel-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mobile-panel-backdrop-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes mobile-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes mobile-panel-exit {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}

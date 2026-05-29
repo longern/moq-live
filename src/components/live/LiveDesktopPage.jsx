@@ -126,7 +126,7 @@ function LiveDesktopPanel(props) {
             </div>
           ) : null}
           <div class="action-row">
-            <button type="button" onClick={onStartScreenShare} disabled={!screenShareSupported || isPublishing}>
+            <button type="button" class="primary" onClick={onStartScreenShare} disabled={!screenShareSupported || isPublishing}>
               {screenShareActive ? "重新选择共享内容" : "开始屏幕共享"}
             </button>
             <button type="button" class="secondary" onClick={onStopScreenShare} disabled={!screenShareActive || isPublishing}>
@@ -161,7 +161,7 @@ function LiveDesktopPanel(props) {
             <input id="watchLinkInput" value={watchLink} readonly />
           </label>
           <div class="action-row">
-            <button type="button" id="copyRoomLink" onClick={onShare} disabled={!shareSupported || !watchLink}>
+            <button type="button" id="copyRoomLink" class="primary" onClick={onShare} disabled={!shareSupported || !watchLink}>
               分享直播间
             </button>
           </div>
@@ -188,7 +188,7 @@ function LiveDesktopPanel(props) {
           <div class="action-row">
             <button
               type="button"
-              class="tertiary"
+              class="success"
               id="startSynthetic"
               onClick={onStartSynthetic}
               disabled={publishBlocked || syntheticPublishing}

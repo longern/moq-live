@@ -73,7 +73,7 @@ function LiveActivationGate({
           </div>
           <div class="live-activation-actions">
             {primaryLabel ? (
-              <button type="button" onClick={onPrimary} disabled={busy}>
+              <button type="button" class="primary" onClick={onPrimary} disabled={busy}>
                 {busy ? "处理中" : primaryLabel}
               </button>
             ) : null}

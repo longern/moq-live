@@ -289,7 +289,7 @@ export function LiveMobilePage(props) {
                 />
                 <button
                   type="button"
-                  class={syntheticPublishing ? "secondary" : "tertiary"}
+                  class={syntheticPublishing ? "secondary" : "success"}
                   onClick={() => {
                     if (syntheticPublishing) {
                       onStopSynthetic();

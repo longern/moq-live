@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { lazy, Suspense } from "preact/compat";
 import { DesktopNavigation, MobileNavigation } from "./components/Navigation.jsx";
 import { LoginDrawer } from "./components/LoginDrawer.jsx";
+import { MobilePanelPresence } from "./components/MobilePanelPresence.jsx";
 import { UserAvatar } from "./components/UserAvatar.jsx";
 import { SettingsPage } from "./components/SettingsPage.jsx";
 import { WatchPage } from "./components/WatchPage.jsx";
@@ -739,14 +740,17 @@ export function App() {
     <>
       <div class={`app-container${mobileWatchJoinedClass}`}>
         <header class="topbar">
-          <button
-            type="button"
+          <a
+            href={window.location.pathname}
             class="brand brand-button"
-            onClick={returnToWatchHome}
+            onClick={(event) => {
+              event.preventDefault();
+              returnToWatchHome();
+            }}
             aria-label={`返回${siteTitle}收看页`}
           >
             <span class="brand-title">{siteTitle}</span>
-          </button>
+          </a>
 
           <div class="topbar-right">
             <DesktopNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
@@ -972,16 +976,19 @@ export function App() {
       {mobileWatchSessionActive ? null : (
         <MobileNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
       )}
-      {loginPromptOpen ? (
-        <LoginDrawer
-          authAvailable={authState.available}
-          authLoading={authState.loading}
-          onClose={() => {
-            setLoginPromptOpen(false);
-          }}
-          onMicrosoftLogin={startMicrosoftLogin}
-        />
-      ) : null}
+      <MobilePanelPresence open={loginPromptOpen}>
+        {({ transitionClassName }) => (
+          <LoginDrawer
+            authAvailable={authState.available}
+            authLoading={authState.loading}
+            onClose={() => {
+              setLoginPromptOpen(false);
+            }}
+            onMicrosoftLogin={startMicrosoftLogin}
+            transitionClassName={transitionClassName}
+          />
+        )}
+      </MobilePanelPresence>
     </>
   );
 }

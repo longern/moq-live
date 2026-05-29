@@ -1,0 +1,445 @@
+@media (max-width: 760px) {
+  .settings-layout {
+    padding: 0;
+  }
+
+  .my-page-shell {
+    width: 100%;
+    padding: 0 0 calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .my-page-main {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .my-account-card {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .my-page-toolbar {
+    display: flex;
+    padding: 0 12px;
+  }
+
+  .my-page-settings-button {
+    width: 34px;
+    min-width: 34px;
+    min-height: 34px;
+  }
+
+  .my-profile-row {
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .desktop-settings-sidebar,
+  .desktop-settings-content {
+    display: none;
+  }
+
+  .mobile-settings-profile {
+    display: block;
+  }
+
+  .mobile-settings-content.my-page-sections {
+    display: grid;
+  }
+
+  .my-profile-avatar {
+    width: 72px;
+    height: 72px;
+  }
+
+  .my-profile-copy strong {
+    font-size: 1.1rem;
+  }
+
+  .my-profile-copy span {
+    font-size: 0.86rem;
+  }
+
+  .my-page-sections,
+  .settings-panel-body {
+    gap: 12px;
+  }
+
+  .my-page-sections > .my-section:first-child {
+    margin-top: 10px;
+  }
+
+  .my-section {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .my-page-content .my-section {
+    min-height: 0;
+  }
+
+  .my-section-head {
+    padding: 8px 16px 8px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .my-section-title {
+    font-size: 0.9rem;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .my-section-link {
+    width: auto;
+    font-size: 0.86rem;
+  }
+
+  .my-info-row,
+  .my-field,
+  .my-history-row {
+    padding: 14px 16px;
+    background: rgba(8, 16, 25, 0.82);
+  }
+
+  .my-actions {
+    padding: 14px 16px 0;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .my-actions button {
+    width: 100%;
+  }
+
+  .my-plain-login-button {
+    width: auto;
+    justify-self: start;
+  }
+
+  .my-empty-state {
+    min-height: 0;
+    padding: 16px;
+    background: rgba(8, 16, 25, 0.82);
+  }
+
+  .my-log-block {
+    padding: 14px 16px 16px;
+    background: rgba(8, 16, 25, 0.82);
+  }
+
+  .my-log-block pre {
+    height: 220px;
+    border-radius: 14px;
+  }
+
+  .settings-panel {
+    inset: 0;
+    width: 100%;
+    max-height: none;
+    height: 100svh;
+    padding: 0 0 calc(16px + env(safe-area-inset-bottom));
+    border-left: 0;
+    border-top: 0;
+    border-radius: 0;
+  }
+
+  .settings-panel-head {
+    min-height: calc(60px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 10px 0;
+  }
+
+  .account-panel-head {
+    min-height: calc(60px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 8px 0;
+  }
+
+  .login-panel-head {
+    min-height: calc(60px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 8px 0;
+  }
+
+  .auth-panel-login {
+    inset: 0;
+    width: auto;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .account-panel-body {
+    padding: 0 0 calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .account-edit-panel-body {
+    padding: 10px 16px calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .account-edit-form {
+    gap: 12px;
+  }
+
+  .account-edit-field {
+    gap: 8px;
+    padding: 14px 0 4px;
+  }
+
+  .account-edit-field input {
+    min-height: 48px;
+    border-radius: 14px;
+  }
+
+  .account-edit-note {
+    padding: 0 2px;
+  }
+
+  .account-edit-actions {
+    margin-top: 8px;
+  }
+
+  .account-edit-actions button {
+    width: 100%;
+  }
+
+  .login-panel-body {
+    gap: 20px;
+    padding: 0 16px calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .my-account-form-content {
+    padding: 0 16px;
+  }
+
+  .login-panel-copy h2 {
+    font-size: 1.5rem;
+  }
+
+  .account-panel-list {
+    --account-list-label-width: 64px;
+    --account-list-gap: 12px;
+  }
+
+  .account-list-item {
+    grid-template-columns: var(--account-list-label-width) minmax(0, 1fr);
+    gap: var(--account-list-gap);
+  }
+
+  .account-list-item,
+  .account-editable-row {
+    padding: 14px 16px;
+  }
+
+  .account-list-avatar .my-profile-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .login-provider-button {
+    max-width: none;
+  }
+
+  .settings-shell {
+    grid-template-columns: 1fr;
+    gap: 0;
+    min-height: calc(
+      100svh - var(--mobile-nav-height) - env(safe-area-inset-bottom)
+    );
+  }
+
+  .settings-shell.is-detail-open .settings-overview {
+    display: none;
+  }
+
+  .settings-detail-panel {
+    display: none;
+    min-height: calc(
+      100svh - var(--mobile-nav-height) - env(safe-area-inset-bottom)
+    );
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .settings-shell.is-detail-open .settings-detail-panel {
+    display: grid;
+  }
+
+  .settings-back-button {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .settings-overview,
+  .settings-detail-panel {
+    gap: 10px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .settings-overview-head,
+  .settings-detail-head {
+    position: relative;
+    min-height: 58px;
+    align-items: center;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(8, 16, 25, 0.92);
+  }
+
+  .settings-overview-head {
+    justify-items: center;
+  }
+
+  .settings-detail-head {
+    justify-items: center;
+    grid-template-columns: 1fr;
+  }
+
+  .settings-overview-head p,
+  .settings-detail-head p {
+    display: none;
+  }
+
+  .settings-overview-head h2,
+  .settings-detail-head h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    line-height: 1.2;
+    font-weight: 650;
+  }
+
+  .settings-overview-groups,
+  .settings-stack {
+    gap: 10px;
+    padding: 0 0 calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .settings-profile-row {
+    margin: 0;
+    min-height: 72px;
+    padding: 14px 16px;
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 0;
+    background: rgba(8, 16, 25, 0.82);
+  }
+
+  .settings-profile-copy strong {
+    font-size: 1.02rem;
+    font-weight: 600;
+  }
+
+  .settings-row {
+    min-height: 72px;
+    padding: 0 16px;
+  }
+
+  .settings-row-main strong {
+    font-size: 1.02rem;
+    font-weight: 500;
+  }
+
+  .settings-row-trailing {
+    gap: 6px;
+  }
+
+  .settings-row-chevron {
+    font-size: 1.8rem;
+  }
+
+  .settings-back-button {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    min-width: 32px;
+    min-height: 32px;
+    justify-content: center;
+    color: var(--text);
+  }
+
+  .settings-stack {
+    gap: 0;
+  }
+
+  .settings-stack > label,
+  .settings-stack > .summary-item,
+  .settings-stack > article.stack,
+  .settings-stack > form.stack {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .settings-stack > form.stack,
+  .settings-stack > article.stack {
+    display: grid;
+    gap: 0;
+  }
+
+  .settings-stack > label,
+  .settings-stack > form.stack > label,
+  .settings-stack > .summary-item,
+  .settings-stack > form.stack > .summary-item {
+    padding: 14px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(8, 16, 25, 0.82);
+  }
+
+  .settings-stack > form.stack > .summary-item,
+  .settings-stack > form.stack > label + .summary-item {
+    border-top: 0;
+  }
+
+  .settings-stack > form.stack > .inline-warning,
+  .settings-stack > form.stack > .status,
+  .settings-stack > .inline-warning,
+  .settings-stack > .status {
+    margin: 10px 16px 0;
+  }
+
+  .settings-stack > .action-row,
+  .settings-stack > form.stack > .action-row {
+    margin: 14px 16px 0;
+  }
+
+  .settings-stack input {
+    margin-top: 8px;
+    border-radius: 12px;
+  }
+
+  .settings-stack .summary-item {
+    border-radius: 0;
+  }
+
+  .settings-stack .summary-item strong {
+    margin-bottom: 6px;
+  }
+
+  .settings-stack article.stack h3 {
+    padding: 14px 16px 6px;
+    color: rgba(153, 174, 193, 0.85);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .settings-stack article.stack pre {
+    margin: 0;
+    height: 260px;
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 0;
+  }
+}

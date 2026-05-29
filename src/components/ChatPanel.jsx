@@ -189,6 +189,7 @@ export function ChatPanel({
             />
             <button
               type="submit"
+              class="primary"
               disabled={composerState.buttonDisabled}
               data-disabled-reason={composerState.buttonDisabledReason}
             >

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { LoginDrawer } from "./LoginDrawer.jsx";
+import { MobilePanelPresence, useMobilePanelViewport } from "./MobilePanelPresence.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 
 function formatHistoryTime(value) {
@@ -167,17 +168,20 @@ function PanelShell({
   panelClassName,
   panelLabel,
   title,
+  transitionClassName = "",
   children
 }) {
+  const transitionSuffix = transitionClassName ? ` ${transitionClassName}` : "";
+
   return (
     <>
       <button
         type="button"
-        class={backdropClassName}
+        class={`${backdropClassName}${transitionSuffix}`}
         aria-label={backdropLabel}
         onClick={onClose}
       />
-      <aside class={panelClassName} aria-label={panelLabel}>
+      <aside class={`${panelClassName}${transitionSuffix}`} aria-label={panelLabel}>
         <div class={headClassName}>
           <button
             type="button"
@@ -261,29 +265,17 @@ function WatchHistorySection({ historyItems, onClearWatchHistory, onOpenWatchHis
   );
 }
 
-function SettingsDrawer({
+function AdvancedSettingsContent({
   authApiStatus,
   buildLabel,
   logRef,
   logText,
-  onClose,
   onRelayUrlInput,
   relayHost,
   relayUrl
 }) {
   return (
-    <PanelShell
-      backdropClassName="settings-panel-backdrop"
-      backdropLabel="关闭设置面板"
-      bodyClassName="settings-panel-body"
-      closeLabel="返回"
-      closeButtonClassName="settings-panel-close"
-      headClassName="settings-panel-head"
-      onClose={onClose}
-      panelClassName="settings-panel"
-      panelLabel="设置面板"
-      title="设置"
-    >
+    <>
       <SectionBlock title="连接">
         <label class="my-field">
           <span>Relay Endpoint</span>
@@ -309,6 +301,44 @@ function SettingsDrawer({
           <pre id="log" ref={logRef}>{logText}</pre>
         </article>
       </SectionBlock>
+    </>
+  );
+}
+
+function SettingsDrawer({
+  authApiStatus,
+  buildLabel,
+  logRef,
+  logText,
+  onClose,
+  onRelayUrlInput,
+  relayHost,
+  relayUrl,
+  transitionClassName
+}) {
+  return (
+    <PanelShell
+      backdropClassName="settings-panel-backdrop"
+      backdropLabel="关闭设置面板"
+      bodyClassName="settings-panel-body"
+      closeLabel="返回"
+      closeButtonClassName="settings-panel-close"
+      headClassName="settings-panel-head"
+      onClose={onClose}
+      panelClassName="settings-panel"
+      panelLabel="设置面板"
+      title="设置"
+      transitionClassName={transitionClassName}
+    >
+      <AdvancedSettingsContent
+        authApiStatus={authApiStatus}
+        buildLabel={buildLabel}
+        logRef={logRef}
+        logText={logText}
+        onRelayUrlInput={onRelayUrlInput}
+        relayHost={relayHost}
+        relayUrl={relayUrl}
+      />
     </PanelShell>
   );
 }
@@ -331,56 +361,221 @@ function AccountEditableField({
   value
 }) {
   return (
-    <div class={`account-list-item account-list-item-display${editing ? " is-editing" : ""}`}>
-      <span class="account-list-label">{label}</span>
+    <div class={`account-editable-row${editing ? " is-editing" : ""}`}>
+      <div class="account-editable-row-main">
+        <span class="account-list-label">{label}</span>
 
-      {editing ? (
-        <div class="account-list-value account-list-value-editing">
+        {editing ? (
+          <div class="account-editable-value account-editable-value-editing">
+            <input
+              value={inputValue}
+              maxLength={maxLength}
+              onInput={onInput}
+              placeholder={placeholder}
+            />
+            <div class="account-icon-actions">
+              <button
+                type="button"
+                class="account-icon-button"
+                aria-label={saveAriaLabel}
+                disabled={saveDisabled}
+                onClick={onSave}
+              >
+                <CheckIcon />
+              </button>
+              <button
+                type="button"
+                class="account-icon-button"
+                aria-label={cancelAriaLabel}
+                onClick={onCancelEditing}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div class="account-editable-value account-editable-value-inline">
+            <strong>{value}</strong>
+            <button
+              type="button"
+              class="account-icon-button"
+              aria-label={editAriaLabel}
+              onClick={onStartEditing}
+            >
+              <EditIcon />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div class={`account-editable-collapse${editing ? " is-open" : ""}`} aria-hidden={!editing}>
+        <div class="account-editable-collapse-inner">
+          <p class="account-editable-note">{note}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AccountEditDrawer({
+  closeLabel,
+  error,
+  inputValue,
+  label,
+  maxLength,
+  note,
+  onCancel,
+  onInput,
+  onSave,
+  placeholder,
+  saveDisabled,
+  saving,
+  status,
+  title,
+  transitionClassName
+}) {
+  return (
+    <PanelShell
+      backdropClassName="auth-panel-backdrop auth-panel-edit-backdrop"
+      backdropLabel={closeLabel}
+      bodyClassName="account-edit-panel-body"
+      closeLabel="返回"
+      closeButtonClassName="account-panel-close"
+      headClassName="account-panel-head"
+      onClose={onCancel}
+      panelClassName="auth-panel auth-panel-account auth-panel-edit"
+      panelLabel={title}
+      title={title}
+      transitionClassName={transitionClassName}
+    >
+      <form
+        class="account-edit-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!saveDisabled) {
+            onSave();
+          }
+        }}
+      >
+        <label class="account-edit-field">
+          <span>{label}</span>
           <input
             value={inputValue}
             maxLength={maxLength}
             onInput={onInput}
             placeholder={placeholder}
+            autoFocus
           />
-          <div class="account-icon-actions">
-            <button
-              type="button"
-              class="account-icon-button"
-              aria-label={saveAriaLabel}
-              disabled={saveDisabled}
-              onClick={onSave}
-            >
-              <CheckIcon />
-            </button>
-            <button
-              type="button"
-              class="account-icon-button"
-              aria-label={cancelAriaLabel}
-              onClick={onCancelEditing}
-            >
-              <CloseIcon />
-            </button>
-          </div>
-          <p class="account-list-note">{note}</p>
-        </div>
-      ) : (
-        <div class="account-list-value account-list-value-inline">
-          <strong>{value}</strong>
-          <button
-            type="button"
-            class="account-icon-button"
-            aria-label={editAriaLabel}
-            onClick={onStartEditing}
-          >
-            <EditIcon />
+        </label>
+        <p class="account-edit-note">{note}</p>
+        {error ? <p class="inline-warning">{error}</p> : null}
+        {status ? <p class="status">{status}</p> : null}
+        <div class="account-edit-actions">
+          <button type="submit" class="primary" disabled={saveDisabled}>
+            {saving ? "保存中" : "保存"}
           </button>
         </div>
-      )}
-    </div>
+      </form>
+    </PanelShell>
   );
 }
 
 function AccountDrawer({
+  authUser,
+  avatarError,
+  avatarInputRef,
+  avatarSaving,
+  avatarStatus,
+  cancelDisplayNameEditing,
+  cancelHandleEditing,
+  displayNameCooldownActive,
+  displayNameEditing,
+  displayNameError,
+  displayNameInput,
+  displayNameSaving,
+  displayNameStatus,
+  displayNameUnchanged,
+  handleCooldownActive,
+  handleEditing,
+  handleError,
+  handleInput,
+  handleIsDefault,
+  handleSaving,
+  handleStatus,
+  handleUnchanged,
+  onClose,
+  onLogout,
+  onOpenAvatarPicker,
+  onSelectAvatar,
+  setDisplayNameError,
+  setDisplayNameInput,
+  setDisplayNameStatus,
+  setHandleError,
+  setHandleInput,
+  setHandleStatus,
+  startDisplayNameEditing,
+  startHandleEditing,
+  submitDisplayName,
+  submitHandle,
+  transitionClassName
+}) {
+  return (
+    <PanelShell
+      backdropClassName="auth-panel-backdrop"
+      backdropLabel="关闭账号页面"
+      bodyClassName="account-panel-body"
+      closeLabel="返回"
+      closeButtonClassName="account-panel-close"
+      headClassName="account-panel-head"
+      onClose={onClose}
+      panelClassName="auth-panel auth-panel-account"
+      panelLabel="账号页面"
+      title="账号"
+      transitionClassName={transitionClassName}
+    >
+      <AccountDetailsContent
+        authUser={authUser}
+        avatarError={avatarError}
+        avatarInputRef={avatarInputRef}
+        avatarSaving={avatarSaving}
+        avatarStatus={avatarStatus}
+        cancelDisplayNameEditing={cancelDisplayNameEditing}
+        cancelHandleEditing={cancelHandleEditing}
+        displayNameCooldownActive={displayNameCooldownActive}
+        displayNameEditing={displayNameEditing}
+        displayNameError={displayNameError}
+        displayNameInput={displayNameInput}
+        displayNameSaving={displayNameSaving}
+        displayNameStatus={displayNameStatus}
+        displayNameUnchanged={displayNameUnchanged}
+        handleCooldownActive={handleCooldownActive}
+        handleEditing={handleEditing}
+        handleError={handleError}
+        handleInput={handleInput}
+        handleIsDefault={handleIsDefault}
+        handleSaving={handleSaving}
+        handleStatus={handleStatus}
+        handleUnchanged={handleUnchanged}
+        onClose={onClose}
+        onLogout={onLogout}
+        onOpenAvatarPicker={onOpenAvatarPicker}
+        onSelectAvatar={onSelectAvatar}
+        setDisplayNameError={setDisplayNameError}
+        setDisplayNameInput={setDisplayNameInput}
+        setDisplayNameStatus={setDisplayNameStatus}
+        setHandleError={setHandleError}
+        setHandleInput={setHandleInput}
+        setHandleStatus={setHandleStatus}
+        startDisplayNameEditing={startDisplayNameEditing}
+        startHandleEditing={startHandleEditing}
+        submitDisplayName={submitDisplayName}
+        submitHandle={submitHandle}
+      />
+    </PanelShell>
+  );
+}
+
+function AccountDetailsContent({
   authUser,
   avatarError,
   avatarInputRef,
@@ -439,141 +634,177 @@ function AccountDrawer({
   }
 
   return (
-    <PanelShell
-      backdropClassName="auth-panel-backdrop"
-      backdropLabel="关闭账号页面"
-      bodyClassName="account-panel-body"
-      closeLabel="返回"
-      closeButtonClassName="account-panel-close"
-      headClassName="account-panel-head"
-      onClose={onClose}
-      panelClassName="auth-panel auth-panel-account"
-      panelLabel="账号页面"
-      title="账号"
-    >
-      <div class="my-account-form">
-        <div class="account-panel-list">
-          <div
-            class="account-list-item account-list-item-avatar account-list-item-button"
-            role="button"
-            tabIndex={avatarSaving ? -1 : 0}
-            aria-disabled={avatarSaving}
-            aria-label="上传新头像"
-            onClick={() => {
-              if (!avatarSaving) {
-                onOpenAvatarPicker();
-              }
-            }}
-            onKeyDown={handleAvatarItemKeyDown}
-          >
-            <span class="account-list-label">头像</span>
-            <div class="account-list-value account-list-avatar">
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif"
-                class="account-avatar-input"
-                onChange={onSelectAvatar}
-              />
-              <div class="account-list-avatar-editable">
-                <ProfileAvatar authUser={authUser} />
-              </div>
-              <span class="account-list-chevron" aria-hidden="true">
-                <ChevronIcon />
-              </span>
+    <div class="my-account-form">
+      <div class="account-panel-list">
+        <div
+          class="account-list-item account-list-item-avatar account-list-item-button"
+          role="button"
+          tabIndex={avatarSaving ? -1 : 0}
+          aria-disabled={avatarSaving}
+          aria-label="上传新头像"
+          onClick={() => {
+            if (!avatarSaving) {
+              onOpenAvatarPicker();
+            }
+          }}
+          onKeyDown={handleAvatarItemKeyDown}
+        >
+          <span class="account-list-label">头像</span>
+          <div class="account-list-value account-list-avatar">
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              class="account-avatar-input"
+              onChange={onSelectAvatar}
+            />
+            <div class="account-list-avatar-editable">
+              <ProfileAvatar authUser={authUser} />
             </div>
-          </div>
-
-          <div class="account-list-item">
-            <span class="account-list-label">邮箱</span>
-            <span class="account-list-value">
-              <strong>{authUser.email || "未绑定"}</strong>
+            <span class="account-list-chevron" aria-hidden="true">
+              <ChevronIcon />
             </span>
           </div>
-
-          <AccountEditableField
-            cancelAriaLabel="取消编辑主播号"
-            editAriaLabel="编辑主播号"
-            editing={handleEditing}
-            inputValue={handleInput}
-            label="主播号"
-            maxLength={24}
-            note={(
-              <>
-                {handleNote}
-                <br />
-                仅支持小写字母、数字、下划线，长度 6-24，不能为纯数字，且不能以下划线开头或结尾。
-              </>
-            )}
-            onCancelEditing={cancelHandleEditing}
-            onInput={(event) => {
-              setHandleInput(event.currentTarget.value.toLowerCase());
-              setHandleError("");
-              setHandleStatus("");
-            }}
-            onSave={() => {
-              void submitHandle();
-            }}
-            onStartEditing={startHandleEditing}
-            placeholder="输入唯一主播号"
-            saveAriaLabel="保存主播号"
-            saveDisabled={handleSaving || !handleInput.trim() || handleUnchanged}
-            value={authUser.handle || "未设置"}
-          />
-
-          <AccountEditableField
-            cancelAriaLabel="取消编辑显示名"
-            editAriaLabel="编辑显示名"
-            editing={displayNameEditing}
-            inputValue={displayNameInput}
-            label="显示名"
-            maxLength={32}
-            note={displayNameNote}
-            onCancelEditing={cancelDisplayNameEditing}
-            onInput={(event) => {
-              setDisplayNameInput(event.currentTarget.value);
-              setDisplayNameError("");
-              setDisplayNameStatus("");
-            }}
-            onSave={() => {
-              void submitDisplayName();
-            }}
-            onStartEditing={startDisplayNameEditing}
-            placeholder="输入想显示的名称"
-            saveAriaLabel="保存显示名"
-            saveDisabled={
-              displayNameSaving
-              || displayNameCooldownActive
-              || !displayNameInput.trim()
-              || displayNameUnchanged
-            }
-            value={authUser.displayName || "未设置"}
-          />
         </div>
 
-        <div class="my-account-form-content">
-          {handleError ? <p class="inline-warning">{handleError}</p> : null}
-          {handleStatus ? <p class="status">{handleStatus}</p> : null}
-          {displayNameError ? <p class="inline-warning">{displayNameError}</p> : null}
-          {displayNameStatus ? <p class="status">{displayNameStatus}</p> : null}
-          {avatarError ? <p class="inline-warning">{avatarError}</p> : null}
-          {avatarStatus ? <p class="status">{avatarStatus}</p> : null}
+        <div class="account-list-item">
+          <span class="account-list-label">邮箱</span>
+          <span class="account-list-value">
+            <strong>{authUser.email || "未绑定"}</strong>
+          </span>
+        </div>
 
-          <div class="my-actions">
-            <button
-              type="button"
-              class="secondary"
-              onClick={() => {
-                onClose();
-                onLogout();
-              }}
-            >
-              退出登录
-            </button>
-          </div>
+        <AccountEditableField
+          cancelAriaLabel="取消编辑主播号"
+          editAriaLabel="编辑主播号"
+          editing={handleEditing}
+          inputValue={handleInput}
+          label="主播号"
+          maxLength={24}
+          note={(
+            <>
+              {handleNote}
+              <br />
+              仅支持小写字母、数字、下划线，长度 6-24，不能为纯数字，且不能以下划线开头或结尾。
+            </>
+          )}
+          onCancelEditing={cancelHandleEditing}
+          onInput={(event) => {
+            setHandleInput(event.currentTarget.value.toLowerCase());
+            setHandleError("");
+            setHandleStatus("");
+          }}
+          onSave={() => {
+            void submitHandle();
+          }}
+          onStartEditing={startHandleEditing}
+          placeholder="输入唯一主播号"
+          saveAriaLabel="保存主播号"
+          saveDisabled={handleSaving || !handleInput.trim() || handleUnchanged}
+          value={authUser.handle || "未设置"}
+        />
+
+        <AccountEditableField
+          cancelAriaLabel="取消编辑显示名"
+          editAriaLabel="编辑显示名"
+          editing={displayNameEditing}
+          inputValue={displayNameInput}
+          label="显示名"
+          maxLength={32}
+          note={displayNameNote}
+          onCancelEditing={cancelDisplayNameEditing}
+          onInput={(event) => {
+            setDisplayNameInput(event.currentTarget.value);
+            setDisplayNameError("");
+            setDisplayNameStatus("");
+          }}
+          onSave={() => {
+            void submitDisplayName();
+          }}
+          onStartEditing={startDisplayNameEditing}
+          placeholder="输入想显示的名称"
+          saveAriaLabel="保存显示名"
+          saveDisabled={
+            displayNameSaving
+            || displayNameCooldownActive
+            || !displayNameInput.trim()
+            || displayNameUnchanged
+          }
+          value={authUser.displayName || "未设置"}
+        />
+      </div>
+
+      <div class="my-account-form-content">
+        {handleError ? <p class="inline-warning">{handleError}</p> : null}
+        {handleStatus ? <p class="status">{handleStatus}</p> : null}
+        {displayNameError ? <p class="inline-warning">{displayNameError}</p> : null}
+        {displayNameStatus ? <p class="status">{displayNameStatus}</p> : null}
+        {avatarError ? <p class="inline-warning">{avatarError}</p> : null}
+        {avatarStatus ? <p class="status">{avatarStatus}</p> : null}
+
+        <div class="my-actions">
+          <button
+            type="button"
+            class="secondary"
+            onClick={() => {
+              onClose();
+              onLogout();
+            }}
+          >
+            退出登录
+          </button>
         </div>
       </div>
-    </PanelShell>
+    </div>
+  );
+}
+
+function DesktopSettingsSidebar({
+  activeSection,
+  onSelectSection
+}) {
+  const items = [
+    {
+      id: "account",
+      title: "账号信息"
+    },
+    {
+      id: "history",
+      title: "观看历史"
+    },
+    {
+      id: "advanced",
+      title: "高级设置"
+    }
+  ];
+
+  return (
+    <nav class="desktop-settings-sidebar" aria-label="个人中心">
+      <div class="desktop-settings-list">
+        {items.map((item) => {
+          const active = activeSection === item.id;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              class={`desktop-settings-list-item${active ? " is-active" : ""}`}
+              aria-current={active ? "page" : undefined}
+              onClick={() => {
+                onSelectSection(item.id);
+              }}
+            >
+              <span>
+                <strong>{item.title}</strong>
+              </span>
+              <span class="my-row-chevron" aria-hidden="true">
+                <ChevronIcon />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -611,11 +842,14 @@ export function SettingsPage({
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [loginPanelOpen, setLoginPanelOpen] = useState(false);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
+  const [mobileEditPanel, setMobileEditPanel] = useState(null);
+  const [desktopSection, setDesktopSection] = useState("account");
   const [avatarError, setAvatarError] = useState("");
   const [avatarStatus, setAvatarStatus] = useState("");
   const [avatarSaving, setAvatarSaving] = useState(false);
   const avatarInputRef = useRef(null);
   const authPending = authLoading;
+  const isMobilePanelViewport = useMobilePanelViewport();
 
   useEffect(() => {
     if (!authUser) {
@@ -629,6 +863,7 @@ export function SettingsPage({
       setDisplayNameStatus("");
       setDisplayNameSaving(false);
       setDisplayNameEditing(false);
+      setMobileEditPanel(null);
       setAvatarError("");
       setAvatarStatus("");
       setAvatarSaving(false);
@@ -697,6 +932,7 @@ export function SettingsPage({
       setDisplayNameInput(nextValue);
       setDisplayNameStatus("显示名已更新");
       setDisplayNameEditing(false);
+      setMobileEditPanel((current) => (current === "displayName" ? null : current));
     } catch (error) {
       setDisplayNameError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -719,6 +955,7 @@ export function SettingsPage({
       setHandleInput(nextValue);
       setHandleStatus("主播号已更新");
       setHandleEditing(false);
+      setMobileEditPanel((current) => (current === "handle" ? null : current));
     } catch (error) {
       setHandleError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -756,6 +993,9 @@ export function SettingsPage({
     setDisplayNameError("");
     setDisplayNameStatus("");
     setDisplayNameEditing(true);
+    if (isMobilePanelViewport) {
+      setMobileEditPanel("displayName");
+    }
   }
 
   function startHandleEditing() {
@@ -767,6 +1007,9 @@ export function SettingsPage({
     setHandleError("");
     setHandleStatus("");
     setHandleEditing(true);
+    if (isMobilePanelViewport) {
+      setMobileEditPanel("handle");
+    }
   }
 
   function cancelHandleEditing() {
@@ -775,6 +1018,7 @@ export function SettingsPage({
     setHandleStatus("");
     setHandleSaving(false);
     setHandleEditing(false);
+    setMobileEditPanel((current) => (current === "handle" ? null : current));
   }
 
   function cancelDisplayNameEditing() {
@@ -783,6 +1027,7 @@ export function SettingsPage({
     setDisplayNameStatus("");
     setDisplayNameSaving(false);
     setDisplayNameEditing(false);
+    setMobileEditPanel((current) => (current === "displayName" ? null : current));
   }
 
   function openAvatarPicker() {
@@ -816,7 +1061,7 @@ export function SettingsPage({
     <section class="page" data-page="settings" hidden={hidden}>
       <div class="page-grid settings-layout">
         <div class="my-page-shell">
-          <div class="my-page-toolbar">
+          <div class="my-page-toolbar my-page-toolbar-mobile">
             <div />
             <button
               type="button"
@@ -832,17 +1077,104 @@ export function SettingsPage({
 
           <div class="my-page-main">
             <aside class="my-page-aside">
-              <ProfileSummaryCard
-                authPending={authPending}
-                authUser={authUser}
-                profileName={profileName}
-                profileSubtitle={profileSubtitle}
-                onOpenProfilePanel={openProfilePanel}
+              <DesktopSettingsSidebar
+                activeSection={desktopSection}
+                onSelectSection={setDesktopSection}
               />
+              <div class="mobile-settings-profile">
+                <ProfileSummaryCard
+                  authPending={authPending}
+                  authUser={authUser}
+                  profileName={profileName}
+                  profileSubtitle={profileSubtitle}
+                  onOpenProfilePanel={openProfilePanel}
+                />
+              </div>
             </aside>
 
             <div class="my-page-content">
-              <div class="my-page-sections">
+              <div class="desktop-settings-content my-page-sections">
+                {desktopSection === "account" ? (
+                  <SectionBlock title="账号信息">
+                    {authUser ? (
+                      <AccountDetailsContent
+                        authUser={authUser}
+                        avatarError={avatarError}
+                        avatarInputRef={avatarInputRef}
+                        avatarSaving={avatarSaving}
+                        avatarStatus={avatarStatus}
+                        cancelDisplayNameEditing={cancelDisplayNameEditing}
+                        cancelHandleEditing={cancelHandleEditing}
+                        displayNameCooldownActive={displayNameCooldownActive}
+                        displayNameEditing={displayNameEditing}
+                        displayNameError={displayNameError}
+                        displayNameInput={displayNameInput}
+                        displayNameSaving={displayNameSaving}
+                        displayNameStatus={displayNameStatus}
+                        displayNameUnchanged={displayNameUnchanged}
+                        handleCooldownActive={handleCooldownActive}
+                        handleEditing={handleEditing}
+                        handleError={handleError}
+                        handleInput={handleInput}
+                        handleIsDefault={handleIsDefault}
+                        handleSaving={handleSaving}
+                        handleStatus={handleStatus}
+                        handleUnchanged={handleUnchanged}
+                        onClose={() => {}}
+                        onLogout={onLogout}
+                        onOpenAvatarPicker={openAvatarPicker}
+                        onSelectAvatar={(event) => {
+                          void submitAvatarFile(event);
+                        }}
+                        setDisplayNameError={setDisplayNameError}
+                        setDisplayNameInput={setDisplayNameInput}
+                        setDisplayNameStatus={setDisplayNameStatus}
+                        setHandleError={setHandleError}
+                        setHandleInput={setHandleInput}
+                        setHandleStatus={setHandleStatus}
+                        startDisplayNameEditing={startDisplayNameEditing}
+                        startHandleEditing={startHandleEditing}
+                        submitDisplayName={submitDisplayName}
+                        submitHandle={submitHandle}
+                      />
+                    ) : (
+                      <div class="my-empty-state my-login-empty">
+                        <span>{authPending ? "正在检查登录状态" : "登录后可以管理头像、主播号和显示名。"}</span>
+                        <button
+                          type="button"
+                          class="my-plain-login-button"
+                          onClick={openLoginPanel}
+                          disabled={authPending}
+                        >
+                          继续登录
+                        </button>
+                      </div>
+                    )}
+                  </SectionBlock>
+                ) : null}
+
+                {desktopSection === "history" ? (
+                  <WatchHistorySection
+                    historyItems={historyItems}
+                    onClearWatchHistory={onClearWatchHistory}
+                    onOpenWatchHistoryItem={onOpenWatchHistoryItem}
+                  />
+                ) : null}
+
+                {desktopSection === "advanced" ? (
+                  <AdvancedSettingsContent
+                    authApiStatus={authApiStatus}
+                    buildLabel={buildLabel}
+                    logRef={logRef}
+                    logText={logText}
+                    onRelayUrlInput={onRelayUrlInput}
+                    relayHost={relayHost}
+                    relayUrl={relayUrl}
+                  />
+                ) : null}
+              </div>
+
+              <div class="mobile-settings-content my-page-sections">
                 <WatchHistorySection
                   historyItems={historyItems}
                   onClearWatchHistory={onClearWatchHistory}
@@ -853,76 +1185,159 @@ export function SettingsPage({
           </div>
         </div>
 
-        {settingsPanelOpen ? (
-          <SettingsDrawer
-            authApiStatus={authApiStatus}
-            buildLabel={buildLabel}
-            logRef={logRef}
-            logText={logText}
-            onClose={() => {
-              setSettingsPanelOpen(false);
-            }}
-            onRelayUrlInput={onRelayUrlInput}
-            relayHost={relayHost}
-            relayUrl={relayUrl}
-          />
-        ) : null}
+        <MobilePanelPresence open={settingsPanelOpen}>
+          {({ transitionClassName }) => (
+            <SettingsDrawer
+              authApiStatus={authApiStatus}
+              buildLabel={buildLabel}
+              logRef={logRef}
+              logText={logText}
+              onClose={() => {
+                setSettingsPanelOpen(false);
+              }}
+              onRelayUrlInput={onRelayUrlInput}
+              relayHost={relayHost}
+              relayUrl={relayUrl}
+              transitionClassName={transitionClassName}
+            />
+          )}
+        </MobilePanelPresence>
 
-        {accountPanelOpen && authUser ? (
-          <AccountDrawer
-            authUser={authUser}
-            avatarError={avatarError}
-            avatarInputRef={avatarInputRef}
-            avatarSaving={avatarSaving}
-            avatarStatus={avatarStatus}
-            cancelDisplayNameEditing={cancelDisplayNameEditing}
-            cancelHandleEditing={cancelHandleEditing}
-            displayNameCooldownActive={displayNameCooldownActive}
-            displayNameEditing={displayNameEditing}
-            displayNameError={displayNameError}
-            displayNameInput={displayNameInput}
-            displayNameSaving={displayNameSaving}
-            displayNameStatus={displayNameStatus}
-            displayNameUnchanged={displayNameUnchanged}
-            handleCooldownActive={handleCooldownActive}
-            handleEditing={handleEditing}
-            handleError={handleError}
-            handleInput={handleInput}
-            handleIsDefault={handleIsDefault}
-            handleSaving={handleSaving}
-            handleStatus={handleStatus}
-            handleUnchanged={handleUnchanged}
-            onClose={() => {
-              setAccountPanelOpen(false);
-            }}
-            onLogout={onLogout}
-            onOpenAvatarPicker={openAvatarPicker}
-            onSelectAvatar={(event) => {
-              void submitAvatarFile(event);
-            }}
-            setDisplayNameError={setDisplayNameError}
-            setDisplayNameInput={setDisplayNameInput}
-            setDisplayNameStatus={setDisplayNameStatus}
-            setHandleError={setHandleError}
-            setHandleInput={setHandleInput}
-            setHandleStatus={setHandleStatus}
-            startDisplayNameEditing={startDisplayNameEditing}
-            startHandleEditing={startHandleEditing}
-            submitDisplayName={submitDisplayName}
-            submitHandle={submitHandle}
-          />
-        ) : null}
+        <MobilePanelPresence open={accountPanelOpen && Boolean(authUser)}>
+          {({ transitionClassName }) => (authUser ? (
+            <AccountDrawer
+              authUser={authUser}
+              avatarError={avatarError}
+              avatarInputRef={avatarInputRef}
+              avatarSaving={avatarSaving}
+              avatarStatus={avatarStatus}
+              cancelDisplayNameEditing={cancelDisplayNameEditing}
+              cancelHandleEditing={cancelHandleEditing}
+              displayNameCooldownActive={displayNameCooldownActive}
+              displayNameEditing={!isMobilePanelViewport && displayNameEditing}
+              displayNameError={displayNameError}
+              displayNameInput={displayNameInput}
+              displayNameSaving={displayNameSaving}
+              displayNameStatus={displayNameStatus}
+              displayNameUnchanged={displayNameUnchanged}
+              handleCooldownActive={handleCooldownActive}
+              handleEditing={!isMobilePanelViewport && handleEditing}
+              handleError={handleError}
+              handleInput={handleInput}
+              handleIsDefault={handleIsDefault}
+              handleSaving={handleSaving}
+              handleStatus={handleStatus}
+              handleUnchanged={handleUnchanged}
+              onClose={() => {
+                setAccountPanelOpen(false);
+                setMobileEditPanel(null);
+              }}
+              onLogout={onLogout}
+              onOpenAvatarPicker={openAvatarPicker}
+              onSelectAvatar={(event) => {
+                void submitAvatarFile(event);
+              }}
+              setDisplayNameError={setDisplayNameError}
+              setDisplayNameInput={setDisplayNameInput}
+              setDisplayNameStatus={setDisplayNameStatus}
+              setHandleError={setHandleError}
+              setHandleInput={setHandleInput}
+              setHandleStatus={setHandleStatus}
+              startDisplayNameEditing={startDisplayNameEditing}
+              startHandleEditing={startHandleEditing}
+              submitDisplayName={submitDisplayName}
+              submitHandle={submitHandle}
+              transitionClassName={transitionClassName}
+            />
+          ) : null)}
+        </MobilePanelPresence>
 
-        {loginPanelOpen ? (
-          <LoginDrawer
-            authAvailable={authAvailable}
-            authLoading={authLoading}
-            onClose={() => {
-              setLoginPanelOpen(false);
-            }}
-            onMicrosoftLogin={onMicrosoftLogin}
-          />
-        ) : null}
+        <MobilePanelPresence open={mobileEditPanel === "handle" && Boolean(authUser)}>
+          {({ transitionClassName }) => (authUser ? (
+            <AccountEditDrawer
+              closeLabel="关闭主播号编辑页面"
+              error={handleError}
+              inputValue={handleInput}
+              label="主播号"
+              maxLength={24}
+              note={(
+                <>
+                  {handleIsDefault
+                    ? "默认主播号可随时设置一次专属地址。"
+                    : handleCooldownActive
+                      ? `自定义后 30 天内只能修改一次，下次可修改时间：${new Date(authUser.nextHandleChangeAt).toLocaleString()}`
+                      : "自定义后 30 天内只能修改一次。"}
+                  <br />
+                  仅支持小写字母、数字、下划线，长度 6-24，不能为纯数字，且不能以下划线开头或结尾。
+                </>
+              )}
+              onCancel={cancelHandleEditing}
+              onInput={(event) => {
+                setHandleInput(event.currentTarget.value.toLowerCase());
+                setHandleError("");
+                setHandleStatus("");
+              }}
+              onSave={() => {
+                void submitHandle();
+              }}
+              placeholder="输入唯一主播号"
+              saveDisabled={handleSaving || !handleInput.trim() || handleUnchanged}
+              saving={handleSaving}
+              status={handleStatus}
+              title="编辑主播号"
+              transitionClassName={transitionClassName}
+            />
+          ) : null)}
+        </MobilePanelPresence>
+
+        <MobilePanelPresence open={mobileEditPanel === "displayName" && Boolean(authUser)}>
+          {({ transitionClassName }) => (authUser ? (
+            <AccountEditDrawer
+              closeLabel="关闭显示名编辑页面"
+              error={displayNameError}
+              inputValue={displayNameInput}
+              label="显示名"
+              maxLength={32}
+              note={displayNameCooldownActive
+                ? `显示名 7 天内只能修改一次，下次可修改时间：${new Date(authUser.nextDisplayNameChangeAt).toLocaleString()}`
+                : "显示名需要唯一，且 7 天内只能修改一次。"}
+              onCancel={cancelDisplayNameEditing}
+              onInput={(event) => {
+                setDisplayNameInput(event.currentTarget.value);
+                setDisplayNameError("");
+                setDisplayNameStatus("");
+              }}
+              onSave={() => {
+                void submitDisplayName();
+              }}
+              placeholder="输入想显示的名称"
+              saveDisabled={
+                displayNameSaving
+                || displayNameCooldownActive
+                || !displayNameInput.trim()
+                || displayNameUnchanged
+              }
+              saving={displayNameSaving}
+              status={displayNameStatus}
+              title="编辑显示名"
+              transitionClassName={transitionClassName}
+            />
+          ) : null)}
+        </MobilePanelPresence>
+
+        <MobilePanelPresence open={loginPanelOpen}>
+          {({ transitionClassName }) => (
+            <LoginDrawer
+              authAvailable={authAvailable}
+              authLoading={authLoading}
+              onClose={() => {
+                setLoginPanelOpen(false);
+              }}
+              onMicrosoftLogin={onMicrosoftLogin}
+              transitionClassName={transitionClassName}
+            />
+          )}
+        </MobilePanelPresence>
       </div>
     </section>
   );

@@ -147,7 +147,7 @@
 }
 
 .live-cover-preview:focus-visible {
-  outline: 2px solid rgba(255, 114, 64, 0.55);
+  outline: 2px solid var(--primary-ring);
   outline-offset: 2px;
 }
 
@@ -209,12 +209,22 @@
   color: var(--text);
   box-shadow: none;
   flex: 0 0 auto;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease,
+    transform 160ms ease;
 }
 
 .live-dock-button:hover,
-.live-dock-button:focus-visible,
 .live-dock-button.is-active {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.live-dock-button:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
 }
 
 .live-dock-button.is-muted {
@@ -222,9 +232,10 @@
 }
 
 .live-dock-button-primary {
-  background: linear-gradient(180deg, #ff8055, #f35f31);
+  background: linear-gradient(180deg, var(--primary), var(--primary-strong));
   color: white;
-  box-shadow: 0 14px 32px rgba(243, 95, 49, 0.28);
+  box-shadow: 0 14px 32px var(--primary-shadow);
+  filter: brightness(1);
 }
 
 .live-dock-button-primary.is-live {
@@ -233,15 +244,22 @@
 }
 
 .live-dock-button-primary:hover,
-.live-dock-button-primary:focus-visible,
 .live-dock-button-primary.is-active {
-  background: linear-gradient(180deg, #ff8f68, #f56d44);
+  filter: brightness(1.12) saturate(1.08);
+  transform: translateY(-1px);
+}
+
+.live-dock-button-primary:focus-visible {
+  filter: brightness(1.12) saturate(1.08);
+  transform: translateY(-1px);
 }
 
 .live-dock-button-primary.is-live:hover,
 .live-dock-button-primary.is-live:focus-visible,
 .live-dock-button-primary.is-live.is-active {
   background: linear-gradient(180deg, #ff6f85, #f14e67);
+  filter: none;
+  transform: none;
 }
 
 .live-dock-button svg {

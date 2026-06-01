@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "react";
 import { canAutoplayAudioWithoutGesture } from "./playerControllerUtils.js";
 
 export function usePlayerAutoplayPrompt({
@@ -78,7 +78,7 @@ export function usePlayerAutoplayPrompt({
 
       setShowTapToUnmute(true);
       await setPlayerMuteRef.current(true, { logFailure: false });
-      logRef.current?.("autoplay started muted until user interaction");
+      logRef.current?.("autoPlay started muted until user interaction");
     })();
 
     return () => {

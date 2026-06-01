@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useState } from "react";
 import { ChatPanel } from "../ChatPanel.jsx";
 import { StatusPill } from "../StatusPill.jsx";
 import {
@@ -25,7 +25,7 @@ function LiveDesktopPanel({ children }) {
     return null;
   }
 
-  return <section class="live-desktop-panel">{children}</section>;
+  return <section className="live-desktop-panel">{children}</section>;
 }
 
 function CameraPanel({
@@ -39,7 +39,7 @@ function CameraPanel({
 }) {
   return (
     <>
-      <div class="live-desktop-panel-head">
+      <div className="live-desktop-panel-head">
         <strong>摄像头</strong>
         <span>{getCameraStatusLabel(cameraMode)}</span>
       </div>
@@ -56,8 +56,8 @@ function CameraPanel({
           ))}
         </select>
       </label>
-      <div class="action-row">
-        <button type="button" class="secondary" onClick={onCycleCamera}>
+      <div className="action-row">
+        <button type="button" className="secondary" onClick={onCycleCamera}>
           {cameraMode === "off" ? "打开摄像头" : "切换前后摄"}
         </button>
       </div>
@@ -75,7 +75,7 @@ function MicrophonePanel({
 }) {
   return (
     <>
-      <div class="live-desktop-panel-head">
+      <div className="live-desktop-panel-head">
         <strong>麦克风</strong>
         <span>{microphoneEnabled ? "正在采集声音" : "当前已静音"}</span>
       </div>
@@ -87,8 +87,8 @@ function MicrophonePanel({
           ))}
         </select>
       </label>
-      <div class="action-row">
-        <button type="button" class="secondary" onClick={onToggleMicrophone}>
+      <div className="action-row">
+        <button type="button" className="secondary" onClick={onToggleMicrophone}>
           {microphoneEnabled ? "关闭麦克风" : "打开麦克风"}
         </button>
       </div>
@@ -106,20 +106,20 @@ function ShareLinkPanel({
 
   return (
     <>
-      <div class="live-desktop-panel-head">
+      <div className="live-desktop-panel-head">
         <strong>直播链接</strong>
         <span>{watchLink ? "可直接分享" : "等待生成"}</span>
       </div>
       <label>
         {sharingNamespace ? "直播 namespace" : "主播号"}
-        <input id="liveRoomId" value={shareTarget} readonly />
+        <input id="liveRoomId" value={shareTarget} readOnly />
       </label>
       <label>
         观看链接
-        <input id="watchLinkInput" value={watchLink} readonly />
+        <input id="watchLinkInput" value={watchLink} readOnly />
       </label>
-      <div class="action-row">
-        <button type="button" id="copyRoomLink" class="primary" onClick={onShare} disabled={!shareSupported || !watchLink}>
+      <div className="action-row">
+        <button type="button" id="copyRoomLink" className="primary" onClick={onShare} disabled={!shareSupported || !watchLink}>
           分享直播间
         </button>
       </div>
@@ -144,7 +144,7 @@ function MorePanel({
 }) {
   return (
     <>
-      <div class="live-desktop-panel-head">
+      <div className="live-desktop-panel-head">
         <strong>更多</strong>
         <span>{syntheticPublishing ? "当前合成源已启动" : publishStatus}</span>
       </div>
@@ -159,10 +159,10 @@ function MorePanel({
         onOpenPicker={onOpenCoverPicker}
         showNote={true}
       />
-      <div class="action-row">
+      <div className="action-row">
         <button
           type="button"
-          class="success"
+          className="success"
           id="startSynthetic"
           onClick={onStartSynthetic}
           disabled={publishBlocked || syntheticPublishing}
@@ -171,7 +171,7 @@ function MorePanel({
         </button>
         <button
           type="button"
-          class="secondary"
+          className="secondary"
           id="stopSynthetic"
           onClick={onStopSynthetic}
           disabled={!syntheticPublishing}
@@ -338,10 +338,10 @@ export function LiveDesktopPage(props) {
   ) : null;
 
   return (
-    <section class="page page-immersive" data-page="live" hidden={hidden}>
-      <div class="page-grid live-layout">
-        <section class="stage-column">
-          <div class="stage-frame live-stage-frame">
+    <section className="page page-immersive" data-page="live" hidden={hidden}>
+      <div className="page-grid live-layout">
+        <section className="stage-column">
+          <div className="stage-frame live-stage-frame">
             <LivePreviewStage
               previewVideoRef={previewVideoRef}
               previewActive={previewActive}
@@ -349,34 +349,34 @@ export function LiveDesktopPage(props) {
               mirrorPreview={mirrorPreview}
             />
           </div>
-          <div class="live-desktop-overlay">
+          <div className="live-desktop-overlay">
             {openPanel ? (
               <button
                 type="button"
-                class="live-desktop-backdrop"
+                className="live-desktop-backdrop"
                 aria-label="关闭浮动面板"
                 onClick={() => setOpenPanel("")}
               />
             ) : null}
-            <div class="live-desktop-meta">
-              <div class="live-desktop-room">
+            <div className="live-desktop-meta">
+              <div className="live-desktop-room">
                 <span>直播间</span>
                 <strong data-room-label>{roomLabel}</strong>
               </div>
               <StatusPill id="publishBadge" label={publishBadge.label} state={publishBadge.state} />
             </div>
 
-            <div class="live-desktop-dock">
+            <div className="live-desktop-dock">
               <LiveDesktopPanel>{activePanel}</LiveDesktopPanel>
 
               {publishBlocked ? (
-                <p class="inline-warning live-desktop-warning">{publishBlockedReason}</p>
+                <p className="inline-warning live-desktop-warning">{publishBlockedReason}</p>
               ) : null}
 
-              <div class="live-desktop-actions" role="toolbar" aria-label="开播控制">
+              <div className="live-desktop-actions" role="toolbar" aria-label="开播控制">
                 <button
                   type="button"
-                  class={`live-dock-button${openPanel === "camera" ? " is-active" : ""}${cameraMode === "off" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable has-tooltip" : ""}`}
+                  className={`live-dock-button${openPanel === "camera" ? " is-active" : ""}${cameraMode === "off" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable has-tooltip" : ""}`}
                   onClick={() => {
                     if (cameraUnavailable) {
                       setOpenPanel((current) => (current === "camera" ? "" : current));
@@ -392,14 +392,14 @@ export function LiveDesktopPage(props) {
                 >
                   <CameraIcon mode={cameraMode} />
                   {cameraUnavailable ? (
-                    <span id="cameraUnavailableTooltip" class="live-dock-tooltip" role="tooltip">
+                    <span id="cameraUnavailableTooltip" className="live-dock-tooltip" role="tooltip">
                       未检测到可用摄像头
                     </span>
                   ) : null}
                 </button>
                 <button
                   type="button"
-                  class={`live-dock-button${openPanel === "microphone" ? " is-active" : ""}${microphoneEnabled ? "" : " is-muted"}`}
+                  className={`live-dock-button${openPanel === "microphone" ? " is-active" : ""}${microphoneEnabled ? "" : " is-muted"}`}
                   onClick={() => setOpenPanel((current) => (current === "microphone" ? "" : "microphone"))}
                   aria-label="麦克风设置"
                   aria-expanded={openPanel === "microphone"}
@@ -409,7 +409,7 @@ export function LiveDesktopPage(props) {
                 </button>
                 <button
                   type="button"
-                  class={`live-dock-button${screenShareActive ? " is-active" : ""}${screenShareUnavailable ? " is-unavailable has-tooltip" : ""}`}
+                  className={`live-dock-button${screenShareActive ? " is-active" : ""}${screenShareUnavailable ? " is-unavailable has-tooltip" : ""}`}
                   onClick={handleScreenShareClick}
                   aria-label={screenShareButtonLabel}
                   aria-describedby={screenShareUnavailable ? "screenShareUnavailableTooltip" : undefined}
@@ -418,14 +418,14 @@ export function LiveDesktopPage(props) {
                 >
                   <ScreenShareIcon />
                   {screenShareUnavailable ? (
-                    <span id="screenShareUnavailableTooltip" class="live-dock-tooltip" role="tooltip">
+                    <span id="screenShareUnavailableTooltip" className="live-dock-tooltip" role="tooltip">
                       {screenShareUnavailableReason}
                     </span>
                   ) : null}
                 </button>
                 <button
                   type="button"
-                  class={`live-dock-button live-dock-button-primary${isPublishing ? " is-live" : ""}`}
+                  className={`live-dock-button live-dock-button-primary${isPublishing ? " is-live" : ""}`}
                   onClick={onTogglePublish}
                   aria-label={isPublishing ? "停止开播" : "开始开播"}
                   title={isPublishing ? "停止开播" : "开始开播"}
@@ -435,7 +435,7 @@ export function LiveDesktopPage(props) {
                 </button>
                 <button
                   type="button"
-                  class={`live-dock-button${openPanel === "link" ? " is-active" : ""}`}
+                  className={`live-dock-button${openPanel === "link" ? " is-active" : ""}`}
                   onClick={() => setOpenPanel((current) => (current === "link" ? "" : "link"))}
                   aria-label="链接与分享"
                   aria-expanded={openPanel === "link"}
@@ -445,7 +445,7 @@ export function LiveDesktopPage(props) {
                 </button>
                 <button
                   type="button"
-                  class={`live-dock-button${openPanel === "more" ? " is-active" : ""}`}
+                  className={`live-dock-button${openPanel === "more" ? " is-active" : ""}`}
                   onClick={() => setOpenPanel((current) => (current === "more" ? "" : "more"))}
                   aria-label="更多"
                   aria-expanded={openPanel === "more"}
@@ -455,7 +455,7 @@ export function LiveDesktopPage(props) {
                 </button>
                 <button
                   type="button"
-                  class="live-dock-button"
+                  className="live-dock-button"
                   onClick={onShare}
                   aria-label="分享直播间"
                   title="分享直播间"
@@ -468,7 +468,7 @@ export function LiveDesktopPage(props) {
           </div>
         </section>
 
-        <aside class="control-column live-chat-column">
+        <aside className="control-column live-chat-column">
           <ChatPanel
             authAvailable={authAvailable}
             authLoading={authLoading}

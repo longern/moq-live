@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import preact from "@preact/preset-vite";
+import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
@@ -266,7 +266,7 @@ export default defineConfig(({ mode }) => {
       injectSiteTitle(siteTitle),
       createWebManifestPlugin(env, siteTitle),
       patchMoqNetPublishDoneDetails(),
-      preact(),
+      react(),
     ],
     optimizeDeps: {
       exclude: ["@moq/net", "@moq/publish", "@moq/watch"],

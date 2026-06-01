@@ -1,14 +1,11 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useState } from "react";
+import { ArrowRight, Image } from "lucide-react";
 import { UserAvatar } from "./UserAvatar.jsx";
 
 function RoomCoverPlaceholder() {
   return (
-    <div class="watch-room-cover-placeholder" aria-hidden="true">
-      <svg viewBox="0 0 24 24">
-        <rect x="4" y="6" width="16" height="12" rx="2.5" />
-        <path d="m8 15 2.8-3.2a1 1 0 0 1 1.54.06L14 14l1.2-1.4a1 1 0 0 1 1.52-.04L19 15" />
-        <circle cx="9" cy="10" r="1.3" />
-      </svg>
+    <div className="watch-room-cover-placeholder" aria-hidden="true">
+      <Image />
       <span>暂无封面</span>
     </div>
   );
@@ -46,13 +43,13 @@ function WatchRoomCard({ room, onOpenRoom }) {
   return (
     <a
       href={getRoomHref(room)}
-      class={`watch-room-row${hasCover ? "" : " is-no-cover"}`}
+      className={`watch-room-row${hasCover ? "" : " is-no-cover"}`}
       onClick={(event) => {
         event.preventDefault();
         onOpenRoom?.(openTarget);
       }}
     >
-      <div class={`watch-room-cover${hasCover ? "" : " is-placeholder"}`}>
+      <div className={`watch-room-cover${hasCover ? "" : " is-placeholder"}`}>
         {hasCover ? (
           <img
             src={room.coverUrl}
@@ -65,11 +62,11 @@ function WatchRoomCard({ room, onOpenRoom }) {
           <RoomCoverPlaceholder />
         )}
       </div>
-      <div class="watch-room-row-body">
-        <div class="watch-room-row-main">
+      <div className="watch-room-row-body">
+        <div className="watch-room-row-main">
           <strong>{roomTitle}</strong>
         </div>
-        <div class="watch-room-row-host">
+        <div className="watch-room-row-host">
           <UserAvatar
             avatarUrl={room.host.avatarUrl}
             displayName={room.host.displayName}
@@ -87,12 +84,7 @@ function WatchRoomCard({ room, onOpenRoom }) {
 }
 
 function JoinIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M5 12h12" />
-      <path d="m13 7 5 5-5 5" />
-    </svg>
-  );
+  return <ArrowRight aria-hidden="true" />;
 }
 
 export function WatchIdlePage({
@@ -152,11 +144,11 @@ export function WatchIdlePage({
   }, []);
 
   return (
-    <section class="page page-immersive watch-idle-page" data-page="watch" data-joined="false" hidden={hidden}>
-      <div class="watch-idle-shell">
-        <div class="watch-idle-panel">
+    <section className="page page-immersive watch-idle-page" data-page="watch" data-joined="false" hidden={hidden}>
+      <div className="watch-idle-shell">
+        <div className="watch-idle-panel">
           <form
-            class="watch-idle-form"
+            className="watch-idle-form"
             onSubmit={(event) => {
               event.preventDefault();
               onStart();
@@ -176,19 +168,19 @@ export function WatchIdlePage({
               <JoinIcon />
             </button>
           </form>
-          <section class={`watch-room-section${roomsState.items.length ? "" : " is-empty"}`}>
+          <section className={`watch-room-section${roomsState.items.length ? "" : " is-empty"}`}>
             {roomsState.loading ? (
-              <div class="watch-room-state">正在加载直播间…</div>
+              <div className="watch-room-state">正在加载直播间…</div>
             ) : roomsState.error ? (
-              <div class="watch-room-state is-error">直播间列表加载失败：{roomsState.error}</div>
+              <div className="watch-room-state is-error">直播间列表加载失败：{roomsState.error}</div>
             ) : roomsState.items.length ? (
-              <div class="watch-room-grid">
+              <div className="watch-room-grid">
                 {roomsState.items.map((item) => (
                   <WatchRoomCard key={item.id} room={item} onOpenRoom={onOpenRoom} />
                 ))}
               </div>
             ) : (
-              <div class="watch-room-state">暂时还没有直播间</div>
+              <div className="watch-room-state">暂时还没有直播间</div>
             )}
           </section>
         </div>

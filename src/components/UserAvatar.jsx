@@ -1,3 +1,5 @@
+import { CircleUserRound } from "lucide-react";
+
 function getAvatarText(displayName, email, initialsLength) {
   const source = String(displayName || email || "").trim();
   if (!source) {
@@ -32,18 +34,15 @@ export function UserAvatar({
   const nextClassName = [className, modeClassName].filter(Boolean).join(" ");
 
   return (
-    <span class={nextClassName} aria-hidden="true">
+    <span className={nextClassName} aria-hidden="true">
       {loading ? (
-        <span class={loadingClassName} />
+        <span className={loadingClassName} />
       ) : avatarUrl ? (
         <img src={avatarUrl} alt={imgAlt} width={imgWidth} height={imgHeight} />
       ) : initials ? (
         <span>{initials}</span>
       ) : (
-        <svg viewBox="0 0 24 24" class={iconClassName}>
-          <circle cx="12" cy="8" r="3.25" />
-          <path d="M5.5 19.5c1.8-3.2 4.1-4.8 6.5-4.8s4.7 1.6 6.5 4.8" />
-        </svg>
+        <CircleUserRound className={iconClassName} />
       )}
     </span>
   );

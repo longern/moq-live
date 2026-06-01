@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "react";
 import { getChatErrorMessage } from "../lib/chatErrors.js";
 
 const RECONNECT_DELAYS_MS = [

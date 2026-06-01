@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef } from "react";
 import { UserAvatar } from "./UserAvatar.jsx";
 
 function getConnectionLabel(state) {
@@ -97,20 +97,20 @@ export function ChatPanel({
     : "欢迎来到直播间";
 
   return (
-    <section class={panelClassName}>
+    <section className={panelClassName}>
       {!floating ? (
-        <div class="control-head chat-panel-head">
-          <div class="chat-panel-title-row">
+        <div className="control-head chat-panel-head">
+          <div className="chat-panel-title-row">
             <h3>{title}</h3>
-            <span class="chat-panel-online-count">{onlineCount} 在线</span>
+            <span className="chat-panel-online-count">{onlineCount} 在线</span>
           </div>
-          <span class={`chat-connection-state is-${connectionState}`}>{getConnectionLabel(connectionState)}</span>
+          <span className={`chat-connection-state is-${connectionState}`}>{getConnectionLabel(connectionState)}</span>
         </div>
       ) : null}
 
-      <div ref={listRef} class="chat-message-list" aria-live="polite">
+      <div ref={listRef} className="chat-message-list" aria-live="polite">
         {messages.length ? messages.map((message) => (
-          <article key={message.id} class="chat-message-card">
+          <article key={message.id} className="chat-message-card">
             <UserAvatar
               avatarUrl={message.user?.avatarUrl}
               displayName={message.user?.displayName}
@@ -120,7 +120,7 @@ export function ChatPanel({
               initialsLength={2}
               placeholderClassName="is-placeholder"
             />
-            <div class="chat-message-body">
+            <div className="chat-message-body">
               <p>
                 <strong>{message.user?.displayName || message.user?.email || "匿名用户"}</strong>
                 <span>{message.text}</span>
@@ -130,8 +130,8 @@ export function ChatPanel({
         )) : null}
 
         {showWelcomeMessage ? (
-          <article class="chat-message-card chat-message-card-system chat-message-card-system-no-avatar">
-            <div class="chat-message-body chat-message-body-system">
+          <article className="chat-message-card chat-message-card-system chat-message-card-system-no-avatar">
+            <div className="chat-message-body chat-message-body-system">
               <p>
                 <strong>系统</strong>
                 <span>{welcomeText}</span>
@@ -141,11 +141,11 @@ export function ChatPanel({
         ) : null}
       </div>
 
-      {chatError ? <p class={`inline-warning${floating ? " chat-floating-warning" : ""}`}>{chatError}</p> : null}
+      {chatError ? <p className={`inline-warning${floating ? " chat-floating-warning" : ""}`}>{chatError}</p> : null}
 
       {showComposer ? (
         composerState.mode === "guest" ? (
-          <div class={`chat-composer chat-composer-readonly${floating ? " chat-composer-floating" : ""}`}>
+          <div className={`chat-composer chat-composer-readOnly${floating ? " chat-composer-floating" : ""}`}>
             <input
               value=""
               readOnly
@@ -164,7 +164,7 @@ export function ChatPanel({
             />
             <button
               type="button"
-              class="secondary"
+              className="secondary"
               onClick={onRequireLogin}
               disabled={composerState.buttonDisabled}
               data-disabled-reason={composerState.buttonDisabledReason}
@@ -174,7 +174,7 @@ export function ChatPanel({
           </div>
         ) : (
           <form
-            class={`chat-composer${floating ? " chat-composer-floating" : ""}`}
+            className={`chat-composer${floating ? " chat-composer-floating" : ""}`}
             onSubmit={(event) => {
               event.preventDefault();
               onSend();
@@ -189,7 +189,7 @@ export function ChatPanel({
             />
             <button
               type="submit"
-              class="primary"
+              className="primary"
               disabled={composerState.buttonDisabled}
               data-disabled-reason={composerState.buttonDisabledReason}
             >

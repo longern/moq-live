@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useState } from "react";
 
 const MOBILE_PANEL_QUERY = "(max-width: 760px)";
 const MOBILE_PANEL_EXIT_MS = 280;

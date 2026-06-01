@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "react";
 import { generateRoomId, getInitialViewState, writeStoredRelayUrl } from "../lib/routeState.js";
 
 export function useRouteController() {

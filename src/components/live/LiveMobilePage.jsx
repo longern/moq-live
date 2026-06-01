@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "../ChatPanel.jsx";
 import { StatusPill } from "../StatusPill.jsx";
 import {
@@ -189,20 +189,20 @@ export function LiveMobilePage(props) {
   }
 
   return (
-    <section class="page page-immersive live-mobile-page" data-page="live" data-shell={shellMode} hidden={hidden}>
-      <div class="live-mobile-shell">
-        <div class="live-mobile-head">
-          <strong class="live-mobile-room">{roomLabel}</strong>
+    <section className="page page-immersive live-mobile-page" data-page="live" data-shell={shellMode} hidden={hidden}>
+      <div className="live-mobile-shell">
+        <div className="live-mobile-head">
+          <strong className="live-mobile-room">{roomLabel}</strong>
           <StatusPill id="publishBadgeOverlay" label={publishBadge.label} state={publishBadge.state} />
         </div>
-        <div class="stage-frame live-stage-frame live-stage-frame-mobile">
+        <div className="stage-frame live-stage-frame live-stage-frame-mobile">
           <LivePreviewStage
             previewVideoRef={previewVideoRef}
             previewActive={previewActive}
             previewHasVideo={previewHasVideo}
             mirrorPreview={mirrorPreview}
           />
-          <div class="live-mobile-chat-overlay">
+          <div className="live-mobile-chat-overlay">
             <ChatPanel
               authAvailable={authAvailable}
               authLoading={authLoading}
@@ -224,15 +224,15 @@ export function LiveMobilePage(props) {
             />
           </div>
           {publishBlocked ? (
-            <div class="live-mobile-warning">{publishBlockedReason}</div>
+            <div className="live-mobile-warning">{publishBlockedReason}</div>
           ) : null}
           {cameraNoticeVisible ? (
-            <div class="live-mobile-toast" role="status">未检测到可用摄像头</div>
+            <div className="live-mobile-toast" role="status">未检测到可用摄像头</div>
           ) : null}
-          <div class="live-mobile-actions">
+          <div className="live-mobile-actions">
             <button
               type="button"
-              class={`live-fab${cameraMode === "off" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable" : ""}`}
+              className={`live-fab${cameraMode === "off" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable" : ""}`}
               onClick={handleCameraAction}
               aria-label={cameraUnavailable ? "未检测到可用摄像头" : `切换摄像头，当前${cameraMode === "rear" ? "后摄" : cameraMode === "front" ? "前摄" : "关闭"}`}
               aria-disabled={cameraUnavailable ? "true" : undefined}
@@ -241,7 +241,7 @@ export function LiveMobilePage(props) {
             </button>
             <button
               type="button"
-              class={`live-fab${microphoneEnabled ? "" : " is-muted"}`}
+              className={`live-fab${microphoneEnabled ? "" : " is-muted"}`}
               onClick={onToggleMicrophone}
               aria-label={microphoneEnabled ? "关闭麦克风" : "打开麦克风"}
             >
@@ -249,7 +249,7 @@ export function LiveMobilePage(props) {
             </button>
             <button
               type="button"
-              class={`live-fab live-fab-primary${isPublishing ? " is-active" : ""}`}
+              className={`live-fab live-fab-primary${isPublishing ? " is-active" : ""}`}
               onClick={onTogglePublish}
               disabled={publishBlocked || (!props.cameraEnabled && !microphoneEnabled)}
               aria-label={isPublishing ? "停止开播" : "开始开播"}
@@ -258,7 +258,7 @@ export function LiveMobilePage(props) {
             </button>
             <button
               type="button"
-              class="live-fab"
+              className="live-fab"
               onClick={onShare}
               aria-label="分享直播间"
               disabled={!shareSupported || !watchLink}
@@ -267,7 +267,7 @@ export function LiveMobilePage(props) {
             </button>
             <button
               type="button"
-              class={`live-fab${moreOpen ? " is-active" : ""}`}
+              className={`live-fab${moreOpen ? " is-active" : ""}`}
               onClick={() => {
                 if (moreMounted) {
                   closeMoreSheet();
@@ -288,7 +288,7 @@ export function LiveMobilePage(props) {
           <>
             <button
               type="button"
-              class={`live-mobile-drawer-backdrop${moreVisible ? " is-open" : ""}`}
+              className={`live-mobile-drawer-backdrop${moreVisible ? " is-open" : ""}`}
               aria-label="关闭更多操作"
               onClick={() => {
                 setMoreOpen(false);
@@ -296,19 +296,19 @@ export function LiveMobilePage(props) {
               }}
             />
             <div
-              class={`live-mobile-drawer${moreVisible ? " is-open" : ""}`}
-              style={dragOffset ? `transform: translateY(${dragOffset}px);` : undefined}
+              className={`live-mobile-drawer${moreVisible ? " is-open" : ""}`}
+              style={dragOffset ? { transform: `translateY(${dragOffset}px)` } : undefined}
             >
               <div
-                class="live-mobile-drawer-handle"
+                className="live-mobile-drawer-handle"
                 onTouchStart={handleDrawerTouchStart}
                 onTouchMove={handleDrawerTouchMove}
                 onTouchEnd={handleDrawerTouchEnd}
                 onTouchCancel={handleDrawerTouchEnd}
               >
-                <span class="live-mobile-drawer-indicator" />
+                <span className="live-mobile-drawer-indicator" />
               </div>
-              <div class="live-mobile-more-panel">
+              <div className="live-mobile-more-panel">
                 <LiveCoverManager
                   roomCoverUrl={roomCoverUrl}
                   roomCoverLoading={roomCoverLoading}
@@ -321,7 +321,7 @@ export function LiveMobilePage(props) {
                 />
                 <button
                   type="button"
-                  class={syntheticPublishing ? "secondary" : "success"}
+                  className={syntheticPublishing ? "secondary" : "success"}
                   onClick={() => {
                     if (syntheticPublishing) {
                       onStopSynthetic();
@@ -337,7 +337,7 @@ export function LiveMobilePage(props) {
                 </button>
                 <button
                   type="button"
-                  class="secondary"
+                  className="secondary"
                   onClick={() => {
                     onShare();
                     setMoreOpen(false);

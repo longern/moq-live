@@ -10,7 +10,7 @@ import {
   SwitchCamera,
   Video,
   VideoOff,
-} from "lucide-preact";
+} from "lucide-react";
 
 const iconProps = {
   "aria-hidden": "true",

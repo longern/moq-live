@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "react";
 import * as MoqPublish from "@moq/publish";
 import {
   createMediaSessionManager,

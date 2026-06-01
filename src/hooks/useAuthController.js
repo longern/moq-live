@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "react";
 
 export function useAuthController({ log, onAuthenticated }) {
   const [authState, setAuthState] = useState({

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "react";
 import { LivePage } from "./LivePage.jsx";
 import { useChatController } from "../hooks/useChatController.js";
 import { usePublisherController } from "../hooks/usePublisherController.js";
@@ -62,23 +62,23 @@ function LiveActivationGate({
   onSecondary,
 }) {
   return (
-    <section class="page page-immersive live-activation-page" data-page="live" hidden={hidden}>
-      <div class="live-activation-shell">
-        <div class="live-activation-panel">
-          <div class="live-activation-copy">
+    <section className="page page-immersive live-activation-page" data-page="live" hidden={hidden}>
+      <div className="live-activation-shell">
+        <div className="live-activation-panel">
+          <div className="live-activation-copy">
             <span>直播功能</span>
             <h2>{title}</h2>
             <p>{message}</p>
-            {error ? <p class="live-activation-error">{error}</p> : null}
+            {error ? <p className="live-activation-error">{error}</p> : null}
           </div>
-          <div class="live-activation-actions">
+          <div className="live-activation-actions">
             {primaryLabel ? (
-              <button type="button" class="primary" onClick={onPrimary} disabled={busy}>
+              <button type="button" className="primary" onClick={onPrimary} disabled={busy}>
                 {busy ? "处理中" : primaryLabel}
               </button>
             ) : null}
             {secondaryLabel ? (
-              <button type="button" class="live-activation-secondary" onClick={onSecondary} disabled={busy}>
+              <button type="button" className="live-activation-secondary" onClick={onSecondary} disabled={busy}>
                 {secondaryLabel}
               </button>
             ) : null}
@@ -91,9 +91,9 @@ function LiveActivationGate({
 
 function LiveActivationBlank({ hidden }) {
   return (
-    <section class="page page-immersive live-activation-page" data-page="live" hidden={hidden} aria-busy="true">
-      <div class="live-activation-shell">
-        <span class="live-circular-progress" role="progressbar" aria-label="正在检查直播功能" />
+    <section className="page page-immersive live-activation-page" data-page="live" hidden={hidden} aria-busy="true">
+      <div className="live-activation-shell">
+        <span className="live-circular-progress" role="progressbar" aria-label="正在检查直播功能" />
       </div>
     </section>
   );

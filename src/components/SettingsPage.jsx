@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { LoginDrawer } from "./LoginDrawer.jsx";
 import { MobilePanelPresence, useMobilePanelViewport } from "./MobilePanelPresence.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
@@ -23,58 +31,27 @@ function getWatchHistoryHref(item) {
 }
 
 function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 24 24">
-      <path d="M9 5.5L15.5 12 9 18.5" />
-    </svg>
-  );
+  return <ChevronRight />;
 }
 
 function BackIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M15 5.5L8.5 12 15 18.5" />
-    </svg>
-  );
+  return <ChevronLeft aria-hidden="true" />;
 }
 
 function SettingsIcon() {
-  return (
-    <svg viewBox="0 0 24 24">
-      <path d="M4 7h16" />
-      <path d="M4 12h16" />
-      <path d="M4 17h16" />
-      <circle cx="9" cy="7" r="1.8" />
-      <circle cx="15" cy="12" r="1.8" />
-      <circle cx="11" cy="17" r="1.8" />
-    </svg>
-  );
+  return <SlidersHorizontal />;
 }
 
 function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24">
-      <path d="M5 12.5l4.2 4.2L19 7" />
-    </svg>
-  );
+  return <Check />;
 }
 
 function CloseIcon() {
-  return (
-    <svg viewBox="0 0 24 24">
-      <path d="M6 6l12 12" />
-      <path d="M18 6L6 18" />
-    </svg>
-  );
+  return <X />;
 }
 
 function EditIcon() {
-  return (
-    <svg viewBox="0 0 24 24">
-      <path d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20z" />
-      <path d="M12.5 7l4.5 4.5" />
-    </svg>
-  );
+  return <Pencil />;
 }
 
 function loadImageFromFile(file) {
@@ -152,12 +129,12 @@ function ProfileAvatar({ authUser }) {
 
 function SectionBlock({ title, action = null, children }) {
   return (
-    <section class="my-section">
-      <div class="my-section-head">
-        <span class="my-section-title">{title}</span>
+    <section className="my-section">
+      <div className="my-section-head">
+        <span className="my-section-title">{title}</span>
         {action}
       </div>
-      <div class="my-section-body">{children}</div>
+      <div className="my-section-body">{children}</div>
     </section>
   );
 }
@@ -182,24 +159,24 @@ function PanelShell({
     <>
       <button
         type="button"
-        class={`${backdropClassName}${transitionSuffix}`}
+        className={`${backdropClassName}${transitionSuffix}`}
         aria-label={backdropLabel}
         onClick={onClose}
       />
-      <aside class={`${panelClassName}${transitionSuffix}`} aria-label={panelLabel}>
-        <div class={headClassName}>
+      <aside className={`${panelClassName}${transitionSuffix}`} aria-label={panelLabel}>
+        <div className={headClassName}>
           <button
             type="button"
-            class={closeButtonClassName}
+            className={closeButtonClassName}
             aria-label={closeLabel}
             onClick={onClose}
           >
             <BackIcon />
           </button>
           <strong>{title}</strong>
-          <span class="panel-head-spacer" aria-hidden="true" />
+          <span className="panel-head-spacer" aria-hidden="true" />
         </div>
-        <div class={bodyClassName}>{children}</div>
+        <div className={bodyClassName}>{children}</div>
       </aside>
     </>
   );
@@ -213,20 +190,20 @@ function ProfileSummaryCard({
   onOpenProfilePanel
 }) {
   return (
-    <section class="my-account-card">
+    <section className="my-account-card">
       <button
         type="button"
-        class={`my-profile-row${authUser ? "" : " is-guest"}${authPending ? " is-loading" : ""}`}
+        className={`my-profile-row${authUser ? "" : " is-guest"}${authPending ? " is-loading" : ""}`}
         onClick={onOpenProfilePanel}
         disabled={authPending}
         aria-busy={authPending}
       >
         <ProfileAvatar authUser={authUser} />
-        <span class="my-profile-copy">
+        <span className="my-profile-copy">
           <strong>{profileName}</strong>
           {profileSubtitle ? <span>{profileSubtitle}</span> : null}
         </span>
-        <span class="my-profile-chevron" aria-hidden="true">
+        <span className="my-profile-chevron" aria-hidden="true">
           <ChevronIcon />
         </span>
       </button>
@@ -239,27 +216,27 @@ function WatchHistorySection({ historyItems, onClearWatchHistory, onOpenWatchHis
     <SectionBlock
       title="观看历史"
       action={historyItems.length ? (
-        <button type="button" class="my-section-link" onClick={onClearWatchHistory}>清空</button>
+        <button type="button" className="my-section-link" onClick={onClearWatchHistory}>清空</button>
       ) : null}
     >
       {historyItems.length ? (
-        <ul class="my-history-list">
+        <ul className="my-history-list">
           {historyItems.map((item) => (
             <li key={`${item.room}-${item.watchedAt}`}>
               <a
                 href={getWatchHistoryHref(item)}
-                class="my-history-row"
+                className="my-history-row"
                 onClick={(event) => {
                   event.preventDefault();
                   onOpenWatchHistoryItem?.(item);
                 }}
               >
-                <span class="my-history-copy">
+                <span className="my-history-copy">
                   <strong>{item.room}</strong>
                 </span>
-                <span class="my-history-meta">
+                <span className="my-history-meta">
                   <span>{item.displayTime}</span>
-                  <span class="my-row-chevron" aria-hidden="true">
+                  <span className="my-row-chevron" aria-hidden="true">
                     <ChevronIcon />
                   </span>
                 </span>
@@ -268,7 +245,7 @@ function WatchHistorySection({ historyItems, onClearWatchHistory, onOpenWatchHis
           ))}
         </ul>
       ) : (
-        <div class="my-empty-state">
+        <div className="my-empty-state">
           <span>暂无观看历史</span>
         </div>
       )}
@@ -288,26 +265,26 @@ function AdvancedSettingsContent({
   return (
     <>
       <SectionBlock title="连接">
-        <label class="my-field">
+        <label className="my-field">
           <span>Relay Endpoint</span>
           <input id="url" value={relayUrl} onInput={onRelayUrlInput} />
         </label>
-        <div class="my-info-row">
+        <div className="my-info-row">
           <strong>当前 Host</strong>
           <span data-relay-host>{relayHost}</span>
         </div>
       </SectionBlock>
 
       <SectionBlock title="诊断">
-        <div class="my-info-row">
+        <div className="my-info-row">
           <strong>Auth API</strong>
           <span>{authApiStatus}</span>
         </div>
-        <div class="my-info-row">
+        <div className="my-info-row">
           <strong>Build</strong>
           <span id="buildSubtitle">{buildLabel}</span>
         </div>
-        <article class="my-log-block">
+        <article className="my-log-block">
           <h3>开发日志</h3>
           <pre id="log" ref={logRef}>{logText}</pre>
         </article>
@@ -372,22 +349,22 @@ function AccountEditableField({
   value
 }) {
   return (
-    <div class={`account-editable-row${editing ? " is-editing" : ""}`}>
-      <div class="account-editable-row-main">
-        <span class="account-list-label">{label}</span>
+    <div className={`account-editable-row${editing ? " is-editing" : ""}`}>
+      <div className="account-editable-row-main">
+        <span className="account-list-label">{label}</span>
 
         {editing ? (
-          <div class="account-editable-value account-editable-value-editing">
+          <div className="account-editable-value account-editable-value-editing">
             <input
               value={inputValue}
               maxLength={maxLength}
               onInput={onInput}
               placeholder={placeholder}
             />
-            <div class="account-icon-actions">
+            <div className="account-icon-actions">
               <button
                 type="button"
-                class="account-icon-button"
+                className="account-icon-button"
                 aria-label={saveAriaLabel}
                 disabled={saveDisabled}
                 onClick={onSave}
@@ -396,7 +373,7 @@ function AccountEditableField({
               </button>
               <button
                 type="button"
-                class="account-icon-button"
+                className="account-icon-button"
                 aria-label={cancelAriaLabel}
                 onClick={onCancelEditing}
               >
@@ -405,11 +382,11 @@ function AccountEditableField({
             </div>
           </div>
         ) : (
-          <div class="account-editable-value account-editable-value-inline">
+          <div className="account-editable-value account-editable-value-inline">
             <strong>{value}</strong>
             <button
               type="button"
-              class="account-icon-button"
+              className="account-icon-button"
               aria-label={editAriaLabel}
               onClick={onStartEditing}
             >
@@ -419,9 +396,9 @@ function AccountEditableField({
         )}
       </div>
 
-      <div class={`account-editable-collapse${editing ? " is-open" : ""}`} aria-hidden={!editing}>
-        <div class="account-editable-collapse-inner">
-          <p class="account-editable-note">{note}</p>
+      <div className={`account-editable-collapse${editing ? " is-open" : ""}`} aria-hidden={!editing}>
+        <div className="account-editable-collapse-inner">
+          <p className="account-editable-note">{note}</p>
         </div>
       </div>
     </div>
@@ -460,7 +437,7 @@ function AccountEditDrawer({
       transitionClassName={transitionClassName}
     >
       <form
-        class="account-edit-form"
+        className="account-edit-form"
         onSubmit={(event) => {
           event.preventDefault();
           if (!saveDisabled) {
@@ -468,7 +445,7 @@ function AccountEditDrawer({
           }
         }}
       >
-        <label class="account-edit-field">
+        <label className="account-edit-field">
           <span>{label}</span>
           <input
             value={inputValue}
@@ -478,11 +455,11 @@ function AccountEditDrawer({
             autoFocus
           />
         </label>
-        <p class="account-edit-note">{note}</p>
-        {error ? <p class="inline-warning">{error}</p> : null}
-        {status ? <p class="status">{status}</p> : null}
-        <div class="account-edit-actions">
-          <button type="submit" class="primary" disabled={saveDisabled}>
+        <p className="account-edit-note">{note}</p>
+        {error ? <p className="inline-warning">{error}</p> : null}
+        {status ? <p className="status">{status}</p> : null}
+        <div className="account-edit-actions">
+          <button type="submit" className="primary" disabled={saveDisabled}>
             {saving ? "保存中" : "保存"}
           </button>
         </div>
@@ -645,10 +622,10 @@ function AccountDetailsContent({
   }
 
   return (
-    <div class="my-account-form">
-      <div class="account-panel-list">
+    <div className="my-account-form">
+      <div className="account-panel-list">
         <div
-          class="account-list-item account-list-item-avatar account-list-item-button"
+          className="account-list-item account-list-item-avatar account-list-item-button"
           role="button"
           tabIndex={avatarSaving ? -1 : 0}
           aria-disabled={avatarSaving}
@@ -660,27 +637,27 @@ function AccountDetailsContent({
           }}
           onKeyDown={handleAvatarItemKeyDown}
         >
-          <span class="account-list-label">头像</span>
-          <div class="account-list-value account-list-avatar">
+          <span className="account-list-label">头像</span>
+          <div className="account-list-value account-list-avatar">
             <input
               ref={avatarInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/avif"
-              class="account-avatar-input"
+              className="account-avatar-input"
               onChange={onSelectAvatar}
             />
-            <div class="account-list-avatar-editable">
+            <div className="account-list-avatar-editable">
               <ProfileAvatar authUser={authUser} />
             </div>
-            <span class="account-list-chevron" aria-hidden="true">
+            <span className="account-list-chevron" aria-hidden="true">
               <ChevronIcon />
             </span>
           </div>
         </div>
 
-        <div class="account-list-item">
-          <span class="account-list-label">邮箱</span>
-          <span class="account-list-value">
+        <div className="account-list-item">
+          <span className="account-list-label">邮箱</span>
+          <span className="account-list-value">
             <strong>{authUser.email || "未绑定"}</strong>
           </span>
         </div>
@@ -745,18 +722,18 @@ function AccountDetailsContent({
         />
       </div>
 
-      <div class="my-account-form-content">
-        {handleError ? <p class="inline-warning">{handleError}</p> : null}
-        {handleStatus ? <p class="status">{handleStatus}</p> : null}
-        {displayNameError ? <p class="inline-warning">{displayNameError}</p> : null}
-        {displayNameStatus ? <p class="status">{displayNameStatus}</p> : null}
-        {avatarError ? <p class="inline-warning">{avatarError}</p> : null}
-        {avatarStatus ? <p class="status">{avatarStatus}</p> : null}
+      <div className="my-account-form-content">
+        {handleError ? <p className="inline-warning">{handleError}</p> : null}
+        {handleStatus ? <p className="status">{handleStatus}</p> : null}
+        {displayNameError ? <p className="inline-warning">{displayNameError}</p> : null}
+        {displayNameStatus ? <p className="status">{displayNameStatus}</p> : null}
+        {avatarError ? <p className="inline-warning">{avatarError}</p> : null}
+        {avatarStatus ? <p className="status">{avatarStatus}</p> : null}
 
-        <div class="my-actions">
+        <div className="my-actions">
           <button
             type="button"
-            class="secondary"
+            className="secondary"
             onClick={() => {
               onClose();
               onLogout();
@@ -790,8 +767,8 @@ function DesktopSettingsSidebar({
   ];
 
   return (
-    <nav class="desktop-settings-sidebar" aria-label="个人中心">
-      <div class="desktop-settings-list">
+    <nav className="desktop-settings-sidebar" aria-label="个人中心">
+      <div className="desktop-settings-list">
         {items.map((item) => {
           const active = activeSection === item.id;
 
@@ -799,7 +776,7 @@ function DesktopSettingsSidebar({
             <button
               key={item.id}
               type="button"
-              class={`desktop-settings-list-item${active ? " is-active" : ""}`}
+              className={`desktop-settings-list-item${active ? " is-active" : ""}`}
               aria-current={active ? "page" : undefined}
               onClick={() => {
                 onSelectSection(item.id);
@@ -808,7 +785,7 @@ function DesktopSettingsSidebar({
               <span>
                 <strong>{item.title}</strong>
               </span>
-              <span class="my-row-chevron" aria-hidden="true">
+              <span className="my-row-chevron" aria-hidden="true">
                 <ChevronIcon />
               </span>
             </button>
@@ -1069,14 +1046,14 @@ export function SettingsPage({
   }
 
   return (
-    <section class="page" data-page="settings" hidden={hidden}>
-      <div class="page-grid settings-layout">
-        <div class="my-page-shell">
-          <div class="my-page-toolbar my-page-toolbar-mobile">
+    <section className="page" data-page="settings" hidden={hidden}>
+      <div className="page-grid settings-layout">
+        <div className="my-page-shell">
+          <div className="my-page-toolbar my-page-toolbar-mobile">
             <div />
             <button
               type="button"
-              class="my-page-settings-button"
+              className="my-page-settings-button"
               aria-label="打开设置"
               onClick={() => {
                 setSettingsPanelOpen(true);
@@ -1086,13 +1063,13 @@ export function SettingsPage({
             </button>
           </div>
 
-          <div class="my-page-main">
-            <aside class="my-page-aside">
+          <div className="my-page-main">
+            <aside className="my-page-aside">
               <DesktopSettingsSidebar
                 activeSection={desktopSection}
                 onSelectSection={setDesktopSection}
               />
-              <div class="mobile-settings-profile">
+              <div className="mobile-settings-profile">
                 <ProfileSummaryCard
                   authPending={authPending}
                   authUser={authUser}
@@ -1103,8 +1080,8 @@ export function SettingsPage({
               </div>
             </aside>
 
-            <div class="my-page-content">
-              <div class="desktop-settings-content my-page-sections">
+            <div className="my-page-content">
+              <div className="desktop-settings-content my-page-sections">
                 {desktopSection === "account" ? (
                   <SectionBlock title="账号信息">
                     {authUser ? (
@@ -1149,11 +1126,11 @@ export function SettingsPage({
                         submitHandle={submitHandle}
                       />
                     ) : (
-                      <div class="my-empty-state my-login-empty">
+                      <div className="my-empty-state my-login-empty">
                         <span>{authPending ? "正在检查登录状态" : "登录后可以管理头像、主播号和显示名。"}</span>
                         <button
                           type="button"
-                          class="my-plain-login-button"
+                          className="my-plain-login-button"
                           onClick={openLoginPanel}
                           disabled={authPending}
                         >
@@ -1185,7 +1162,7 @@ export function SettingsPage({
                 ) : null}
               </div>
 
-              <div class="mobile-settings-content my-page-sections">
+              <div className="mobile-settings-content my-page-sections">
                 <WatchHistorySection
                   historyItems={historyItems}
                   onClearWatchHistory={onClearWatchHistory}

@@ -1,4 +1,16 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "react";
+import {
+  ChevronLeft,
+  Copy,
+  Maximize,
+  Minimize,
+  MoreHorizontal,
+  Pause,
+  Play,
+  Share,
+  Volume2,
+  VolumeX
+} from "lucide-react";
 import { ChatPanel } from "./ChatPanel.jsx";
 import { StatusPill } from "./StatusPill.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
@@ -300,41 +312,35 @@ export function WatchSessionPage({
     const visible = persistent || controlsVisible || playerBadge.state === "error";
 
     return (
-      <div class={`stage-mobile-hud${visible ? " is-visible" : ""}${className ? ` ${className}` : ""}`}>
-        <div class="stage-mobile-hud-left">
+      <div className={`stage-mobile-hud${visible ? " is-visible" : ""}${className ? ` ${className}` : ""}`}>
+        <div className="stage-mobile-hud-left">
           <button
             type="button"
-            class="stage-mobile-leave"
+            className="stage-mobile-leave"
             onClick={(event) => {
               event.stopPropagation();
               onStop();
             }}
             aria-label="离开直播间"
           >
-            <svg viewBox="0 0 24 24">
-              <path d="M14.5 5.5 8 12l6.5 6.5" />
-            </svg>
+            <ChevronLeft aria-hidden="true" />
           </button>
-          <div class="stage-mobile-meta stage-mobile-meta-left">
+          <div className="stage-mobile-meta stage-mobile-meta-left">
             <strong>{roomLabel}</strong>
           </div>
         </div>
-        <div class="stage-mobile-hud-actions">
+        <div className="stage-mobile-hud-actions">
           <StatusPill id="playerBadgeOverlay" label={playerBadge.label} state={playerBadge.state} />
           <button
             type="button"
-            class="stage-mobile-more"
+            className="stage-mobile-more"
             onClick={(event) => {
               event.stopPropagation();
               openMoreSheet();
             }}
             aria-label="更多操作"
           >
-            <svg viewBox="0 0 24 24">
-              <circle cx="6" cy="12" r="1.8" />
-              <circle cx="12" cy="12" r="1.8" />
-              <circle cx="18" cy="12" r="1.8" />
-            </svg>
+            <MoreHorizontal aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -342,13 +348,13 @@ export function WatchSessionPage({
   }
 
   return (
-    <section class="page page-immersive" data-page="watch" data-joined="true" hidden={hidden}>
-      <div class="page-grid watch-layout">
-        <section class="stage-column">
+    <section className="page page-immersive" data-page="watch" data-joined="true" hidden={hidden}>
+      <div className="page-grid watch-layout">
+        <section className="stage-column">
           {playerOrientation !== "portrait" ? renderMobileHud("stage-mobile-hud-top", true) : null}
           <div
             ref={stageRef}
-            class={`stage-frame watch-stage-frame${controlsVisible ? " controls-visible" : ""}${playerOrientation === "portrait" ? " is-portrait" : ""}`}
+            className={`stage-frame watch-stage-frame${controlsVisible ? " controls-visible" : ""}${playerOrientation === "portrait" ? " is-portrait" : ""}`}
             onMouseMove={handleStagePointerMove}
             onMouseLeave={handleStagePointerLeave}
             onClick={handleStageClick}
@@ -357,26 +363,26 @@ export function WatchSessionPage({
               {playerSession ? (
                 <canvas
                   ref={playerRef}
-                  class="player-moq"
+                  className="player-moq"
                   width="1280"
                   height="720"
                   aria-label={`${playerSession.namespace} 直播画面`}
                 />
               ) : (
-                <div class="placeholder">
+                <div className="placeholder">
                   <p>{stageMessage}</p>
                 </div>
               )}
             </div>
             {playerBadge.state === "error" ? (
-              <div class="stage-error">
+              <div className="stage-error">
                 <p>{playerStatus}</p>
               </div>
             ) : null}
             {showTapToUnmute && playerSession && playerBadge.state !== "error" ? (
               <button
                 type="button"
-                class="stage-unmute-prompt"
+                className="stage-unmute-prompt"
                 onClick={(event) => {
                   event.stopPropagation();
                   onDismissTapToUnmute();
@@ -388,7 +394,7 @@ export function WatchSessionPage({
             ) : null}
             {playerOrientation === "portrait" ? renderMobileHud("stage-mobile-hud-overlay", true) : null}
             {playerOrientation === "portrait" ? (
-              <div class="watch-portrait-chat-overlay">
+              <div className="watch-portrait-chat-overlay">
                 <ChatPanel
                   roomLabel={chatRoomLabel}
                   authAvailable={authAvailable}
@@ -409,11 +415,11 @@ export function WatchSessionPage({
               </div>
             ) : null}
             {playerBadge.state !== "error" ? (
-              <div class={`stage-controls${controlsVisible ? " is-visible" : ""}`}>
-                <div class="stage-controls-fade" />
+              <div className={`stage-controls${controlsVisible ? " is-visible" : ""}`}>
+                <div className="stage-controls-fade" />
                 <button
                   type="button"
-                  class="stage-control-button stage-control-primary"
+                  className="stage-control-button stage-control-primary"
                   onClick={(event) => {
                     event.stopPropagation();
                     onTogglePlayback();
@@ -421,21 +427,12 @@ export function WatchSessionPage({
                   }}
                   aria-label={playerPaused ? "继续播放" : "暂停播放"}
                 >
-                  {playerPaused ? (
-                    <svg viewBox="0 0 24 24">
-                      <path d="M8 6v12l10-6Z" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24">
-                      <path d="M9 6v12" />
-                      <path d="M15 6v12" />
-                    </svg>
-                  )}
+                  {playerPaused ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
                 </button>
-                <div class="stage-controls-right">
+                <div className="stage-controls-right">
                   <button
                     type="button"
-                    class="stage-control-button"
+                    className="stage-control-button"
                     onClick={(event) => {
                       event.stopPropagation();
                       onToggleMute();
@@ -443,23 +440,11 @@ export function WatchSessionPage({
                     }}
                     aria-label={playerMuted ? "取消静音" : "静音"}
                   >
-                    {playerMuted ? (
-                      <svg viewBox="0 0 24 24">
-                        <path d="M11 5 6.5 9H3v6h3.5L11 19z" />
-                        <path d="m16 9 5 5" />
-                        <path d="m21 9-5 5" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24">
-                        <path d="M11 5 6.5 9H3v6h3.5L11 19z" />
-                        <path d="M15.5 9.5a4 4 0 0 1 0 5" />
-                        <path d="M18 7a7.5 7.5 0 0 1 0 10" />
-                      </svg>
-                    )}
+                    {playerMuted ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
                   </button>
                   <button
                     type="button"
-                    class="stage-control-button"
+                    className="stage-control-button"
                     onClick={(event) => {
                       event.stopPropagation();
                       onFullscreen();
@@ -467,37 +452,15 @@ export function WatchSessionPage({
                     }}
                     aria-label={fullscreenActive ? "退出全屏" : "全屏播放"}
                   >
-                    {fullscreenActive ? (
-                      <svg viewBox="0 0 24 24">
-                        <path d="M9 4H4v5" />
-                        <path d="m4 4 6 6" />
-                        <path d="M15 4h5v5" />
-                        <path d="m20 4-6 6" />
-                        <path d="M9 20H4v-5" />
-                        <path d="m4 20 6-6" />
-                        <path d="M15 20h5v-5" />
-                        <path d="m20 20-6-6" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24">
-                        <path d="M8 4H4v4" />
-                        <path d="m4 4 5 5" />
-                        <path d="M16 4h4v4" />
-                        <path d="m20 4-5 5" />
-                        <path d="M8 20H4v-4" />
-                        <path d="m4 20 5-5" />
-                        <path d="M16 20h4v-4" />
-                        <path d="m20 20-5-5" />
-                      </svg>
-                    )}
+                    {fullscreenActive ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}
                   </button>
                 </div>
               </div>
             ) : null}
           </div>
-          <div class="info-strip">
-            <div class="info-item">
-              <div class="watch-desktop-room-meta">
+          <div className="info-strip">
+            <div className="info-item">
+              <div className="watch-desktop-room-meta">
                 <UserAvatar
                   avatarUrl={hostAvatarUrl}
                   displayName={hostDisplayName}
@@ -507,17 +470,17 @@ export function WatchSessionPage({
                   placeholderClassName="is-placeholder"
                   iconClassName="watch-desktop-room-avatar-icon"
                 />
-                <div class="watch-desktop-room-copy">
+                <div className="watch-desktop-room-copy">
                   <strong data-room-label>{roomTitle || roomLabel}</strong>
                   <p>{hostDisplayName || roomLabel}</p>
                 </div>
               </div>
             </div>
-            <div class="info-item info-item-pill watch-desktop-status-actions">
+            <div className="info-item info-item-pill watch-desktop-status-actions">
               <button
                 ref={shareButtonRef}
                 type="button"
-                class="watch-desktop-share-button"
+                className="watch-desktop-share-button"
                 onClick={openShareMenu}
                 disabled={!watchLink}
                 aria-label="分享观看链接"
@@ -531,12 +494,12 @@ export function WatchSessionPage({
           </div>
         </section>
 
-        <aside class={`control-column${playerOrientation !== "portrait" ? " watch-control-column-landscape" : ""}`} data-joined="true">
-          <div class="info-strip info-strip-mobile">
-            <div class="info-item">
+        <aside className={`control-column${playerOrientation !== "portrait" ? " watch-control-column-landscape" : ""}`} data-joined="true">
+          <div className="info-strip info-strip-mobile">
+            <div className="info-item">
               <strong data-room-label>{roomLabel}</strong>
             </div>
-            <div class="info-item info-item-pill">
+            <div className="info-item info-item-pill">
               <StatusPill id="playerBadgeInlineMobile" label={playerBadge.label} state={playerBadge.state} />
             </div>
           </div>
@@ -561,22 +524,22 @@ export function WatchSessionPage({
         <>
           <button
             type="button"
-            class={`watch-mobile-more-backdrop${moreVisible ? " is-open" : ""}`}
+            className={`watch-mobile-more-backdrop${moreVisible ? " is-open" : ""}`}
             aria-label="关闭更多操作"
             onClick={closeMoreSheet}
           />
-          <section class={`watch-mobile-more-panel${moreVisible ? " is-open" : ""}`}>
-            <div class="watch-mobile-more-header">
+          <section className={`watch-mobile-more-panel${moreVisible ? " is-open" : ""}`}>
+            <div className="watch-mobile-more-header">
               <strong>{roomLabel}</strong>
               <span>{playerBadge.label}</span>
             </div>
-            <div class="summary-item">
+            <div className="summary-item">
               <strong>观看链接</strong>
               <span data-watch-link>{watchLinkText}</span>
             </div>
             <button
               type="button"
-              class="secondary"
+              className="secondary"
               onClick={async () => {
                 if (!watchLink) {
                   closeMoreSheet();
@@ -600,12 +563,12 @@ export function WatchSessionPage({
         <>
           <button
             type="button"
-            class="watch-desktop-share-backdrop"
+            className="watch-desktop-share-backdrop"
             aria-label="关闭分享面板"
             onClick={closeShareMenu}
           />
           <section
-            class={`watch-desktop-share-panel${shareMenuVisible ? " is-open" : ""}`}
+            className={`watch-desktop-share-panel${shareMenuVisible ? " is-open" : ""}`}
             style={{
               left: `${shareMenuPosition.left}px`,
               top: `${shareMenuPosition.top}px`
@@ -614,47 +577,28 @@ export function WatchSessionPage({
             aria-modal="true"
             aria-label="分享到"
           >
-            <div class="watch-desktop-share-title">分享到</div>
+            <div className="watch-desktop-share-title">分享到</div>
             <button
               type="button"
-              class="watch-desktop-share-action"
+              className="watch-desktop-share-action"
               onClick={copyWatchLink}
               disabled={!watchLink}
             >
-              <CopyIcon />
+              <Copy aria-hidden="true" />
               <span>复制链接</span>
             </button>
             <button
               type="button"
-              class="watch-desktop-share-action"
+              className="watch-desktop-share-action"
               onClick={shareWatchLink}
               disabled={!watchLink || !shareSupported}
             >
-              <ShareIcon />
+              <Share aria-hidden="true" />
               <span>分享</span>
             </button>
           </section>
         </>
       ) : null}
     </section>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
-      <path d="M12 16V4" />
-      <path d="m7 9 5-5 5 5" />
-    </svg>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="8" y="8" width="12" height="12" rx="2" />
-      <path d="M4 16V6a2 2 0 0 1 2-2h10" />
-    </svg>
   );
 }

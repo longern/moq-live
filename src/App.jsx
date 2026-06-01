@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "preact/hooks";
-import { lazy, Suspense } from "preact/compat";
+import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense } from "react";
 import { DesktopNavigation, MobileNavigation } from "./components/Navigation.jsx";
 import { LoginDrawer } from "./components/LoginDrawer.jsx";
 import { MobilePanelPresence } from "./components/MobilePanelPresence.jsx";
@@ -44,11 +44,11 @@ function getHandleWatchValue(value) {
 
 function LivePageFallback({ hidden }) {
   return (
-    <section class="page" data-page="live" hidden={hidden}>
-      <div class="page-grid live-layout">
-        <section class="control-column" aria-busy="true">
-          <div class="placeholder">
-            <span class="live-circular-progress" role="progressbar" aria-label="正在加载开播页" />
+    <section className="page" data-page="live" hidden={hidden}>
+      <div className="page-grid live-layout">
+        <section className="control-column" aria-busy="true">
+          <div className="placeholder">
+            <span className="live-circular-progress" role="progressbar" aria-label="正在加载开播页" />
           </div>
         </section>
       </div>
@@ -738,30 +738,30 @@ export function App() {
 
   return (
     <>
-      <div class={`app-container${mobileWatchJoinedClass}`}>
-        <header class="topbar">
+      <div className={`app-container${mobileWatchJoinedClass}`}>
+        <header className="topbar">
           <a
             href={window.location.pathname}
-            class="brand brand-button"
+            className="brand brand-button"
             onClick={(event) => {
               event.preventDefault();
               returnToWatchHome();
             }}
             aria-label={`返回${siteTitle}收看页`}
           >
-            <span class="brand-title">{siteTitle}</span>
+            <span className="brand-title">{siteTitle}</span>
           </a>
 
-          <div class="topbar-right">
+          <div className="topbar-right">
             <DesktopNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
-            <div class="auth-toolbar">
+            <div className="auth-toolbar">
               <div
                 ref={authMenuRef}
-                class="auth-menu-shell"
+                className="auth-menu-shell"
                 onMouseEnter={openAuthMenu}
                 onMouseLeave={scheduleCloseAuthMenu}
-                onFocusIn={openAuthMenu}
-                onFocusOut={(event) => {
+                onFocus={openAuthMenu}
+                onBlur={(event) => {
                   const nextTarget = event.relatedTarget;
                   if (nextTarget instanceof Node && authMenuRef.current?.contains(nextTarget)) {
                     return;
@@ -771,7 +771,7 @@ export function App() {
               >
                 <button
                   type="button"
-                  class="auth-avatar-button"
+                  className="auth-avatar-button"
                   aria-haspopup="menu"
                   aria-expanded={authMenuOpen ? "true" : "false"}
                   aria-label={authState.user ? `账户菜单：${avatarLabel}` : "账户菜单：匿名用户"}
@@ -794,12 +794,12 @@ export function App() {
                   />
                 </button>
 
-                <div class={`auth-menu-dropdown${authMenuOpen ? " is-open" : ""}`} role="menu" aria-label="账户">
+                <div className={`auth-menu-dropdown${authMenuOpen ? " is-open" : ""}`} role="menu" aria-label="账户">
                   {authState.user ? (
                     <>
                       <button
                         type="button"
-                        class="auth-menu-item"
+                        className="auth-menu-item"
                         role="menuitem"
                         onClick={() => {
                           closeAuthMenu();
@@ -810,7 +810,7 @@ export function App() {
                       </button>
                       <button
                         type="button"
-                        class="auth-menu-item"
+                        className="auth-menu-item"
                         role="menuitem"
                         onClick={() => {
                           closeAuthMenu();
@@ -823,7 +823,7 @@ export function App() {
                   ) : (
                     <button
                       type="button"
-                      class="auth-menu-item"
+                      className="auth-menu-item"
                       role="menuitem"
                       onClick={() => {
                         closeAuthMenu();
@@ -841,7 +841,7 @@ export function App() {
           </div>
         </header>
 
-        <main class="page-shell">
+        <main className="page-shell">
           <WatchPage
             hidden={page !== "watch"}
             watchJoined={watchJoined}

@@ -310,15 +310,13 @@
 }
 
 .my-info-row,
-.my-field,
-.my-history-row {
+.my-field {
   padding: 14px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .my-info-row:first-child,
-.my-field:first-child,
-.my-history-row:first-child {
+.my-field:first-child {
   border-top: 0;
 }
 

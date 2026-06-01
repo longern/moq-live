@@ -9,6 +9,12 @@ import {
 } from "./playerControllerUtils.js";
 
 const PLAYER_TARGET_LATENCY_MS = 600;
+const AUDIO_TRACK_NAME = "audio/data";
+const RECOVERABLE_AUDIO_PUBLISH_DONE_STATUS_CODES = new Set([1]);
+const AUDIO_RECOVERY_MIN_INTERVAL_MS = 10_000;
+const AUDIO_RECOVERY_WINDOW_MS = 5 * 60 * 1000;
+const AUDIO_RECOVERY_STABLE_RESET_MS = 2 * 60 * 1000;
+const AUDIO_RECOVERY_MAX_ATTEMPTS = 12;
 
 export function getAppleOsUpgradeMessage(navigatorLike = globalThis.navigator) {
   if (!navigatorLike || typeof navigatorLike !== "object") {
@@ -114,6 +120,15 @@ export function usePlayerSession({
   const orientationLockedRef = useRef(false);
   const audioFallbackLoggedRef = useRef(false);
   const desiredPlayerMutedRef = useRef(!audioPlaybackSupported);
+  const audioRecoveryAttemptsRef = useRef([]);
+  const audioRecoveryInFlightRef = useRef(false);
+  const audioRecoveryTimerRef = useRef(null);
+  const audioRecoveryStableRef = useRef({
+    sessionKey: "",
+    bytesReceived: 0,
+    growthStartedAt: 0,
+    lastGrowthAt: 0,
+  });
 
   logRef.current = log;
   playerSessionStateRef.current = playerSession;
@@ -252,6 +267,11 @@ export function usePlayerSession({
 
     sessionRef.current = null;
     window.player = null;
+    if (audioRecoveryTimerRef.current) {
+      clearTimeout(audioRecoveryTimerRef.current);
+      audioRecoveryTimerRef.current = null;
+    }
+    audioRecoveryInFlightRef.current = false;
 
     if (!hadPlayer) {
       setPlayerSession(null);
@@ -367,6 +387,7 @@ export function usePlayerSession({
     }
 
     setPlayerSession(nextSession);
+    audioRecoveryInFlightRef.current = false;
     setFullscreenActive(false);
     setFullscreenRotate(false);
     setPlayerPaused(false);
@@ -530,6 +551,50 @@ export function usePlayerSession({
     }
   }
 
+  function updateAudioRecoveryStability(sessionKey, bytesReceived, now) {
+    if (!Number.isFinite(bytesReceived) || bytesReceived <= 0) {
+      return;
+    }
+
+    const stable = audioRecoveryStableRef.current;
+    if (
+      stable.sessionKey !== sessionKey ||
+      bytesReceived < stable.bytesReceived
+    ) {
+      audioRecoveryStableRef.current = {
+        sessionKey,
+        bytesReceived,
+        growthStartedAt: now,
+        lastGrowthAt: now,
+      };
+      return;
+    }
+
+    if (bytesReceived <= stable.bytesReceived) {
+      return;
+    }
+
+    const continuousGrowthStartedAt =
+      stable.growthStartedAt && now - stable.lastGrowthAt <= 5000
+        ? stable.growthStartedAt
+        : now;
+    audioRecoveryStableRef.current = {
+      sessionKey,
+      bytesReceived,
+      growthStartedAt: continuousGrowthStartedAt,
+      lastGrowthAt: now,
+    };
+
+    if (
+      audioRecoveryAttemptsRef.current.length > 0 &&
+      now - continuousGrowthStartedAt >= AUDIO_RECOVERY_STABLE_RESET_MS
+    ) {
+      audioRecoveryAttemptsRef.current = [];
+      audioRecoveryStableRef.current.growthStartedAt = now;
+      logRef.current?.("[Player] audio recovery counter reset after stable audio");
+    }
+  }
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       const active = Boolean(document.fullscreenElement);
@@ -566,7 +631,7 @@ export function usePlayerSession({
     }
 
     const MoqWatch = moqWatchModule;
-    const connection = new MoqWatch.Lite.Connection.Reload({
+    const connection = new MoqWatch.Net.Connection.Reload({
       enabled: true,
       url: new URL(playerSession.relayUrl),
       websocket: { enabled: false },
@@ -575,7 +640,7 @@ export function usePlayerSession({
       connection: connection.established,
       announced: connection.announced,
       enabled: true,
-      name: MoqWatch.Lite.Path.from(playerSession.namespace),
+      name: MoqWatch.Net.Path.from(playerSession.namespace),
       catalogFormat: "hang",
     });
     const rtt = new MoqWatch.Signals.Signal(undefined);
@@ -624,6 +689,102 @@ export function usePlayerSession({
       logRef.current?.("playback started");
     };
 
+    const shouldRecoverAudioSubscribe = (detail = {}) => {
+      if (sessionRef.current !== ctx) {
+        return false;
+      }
+
+      if (detail.track !== AUDIO_TRACK_NAME) {
+        return false;
+      }
+
+      const statusCode = Number(detail.statusCode);
+      if (!RECOVERABLE_AUDIO_PUBLISH_DONE_STATUS_CODES.has(statusCode)) {
+        return false;
+      }
+      if (!/\bcode=1\b/.test(String(detail.reasonPhrase ?? ""))) {
+        return false;
+      }
+
+      if (!audioPlaybackSupported) {
+        return false;
+      }
+
+      const connStatus = connection.status.peek();
+      const broadcastStatus = broadcast.status.peek();
+      const videoStats = backend.video.stats.peek();
+      const audioStats = backend.audio.stats.peek();
+      const hasMediaProgress =
+        ctx.started ||
+        Number(videoStats?.frameCount ?? 0) > 0 ||
+        Number(audioStats?.bytesReceived ?? 0) > 0;
+      return (
+        connStatus === "connected" &&
+        broadcastStatus === "live" &&
+        hasMediaProgress
+      );
+    };
+
+    const recoverAudioSubscribe = (detail = {}) => {
+      if (!shouldRecoverAudioSubscribe(detail)) {
+        return;
+      }
+
+      const reconnect = () => {
+        audioRecoveryTimerRef.current = null;
+        if (sessionRef.current !== ctx) {
+          audioRecoveryInFlightRef.current = false;
+          return;
+        }
+
+        const attemptAt = Date.now();
+        audioRecoveryInFlightRef.current = true;
+        audioRecoveryAttemptsRef.current.push(attemptAt);
+        updatePlayerStatus("buffering", "音频流中断，正在自动重连。");
+        logRef.current?.(
+          `[Player] audio subscribe closed by server; reconnecting statusCode=${detail.statusCode} reason=${detail.reasonPhrase || ""}`,
+        );
+        void startPlayer({
+          initialMuted: desiredPlayerMutedRef.current,
+        }).catch((error) => {
+          audioRecoveryInFlightRef.current = false;
+          logRef.current?.(
+            `[Player] audio auto reconnect failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
+      };
+
+      const now = Date.now();
+      audioRecoveryAttemptsRef.current = audioRecoveryAttemptsRef.current.filter(
+        (attemptedAt) => now - attemptedAt <= AUDIO_RECOVERY_WINDOW_MS,
+      );
+      if (audioRecoveryInFlightRef.current) {
+        return;
+      }
+      if (audioRecoveryAttemptsRef.current.length >= AUDIO_RECOVERY_MAX_ATTEMPTS) {
+        logRef.current?.(
+          `[Player] audio subscribe closed repeatedly; skip auto reconnect statusCode=${detail.statusCode} reason=${detail.reasonPhrase || ""}`,
+        );
+        return;
+      }
+
+      const lastAttemptAt = audioRecoveryAttemptsRef.current.at(-1) ?? 0;
+      const waitMs = Math.max(
+        0,
+        AUDIO_RECOVERY_MIN_INTERVAL_MS - (now - lastAttemptAt),
+      );
+      if (waitMs > 0) {
+        audioRecoveryInFlightRef.current = true;
+        audioRecoveryTimerRef.current = window.setTimeout(reconnect, waitMs);
+        logRef.current?.(
+          `[Player] audio subscribe closed by server; delayed reconnect ${Math.round(waitMs)}ms statusCode=${detail.statusCode} reason=${detail.reasonPhrase || ""}`,
+        );
+        return;
+      }
+
+      reconnect();
+    };
+
     attach(ctx, ctx.player, "loadeddata", markStarted);
     attach(ctx, ctx.player, "playing", markStarted);
     attach(ctx, ctx.player, "play", () => {
@@ -658,6 +819,9 @@ export function usePlayerSession({
           ? mutedFromDetail
           : backend.audio.muted.peek();
       syncPlayerMutedState(muted);
+    });
+    attach(ctx, window, "moq-subscribe-done", (event) => {
+      recoverAudioSubscribe(event?.detail);
     });
 
     attach(ctx, ctx.player, "error", (event) => {
@@ -748,6 +912,11 @@ export function usePlayerSession({
       if (videoStats?.frameCount > 0) {
         markStarted();
       }
+      updateAudioRecoveryStability(
+        ctx.key,
+        Number(audioStats?.bytesReceived ?? 0),
+        now,
+      );
 
       if (stalled) {
         updatePlayerStatus("buffering", "缓冲中（等待稳定缓冲）。");

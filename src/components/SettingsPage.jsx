@@ -17,6 +17,11 @@ function formatHistoryTime(value) {
   }).format(date);
 }
 
+function getWatchHistoryHref(item) {
+  const room = item?.room?.trim();
+  return room ? `?r=${encodeURIComponent(room)}` : "?";
+}
+
 function ChevronIcon() {
   return (
     <svg viewBox="0 0 24 24">
@@ -237,26 +242,32 @@ function WatchHistorySection({ historyItems, onClearWatchHistory, onOpenWatchHis
         <button type="button" class="my-section-link" onClick={onClearWatchHistory}>清空</button>
       ) : null}
     >
-      {historyItems.length ? historyItems.map((item) => (
-        <button
-          key={`${item.room}-${item.watchedAt}`}
-          type="button"
-          class="my-history-row"
-          onClick={() => {
-            onOpenWatchHistoryItem?.(item);
-          }}
-        >
-          <span class="my-history-copy">
-            <strong>{item.room}</strong>
-          </span>
-          <span class="my-history-meta">
-            <span>{item.displayTime}</span>
-            <span class="my-row-chevron" aria-hidden="true">
-              <ChevronIcon />
-            </span>
-          </span>
-        </button>
-      )) : (
+      {historyItems.length ? (
+        <ul class="my-history-list">
+          {historyItems.map((item) => (
+            <li key={`${item.room}-${item.watchedAt}`}>
+              <a
+                href={getWatchHistoryHref(item)}
+                class="my-history-row"
+                onClick={(event) => {
+                  event.preventDefault();
+                  onOpenWatchHistoryItem?.(item);
+                }}
+              >
+                <span class="my-history-copy">
+                  <strong>{item.room}</strong>
+                </span>
+                <span class="my-history-meta">
+                  <span>{item.displayTime}</span>
+                  <span class="my-row-chevron" aria-hidden="true">
+                    <ChevronIcon />
+                  </span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : (
         <div class="my-empty-state">
           <span>暂无观看历史</span>
         </div>

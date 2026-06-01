@@ -6,159 +6,13 @@ import preact from "@preact/preset-vite";
 import { defineConfig, loadEnv } from "vite";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
-const moqWatchBroadcastModuleMarker = "/node_modules/@moq/watch/broadcast-";
-const moqLiteSubscribeModulePath = "/node_modules/@moq/lite/ietf/subscribe.js";
-const AUDIO_PREBUFFER_MS = 100;
-const AUDIO_RING_CAPACITY_MS = 2000;
-const AUDIO_TARGET_BUFFER_MS = 140;
-const AUDIO_MAX_BUFFER_MS = 220;
-const AUDIO_SEGMENT_READ_TIMEOUT_MS = 4000;
-const VIDEO_SEGMENT_READ_TIMEOUT_MS = 10000;
-const AUDIO_SUBGROUP_SWITCH_TIMEOUT_MS = 750;
-const VIDEO_SUBGROUP_SWITCH_TIMEOUT_MS = 2000;
+const moqNetAdapterModulePath = "/node_modules/@moq/net/ietf/adapter.js";
+const moqNetSubscribeModulePath = "/node_modules/@moq/net/ietf/subscribe.js";
+const moqNetSubscriberModulePath = "/node_modules/@moq/net/ietf/subscriber.js";
+const moqPublishModulePath = "/node_modules/@moq/publish/";
+const moqWatchModulePath = "/node_modules/@moq/watch/";
 
-function patchMoqWatchCatalogFormats() {
-  const broadcastFetchSnippet =
-    'const o = r === "hang" ? "catalog.json" : "catalog", a = i.subscribe(o, ee.catalog);\n    e.cleanup(() => a.close());\n    const c = r === "hang" ? async () => ms(a) : async () => {\n      const u = await er(a);\n      return u ? rr(u) : void 0;\n    };';
-  const patchedBroadcastFetchSnippet =
-    'const o = r === "hang" ? "catalog.json" : r === ".catalog" ? ".catalog" : "catalog", a = i.subscribe(o, ee.catalog);\n    e.cleanup(() => a.close());\n    const c = r === "hang" ? async () => ms(a) : r === ".catalog" ? async () => {\n      const u = await __moqWatchFetchMoqJsCatalog(a);\n      return u ? await __moqWatchMoqJsCatalogToHang(u, i, e) : void 0;\n    } : async () => {\n      const u = await er(a);\n      return u ? rr(u) : void 0;\n    };';
-  const converterInsertAfter =
-    "async function er(t) {\n  const e = await t.readFrame();\n  if (e)\n    return Qi(e);\n}\n";
-  const moqJsCatalogConverter = `${converterInsertAfter}function __moqWatchBytes(t) {
-  if (t instanceof Uint8Array) return t;
-  if (t instanceof ArrayBuffer) return new Uint8Array(t);
-  return new Uint8Array(t.buffer, t.byteOffset, t.byteLength);
-}
-
-function __moqWatchBase64ToBytes(t) {
-  try {
-    const e = atob(t), n = new Uint8Array(e.length);
-    for (let s = 0; s < e.length; s++) n[s] = e.charCodeAt(s);
-    return n;
-  } catch {
-    return;
-  }
-}
-function __moqWatchBase64ToHex(t) {
-  if (!t) return;
-  try {
-    return rt(__moqWatchBytes(__moqWatchBase64ToBytes(t) ?? new Uint8Array()));
-  } catch {
-    return;
-  }
-}
-function __moqWatchFlattenMoqJsTracks(t) {
-  const e = t?.commonTrackFields ?? {};
-  return (t?.tracks ?? []).map((n) => ({
-    ...e,
-    ...n,
-    selectionParams: {
-      ...(e.selectionParams ?? {}),
-      ...(n.selectionParams ?? {})
-    }
-  }));
-}
-function __moqWatchDecodeMoqJsCatalog(t) {
-  const e = new TextDecoder().decode(t);
-  try {
-    return JSON.parse(e);
-  } catch (n) {
-    console.warn("invalid .catalog payload", e);
-    throw n;
-  }
-}
-async function __moqWatchFetchMoqJsCatalog(t) {
-  const e = await t.readFrame();
-  if (e)
-    return __moqWatchDecodeMoqJsCatalog(e);
-}
-async function __moqWatchReadInitTrack(t, e, n) {
-  if (!t) return;
-  const s = e.subscribe(t, ee.catalog);
-  n.cleanup(() => s.close());
-  try {
-    const i = await s.readFrame();
-    if (!i) return;
-    return ri(i);
-  } catch (i) {
-    console.warn("failed to read .catalog init track", t, i);
-    return;
-  } finally {
-    s.close();
-  }
-}
-async function __moqWatchMoqJsCatalogToHang(t, e, n) {
-  const s = {}, i = {};
-  for (const l of __moqWatchFlattenMoqJsTracks(t)) {
-    const r = l.selectionParams ?? {}, o = l.name;
-    if (!o) continue;
-    const a = l.packaging === "cmaf" && l.initTrack ? await __moqWatchReadInitTrack(l.initTrack, e, n) : void 0;
-    const c = l.packaging === "cmaf" ? { kind: "cmaf", timescale: L(a?.timescale ?? 1e6), trackId: L(a?.trackId ?? 1) } : { kind: "legacy" };
-    const u = a?.description ? rt(a.description) : __moqWatchBase64ToHex(l.initData);
-    if (typeof r.width == "number" && typeof r.height == "number") {
-      s[o] = {
-        codec: r.codec ?? "",
-        container: c,
-        description: u,
-        codedWidth: L(r.width),
-        codedHeight: L(r.height),
-        framerate: r.framerate,
-        bitrate: r.bitrate != null ? L(r.bitrate) : void 0
-      };
-    } else if (typeof r.samplerate == "number" || typeof r.channelConfig == "string") {
-      const d = Number.parseInt(r.channelConfig ?? "2", 10);
-      i[o] = {
-        codec: r.codec ?? "opus",
-        container: c,
-        description: u,
-        sampleRate: L(r.samplerate ?? 48e3),
-        numberOfChannels: L(Number.isFinite(d) ? d : 2),
-        bitrate: r.bitrate != null ? L(r.bitrate) : void 0
-      };
-    }
-  }
-  const r = {};
-  return Object.keys(s).length > 0 && (r.video = { renditions: s }), Object.keys(i).length > 0 && (r.audio = { renditions: i }), r;
-}
-`;
-
-  return {
-    name: "patch-moq-watch-catalog-formats",
-    enforce: "pre",
-    transform(code, id) {
-      const normalizedId = id.split("?")[0];
-      if (
-        normalizedId.includes(moqWatchBroadcastModuleMarker) &&
-        normalizedId.endsWith(".js")
-      ) {
-        let nextCode = code;
-        if (!nextCode.includes(converterInsertAfter)) {
-          throw new Error(
-            "Missing @moq/watch broadcast converter insert target",
-          );
-        }
-        nextCode = nextCode.replace(
-          converterInsertAfter,
-          moqJsCatalogConverter,
-        );
-        if (!nextCode.includes(broadcastFetchSnippet)) {
-          throw new Error(
-            "Missing @moq/watch broadcast catalog fetch patch target",
-          );
-        }
-        nextCode = nextCode.replace(
-          broadcastFetchSnippet,
-          patchedBroadcastFetchSnippet,
-        );
-        return nextCode === code ? null : { code: nextCode, map: null };
-      }
-
-      return null;
-    },
-  };
-}
-
-function patchMoqLiteCloudflareSubscribe() {
+function patchMoqNetCloudflareSubscribe() {
   const groupOrderSnippet =
     "// we only support Group Order descending\nconst GROUP_ORDER = 0x02;";
   const patchedGroupOrderSnippet =
@@ -173,11 +27,11 @@ function patchMoqLiteCloudflareSubscribe() {
     "params.subscriptionFilter = 0x1; // NextGroupStart";
 
   return {
-    name: "patch-moq-lite-cloudflare-subscribe",
+    name: "patch-moq-net-cloudflare-subscribe",
     enforce: "pre",
     transform(code, id) {
       const normalizedId = id.split("?")[0];
-      if (!normalizedId.endsWith(moqLiteSubscribeModulePath)) {
+      if (!normalizedId.endsWith(moqNetSubscribeModulePath)) {
         return null;
       }
 
@@ -190,12 +44,99 @@ function patchMoqLiteCloudflareSubscribe() {
 
       for (const [from, to] of replacements) {
         if (!nextCode.includes(from)) {
-          throw new Error(`Missing @moq/lite subscribe patch target: ${from}`);
+          throw new Error(`Missing @moq/net subscribe patch target: ${from}`);
         }
         nextCode = nextCode.replace(from, to);
       }
 
       return nextCode === code ? null : { code: nextCode, map: null };
+    },
+  };
+}
+
+function patchMoqNetPublishDoneDetails() {
+  const adapterPublishDoneSnippet = `            case 0x0b: {
+                // PublishDone
+                const requestId = await readRequestId();
+                return { route: Route.CloseStream, requestId };
+            }`;
+  const patchedAdapterPublishDoneSnippet = `            case 0x0b: {
+                // PublishDone carries the subscription close status; route it
+                // through so the subscriber can decode statusCode/reasonPhrase.
+                const requestId = await readRequestId();
+                return { route: Route.FollowUp, requestId };
+            }`;
+  const subscriberImportSnippet =
+    'import { PublishError } from "./publish.js";';
+  const patchedSubscriberImportSnippet =
+    'import { PublishDone, PublishError } from "./publish.js";';
+  const subscriberCloseSnippet = `                        // Wait for stream close (= PublishDone) or track close (= local unsubscribe)
+                        await Promise.race([stream.reader.closed, request.track.closed]);`;
+  const patchedSubscriberCloseSnippet = `                        // Wait for PublishDone, stream close, or local unsubscribe.
+                        const closeResult = await Promise.race([
+                            (async () => {
+                                const msgType = await stream.reader.u53();
+                                if (msgType !== PublishDone.id) {
+                                    throw new Error(\`unexpected subscribe follow-up: 0x\${msgType.toString(16)}\`);
+                                }
+                                const done = await PublishDone.decode(stream.reader, version);
+                                return { type: "publishDone", done };
+                            })(),
+                            stream.reader.closed.then(() => ({ type: "stream" })),
+                            request.track.closed.then((reason) => ({ type: "track", reason })),
+                        ]);
+                        if (closeResult.type === "publishDone") {
+                            const done = closeResult.done;
+                            console.debug(\`publish done detail: id=\${requestId} broadcast=\${broadcast} track=\${request.track.name} statusCode=\${done.statusCode} reason=\${done.reasonPhrase}\`);
+                            if (typeof globalThis.dispatchEvent === "function" && typeof globalThis.CustomEvent === "function") {
+                                globalThis.dispatchEvent(new CustomEvent("moq-subscribe-done", {
+                                    detail: {
+                                        requestId: Number(requestId),
+                                        requestIdText: requestId.toString(),
+                                        broadcast,
+                                        track: request.track.name,
+                                        statusCode: done.statusCode,
+                                        reasonPhrase: done.reasonPhrase,
+                                    },
+                                }));
+                            }
+                        }`;
+
+  return {
+    name: "patch-moq-net-publish-done-details",
+    enforce: "pre",
+    transform(code, id) {
+      const normalizedId = id.split("?")[0];
+      if (normalizedId.endsWith(moqNetAdapterModulePath)) {
+        if (!code.includes(adapterPublishDoneSnippet)) {
+          throw new Error("Missing @moq/net adapter PublishDone patch target");
+        }
+        return {
+          code: code.replace(
+            adapterPublishDoneSnippet,
+            patchedAdapterPublishDoneSnippet,
+          ),
+          map: null,
+        };
+      }
+
+      if (normalizedId.endsWith(moqNetSubscriberModulePath)) {
+        let nextCode = code;
+        for (const [from, to] of [
+          [subscriberImportSnippet, patchedSubscriberImportSnippet],
+          [subscriberCloseSnippet, patchedSubscriberCloseSnippet],
+        ]) {
+          if (!nextCode.includes(from)) {
+            throw new Error(
+              `Missing @moq/net subscriber patch target: ${from}`,
+            );
+          }
+          nextCode = nextCode.replace(from, to);
+        }
+        return nextCode === code ? null : { code: nextCode, map: null };
+      }
+
+      return null;
     },
   };
 }
@@ -324,12 +265,11 @@ export default defineConfig(({ mode }) => {
     plugins: [
       injectSiteTitle(siteTitle),
       createWebManifestPlugin(env, siteTitle),
-      patchMoqWatchCatalogFormats(),
-      patchMoqLiteCloudflareSubscribe(),
+      patchMoqNetPublishDoneDetails(),
       preact(),
     ],
     optimizeDeps: {
-      exclude: ["@moq/lite", "@moq/watch"],
+      exclude: ["@moq/net", "@moq/publish", "@moq/watch"],
     },
     define: {
       __APP_TITLE__: JSON.stringify(siteTitle),

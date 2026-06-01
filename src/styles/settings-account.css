@@ -251,9 +251,17 @@
   opacity: 0.64;
 }
 
+.my-history-list {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  list-style: none;
+}
+
 .my-history-row {
   width: 100%;
   min-width: 0;
+  padding: 14px 18px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -263,7 +271,12 @@
   background: transparent;
   color: var(--text);
   text-align: left;
+  text-decoration: none;
   box-shadow: none;
+}
+
+.my-history-list > li + li .my-history-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .my-history-copy {

@@ -1,0 +1,393 @@
+@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+  body:has(.watch-stage-frame.is-portrait) .app-container-watch-joined {
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .app-container-watch-joined
+    .topbar {
+    display: none;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .page[data-page="watch"][data-joined="true"] {
+    height: 100svh;
+    overflow: hidden;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .page[data-page="watch"]
+    .page-grid {
+    min-height: 0;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-layout:has(.watch-stage-frame.is-portrait) {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-layout:has(.watch-stage-frame.is-portrait)
+    .stage-column {
+    position: relative;
+    width: 100%;
+    align-self: stretch;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+    background: #050d14;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-layout:has(.watch-stage-frame.is-portrait)
+    .watch-stage-frame.is-portrait {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    flex: 1 1 auto;
+    aspect-ratio: 9 / 16;
+    border-right: 0;
+    border-bottom: 0;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-layout:has(.watch-stage-frame.is-portrait)
+    .control-column[data-joined="true"] {
+    display: none;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-layout:has(.watch-stage-frame.is-portrait)
+    .info-strip-mobile {
+    display: none;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud {
+    z-index: 3;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud-overlay {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-leave {
+    width: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    box-shadow: none;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-leave svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-meta strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.92rem;
+    color: var(--text);
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-meta-left {
+    max-width: min(72vw, 260px);
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .stage-mobile-hud-actions
+    > .state-pill {
+    flex: 0 0 auto;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-more {
+    width: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: rgba(235, 244, 251, 0.92);
+    box-shadow: none;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-mobile-more svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .stage-unmute-prompt {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: fit-content;
+    max-width: calc(100% - 24px);
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    border: 0;
+    border-radius: 0;
+    background: rgba(4, 11, 17, 0.56);
+    opacity: 0;
+    transition: opacity 220ms ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-mobile-more-backdrop.is-open {
+    opacity: 1;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-panel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom) + 12px);
+    z-index: 21;
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: rgba(8, 16, 25, 0.98);
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+    transform-origin: bottom center;
+    transition:
+      opacity 220ms ease,
+      transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, opacity;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-mobile-more-panel.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-header {
+    display: grid;
+    gap: 4px;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-header strong {
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-header span {
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-portrait-chat-overlay {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 0;
+    pointer-events: none;
+    padding: 0 10px 12px;
+    isolation: isolate;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .chat-panel-watch-overlay {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-message-list {
+    --watch-chat-list-max-height: min(34vh, 260px);
+    --watch-chat-list-fade-size: 30px;
+    flex: 0 1 auto;
+    align-items: flex-start;
+    min-height: 0;
+    max-height: var(--watch-chat-list-max-height);
+    gap: 8px;
+    padding: 0 72px 8px 0;
+    overflow: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(
+      0deg,
+      #000 0,
+      #000
+        calc(
+          var(--watch-chat-list-max-height) - var(--watch-chat-list-fade-size)
+        ),
+      rgba(0, 0, 0, 0.42) calc(var(--watch-chat-list-max-height) - 12px),
+      transparent var(--watch-chat-list-max-height)
+    );
+    mask-image: linear-gradient(
+      0deg,
+      #000 0,
+      #000
+        calc(
+          var(--watch-chat-list-max-height) - var(--watch-chat-list-fade-size)
+        ),
+      rgba(0, 0, 0, 0.42) calc(var(--watch-chat-list-max-height) - 12px),
+      transparent var(--watch-chat-list-max-height)
+    );
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-message-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-message-card {
+    max-width: min(84%, 320px);
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 6px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 16px;
+    background: rgba(9, 18, 29, 0.72);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-message-card-system-no-avatar {
+    max-width: min(84%, 320px);
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-message-body
+    p {
+    font-size: 0.9rem;
+    line-height: 1.42;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-message-body
+    strong {
+    font-size: 0.9rem;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-composer-floating {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding-right: 0;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-composer-floating
+    input {
+    min-height: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(15, 24, 34, 0.78);
+    padding: 0 14px;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-composer-floating
+    button {
+    width: auto;
+    min-width: 60px;
+    min-height: 36px;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    box-shadow: 0 12px 24px var(--primary-shadow);
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .chat-panel-watch-overlay
+    .chat-floating-warning {
+    margin: 0 0 2px;
+    padding: 8px 10px;
+    border-radius: 14px;
+    background: rgba(255, 100, 121, 0.14);
+    color: #ffd6de;
+  }
+}

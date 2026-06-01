@@ -1,8 +1,27 @@
-@media (max-width: 760px) {
   .live-mobile-page {
+    overflow: hidden;
+  }
+
+  .live-mobile-page[data-shell="compact"] {
     height: calc(
       100svh - var(--mobile-nav-height) - env(safe-area-inset-bottom)
     );
+  }
+
+  .live-mobile-page[data-shell="immersive"] {
+    height: 100svh;
+  }
+
+  body:has(.live-mobile-page[data-shell="immersive"]:not([hidden]))
+    .app-container {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  body:has(.live-mobile-page[data-shell="immersive"]:not([hidden]))
+    .topbar,
+  body:has(.live-mobile-page[data-shell="immersive"]:not([hidden]))
+    .mobile-nav {
+    display: none;
   }
 
   .live-mobile-shell {
@@ -64,6 +83,26 @@
     font-size: 0.86rem;
     line-height: 1.45;
     text-align: center;
+  }
+
+  .live-mobile-toast {
+    position: absolute;
+    left: 50%;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    z-index: 5;
+    max-width: min(320px, calc(100% - 32px));
+    padding: 9px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    background: rgba(8, 16, 25, 0.92);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
+    color: var(--text);
+    font-size: 0.86rem;
+    line-height: 1.35;
+    text-align: center;
+    transform: translateX(-50%);
+    backdrop-filter: blur(14px);
+    pointer-events: none;
   }
 
   .live-mobile-chat-overlay {
@@ -189,6 +228,10 @@
     color: #8ea4b8;
   }
 
+  .live-fab.is-unavailable {
+    color: #71879c;
+  }
+
   .live-fab.is-active,
   .live-fab-primary {
     background: linear-gradient(
@@ -285,4 +328,3 @@
     font-size: 0.82rem;
     line-height: 1.4;
   }
-}

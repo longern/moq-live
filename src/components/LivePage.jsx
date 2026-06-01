@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { useMediaOrientation } from "../hooks/useMediaOrientation.js";
+import { useCompactViewport, useTouchPortraitViewport } from "../hooks/useMediaQuery.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
 
@@ -52,7 +54,12 @@ export function LivePage({
   onChatRequireLogin,
   onRoomDetailsChange
 }) {
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 760px)").matches);
+  const compactViewport = useCompactViewport();
+  const touchPortraitViewport = useTouchPortraitViewport();
+  const previewOrientation = useMediaOrientation({
+    mediaRef: previewVideoRef,
+    active: previewActive && previewHasVideo,
+  });
   const [roomCoverUrl, setRoomCoverUrl] = useState("");
   const [roomCoverLoading, setRoomCoverLoading] = useState(false);
   const [roomCoverBusy, setRoomCoverBusy] = useState(false);
@@ -61,19 +68,13 @@ export function LivePage({
   const roomCoverInputRef = useRef(null);
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
-
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 760px)");
-    const sync = () => {
-      setIsMobile(media.matches);
-    };
-
-    sync();
-    media.addEventListener("change", sync);
-    return () => {
-      media.removeEventListener("change", sync);
-    };
-  }, []);
+  const immersiveTouchPortrait =
+    touchPortraitViewport &&
+    previewActive &&
+    previewHasVideo &&
+    previewOrientation === "portrait";
+  const useMobileShell = compactViewport || immersiveTouchPortrait;
+  const mobileShellMode = immersiveTouchPortrait ? "immersive" : "compact";
 
   useEffect(() => {
     if (!authUser?.id || hidden) {
@@ -189,8 +190,8 @@ export function LivePage({
     onOpenCoverPicker: openRoomCoverPicker
   };
 
-  if (isMobile) {
-    return <LiveMobilePage {...pageProps} />;
+  if (useMobileShell) {
+    return <LiveMobilePage {...pageProps} shellMode={mobileShellMode} />;
   }
 
   return <LiveDesktopPage {...pageProps} />;

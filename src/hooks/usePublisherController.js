@@ -1194,18 +1194,31 @@ export function usePublisherController({
       return;
     }
 
-    const previewVideo = previewVideoRef.current;
-    const stream = previewMediaStreamRef.current;
-    if (!previewVideo || !stream || !previewHasVideo) {
+    const syncPreviewVideo = () => {
+      const previewVideo = previewVideoRef.current;
+      const stream = previewMediaStreamRef.current;
+      if (!previewVideo || !stream || !previewHasVideo) {
+        if (previewVideo) {
+          previewVideo.srcObject = null;
+        }
+        return;
+      }
+
+      if (previewVideo.srcObject !== stream) {
+        previewVideo.srcObject = stream;
+      }
+    };
+
+    syncPreviewVideo();
+    const syncTicker = window.setInterval(syncPreviewVideo, 250);
+
+    return () => {
+      window.clearInterval(syncTicker);
+      const previewVideo = previewVideoRef.current;
       if (previewVideo) {
         previewVideo.srcObject = null;
       }
-      return;
-    }
-
-    if (previewVideo.srcObject !== stream) {
-      previewVideo.srcObject = stream;
-    }
+    };
   }, [page, previewActive, previewHasVideo, previewSourceType]);
 
   useEffect(() => {

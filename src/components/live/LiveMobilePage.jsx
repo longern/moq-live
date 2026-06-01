@@ -15,8 +15,10 @@ export function LiveMobilePage(props) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreMounted, setMoreMounted] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
+  const [cameraNoticeVisible, setCameraNoticeVisible] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const closeTimerRef = useRef(null);
+  const cameraNoticeTimerRef = useRef(null);
   const openFrameRef = useRef(null);
   const dragStateRef = useRef({
     active: false,
@@ -29,6 +31,7 @@ export function LiveMobilePage(props) {
     publishBlocked,
     publishBlockedReason,
     publishBadge,
+    cameraOptions,
     cameraMode,
     microphoneEnabled,
     isPublishing,
@@ -64,12 +67,17 @@ export function LiveMobilePage(props) {
     roomCoverStatus,
     roomCoverInputRef,
     onPickCover,
-    onOpenCoverPicker
+    onOpenCoverPicker,
+    shellMode = "compact"
   } = props;
+  const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
 
   useEffect(() => () => {
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
+    }
+    if (cameraNoticeTimerRef.current) {
+      clearTimeout(cameraNoticeTimerRef.current);
     }
     if (openFrameRef.current) {
       cancelAnimationFrame(openFrameRef.current);
@@ -160,8 +168,28 @@ export function LiveMobilePage(props) {
     setDragOffset(0);
   }
 
+  function showCameraUnavailableNotice() {
+    setCameraNoticeVisible(true);
+    if (cameraNoticeTimerRef.current) {
+      clearTimeout(cameraNoticeTimerRef.current);
+    }
+    cameraNoticeTimerRef.current = window.setTimeout(() => {
+      setCameraNoticeVisible(false);
+      cameraNoticeTimerRef.current = null;
+    }, 1800);
+  }
+
+  function handleCameraAction() {
+    if (cameraUnavailable) {
+      showCameraUnavailableNotice();
+      return;
+    }
+
+    onCycleCamera();
+  }
+
   return (
-    <section class="page page-immersive live-mobile-page" data-page="live" hidden={hidden}>
+    <section class="page page-immersive live-mobile-page" data-page="live" data-shell={shellMode} hidden={hidden}>
       <div class="live-mobile-shell">
         <div class="live-mobile-head">
           <strong class="live-mobile-room">{roomLabel}</strong>
@@ -198,12 +226,16 @@ export function LiveMobilePage(props) {
           {publishBlocked ? (
             <div class="live-mobile-warning">{publishBlockedReason}</div>
           ) : null}
+          {cameraNoticeVisible ? (
+            <div class="live-mobile-toast" role="status">未检测到可用摄像头</div>
+          ) : null}
           <div class="live-mobile-actions">
             <button
               type="button"
-              class={`live-fab${cameraMode === "off" ? " is-muted" : ""}`}
-              onClick={onCycleCamera}
-              aria-label={`切换摄像头，当前${cameraMode === "rear" ? "后摄" : cameraMode === "front" ? "前摄" : "关闭"}`}
+              class={`live-fab${cameraMode === "off" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable" : ""}`}
+              onClick={handleCameraAction}
+              aria-label={cameraUnavailable ? "未检测到可用摄像头" : `切换摄像头，当前${cameraMode === "rear" ? "后摄" : cameraMode === "front" ? "前摄" : "关闭"}`}
+              aria-disabled={cameraUnavailable ? "true" : undefined}
             >
               <CameraIcon mode={cameraMode} />
             </button>

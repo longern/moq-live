@@ -13,201 +13,173 @@ import {
 import { LiveCoverManager } from "./LiveCoverManager.jsx";
 import { LivePreviewStage } from "./LivePreviewStage.jsx";
 
-function LiveDesktopPanel(props) {
-  const {
-    openPanel,
-    cameraMode,
-    selectedCameraId,
-    selectedMicrophoneId,
-    cameraOptions,
-    microphoneOptions,
-    microphoneEnabled,
-    isPublishing,
-    screenShareSupported,
-    screenShareActive,
-    previewSourceType,
-    onCameraChange,
-    onMicrophoneChange,
-    onCycleCamera,
-    onToggleMicrophone,
-    onStartScreenShare,
-    onStopScreenShare,
-    watchLink,
-    shareTarget,
-    onShare,
-    shareSupported,
-    syntheticPublishing,
-    publishBlocked,
-    publishStatus,
-    onStartSynthetic,
-    onStopSynthetic,
-    roomCoverUrl,
-    roomCoverLoading,
-    roomCoverBusy,
-    roomCoverError,
-    roomCoverStatus,
-    roomCoverInputRef,
-    onPickCover,
-    onOpenCoverPicker
-  } = props;
-  const sharingNamespace = shareTarget.startsWith("ns:");
+function getCameraStatusLabel(cameraMode) {
+  if (cameraMode === "off") {
+    return "当前已关闭";
+  }
+  return cameraMode === "rear" ? "当前后置" : "当前前置";
+}
 
-  if (!openPanel) {
+function LiveDesktopPanel({ children }) {
+  if (!children) {
     return null;
   }
 
+  return <section class="live-desktop-panel">{children}</section>;
+}
+
+function CameraPanel({
+  cameraMode,
+  selectedCameraId,
+  cameraOptions,
+  isPublishing,
+  previewSourceType,
+  onCameraChange,
+  onCycleCamera,
+}) {
   return (
-    <section class="live-desktop-panel">
-      {openPanel === "camera" ? (
-        <>
-          <div class="live-desktop-panel-head">
-            <strong>摄像头</strong>
-            <span>{cameraMode === "off" ? "当前已关闭" : cameraMode === "rear" ? "当前后置" : "当前前置"}</span>
-          </div>
-          <label>
-            选择设备
-            <select
-              id="cameraSelect"
-              value={selectedCameraId}
-              onChange={onCameraChange}
-              disabled={isPublishing && previewSourceType !== "camera"}
-            >
-              {cameraOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          <div class="action-row">
-            <button type="button" class="secondary" onClick={onCycleCamera}>
-              {cameraMode === "off" ? "打开摄像头" : "切换前后摄"}
-            </button>
-          </div>
-        </>
-      ) : null}
+    <>
+      <div class="live-desktop-panel-head">
+        <strong>摄像头</strong>
+        <span>{getCameraStatusLabel(cameraMode)}</span>
+      </div>
+      <label>
+        选择设备
+        <select
+          id="cameraSelect"
+          value={selectedCameraId}
+          onChange={onCameraChange}
+          disabled={isPublishing && previewSourceType !== "camera"}
+        >
+          {cameraOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </label>
+      <div class="action-row">
+        <button type="button" class="secondary" onClick={onCycleCamera}>
+          {cameraMode === "off" ? "打开摄像头" : "切换前后摄"}
+        </button>
+      </div>
+    </>
+  );
+}
 
-      {openPanel === "microphone" ? (
-        <>
-          <div class="live-desktop-panel-head">
-            <strong>麦克风</strong>
-            <span>{microphoneEnabled ? "正在采集声音" : "当前已静音"}</span>
-          </div>
-          <label>
-            选择设备
-            <select id="microphoneSelect" value={selectedMicrophoneId} onChange={onMicrophoneChange} disabled={isPublishing}>
-              {microphoneOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          <div class="action-row">
-            <button type="button" class="secondary" onClick={onToggleMicrophone}>
-              {microphoneEnabled ? "关闭麦克风" : "打开麦克风"}
-            </button>
-          </div>
-        </>
-      ) : null}
+function MicrophonePanel({
+  selectedMicrophoneId,
+  microphoneOptions,
+  microphoneEnabled,
+  isPublishing,
+  onMicrophoneChange,
+  onToggleMicrophone,
+}) {
+  return (
+    <>
+      <div class="live-desktop-panel-head">
+        <strong>麦克风</strong>
+        <span>{microphoneEnabled ? "正在采集声音" : "当前已静音"}</span>
+      </div>
+      <label>
+        选择设备
+        <select id="microphoneSelect" value={selectedMicrophoneId} onChange={onMicrophoneChange} disabled={isPublishing}>
+          {microphoneOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </label>
+      <div class="action-row">
+        <button type="button" class="secondary" onClick={onToggleMicrophone}>
+          {microphoneEnabled ? "关闭麦克风" : "打开麦克风"}
+        </button>
+      </div>
+    </>
+  );
+}
 
-      {openPanel === "screen" ? (
-        <>
-          <div class="live-desktop-panel-head">
-            <strong>屏幕分享</strong>
-            <span>
-              {!screenShareSupported
-                ? "当前浏览器不支持"
-                : screenShareActive
-                  ? (isPublishing ? "当前正在以屏幕共享开播" : "当前预览源为屏幕共享")
-                  : "选择窗口或整个屏幕作为开播源"}
-            </span>
-          </div>
-          {isPublishing ? (
-            <div class="summary-item live-desktop-summary">
-              <strong>当前状态</strong>
-              <span>直播中不能切换共享源，先停止开播再重新选择屏幕共享或摄像头。</span>
-            </div>
-          ) : null}
-          <div class="action-row">
-            <button type="button" class="primary" onClick={onStartScreenShare} disabled={!screenShareSupported || isPublishing}>
-              {screenShareActive ? "重新选择共享内容" : "开始屏幕共享"}
-            </button>
-            <button type="button" class="secondary" onClick={onStopScreenShare} disabled={!screenShareActive || isPublishing}>
-              停止共享
-            </button>
-          </div>
-          <div class="summary-item live-desktop-summary">
-            <strong>预览源</strong>
-            <span>
-              {previewSourceType === "screen"
-                ? "当前预览来自屏幕共享"
-                : previewSourceType === "synthetic"
-                  ? "当前预览来自合成源"
-                  : "当前预览来自摄像头"}
-            </span>
-          </div>
-        </>
-      ) : null}
+function ShareLinkPanel({
+  watchLink,
+  shareTarget,
+  onShare,
+  shareSupported,
+}) {
+  const sharingNamespace = shareTarget.startsWith("ns:");
 
-      {openPanel === "link" ? (
-        <>
-          <div class="live-desktop-panel-head">
-            <strong>直播链接</strong>
-            <span>{watchLink ? "可直接分享" : "等待生成"}</span>
-          </div>
-          <label>
-            {sharingNamespace ? "直播 namespace" : "主播号"}
-            <input id="liveRoomId" value={shareTarget} readonly />
-          </label>
-          <label>
-            观看链接
-            <input id="watchLinkInput" value={watchLink} readonly />
-          </label>
-          <div class="action-row">
-            <button type="button" id="copyRoomLink" class="primary" onClick={onShare} disabled={!shareSupported || !watchLink}>
-              分享直播间
-            </button>
-          </div>
-        </>
-      ) : null}
+  return (
+    <>
+      <div class="live-desktop-panel-head">
+        <strong>直播链接</strong>
+        <span>{watchLink ? "可直接分享" : "等待生成"}</span>
+      </div>
+      <label>
+        {sharingNamespace ? "直播 namespace" : "主播号"}
+        <input id="liveRoomId" value={shareTarget} readonly />
+      </label>
+      <label>
+        观看链接
+        <input id="watchLinkInput" value={watchLink} readonly />
+      </label>
+      <div class="action-row">
+        <button type="button" id="copyRoomLink" class="primary" onClick={onShare} disabled={!shareSupported || !watchLink}>
+          分享直播间
+        </button>
+      </div>
+    </>
+  );
+}
 
-      {openPanel === "more" ? (
-        <>
-          <div class="live-desktop-panel-head">
-            <strong>更多</strong>
-            <span>{syntheticPublishing ? "当前合成源已启动" : publishStatus}</span>
-          </div>
-          <LiveCoverManager
-            roomCoverUrl={roomCoverUrl}
-            roomCoverLoading={roomCoverLoading}
-            roomCoverBusy={roomCoverBusy}
-            roomCoverError={roomCoverError}
-            roomCoverStatus={roomCoverStatus}
-            roomCoverInputRef={roomCoverInputRef}
-            onPickCover={onPickCover}
-            onOpenPicker={onOpenCoverPicker}
-            showNote={true}
-          />
-          <div class="action-row">
-            <button
-              type="button"
-              class="success"
-              id="startSynthetic"
-              onClick={onStartSynthetic}
-              disabled={publishBlocked || syntheticPublishing}
-            >
-              启动合成源
-            </button>
-            <button
-              type="button"
-              class="secondary"
-              id="stopSynthetic"
-              onClick={onStopSynthetic}
-              disabled={!syntheticPublishing}
-            >
-              停止合成源
-            </button>
-          </div>
-        </>
-      ) : null}
-    </section>
+function MorePanel({
+  syntheticPublishing,
+  publishBlocked,
+  publishStatus,
+  onStartSynthetic,
+  onStopSynthetic,
+  roomCoverUrl,
+  roomCoverLoading,
+  roomCoverBusy,
+  roomCoverError,
+  roomCoverStatus,
+  roomCoverInputRef,
+  onPickCover,
+  onOpenCoverPicker,
+}) {
+  return (
+    <>
+      <div class="live-desktop-panel-head">
+        <strong>更多</strong>
+        <span>{syntheticPublishing ? "当前合成源已启动" : publishStatus}</span>
+      </div>
+      <LiveCoverManager
+        roomCoverUrl={roomCoverUrl}
+        roomCoverLoading={roomCoverLoading}
+        roomCoverBusy={roomCoverBusy}
+        roomCoverError={roomCoverError}
+        roomCoverStatus={roomCoverStatus}
+        roomCoverInputRef={roomCoverInputRef}
+        onPickCover={onPickCover}
+        onOpenPicker={onOpenCoverPicker}
+        showNote={true}
+      />
+      <div class="action-row">
+        <button
+          type="button"
+          class="success"
+          id="startSynthetic"
+          onClick={onStartSynthetic}
+          disabled={publishBlocked || syntheticPublishing}
+        >
+          启动合成源
+        </button>
+        <button
+          type="button"
+          class="secondary"
+          id="stopSynthetic"
+          onClick={onStopSynthetic}
+          disabled={!syntheticPublishing}
+        >
+          停止合成源
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -271,6 +243,18 @@ export function LiveDesktopPage(props) {
     onPickCover,
     onOpenCoverPicker
   } = props;
+  const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
+  const screenShareUnavailableReason = !screenShareSupported
+    ? "当前浏览器不支持屏幕分享"
+    : isPublishing
+      ? "直播中不能切换共享源"
+      : "";
+  const screenShareUnavailable = Boolean(screenShareUnavailableReason);
+  const screenShareButtonLabel = screenShareUnavailable
+    ? screenShareUnavailableReason
+    : screenShareActive
+      ? "停止屏幕分享"
+      : "屏幕分享";
 
   useEffect(() => {
     if (!openPanel) {
@@ -288,6 +272,70 @@ export function LiveDesktopPage(props) {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [openPanel]);
+
+  useEffect(() => {
+    if ((cameraUnavailable && openPanel === "camera") || openPanel === "screen") {
+      setOpenPanel("");
+    }
+  }, [cameraUnavailable, openPanel]);
+
+  function handleScreenShareClick() {
+    setOpenPanel("");
+    if (screenShareUnavailable) {
+      return;
+    }
+
+    if (screenShareActive) {
+      onStopScreenShare();
+      return;
+    }
+
+    onStartScreenShare();
+  }
+
+  const activePanel = openPanel === "camera" ? (
+    <CameraPanel
+      cameraMode={cameraMode}
+      selectedCameraId={selectedCameraId}
+      cameraOptions={cameraOptions}
+      isPublishing={isPublishing}
+      previewSourceType={previewSourceType}
+      onCameraChange={onCameraChange}
+      onCycleCamera={onCycleCamera}
+    />
+  ) : openPanel === "microphone" ? (
+    <MicrophonePanel
+      selectedMicrophoneId={selectedMicrophoneId}
+      microphoneOptions={microphoneOptions}
+      microphoneEnabled={microphoneEnabled}
+      isPublishing={isPublishing}
+      onMicrophoneChange={onMicrophoneChange}
+      onToggleMicrophone={onToggleMicrophone}
+    />
+  ) : openPanel === "link" ? (
+    <ShareLinkPanel
+      watchLink={watchLink}
+      shareTarget={shareTarget}
+      onShare={onShare}
+      shareSupported={shareSupported}
+    />
+  ) : openPanel === "more" ? (
+    <MorePanel
+      syntheticPublishing={syntheticPublishing}
+      publishBlocked={publishBlocked}
+      publishStatus={publishStatus}
+      onStartSynthetic={onStartSynthetic}
+      onStopSynthetic={onStopSynthetic}
+      roomCoverUrl={roomCoverUrl}
+      roomCoverLoading={roomCoverLoading}
+      roomCoverBusy={roomCoverBusy}
+      roomCoverError={roomCoverError}
+      roomCoverStatus={roomCoverStatus}
+      roomCoverInputRef={roomCoverInputRef}
+      onPickCover={onPickCover}
+      onOpenCoverPicker={onOpenCoverPicker}
+    />
+  ) : null;
 
   return (
     <section class="page page-immersive" data-page="live" hidden={hidden}>
@@ -319,42 +367,7 @@ export function LiveDesktopPage(props) {
             </div>
 
             <div class="live-desktop-dock">
-              <LiveDesktopPanel
-                openPanel={openPanel}
-                cameraMode={cameraMode}
-                selectedCameraId={selectedCameraId}
-                selectedMicrophoneId={selectedMicrophoneId}
-                cameraOptions={cameraOptions}
-                microphoneOptions={microphoneOptions}
-                microphoneEnabled={microphoneEnabled}
-                isPublishing={isPublishing}
-                screenShareSupported={screenShareSupported}
-                screenShareActive={screenShareActive}
-                previewSourceType={previewSourceType}
-                onCameraChange={onCameraChange}
-                onMicrophoneChange={onMicrophoneChange}
-                onCycleCamera={onCycleCamera}
-                onToggleMicrophone={onToggleMicrophone}
-                onStartScreenShare={onStartScreenShare}
-                onStopScreenShare={onStopScreenShare}
-                watchLink={watchLink}
-                shareTarget={shareTarget}
-                onShare={onShare}
-                shareSupported={shareSupported}
-                syntheticPublishing={syntheticPublishing}
-                publishBlocked={publishBlocked}
-                publishStatus={publishStatus}
-                onStartSynthetic={onStartSynthetic}
-                onStopSynthetic={onStopSynthetic}
-                roomCoverUrl={roomCoverUrl}
-                roomCoverLoading={roomCoverLoading}
-                roomCoverBusy={roomCoverBusy}
-                roomCoverError={roomCoverError}
-                roomCoverStatus={roomCoverStatus}
-                roomCoverInputRef={roomCoverInputRef}
-                onPickCover={onPickCover}
-                onOpenCoverPicker={onOpenCoverPicker}
-              />
+              <LiveDesktopPanel>{activePanel}</LiveDesktopPanel>
 
               {publishBlocked ? (
                 <p class="inline-warning live-desktop-warning">{publishBlockedReason}</p>
@@ -363,13 +376,26 @@ export function LiveDesktopPage(props) {
               <div class="live-desktop-actions" role="toolbar" aria-label="开播控制">
                 <button
                   type="button"
-                  class={`live-dock-button${openPanel === "camera" ? " is-active" : ""}${cameraMode === "off" ? " is-muted" : ""}`}
-                  onClick={() => setOpenPanel((current) => (current === "camera" ? "" : "camera"))}
-                  aria-label="摄像头设置"
-                  aria-expanded={openPanel === "camera"}
-                  title="摄像头"
+                  class={`live-dock-button${openPanel === "camera" ? " is-active" : ""}${cameraMode === "off" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable has-tooltip" : ""}`}
+                  onClick={() => {
+                    if (cameraUnavailable) {
+                      setOpenPanel((current) => (current === "camera" ? "" : current));
+                      return;
+                    }
+                    setOpenPanel((current) => (current === "camera" ? "" : "camera"));
+                  }}
+                  aria-label={cameraUnavailable ? "未检测到可用摄像头" : "摄像头设置"}
+                  aria-describedby={cameraUnavailable ? "cameraUnavailableTooltip" : undefined}
+                  aria-expanded={cameraUnavailable ? undefined : openPanel === "camera"}
+                  aria-disabled={cameraUnavailable ? "true" : undefined}
+                  title={cameraUnavailable ? "未检测到可用摄像头" : "摄像头"}
                 >
                   <CameraIcon mode={cameraMode} />
+                  {cameraUnavailable ? (
+                    <span id="cameraUnavailableTooltip" class="live-dock-tooltip" role="tooltip">
+                      未检测到可用摄像头
+                    </span>
+                  ) : null}
                 </button>
                 <button
                   type="button"
@@ -383,13 +409,19 @@ export function LiveDesktopPage(props) {
                 </button>
                 <button
                   type="button"
-                  class={`live-dock-button${openPanel === "screen" || screenShareActive ? " is-active" : ""}`}
-                  onClick={() => setOpenPanel((current) => (current === "screen" ? "" : "screen"))}
-                  aria-label="屏幕分享设置"
-                  aria-expanded={openPanel === "screen"}
-                  title="屏幕分享"
+                  class={`live-dock-button${screenShareActive ? " is-active" : ""}${screenShareUnavailable ? " is-unavailable has-tooltip" : ""}`}
+                  onClick={handleScreenShareClick}
+                  aria-label={screenShareButtonLabel}
+                  aria-describedby={screenShareUnavailable ? "screenShareUnavailableTooltip" : undefined}
+                  aria-disabled={screenShareUnavailable ? "true" : undefined}
+                  title={screenShareButtonLabel}
                 >
                   <ScreenShareIcon />
+                  {screenShareUnavailable ? (
+                    <span id="screenShareUnavailableTooltip" class="live-dock-tooltip" role="tooltip">
+                      {screenShareUnavailableReason}
+                    </span>
+                  ) : null}
                 </button>
                 <button
                   type="button"
@@ -451,7 +483,6 @@ export function LiveDesktopPage(props) {
             readOnly={chatReadOnly}
             chatError={chatError}
             title="评论"
-            showComposer={false}
             showWelcome={false}
           />
         </aside>

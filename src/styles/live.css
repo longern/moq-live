@@ -196,6 +196,7 @@
 }
 
 .live-dock-button {
+  position: relative;
   width: 44px;
   min-width: 44px;
   min-height: 44px;
@@ -218,17 +219,56 @@
 
 .live-dock-button:hover,
 .live-dock-button.is-active {
-  background: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .live-dock-button:focus-visible {
-  background: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.06);
   outline: 2px solid var(--primary-ring);
   outline-offset: 2px;
 }
 
 .live-dock-button.is-muted {
   color: #8ea4b8;
+}
+
+.live-dock-button.is-unavailable {
+  color: #71879c;
+}
+
+.live-dock-button.is-unavailable:hover,
+.live-dock-button.is-unavailable:focus-visible {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.live-dock-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 5;
+  width: max-content;
+  max-width: 220px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(8, 16, 25, 0.96);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  white-space: normal;
+}
+
+.live-dock-button.has-tooltip:hover .live-dock-tooltip,
+.live-dock-button.has-tooltip:focus-visible .live-dock-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .live-dock-button-primary {

@@ -225,7 +225,12 @@
   }
 
   .live-fab.is-muted {
-    color: #8ea4b8;
+    color: #ffc8bd;
+  }
+
+  .live-fab.is-muted:hover,
+  .live-fab.is-muted:focus-visible {
+    background: rgba(255, 125, 100, 0.1);
   }
 
   .live-fab.is-unavailable {

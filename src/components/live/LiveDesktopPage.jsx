@@ -20,12 +20,12 @@ function getCameraStatusLabel(cameraMode) {
   return cameraMode === "rear" ? "当前后置" : "当前前置";
 }
 
-function LiveDesktopPanel({ children }) {
+function LiveDesktopPanel({ children, className = "" }) {
   if (!children) {
     return null;
   }
 
-  return <section className="live-desktop-panel">{children}</section>;
+  return <section className={`live-desktop-panel${className ? ` ${className}` : ""}`}>{children}</section>;
 }
 
 function CameraPanel({
@@ -75,21 +75,25 @@ function MicrophonePanel({
 }) {
   return (
     <>
-      <div className="live-desktop-panel-head">
+      <div className="live-desktop-panel-head live-microphone-panel-head">
         <strong>麦克风</strong>
-        <span>{microphoneEnabled ? "正在采集声音" : "当前已静音"}</span>
       </div>
-      <label>
-        选择设备
+      <label className="live-panel-field">
+        <span>选择设备</span>
         <select id="microphoneSelect" value={selectedMicrophoneId} onChange={onMicrophoneChange} disabled={isPublishing}>
           {microphoneOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
       </label>
-      <div className="action-row">
-        <button type="button" className="secondary" onClick={onToggleMicrophone}>
-          {microphoneEnabled ? "关闭麦克风" : "打开麦克风"}
+      <div className="action-row live-panel-actions">
+        <button
+          type="button"
+          className={`live-panel-toggle${microphoneEnabled ? " is-danger" : " is-on"}`}
+          onClick={onToggleMicrophone}
+        >
+          <MicrophoneIcon enabled={microphoneEnabled} />
+          <span>{microphoneEnabled ? "关闭麦克风" : "打开麦克风"}</span>
         </button>
       </div>
     </>
@@ -336,6 +340,7 @@ export function LiveDesktopPage(props) {
       onOpenCoverPicker={onOpenCoverPicker}
     />
   ) : null;
+  const activePanelClassName = openPanel === "microphone" ? "is-microphone-panel" : "";
 
   return (
     <section className="page page-immersive" data-page="live" hidden={hidden}>
@@ -367,7 +372,7 @@ export function LiveDesktopPage(props) {
             </div>
 
             <div className="live-desktop-dock">
-              <LiveDesktopPanel>{activePanel}</LiveDesktopPanel>
+              <LiveDesktopPanel className={activePanelClassName}>{activePanel}</LiveDesktopPanel>
 
               {publishBlocked ? (
                 <p className="inline-warning live-desktop-warning">{publishBlockedReason}</p>

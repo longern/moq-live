@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   Copy,
@@ -14,6 +14,10 @@ import {
 import { ChatPanel } from "./ChatPanel.jsx";
 import { StatusPill } from "./StatusPill.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
+
+const WatchTestCanvas = import.meta.env.DEV
+  ? lazy(() => import("./WatchTestCanvas.jsx").then((module) => ({ default: module.WatchTestCanvas })))
+  : null;
 
 export function WatchSessionPage({
   hidden,
@@ -49,6 +53,7 @@ export function WatchSessionPage({
   chatOnlineCount,
   chatReadOnly,
   chatError,
+  testPlayback,
   onChatDraftChange,
   onChatSend,
   onChatRequireLogin
@@ -360,7 +365,15 @@ export function WatchSessionPage({
             onClick={handleStageClick}
           >
             <div id="playerMount">
-              {playerSession ? (
+              {playerSession && testPlayback && WatchTestCanvas ? (
+                <Suspense fallback={null}>
+                  <WatchTestCanvas
+                    playback={testPlayback}
+                    playerRef={playerRef}
+                    playerSession={playerSession}
+                  />
+                </Suspense>
+              ) : playerSession ? (
                 <canvas
                   ref={playerRef}
                   className="player-moq"
@@ -487,7 +500,7 @@ export function WatchSessionPage({
                 aria-haspopup="dialog"
                 aria-expanded={shareMenuMounted ? "true" : "false"}
               >
-                <ShareIcon />
+                <Share aria-hidden="true" />
               </button>
               <StatusPill id="playerBadgeInline" label={playerBadge.label} state={playerBadge.state} />
             </div>

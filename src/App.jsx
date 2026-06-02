@@ -13,6 +13,7 @@ import { useRouteController } from "./hooks/useRouteController.js";
 import { buildWatchLink, getRelayHostValue, writeRoute } from "./lib/routeState.js";
 import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from "./lib/watchHistory.js";
 import { describePlayerState } from "./lib/status.js";
+import { getWatchTestChannel } from "./lib/watchTestChannels.js";
 
 const LiveRoute = lazy(() =>
   import("./components/LiveRoute.jsx").then((module) => ({ default: module.LiveRoute }))
@@ -152,11 +153,17 @@ export function App() {
   const watchPlaybackNamespaceRef = useRef("");
 
   const normalizedWatchInput = watchRoom.trim();
-  const watchingNamespace = isNamespaceWatchTarget(normalizedWatchInput);
+  const watchTestChannel = getWatchTestChannel(normalizedWatchInput);
+  const watchingTestChannel = Boolean(watchTestChannel);
+  const watchingNamespace = !watchingTestChannel && isNamespaceWatchTarget(normalizedWatchInput);
   const directWatchNamespace = getNamespaceWatchValue(normalizedWatchInput);
-  const watchHandle = watchingNamespace ? "" : getHandleWatchValue(normalizedWatchInput);
-  const resolvedWatchRoomId = watchingNamespace ? "" : watchRoomResolution.roomId;
-  const watchChatRoom = watchingNamespace ? directWatchNamespace : resolvedWatchRoomId;
+  const watchHandle = watchingNamespace || watchingTestChannel ? "" : getHandleWatchValue(normalizedWatchInput);
+  const resolvedWatchRoomId = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.roomId;
+  const watchChatRoom = watchingTestChannel
+    ? ""
+    : watchingNamespace
+      ? directWatchNamespace
+      : resolvedWatchRoomId;
 
   const player = usePlayerController({
     initialAutorun: false,
@@ -166,7 +173,7 @@ export function App() {
     log,
     syntheticSessionRef
   });
-  const watchChatEnabled = page === "watch" && Boolean(watchChatRoom) && !authState.loading;
+  const watchChatEnabled = page === "watch" && !watchingTestChannel && Boolean(watchChatRoom) && !authState.loading;
 
   const chat = useChatController({
     room: watchChatRoom,
@@ -176,14 +183,20 @@ export function App() {
     log
   });
 
-  const resolvedWatchRelayUrl = watchingNamespace
+  const resolvedWatchRelayUrl = watchingTestChannel
+    ? ""
+    : watchingNamespace
     ? relayUrl
     : chat.roomMeta.stream.relayUrl || "";
-  const resolvedWatchNamespace = watchingNamespace
+  const resolvedWatchNamespace = watchingTestChannel
+    ? watchTestChannel.id
+    : watchingNamespace
     ? directWatchNamespace
     : chat.roomMeta.stream.namespace || "";
   const watchJoined = page === "watch" && watchRouteCommitted && Boolean(normalizedWatchInput);
-  const watchStageMessage = watchingNamespace
+  const watchStageMessage = watchingTestChannel
+    ? ""
+    : watchingNamespace
     ? (directWatchNamespace ? "正在连接公共频道。" : "等待输入公共频道号。")
     : watchRoomResolution.loading
       ? "加载中"
@@ -200,7 +213,9 @@ export function App() {
   watchPlaybackRelayUrlRef.current = resolvedWatchRelayUrl;
   watchPlaybackNamespaceRef.current = resolvedWatchNamespace;
 
-  const watchRoomLabel = watchingNamespace
+  const watchRoomLabel = watchingTestChannel
+    ? watchTestChannel.label
+    : watchingNamespace
     ? (directWatchNamespace || "等待输入 namespace")
     : chat.roomMeta.host.displayName
       || watchRoomResolution.hostDisplayName
@@ -211,7 +226,9 @@ export function App() {
       || watchHandle
       || watchRoom
       || "等待输入主播号";
-  const watchChatRoomLabel = watchingNamespace
+  const watchChatRoomLabel = watchingTestChannel
+    ? watchTestChannel.label
+    : watchingNamespace
     ? (directWatchNamespace || "")
     : chat.roomMeta.host.displayName
       || watchRoomResolution.hostDisplayName
@@ -219,12 +236,16 @@ export function App() {
       || watchRoomResolution.hostHandle
       || watchHandle
       || "";
-  const watchRoomTitle = watchingNamespace
+  const watchRoomTitle = watchingTestChannel
+    ? watchTestChannel.title
+    : watchingNamespace
     ? (directWatchNamespace || "公共 namespace")
     : chat.roomMeta.title
       || watchRoomResolution.title
       || (watchChatRoomLabel ? `${watchChatRoomLabel}的直播间` : watchRoomLabel);
-  const watchHostDisplayName = watchingNamespace
+  const watchHostDisplayName = watchingTestChannel
+    ? watchTestChannel.hostDisplayName
+    : watchingNamespace
     ? ""
     : chat.roomMeta.host.displayName
       || watchRoomResolution.hostDisplayName
@@ -232,15 +253,29 @@ export function App() {
       || watchRoomResolution.hostHandle
       || watchHandle
       || "";
-  const watchHostAvatarUrl = watchingNamespace ? "" : chat.roomMeta.host.avatarUrl || "";
-  const watchShareTarget = watchingNamespace
+  const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : chat.roomMeta.host.avatarUrl || "";
+  const watchShareTarget = watchingTestChannel
+    ? ""
+    : watchingNamespace
     ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
     : watchRoomResolution.hostHandle || watchHandle || watchRoom;
   const watchPageLink = buildWatchLink(relayUrl, watchShareTarget);
   const relayHost = getRelayHostValue(relayUrl);
-  const playerBadge = describePlayerState(player.playerStatusKind);
+  const testPlayerSession = watchingTestChannel
+    ? {
+        key: watchTestChannel.sessionKey,
+        token: -1,
+        relayUrl: "",
+        namespace: watchTestChannel.id,
+      }
+    : null;
+  const effectivePlayerSession = testPlayerSession ?? player.playerSession;
+  const effectivePlayerOrientation = watchTestChannel?.orientation ?? player.playerOrientation;
+  const effectivePlayerStatusKind = watchingTestChannel ? "live" : player.playerStatusKind;
+  const effectivePlayerStatus = watchTestChannel?.statusMessage ?? player.playerStatus;
+  const playerBadge = describePlayerState(effectivePlayerStatusKind);
   const buildLabel = `Build ${__BUILD_HASH__}`;
-  const mobileWatchSessionActive = page === "watch" && Boolean(player.playerSession);
+  const mobileWatchSessionActive = page === "watch" && Boolean(effectivePlayerSession);
   const mobileWatchJoinedClass = mobileWatchSessionActive ? " app-container-watch-joined" : "";
   const requireLoginForLive = false;
   const avatarLabel = getAvatarLabel(authState);
@@ -336,7 +371,10 @@ export function App() {
       return;
     }
 
-    if (isNamespaceWatchTarget(normalizedTarget)) {
+    const testChannel = getWatchTestChannel(normalizedTarget);
+    if (testChannel) {
+      // Dev-only local test streams deliberately bypass room resolution.
+    } else if (isNamespaceWatchTarget(normalizedTarget)) {
       if (!getNamespaceWatchValue(normalizedTarget)) {
         return;
       }
@@ -427,7 +465,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (page !== "watch" || !watchRouteCommitted || watchingNamespace || !watchHandle) {
+    if (page !== "watch" || !watchRouteCommitted || watchingTestChannel || watchingNamespace || !watchHandle) {
       setWatchRoomResolution({
         loading: false,
         error: "",
@@ -496,7 +534,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [page, watchHandle, watchRouteCommitted, watchingNamespace]);
+  }, [page, watchHandle, watchRouteCommitted, watchingNamespace, watchingTestChannel]);
 
   useEffect(() => {
     if (page !== "watch" || !watchRouteCommitted || watchingNamespace || !resolvedWatchRoomId) {
@@ -513,6 +551,7 @@ export function App() {
     if (
       page !== "watch"
       || !watchRouteCommitted
+      || watchingTestChannel
       || watchingNamespace
       || !resolvedWatchRoomId
       || !chat.roomStateReady
@@ -539,7 +578,8 @@ export function App() {
     page,
     resolvedWatchRoomId,
     watchRouteCommitted,
-    watchingNamespace
+    watchingNamespace,
+    watchingTestChannel
   ]);
 
   useEffect(() => {
@@ -853,13 +893,13 @@ export function App() {
             stageMessage={watchStageMessage}
             chatRoom={watchChatRoom}
             chatRoomLabel={watchChatRoomLabel}
-            playerStatus={player.playerStatus}
+            playerStatus={effectivePlayerStatus}
             playerBadge={playerBadge}
             fullscreenActive={player.fullscreenActive}
-            playerPaused={player.playerPaused}
-            playerMuted={player.playerMuted}
-            showTapToUnmute={player.showTapToUnmute}
-            playerOrientation={player.playerOrientation}
+            playerPaused={watchingTestChannel ? false : player.playerPaused}
+            playerMuted={watchingTestChannel ? true : player.playerMuted}
+            showTapToUnmute={watchingTestChannel ? false : player.showTapToUnmute}
+            playerOrientation={effectivePlayerOrientation}
             room={watchRoom}
             onRoomInput={(event) => {
               setWatchRoomValue(event.currentTarget.value);
@@ -898,8 +938,9 @@ export function App() {
               });
             }}
             stageRef={player.watchStageRef}
-            playerSession={player.playerSession}
+            playerSession={effectivePlayerSession}
             playerRef={player.playerRef}
+            testPlayback={watchTestChannel}
             authAvailable={authState.available}
             authLoading={authState.loading}
             authUser={authState.user}

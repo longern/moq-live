@@ -1,4 +1,4 @@
-@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+@media (orientation: portrait) {
   body:has(.watch-stage-frame.is-portrait) .app-container-watch-joined {
     grid-template-rows: minmax(0, 1fr);
     gap: 0;
@@ -72,6 +72,13 @@
   body:has(.watch-stage-frame.is-portrait)
     .watch-layout:has(.watch-stage-frame.is-portrait)
     .info-strip-mobile {
+    display: none;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-layout:has(.watch-stage-frame.is-portrait)
+    .stage-column
+    > .info-strip:not(.info-strip-mobile) {
     display: none;
   }
 

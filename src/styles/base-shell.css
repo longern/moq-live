@@ -1,4 +1,14 @@
 :root {
+  --font-sans:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Segoe UI",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    sans-serif;
   --bg: #08131d;
   --panel: rgba(10, 20, 31, 0.9);
   --panel-2: rgba(8, 16, 25, 0.96);
@@ -50,7 +60,9 @@ body {
   margin: 0;
   min-height: 100%;
   overflow: hidden;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   color: var(--text);
   background:
     radial-gradient(
@@ -306,16 +318,26 @@ pre {
   stroke-linejoin: round;
 }
 
-.auth-avatar-spinner {
-  width: 16px;
-  height: 16px;
+.loading-spinner {
+  display: inline-block;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.22);
-  border-top-color: rgba(255, 255, 255, 0.92);
-  animation: auth-avatar-spin 0.85s linear infinite;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent-2);
+  animation: loading-spinner-spin 760ms linear infinite;
 }
 
-@keyframes auth-avatar-spin {
+.auth-avatar-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  border-top-color: rgba(255, 255, 255, 0.92);
+}
+
+@keyframes loading-spinner-spin {
   from {
     transform: rotate(0deg);
   }

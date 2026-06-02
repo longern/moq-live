@@ -1,4 +1,5 @@
 import { CircleUserRound } from "lucide-react";
+import { LoadingSpinner } from "./LoadingSpinner.jsx";
 
 function getAvatarText(displayName, email, initialsLength) {
   const source = String(displayName || email || "").trim();
@@ -36,7 +37,7 @@ export function UserAvatar({
   return (
     <span className={nextClassName} aria-hidden="true">
       {loading ? (
-        <span className={loadingClassName} />
+        <LoadingSpinner className={loadingClassName} ariaHidden />
       ) : avatarUrl ? (
         <img src={avatarUrl} alt={imgAlt} width={imgWidth} height={imgHeight} />
       ) : initials ? (

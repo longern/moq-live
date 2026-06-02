@@ -246,6 +246,12 @@
     padding: 0 8px calc(96px + env(safe-area-inset-bottom));
   }
 
+  .watch-room-section.is-empty {
+    min-height: calc(
+      100svh - 60px - var(--mobile-nav-height) - env(safe-area-inset-bottom)
+    );
+  }
+
   .page[data-page="watch"][data-joined="true"] {
     height: calc(
       100svh - var(--mobile-nav-height) - env(safe-area-inset-bottom)

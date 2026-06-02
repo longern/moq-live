@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Image } from "lucide-react";
+import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 
 function RoomCoverPlaceholder() {
@@ -170,7 +171,9 @@ export function WatchIdlePage({
           </form>
           <section className={`watch-room-section${roomsState.items.length ? "" : " is-empty"}`}>
             {roomsState.loading ? (
-              <div className="watch-room-state">正在加载直播间…</div>
+              <div className="watch-room-state is-loading">
+                <LoadingSpinner className="watch-room-loading-spinner" label="正在加载直播间" />
+              </div>
             ) : roomsState.error ? (
               <div className="watch-room-state is-error">直播间列表加载失败：{roomsState.error}</div>
             ) : roomsState.items.length ? (

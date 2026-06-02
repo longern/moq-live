@@ -114,6 +114,12 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.watch-desktop-room-avatar.is-public-channel {
+  border: 1px solid rgba(16, 196, 182, 0.18);
+  background: rgba(16, 196, 182, 0.1);
+  color: #9af2d1;
+}
+
 .watch-desktop-room-avatar-icon {
   width: 18px;
   height: 18px;

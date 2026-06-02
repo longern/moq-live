@@ -148,7 +148,7 @@ export function App() {
     title: ""
   });
   const [watchStreamEnded, setWatchStreamEnded] = useState(false);
-  const [topbarWatchRoom, setTopbarWatchRoom] = useState(watchRoom);
+  const [topbarWatchRoom, setTopbarWatchRoom] = useState("");
 
   const watchPlaybackRelayUrlRef = useRef("");
   const watchPlaybackNamespaceRef = useRef("");
@@ -195,6 +195,13 @@ export function App() {
     ? directWatchNamespace
     : chat.roomMeta.stream.namespace || "";
   const watchJoined = page === "watch" && watchRouteCommitted && Boolean(normalizedWatchInput);
+  const watchStageLoading = !watchingTestChannel
+    && (
+      watchingNamespace
+        ? Boolean(directWatchNamespace)
+        : watchRoomResolution.loading
+          || (!watchRoomResolution.error && (!resolvedWatchRoomId || !chat.roomStateReady))
+    );
   const watchStageMessage = watchingTestChannel
     ? ""
     : watchingNamespace
@@ -255,6 +262,7 @@ export function App() {
       || watchHandle
       || "";
   const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : chat.roomMeta.host.avatarUrl || "";
+  const watchHostIcon = watchingNamespace ? "public-channel" : "";
   const watchShareTarget = watchingTestChannel
     ? ""
     : watchingNamespace
@@ -300,10 +308,6 @@ export function App() {
       setLivePageMounted(true);
     }
   }, [page]);
-
-  useEffect(() => {
-    setTopbarWatchRoom(watchRoom);
-  }, [watchRoom]);
 
   function openSettingsLogin(options) {
     setAuthMenuOpen(false);
@@ -803,7 +807,12 @@ export function App() {
               role="search"
               onSubmit={(event) => {
                 event.preventDefault();
-                beginWatch(topbarWatchRoom);
+                const nextWatchRoom = topbarWatchRoom.trim();
+                if (!nextWatchRoom) {
+                  return;
+                }
+                beginWatch(nextWatchRoom);
+                setTopbarWatchRoom("");
               }}
             >
               <input
@@ -859,7 +868,7 @@ export function App() {
                     imgWidth={40}
                     imgHeight={40}
                     loading={authState.loading}
-                    loadingClassName="auth-avatar-spinner"
+                    loadingClassName="auth-avatar-loading-spinner"
                     iconClassName="auth-avatar-icon"
                   />
                 </button>
@@ -919,7 +928,9 @@ export function App() {
             roomTitle={watchRoomTitle}
             hostDisplayName={watchHostDisplayName}
             hostAvatarUrl={watchHostAvatarUrl}
+            hostIcon={watchHostIcon}
             watchLink={watchPageLink}
+            stageLoading={watchStageLoading}
             stageMessage={watchStageMessage}
             chatRoom={watchChatRoom}
             chatRoomLabel={watchChatRoomLabel}

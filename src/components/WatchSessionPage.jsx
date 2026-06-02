@@ -7,11 +7,13 @@ import {
   MoreHorizontal,
   Pause,
   Play,
+  Radio,
   Share,
   Volume2,
   VolumeX
 } from "lucide-react";
 import { ChatPanel } from "./ChatPanel.jsx";
+import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { StatusPill } from "./StatusPill.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 
@@ -25,7 +27,9 @@ export function WatchSessionPage({
   roomTitle,
   hostDisplayName,
   hostAvatarUrl,
+  hostIcon,
   watchLink,
+  stageLoading,
   stageMessage,
   chatRoom,
   chatRoomLabel,
@@ -383,7 +387,11 @@ export function WatchSessionPage({
                 />
               ) : (
                 <div className="placeholder">
-                  <p>{stageMessage}</p>
+                  {stageLoading ? (
+                    <LoadingSpinner className="stage-loading-spinner" />
+                  ) : (
+                    <p>{stageMessage}</p>
+                  )}
                 </div>
               )}
             </div>
@@ -474,15 +482,21 @@ export function WatchSessionPage({
           <div className="info-strip">
             <div className="info-item">
               <div className="watch-desktop-room-meta">
-                <UserAvatar
-                  avatarUrl={hostAvatarUrl}
-                  displayName={hostDisplayName}
-                  className="watch-desktop-room-avatar"
-                  imgAlt={hostDisplayName || "主播头像"}
-                  monogramClassName="is-monogram"
-                  placeholderClassName="is-placeholder"
-                  iconClassName="watch-desktop-room-avatar-icon"
-                />
+                {hostIcon === "public-channel" ? (
+                  <span className="watch-desktop-room-avatar is-public-channel" aria-hidden="true">
+                    <Radio className="watch-desktop-room-avatar-icon" />
+                  </span>
+                ) : (
+                  <UserAvatar
+                    avatarUrl={hostAvatarUrl}
+                    displayName={hostDisplayName}
+                    className="watch-desktop-room-avatar"
+                    imgAlt={hostDisplayName || "主播头像"}
+                    monogramClassName="is-monogram"
+                    placeholderClassName="is-placeholder"
+                    iconClassName="watch-desktop-room-avatar-icon"
+                  />
+                )}
                 <div className="watch-desktop-room-copy">
                   <strong data-room-label>{roomTitle || roomLabel}</strong>
                   <p>{hostDisplayName || roomLabel}</p>

@@ -75,6 +75,7 @@
 }
 
 .watch-room-section.is-empty {
+  min-height: calc(100svh - 72px);
   place-items: center;
   overflow: hidden;
 }
@@ -337,6 +338,19 @@
   line-height: 1.5;
   text-align: center;
   justify-self: center;
+}
+
+.watch-room-state.is-loading {
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  justify-self: stretch;
+}
+
+.watch-room-loading-spinner {
+  width: 34px;
+  height: 34px;
 }
 
 .watch-room-state.is-error {

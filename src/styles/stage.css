@@ -132,6 +132,11 @@ publisher-moq {
   line-height: 1.55;
 }
 
+.stage-loading-spinner {
+  width: 34px;
+  height: 34px;
+}
+
 .stage-controls {
   position: absolute;
   inset: auto 0 0;

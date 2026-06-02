@@ -6,10 +6,10 @@ import {
   MonitorUp,
   MoreHorizontal,
   Pause,
+  Power,
   Share,
   SwitchCamera,
-  Video,
-  VideoOff,
+  X,
 } from "lucide-react";
 
 const iconProps = {
@@ -17,16 +17,16 @@ const iconProps = {
   focusable: "false",
 };
 
-export function CameraIcon({ mode }) {
-  if (mode === "off") {
-    return <VideoOff {...iconProps} />;
-  }
+export function FlipCameraIcon() {
+  return <SwitchCamera {...iconProps} />;
+}
 
-  if (mode === "rear") {
-    return <SwitchCamera {...iconProps} />;
-  }
+export function CloseIcon() {
+  return <X {...iconProps} />;
+}
 
-  return <Video {...iconProps} />;
+export function EndBroadcastIcon() {
+  return <Power {...iconProps} />;
 }
 
 export function MicrophoneIcon({ enabled }) {

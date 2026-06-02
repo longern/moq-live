@@ -11,8 +11,10 @@ const CHAT_ERROR_MESSAGES = {
     forbidden_room_update: "仅房主可更新直播间信息",
     storage_write_limited: "聊天室写入额度已用尽，已暂停写入，请稍后再试",
     socket_payload_invalid: "聊天室返回了无法解析的数据",
-    socket_closed_retrying: "聊天室连接异常，正在重试",
+    socket_retrying: "聊天室连接异常，正在重试连接",
+    socket_retry_scheduled: ({ seconds } = {}) => `聊天室连接异常，${seconds ?? 1} 秒后重试`,
     socket_error_waiting: "聊天室连接异常，等待重新连接",
+    socket_reconnect_stopped: "聊天室连接异常，请刷新页面",
     unknown: "聊天室出现错误"
   },
   en: {
@@ -27,8 +29,10 @@ const CHAT_ERROR_MESSAGES = {
     forbidden_room_update: "Only the room owner can update the room info.",
     storage_write_limited: "Chat writes are temporarily paused because storage quota was exhausted.",
     socket_payload_invalid: "The chat server returned unreadable data.",
-    socket_closed_retrying: "Chat connection lost. Reconnecting.",
+    socket_retrying: "Chat connection error. Retrying.",
+    socket_retry_scheduled: ({ seconds } = {}) => `Chat connection lost. Retrying in ${seconds ?? 1}s.`,
     socket_error_waiting: "Chat connection error. Waiting to reconnect.",
+    socket_reconnect_stopped: "Chat connection error. Refresh the page.",
     unknown: "Chat error."
   }
 };

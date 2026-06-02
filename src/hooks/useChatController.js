@@ -7,16 +7,11 @@ const RECONNECT_DELAYS_MS = [
   3_000,
   15_000,
   30_000,
-  60_000,
-  2 * 60_000,
-  5 * 60_000,
-  10 * 60_000,
-  20 * 60_000,
-  40 * 60_000,
-  60 * 60_000,
-  2 * 60 * 60_000,
-  4 * 60 * 60_000
+  60_000
 ];
+const MAX_RECONNECT_ATTEMPTS = RECONNECT_DELAYS_MS.length;
+const CONNECTION_WINDOW_MS = 5 * 60_000;
+const MAX_CONNECTIONS_PER_WINDOW = 20;
 
 function upsertMessages(currentMessages, incomingMessages) {
   const deduped = new Map(currentMessages.map((message) => [message.id, message]));
@@ -76,20 +71,56 @@ export function useChatController({
 
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
+  const reconnectCountdownTimerRef = useRef(null);
   const reconnectAttemptRef = useRef(0);
+  const connectionAttemptedAtRef = useRef([]);
   const logRef = useRef(log);
 
   logRef.current = log;
 
-  function clearReconnectTimer() {
+  function clearReconnectTimers() {
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
     }
+    if (reconnectCountdownTimerRef.current) {
+      clearInterval(reconnectCountdownTimerRef.current);
+      reconnectCountdownTimerRef.current = null;
+    }
+  }
+
+  function showReconnectCountdown(delayMs) {
+    const retryAt = Date.now() + delayMs;
+    const updateCountdown = () => {
+      const seconds = Math.max(1, Math.ceil((retryAt - Date.now()) / 1000));
+      setChatError(getChatErrorMessage({
+        code: "socket_retry_scheduled",
+        details: { seconds }
+      }));
+    };
+
+    if (reconnectCountdownTimerRef.current) {
+      clearInterval(reconnectCountdownTimerRef.current);
+      reconnectCountdownTimerRef.current = null;
+    }
+    updateCountdown();
+    reconnectCountdownTimerRef.current = window.setInterval(updateCountdown, 1_000);
+  }
+
+  function reserveConnectionAttempt() {
+    const now = Date.now();
+    connectionAttemptedAtRef.current = connectionAttemptedAtRef.current.filter(
+      (attemptedAt) => now - attemptedAt <= CONNECTION_WINDOW_MS
+    );
+    if (connectionAttemptedAtRef.current.length >= MAX_CONNECTIONS_PER_WINDOW) {
+      return false;
+    }
+    connectionAttemptedAtRef.current.push(now);
+    return true;
   }
 
   useEffect(() => {
-    clearReconnectTimer();
+    clearReconnectTimers();
 
     if (!enabled || !room) {
       if (socketRef.current) {
@@ -106,24 +137,40 @@ export function useChatController({
       setRoomMeta(getDefaultRoomMeta());
       setRoomStateReady(false);
       reconnectAttemptRef.current = 0;
+      connectionAttemptedAtRef.current = [];
       return undefined;
     }
+
+    reconnectAttemptRef.current = 0;
+    connectionAttemptedAtRef.current = [];
 
     let cancelled = false;
     let socket = null;
 
     const connect = () => {
+      if (!reserveConnectionAttempt()) {
+        setConnectionState("closed");
+        setChatError(getChatErrorMessage({ code: "socket_reconnect_stopped" }));
+        logRef.current?.(
+          `chat reconnect stopped after ${MAX_CONNECTIONS_PER_WINDOW} connection attempts in ${Math.round(CONNECTION_WINDOW_MS / 60_000)} minutes`
+        );
+        return;
+      }
+
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const socketUrl = new URL(`/api/chat/${encodeURIComponent(room)}/ws`, `${protocol}//${window.location.host}`);
       socketUrl.searchParams.set("role", role);
-      setConnectionState(reconnectAttemptRef.current > 0 ? "reconnecting" : "connecting");
+      const reconnecting = reconnectAttemptRef.current > 0;
+      setConnectionState(reconnecting ? "reconnecting" : "connecting");
+      setChatError(reconnecting
+        ? getChatErrorMessage({ code: "socket_retrying" })
+        : "");
 
       socket = new WebSocket(socketUrl);
       socketRef.current = socket;
 
       socket.addEventListener("open", () => {
-        reconnectAttemptRef.current = 0;
-        setConnectionState("connected");
+        setConnectionState("connecting");
         setChatError("");
       });
 
@@ -137,6 +184,8 @@ export function useChatController({
         }
 
         if (payload.type === "chat.snapshot") {
+          setConnectionState("connected");
+          reconnectAttemptRef.current = 0;
           setMessages(Array.isArray(payload.messages) ? payload.messages : []);
           setOnlineCount(Number(payload.onlineCount) || 0);
           setReadOnly(Boolean(payload.readOnly));
@@ -216,12 +265,25 @@ export function useChatController({
         }
         setConnectionState("closed");
         const attempt = reconnectAttemptRef.current;
+        if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+          setChatError(getChatErrorMessage({ code: "socket_reconnect_stopped" }));
+          logRef.current?.(`chat reconnect stopped after ${MAX_RECONNECT_ATTEMPTS} attempts`);
+          return;
+        }
+
         const delay = getReconnectDelayMs(attempt);
         reconnectAttemptRef.current = attempt + 1;
-        setChatError(getChatErrorMessage({ code: "socket_closed_retrying" }));
+        showReconnectCountdown(delay);
         logRef.current?.(`chat reconnect scheduled in ${delay}ms (attempt ${attempt + 1})`);
-        clearReconnectTimer();
+        if (reconnectTimerRef.current) {
+          clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = null;
+        }
         reconnectTimerRef.current = window.setTimeout(() => {
+          if (reconnectCountdownTimerRef.current) {
+            clearInterval(reconnectCountdownTimerRef.current);
+            reconnectCountdownTimerRef.current = null;
+          }
           if (!cancelled) {
             connect();
           }
@@ -237,7 +299,7 @@ export function useChatController({
 
     return () => {
       cancelled = true;
-      clearReconnectTimer();
+      clearReconnectTimers();
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;

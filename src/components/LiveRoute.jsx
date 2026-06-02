@@ -51,7 +51,6 @@ function getCameraMode(cameraOptions, selectedCameraId, cameraEnabled) {
 }
 
 function LiveActivationGate({
-  hidden,
   title,
   message,
   error,
@@ -62,141 +61,89 @@ function LiveActivationGate({
   onSecondary,
 }) {
   return (
-    <section className="page page-immersive live-activation-page" data-page="live" hidden={hidden}>
-      <div className="live-activation-shell">
-        <div className="live-activation-panel">
-          <div className="live-activation-copy">
-            <span>直播功能</span>
-            <h2>{title}</h2>
-            <p>{message}</p>
-            {error ? <p className="live-activation-error">{error}</p> : null}
-          </div>
-          <div className="live-activation-actions">
-            {primaryLabel ? (
-              <button type="button" className="primary" onClick={onPrimary} disabled={busy}>
-                {busy ? "处理中" : primaryLabel}
-              </button>
-            ) : null}
-            {secondaryLabel ? (
-              <button type="button" className="live-activation-secondary" onClick={onSecondary} disabled={busy}>
-                {secondaryLabel}
-              </button>
-            ) : null}
-          </div>
-        </div>
+    <div className="live-activation-panel">
+      <div className="live-activation-copy">
+        <span>直播功能</span>
+        <h2>{title}</h2>
+        <p>{message}</p>
+        {error ? <p className="live-activation-error">{error}</p> : null}
       </div>
-    </section>
+      <div className="live-activation-actions">
+        {primaryLabel ? (
+          <button type="button" className="primary" onClick={onPrimary} disabled={busy}>
+            {busy ? "处理中" : primaryLabel}
+          </button>
+        ) : null}
+        {secondaryLabel ? (
+          <button type="button" className="live-activation-secondary" onClick={onSecondary} disabled={busy}>
+            {secondaryLabel}
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
-function LiveActivationBlank({ hidden }) {
+function LiveActivationBlank() {
   return (
-    <section className="page page-immersive live-activation-page" data-page="live" hidden={hidden} aria-busy="true">
-      <div className="live-activation-shell">
-        <span className="live-circular-progress" role="progressbar" aria-label="正在检查直播功能" />
-      </div>
-    </section>
+    <span className="live-circular-progress" role="progressbar" aria-label="正在检查直播功能" />
   );
 }
 
-export function LiveRoute({
-  hidden,
-  page,
-  pageRef,
-  relayUrl,
-  relayUrlRef,
-  liveRoom,
-  liveRoomRef,
-  setLiveRoomValue,
-  selectPageWithGuard,
-  authState,
-  log,
-  onRequireLogin,
-  syntheticSessionRef,
-}) {
-  const [liveChatRoomResolution, setLiveChatRoomResolution] = useState({
+function getDefaultLiveChatRoomResolution() {
+  return {
     loading: false,
     error: "",
     roomId: "",
-  });
-  const [liveRoomDetails, setLiveRoomDetails] = useState(null);
-  const [liveActivation, setLiveActivation] = useState({
+  };
+}
+
+function getDefaultLiveActivation() {
+  return {
     checked: false,
     missing: false,
     loading: false,
     creating: false,
     error: "",
-  });
+  };
+}
+
+function useLiveRoomActivation({ page, userId, log }) {
+  const [liveChatRoomResolution, setLiveChatRoomResolution] = useState(
+    getDefaultLiveChatRoomResolution,
+  );
+  const [liveRoomDetails, setLiveRoomDetails] = useState(null);
+  const [liveActivation, setLiveActivation] = useState(getDefaultLiveActivation);
   const [liveRoomRefreshKey, setLiveRoomRefreshKey] = useState(0);
-  const announcedLiveStateRef = useRef({ room: "", isLive: null });
-  const liveGateActive = page === "live" && (
-    authState.loading
-    || (Boolean(authState.user?.id) && (
-      liveActivation.loading
-      || !liveActivation.checked
-      || liveActivation.missing
-      || Boolean(liveActivation.error)
-    ))
-  );
-  const publisherPage = liveGateActive ? "watch" : page;
+  const lastUserIdRef = useRef("");
+  const logRef = useRef(log);
 
-  const publisher = usePublisherController({
-    page: publisherPage,
-    pageRef,
-    relayUrlRef,
-    roomRef: liveRoomRef,
-    generateRoomId: () => setLiveRoomValue(generateRoomId()),
-    syntheticSessionRef,
-    log,
-  });
-
-  const liveChatEnabled = Boolean(authState.user?.id) && page === "live" && !liveGateActive;
-  const liveChatRoomId = authState.user?.id
-    ? liveChatRoomResolution.roomId
-    : "";
-  const liveChat = useChatController({
-    room: liveChatRoomId,
-    enabled: liveChatEnabled && Boolean(liveChatRoomId),
-    authKey: authState.user?.id ?? "anonymous",
-    role: "broadcaster",
-    log,
-  });
-
-  const liveRoomLabel = liveChat.roomMeta.host.displayName
-    || authState.user?.displayName
-    || authState.user?.email
-    || liveRoom
-    || "等待生成频道号";
-  const liveRoomAvatarUrl = liveChat.roomMeta.host.avatarUrl
-    || authState.user?.avatarUrl
-    || "";
-  const liveShareTarget = authState.user?.handle?.trim() || (liveRoom ? `ns:${liveRoom}` : "");
-  const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
-  const publishBadge = describePublishState(publisher.publishStatusKind);
-  const liveStreamActive = publisher.publisherIsPublishing || publisher.syntheticPublishing;
-  const publishBlocked = isPublishBlocked(liveRoom);
-  const publishBlockedReason = getPublishBlockReason(liveRoom);
-  const cameraMode = getCameraMode(
-    publisher.cameraOptions,
-    publisher.selectedCameraId,
-    publisher.cameraEnabled,
-  );
+  logRef.current = log;
 
   useEffect(() => {
-    if (page !== "live" || !authState.user?.id) {
-      setLiveChatRoomResolution({
-        loading: false,
-        error: "",
-        roomId: "",
-      });
+    if (lastUserIdRef.current === userId) {
+      return;
+    }
+
+    lastUserIdRef.current = userId || "";
+    setLiveChatRoomResolution(getDefaultLiveChatRoomResolution());
+    setLiveRoomDetails(null);
+    setLiveActivation(getDefaultLiveActivation());
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      setLiveChatRoomResolution(getDefaultLiveChatRoomResolution());
       setLiveRoomDetails(null);
-      setLiveActivation({
-        checked: false,
-        missing: false,
-        loading: false,
-        creating: false,
-        error: "",
-      });
+      setLiveActivation(getDefaultLiveActivation());
+      return;
+    }
+
+    if (page !== "live") {
+      return;
+    }
+
+    if (liveActivation.checked) {
       return;
     }
 
@@ -282,7 +229,7 @@ export function LiveRoute({
           creating: false,
           error: message,
         });
-        log(`live room resolve failed: ${message}`);
+        logRef.current?.(`live room resolve failed: ${message}`);
       }
     }
 
@@ -291,7 +238,7 @@ export function LiveRoute({
     return () => {
       cancelled = true;
     };
-  }, [authState.user?.id, liveRoomRefreshKey, page]);
+  }, [userId, liveActivation.checked, liveRoomRefreshKey, page]);
 
   async function activateLiveRoom() {
     setLiveActivation((current) => ({
@@ -331,13 +278,36 @@ export function LiveRoute({
         creating: false,
         error: message,
       }));
-      log(`live room activation failed: ${message}`);
+      logRef.current?.(`live room activation failed: ${message}`);
     }
   }
 
-  function returnToWatch() {
-    selectPageWithGuard("watch", { updateAutorun: false });
+  function retryLiveRoomActivation() {
+    setLiveActivation(getDefaultLiveActivation());
+    setLiveRoomRefreshKey((current) => current + 1);
   }
+
+  return {
+    liveActivation,
+    liveChatRoomId: userId ? liveChatRoomResolution.roomId : "",
+    liveRoomDetails,
+    setLiveRoomDetails,
+    activateLiveRoom,
+    retryLiveRoomActivation,
+  };
+}
+
+function useLiveRoomChatSync({
+  liveRoom,
+  liveChat,
+  liveStreamActive,
+  relayUrl,
+  user,
+}) {
+  const announcedLiveStateRef = useRef({ room: "", isLive: null });
+  const sendChatEventRef = useRef(liveChat.sendEvent);
+
+  sendChatEventRef.current = liveChat.sendEvent;
 
   useEffect(() => {
     if (!liveRoom) {
@@ -345,7 +315,15 @@ export function LiveRoute({
       return;
     }
 
-    if (liveChat.connectionState !== "connected") {
+    if (liveChat.connectionState !== "connected" || !liveChat.roomStateReady) {
+      return;
+    }
+
+    if (liveChat.streamState.isLive === liveStreamActive) {
+      announcedLiveStateRef.current = {
+        room: liveRoom,
+        isLive: liveStreamActive,
+      };
       return;
     }
 
@@ -354,7 +332,7 @@ export function LiveRoute({
       return;
     }
 
-    const sent = liveChat.sendEvent({
+    const sent = sendChatEventRef.current?.({
       type: liveStreamActive ? "stream.started" : "stream.stopped",
       stream: liveStreamActive
         ? { startedAt: new Date().toISOString() }
@@ -367,10 +345,16 @@ export function LiveRoute({
         isLive: liveStreamActive,
       };
     }
-  }, [liveChat, liveChat.connectionState, liveRoom, liveStreamActive]);
+  }, [
+    liveChat.connectionState,
+    liveChat.roomStateReady,
+    liveChat.streamState.isLive,
+    liveRoom,
+    liveStreamActive,
+  ]);
 
   useEffect(() => {
-    if (!liveRoom || liveChat.connectionState !== "connected") {
+    if (!liveRoom || liveChat.connectionState !== "connected" || !liveChat.roomStateReady) {
       return;
     }
 
@@ -379,9 +363,9 @@ export function LiveRoute({
       namespace: liveRoom,
     };
     const nextHost = {
-      id: authState.user?.id || "",
-      displayName: authState.user?.displayName || authState.user?.email || "",
-      avatarUrl: authState.user?.avatarUrl || "",
+      id: user?.id || "",
+      displayName: user?.displayName || user?.email || "",
+      avatarUrl: user?.avatarUrl || "",
     };
     if (
       liveChat.roomMeta.stream.relayUrl === nextStream.relayUrl
@@ -393,7 +377,7 @@ export function LiveRoute({
       return;
     }
 
-    liveChat.sendEvent({
+    sendChatEventRef.current?.({
       type: "room.updated",
       roomMeta: {
         stream: nextStream,
@@ -401,12 +385,8 @@ export function LiveRoute({
       },
     });
   }, [
-    authState.user?.avatarUrl,
-    authState.user?.displayName,
-    authState.user?.email,
-    authState.user?.id,
-    liveChat,
     liveChat.connectionState,
+    liveChat.roomStateReady,
     liveChat.roomMeta.stream.namespace,
     liveChat.roomMeta.stream.relayUrl,
     liveChat.roomMeta.host.avatarUrl,
@@ -414,7 +394,102 @@ export function LiveRoute({
     liveChat.roomMeta.host.id,
     relayUrl,
     liveRoom,
+    user?.avatarUrl,
+    user?.displayName,
+    user?.email,
+    user?.id,
   ]);
+}
+
+export function LiveRoute({
+  hidden,
+  page,
+  pageRef,
+  relayUrl,
+  relayUrlRef,
+  liveRoom,
+  liveRoomRef,
+  setLiveRoomValue,
+  selectPageWithGuard,
+  authState,
+  log,
+  onRequireLogin,
+  onReturnHome,
+  syntheticSessionRef,
+}) {
+  const {
+    liveActivation,
+    liveChatRoomId,
+    liveRoomDetails,
+    setLiveRoomDetails,
+    activateLiveRoom,
+    retryLiveRoomActivation,
+  } = useLiveRoomActivation({
+    page,
+    userId: authState.user?.id || "",
+    log,
+  });
+  const liveGateActive = page === "live" && (
+    authState.loading
+    || (Boolean(authState.user?.id) && (
+      liveActivation.loading
+      || !liveActivation.checked
+      || liveActivation.missing
+      || Boolean(liveActivation.error)
+    ))
+  );
+  const publisherPage = liveGateActive ? "watch" : page;
+
+  const publisher = usePublisherController({
+    page: publisherPage,
+    pageRef,
+    relayUrlRef,
+    roomRef: liveRoomRef,
+    generateRoomId: () => setLiveRoomValue(generateRoomId()),
+    syntheticSessionRef,
+    log,
+  });
+
+  const liveChatEnabled = Boolean(authState.user?.id) && page === "live" && !liveGateActive;
+  const liveChat = useChatController({
+    room: liveChatRoomId,
+    enabled: liveChatEnabled && Boolean(liveChatRoomId),
+    authKey: authState.user?.id ?? "anonymous",
+    role: "broadcaster",
+    log,
+  });
+
+  const liveRoomLabel = liveChat.roomMeta.host.displayName
+    || authState.user?.displayName
+    || authState.user?.email
+    || liveRoom
+    || "等待生成频道号";
+  const liveRoomAvatarUrl = liveChat.roomMeta.host.avatarUrl
+    || authState.user?.avatarUrl
+    || "";
+  const liveShareTarget = authState.user?.handle?.trim() || (liveRoom ? `ns:${liveRoom}` : "");
+  const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
+  const publishBadge = describePublishState(publisher.publishStatusKind);
+  const liveStreamActive = publisher.publisherIsPublishing || publisher.syntheticPublishing;
+  const publishBlocked = isPublishBlocked(liveRoom);
+  const publishBlockedReason = getPublishBlockReason(liveRoom);
+  const cameraMode = getCameraMode(
+    publisher.cameraOptions,
+    publisher.selectedCameraId,
+    publisher.cameraEnabled,
+  );
+
+  useLiveRoomChatSync({
+    liveRoom,
+    liveChat,
+    liveStreamActive,
+    relayUrl,
+    user: authState.user,
+  });
+
+  function returnToWatch() {
+    selectPageWithGuard("watch", { updateAutorun: false });
+  }
 
   async function shareLiveRoom() {
     if (!liveWatchLink) {
@@ -440,19 +515,18 @@ export function LiveRoute({
     }
   }
 
+  let activationContent = null;
+
   if (page === "live" && authState.loading) {
-    return <LiveActivationBlank hidden={hidden} />;
+    activationContent = <LiveActivationBlank />;
   }
 
-  if (page === "live" && authState.user?.id) {
+  if (!activationContent && page === "live" && authState.user?.id) {
     if (liveActivation.loading || !liveActivation.checked) {
-      return <LiveActivationBlank hidden={hidden} />;
-    }
-
-    if (liveActivation.missing) {
-      return (
+      activationContent = <LiveActivationBlank />;
+    } else if (liveActivation.missing) {
+      activationContent = (
         <LiveActivationGate
-          hidden={hidden}
           title="开通直播功能"
           message="开通后会为你的账号创建直播间，并用于主播分享、封面和聊天室管理。"
           error={liveActivation.error}
@@ -465,28 +539,16 @@ export function LiveRoute({
           onSecondary={returnToWatch}
         />
       );
-    }
-
-    if (liveActivation.error) {
-      return (
+    } else if (liveActivation.error) {
+      activationContent = (
         <LiveActivationGate
-          hidden={hidden}
           title="暂时无法检查直播功能"
           message="请重试，或先返回收看页。"
           error={liveActivation.error}
           busy={liveActivation.creating}
           primaryLabel="重试"
           secondaryLabel="返回收看"
-          onPrimary={() => {
-            setLiveActivation({
-              checked: false,
-              missing: false,
-              loading: false,
-              creating: false,
-              error: "",
-            });
-            setLiveRoomRefreshKey((current) => current + 1);
-          }}
+          onPrimary={retryLiveRoomActivation}
           onSecondary={returnToWatch}
         />
       );
@@ -512,6 +574,29 @@ export function LiveRoute({
     publisher.setCameraEnabled(true);
   }
 
+  function enableVideoMode() {
+    const { front, rear } = splitCameraOptions(publisher.cameraOptions);
+    const nextCamera = publisher.selectedCameraId
+      ? publisher.cameraOptions.find((option) => option.value === publisher.selectedCameraId)
+      : front ?? rear;
+
+    if (!publisher.cameraEnabled && nextCamera) {
+      void changeCamera(nextCamera.value);
+      return;
+    }
+
+    publisher.setCameraEnabled(true);
+  }
+
+  function selectLiveMode(mode) {
+    if (mode === "voice") {
+      publisher.setCameraEnabled(false);
+      return;
+    }
+
+    enableVideoMode();
+  }
+
   function cycleCameraMode() {
     const { front, rear } = splitCameraOptions(publisher.cameraOptions);
     const currentMode = getCameraMode(
@@ -521,10 +606,6 @@ export function LiveRoute({
     );
 
     if (currentMode === "off") {
-      const nextCamera = front ?? rear;
-      if (nextCamera) {
-        void changeCamera(nextCamera.value);
-      }
       return;
     }
 
@@ -538,12 +619,15 @@ export function LiveRoute({
       return;
     }
 
-    publisher.setCameraEnabled(false);
+    if (currentMode === "rear" && front) {
+      void changeCamera(front.value);
+    }
   }
 
   return (
     <LivePage
       hidden={hidden}
+      activationContent={activationContent}
       room={liveRoom}
       roomDetails={liveRoomDetails}
       roomLabel={liveRoomLabel}
@@ -562,8 +646,10 @@ export function LiveRoute({
       microphoneEnabled={publisher.microphoneEnabled}
       cameraMode={cameraMode}
       isPublishing={publisher.publisherIsPublishing}
+      isStarting={publisher.publisherIsStarting}
       previewActive={publisher.previewActive}
       previewHasVideo={publisher.previewHasVideo}
+      previewPending={publisher.previewPending}
       syntheticPublishing={publisher.syntheticPublishing}
       previewVideoRef={publisher.previewVideoRef}
       onCameraChange={(event) => {
@@ -578,7 +664,7 @@ export function LiveRoute({
         publisher.setMicrophoneEnabled(!publisher.microphoneEnabled);
       }}
       onTogglePublish={() => {
-        if (publisher.publisherIsPublishing) {
+        if (publisher.publisherIsPublishing || publisher.publisherIsStarting) {
           void publisher.stopCameraPublish();
           return;
         }
@@ -612,6 +698,10 @@ export function LiveRoute({
         selectPageWithGuard("live");
         void publisher.stopSyntheticPublish();
       }}
+      onRequestClose={() => {
+        onReturnHome?.();
+      }}
+      onSelectLiveMode={selectLiveMode}
       screenShareSupported={publisher.screenShareSupported}
       screenShareActive={publisher.screenShareActive}
       previewSourceType={publisher.previewSourceType}

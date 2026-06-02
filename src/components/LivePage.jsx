@@ -4,8 +4,11 @@ import { useCompactViewport, usePortraitViewport } from "../hooks/useMediaQuery.
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
 
+const LIVE_PAGE_EXIT_MS = 280;
+
 export function LivePage({
   hidden,
+  activationContent,
   roomDetails,
   roomLabel,
   roomAvatarUrl,
@@ -22,8 +25,10 @@ export function LivePage({
   microphoneEnabled,
   cameraMode,
   isPublishing,
+  isStarting = false,
   previewActive,
   previewHasVideo,
+  previewPending,
   previewSourceType,
   screenShareSupported,
   screenShareActive,
@@ -53,7 +58,9 @@ export function LivePage({
   onChatDraftChange,
   onChatSend,
   onChatRequireLogin,
-  onRoomDetailsChange
+  onRoomDetailsChange,
+  onRequestClose,
+  onSelectLiveMode
 }) {
   const compactViewport = useCompactViewport();
   const portraitViewport = usePortraitViewport();
@@ -66,8 +73,12 @@ export function LivePage({
   const [roomCoverBusy, setRoomCoverBusy] = useState(false);
   const [roomCoverError, setRoomCoverError] = useState("");
   const [roomCoverStatus, setRoomCoverStatus] = useState("");
+  const [closing, setClosing] = useState(false);
+  const [renderHidden, setRenderHidden] = useState(hidden);
+  const closeTimerRef = useRef(null);
   const roomCoverInputRef = useRef(null);
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const mediaMode = cameraEnabled ? "video" : "voice";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
   const immersiveTouchPortrait =
     portraitViewport &&
@@ -77,8 +88,57 @@ export function LivePage({
   const useMobileShell = compactViewport || portraitViewport;
   const mobileShellMode = immersiveTouchPortrait ? "immersive" : "compact";
 
+  useEffect(() => () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!authUser?.id || hidden) {
+    if (!hidden) {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+      setRenderHidden(false);
+      setClosing(false);
+      return;
+    }
+
+    if (renderHidden) {
+      return;
+    }
+
+    setClosing(true);
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      setRenderHidden(true);
+      setClosing(false);
+      closeTimerRef.current = null;
+    }, LIVE_PAGE_EXIT_MS);
+  }, [hidden, renderHidden]);
+
+  function requestClose() {
+    if (closing) {
+      return;
+    }
+
+    setClosing(true);
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      setRenderHidden(true);
+      setClosing(false);
+      onRequestClose?.();
+    }, LIVE_PAGE_EXIT_MS);
+  }
+
+  useEffect(() => {
+    if (!authUser?.id || renderHidden) {
       setRoomCoverUrl("");
       setRoomCoverLoading(false);
       setRoomCoverBusy(false);
@@ -90,7 +150,7 @@ export function LivePage({
     setRoomCoverUrl(roomDetails?.coverUrl || "");
     setRoomCoverLoading(false);
     setRoomCoverError("");
-  }, [authUser?.id, hidden, roomDetails?.coverUrl, roomDetails?.id]);
+  }, [authUser?.id, renderHidden, roomDetails?.coverUrl, roomDetails?.id]);
 
   function openRoomCoverPicker() {
     roomCoverInputRef.current?.click();
@@ -133,7 +193,9 @@ export function LivePage({
   }
 
   const pageProps = {
-    hidden,
+    hidden: renderHidden,
+    closing,
+    activationContent,
     roomLabel,
     roomAvatarUrl,
     shareTarget,
@@ -146,11 +208,14 @@ export function LivePage({
     selectedCameraId,
     selectedMicrophoneId,
     cameraEnabled,
+    mediaMode,
     microphoneEnabled,
     cameraMode,
     isPublishing,
+    isStarting,
     previewActive,
     previewHasVideo,
+    previewPending,
     previewSourceType,
     screenShareSupported,
     screenShareActive,
@@ -181,6 +246,8 @@ export function LivePage({
     onChatDraftChange,
     onChatSend,
     onChatRequireLogin,
+    onRequestClose: requestClose,
+    onSelectLiveMode,
     shareSupported,
     roomCoverUrl,
     roomCoverLoading,

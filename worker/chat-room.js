@@ -265,6 +265,10 @@ export class ChatRoomDO {
       isLive: true,
       startedAt: sanitizeIsoTimestamp(payload.stream?.startedAt) ?? new Date().toISOString()
     };
+    if (this.roomState.stream.isLive) {
+      return;
+    }
+
     const nextRoomState = {
       ...this.roomState,
       stream: nextStream
@@ -283,6 +287,10 @@ export class ChatRoomDO {
   async handleStreamStopped(ws, session) {
     if (!session.isRoomOwner) {
       this.sendError(ws, "forbidden_stream_update");
+      return;
+    }
+
+    if (!this.roomState.stream.isLive) {
       return;
     }
 
@@ -319,6 +327,10 @@ export class ChatRoomDO {
         avatarUrl: sanitizeUrl(payload.roomMeta?.host?.avatarUrl)
       }
     };
+    if (areRoomMetaEqual(this.roomState.roomMeta, nextRoomMeta)) {
+      return;
+    }
+
     const nextRoomState = {
       ...this.roomState,
       roomMeta: nextRoomMeta
@@ -465,6 +477,17 @@ function sanitizeUrl(value) {
 
 function sanitizeNamespace(value) {
   return String(value ?? "").trim().slice(0, 128);
+}
+
+function areRoomMetaEqual(left, right) {
+  return (
+    String(left?.title ?? "") === String(right?.title ?? "") &&
+    String(left?.stream?.relayUrl ?? "") === String(right?.stream?.relayUrl ?? "") &&
+    String(left?.stream?.namespace ?? "") === String(right?.stream?.namespace ?? "") &&
+    String(left?.host?.id ?? "") === String(right?.host?.id ?? "") &&
+    String(left?.host?.displayName ?? "") === String(right?.host?.displayName ?? "") &&
+    String(left?.host?.avatarUrl ?? "") === String(right?.host?.avatarUrl ?? "")
+  );
 }
 
 function isMessageFresh(message, now) {

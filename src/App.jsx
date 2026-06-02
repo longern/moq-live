@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { lazy, Suspense } from "react";
 import { DesktopNavigation, MobileNavigation } from "./components/Navigation.jsx";
 import { LoginDrawer } from "./components/LoginDrawer.jsx";
 import { MobilePanelPresence } from "./components/MobilePanelPresence.jsx";
 import { UserAvatar } from "./components/UserAvatar.jsx";
 import { SettingsPage } from "./components/SettingsPage.jsx";
+import { LiveRoute } from "./components/LiveRoute.jsx";
 import { WatchPage } from "./components/WatchPage.jsx";
 import { useAuthController } from "./hooks/useAuthController.js";
 import { useChatController } from "./hooks/useChatController.js";
@@ -14,10 +14,6 @@ import { buildWatchLink, getRelayHostValue, writeRoute } from "./lib/routeState.
 import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from "./lib/watchHistory.js";
 import { describePlayerState } from "./lib/status.js";
 import { getWatchTestChannel } from "./lib/watchTestChannels.js";
-
-const LiveRoute = lazy(() =>
-  import("./components/LiveRoute.jsx").then((module) => ({ default: module.LiveRoute }))
-);
 
 function getAvatarLabel(authState) {
   if (!authState.user) {
@@ -43,20 +39,6 @@ function getHandleWatchValue(value) {
   return value.trim().replace(/^@+/, "").toLowerCase();
 }
 
-function LivePageFallback({ hidden }) {
-  return (
-    <section className="page" data-page="live" hidden={hidden}>
-      <div className="page-grid live-layout">
-        <section className="control-column" aria-busy="true">
-          <div className="placeholder">
-            <span className="live-circular-progress" role="progressbar" aria-label="正在加载开播页" />
-          </div>
-        </section>
-      </div>
-    </section>
-  );
-}
-
 export function App() {
   const siteTitle = __APP_TITLE__;
   const [logText, setLogText] = useState("");
@@ -67,6 +49,10 @@ export function App() {
   const [livePageMounted, setLivePageMounted] = useState(
     () => new URLSearchParams(window.location.search).get("p") === "l"
   );
+  const [liveBackdropPage, setLiveBackdropPage] = useState(() => {
+    const initialPage = new URLSearchParams(window.location.search).get("p");
+    return initialPage === "s" ? "settings" : "watch";
+  });
   const [watchRouteCommitted, setWatchRouteCommitted] = useState(() => Boolean(new URLSearchParams(window.location.search).get("r")?.trim()));
   const logRef = useRef(null);
   const authMenuRef = useRef(null);
@@ -302,6 +288,8 @@ export function App() {
       : !authState.available
         ? "Auth API 未连接"
         : "匿名用户";
+  const showWatchPage = page === "watch" || (page === "live" && liveBackdropPage === "watch");
+  const showSettingsPage = page === "settings" || (page === "live" && liveBackdropPage === "settings");
 
   useEffect(() => {
     if (page === "live") {
@@ -309,10 +297,18 @@ export function App() {
     }
   }, [page]);
 
+  function selectPagePreservingLiveBackdrop(nextPage, options) {
+    if (nextPage === "live" && pageRef.current !== "live") {
+      setLiveBackdropPage(pageRef.current === "settings" ? "settings" : "watch");
+    }
+
+    selectPage(nextPage, options);
+  }
+
   function openSettingsLogin(options) {
     setAuthMenuOpen(false);
     pendingProtectedPageRef.current = null;
-    selectPage("settings", options);
+    selectPagePreservingLiveBackdrop("settings", options);
     setSettingsLoginPanelRequestKey((current) => current + 1);
   }
 
@@ -323,7 +319,7 @@ export function App() {
     closeAuthMenu();
     setWatchRouteCommitted(false);
     setWatchRoomValue("");
-    selectPage("watch", { updateAutorun: false });
+    selectPagePreservingLiveBackdrop("watch", { updateAutorun: false });
     void player.stopPlayer();
   }
 
@@ -356,7 +352,7 @@ export function App() {
   function selectPageWithGuard(nextPage, options) {
     if (!requireLoginForLive || nextPage !== "live") {
       pendingProtectedPageRef.current = null;
-      selectPage(nextPage, options);
+      selectPagePreservingLiveBackdrop(nextPage, options);
       return;
     }
 
@@ -371,7 +367,7 @@ export function App() {
     }
 
     pendingProtectedPageRef.current = null;
-    selectPage(nextPage, options);
+    selectPagePreservingLiveBackdrop(nextPage, options);
   }
 
   function beginWatch(nextWatchTarget = watchRoom) {
@@ -470,7 +466,7 @@ export function App() {
     }
 
     autorunRef.current = true;
-    selectPage("watch", { updateAutorun: false });
+    selectPagePreservingLiveBackdrop("watch", { updateAutorun: false });
   }, []);
 
   useEffect(() => {
@@ -882,7 +878,7 @@ export function App() {
                         role="menuitem"
                         onClick={() => {
                           closeAuthMenu();
-                          selectPage("settings", { updateAutorun: false });
+                          selectPagePreservingLiveBackdrop("settings", { updateAutorun: false });
                         }}
                       >
                         个人中心
@@ -922,7 +918,7 @@ export function App() {
 
         <main className="page-shell">
           <WatchPage
-            hidden={page !== "watch"}
+            hidden={!showWatchPage}
             watchJoined={watchJoined}
             roomLabel={watchRoomLabel}
             roomTitle={watchRoomTitle}
@@ -1003,29 +999,28 @@ export function App() {
           />
 
           {livePageMounted ? (
-            <Suspense fallback={<LivePageFallback hidden={page !== "live"} />}>
-              <LiveRoute
-                hidden={page !== "live"}
-                page={page}
-                pageRef={pageRef}
-                relayUrl={relayUrl}
-                relayUrlRef={relayUrlRef}
-                liveRoom={liveRoom}
-                liveRoomRef={liveRoomRef}
-                setLiveRoomValue={setLiveRoomValue}
-                selectPageWithGuard={selectPageWithGuard}
-                authState={authState}
-                log={log}
-                onRequireLogin={() => {
-                  setLoginPromptOpen(true);
-                }}
-                syntheticSessionRef={syntheticSessionRef}
-              />
-            </Suspense>
+            <LiveRoute
+              hidden={page !== "live"}
+              page={page}
+              pageRef={pageRef}
+              relayUrl={relayUrl}
+              relayUrlRef={relayUrlRef}
+              liveRoom={liveRoom}
+              liveRoomRef={liveRoomRef}
+              setLiveRoomValue={setLiveRoomValue}
+              selectPageWithGuard={selectPageWithGuard}
+              authState={authState}
+              log={log}
+              onRequireLogin={() => {
+                setLoginPromptOpen(true);
+              }}
+              onReturnHome={returnToWatchHome}
+              syntheticSessionRef={syntheticSessionRef}
+            />
           ) : null}
 
           <SettingsPage
-            hidden={page !== "settings"}
+            hidden={!showSettingsPage}
             relayUrl={relayUrl}
             relayHost={relayHost}
             buildLabel={buildLabel}

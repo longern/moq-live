@@ -137,6 +137,11 @@ publisher-moq {
   height: 34px;
 }
 
+.publisher-preview-spinner {
+  width: 34px;
+  height: 34px;
+}
+
 .stage-controls {
   position: absolute;
   inset: auto 0 0;

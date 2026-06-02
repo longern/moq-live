@@ -3,7 +3,9 @@ import { ChatPanel } from "../ChatPanel.jsx";
 import { StatusPill } from "../StatusPill.jsx";
 import {
   BroadcastIcon,
-  CameraIcon,
+  CloseIcon,
+  EndBroadcastIcon,
+  FlipCameraIcon,
   LinkIcon,
   MicrophoneIcon,
   MoreIcon,
@@ -58,7 +60,7 @@ function CameraPanel({
       </label>
       <div className="action-row">
         <button type="button" className="secondary" onClick={onCycleCamera}>
-          {cameraMode === "off" ? "打开摄像头" : "切换前后摄"}
+          翻转摄像头
         </button>
       </div>
     </>
@@ -205,8 +207,10 @@ export function LiveDesktopPage(props) {
     microphoneEnabled,
     cameraMode,
     isPublishing,
+    isStarting = false,
     previewActive,
     previewHasVideo,
+    previewPending,
     previewSourceType,
     screenShareSupported,
     screenShareActive,
@@ -245,9 +249,14 @@ export function LiveDesktopPage(props) {
     roomCoverStatus,
     roomCoverInputRef,
     onPickCover,
-    onOpenCoverPicker
+    onOpenCoverPicker,
+    closing,
+    onRequestClose,
+    onSelectLiveMode
   } = props;
   const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
+  const mediaMode = props.mediaMode;
+  const publishControlActive = isPublishing || isStarting;
   const screenShareUnavailableReason = !screenShareSupported
     ? "当前浏览器不支持屏幕分享"
     : isPublishing
@@ -297,6 +306,14 @@ export function LiveDesktopPage(props) {
     onStartScreenShare();
   }
 
+  function handleCameraFlip() {
+    if (mediaMode === "voice" || cameraUnavailable) {
+      return;
+    }
+
+    onCycleCamera();
+  }
+
   const activePanel = openPanel === "camera" ? (
     <CameraPanel
       cameraMode={cameraMode}
@@ -343,7 +360,38 @@ export function LiveDesktopPage(props) {
   const activePanelClassName = openPanel === "microphone" ? "is-microphone-panel" : "";
 
   return (
-    <section className="page page-immersive" data-page="live" hidden={hidden}>
+    <section className={`page page-immersive live-desktop-page${closing ? " is-closing" : ""}`} data-page="live" hidden={hidden}>
+      <div className="live-page-top">
+        <button
+          type="button"
+          className={`live-page-close${publishControlActive ? " is-live-control" : ""}`}
+          onClick={publishControlActive ? onTogglePublish : onRequestClose}
+          aria-label={publishControlActive ? (isStarting ? "取消开播" : "结束直播") : "退出开播页"}
+        >
+          {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
+        </button>
+        {!publishControlActive ? (
+          <div className="live-mode-switch" role="group" aria-label="开播模式">
+            <button
+              type="button"
+              className={mediaMode === "video" ? "is-active" : ""}
+              onClick={() => onSelectLiveMode?.("video")}
+              aria-pressed={mediaMode === "video"}
+            >
+              视频
+            </button>
+            <button
+              type="button"
+              className={mediaMode === "voice" ? "is-active" : ""}
+              onClick={() => onSelectLiveMode?.("voice")}
+              aria-pressed={mediaMode === "voice"}
+            >
+              语音
+            </button>
+          </div>
+        ) : null}
+        <StatusPill id="publishBadge" label={publishBadge.label} state={publishBadge.state} />
+      </div>
       <div className="page-grid live-layout">
         <section className="stage-column">
           <div className="stage-frame live-stage-frame">
@@ -351,9 +399,16 @@ export function LiveDesktopPage(props) {
               previewVideoRef={previewVideoRef}
               previewActive={previewActive}
               previewHasVideo={previewHasVideo}
+              previewPending={previewPending}
+              mediaMode={mediaMode}
               mirrorPreview={mirrorPreview}
             />
           </div>
+          {props.activationContent ? (
+            <div className="live-activation-overlay">
+              {props.activationContent}
+            </div>
+          ) : null}
           <div className="live-desktop-overlay">
             {openPanel ? (
               <button
@@ -368,7 +423,6 @@ export function LiveDesktopPage(props) {
                 <span>直播间</span>
                 <strong data-room-label>{roomLabel}</strong>
               </div>
-              <StatusPill id="publishBadge" label={publishBadge.label} state={publishBadge.state} />
             </div>
 
             <div className="live-desktop-dock">
@@ -381,21 +435,20 @@ export function LiveDesktopPage(props) {
               <div className="live-desktop-actions" role="toolbar" aria-label="开播控制">
                 <button
                   type="button"
-                  className={`live-dock-button${openPanel === "camera" ? " is-active" : ""}${cameraMode === "off" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable has-tooltip" : ""}`}
-                  onClick={() => {
-                    if (cameraUnavailable) {
-                      setOpenPanel((current) => (current === "camera" ? "" : current));
-                      return;
-                    }
-                    setOpenPanel((current) => (current === "camera" ? "" : "camera"));
-                  }}
-                  aria-label={cameraUnavailable ? "未检测到可用摄像头" : "摄像头设置"}
+                  className={`live-dock-button${mediaMode === "voice" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable has-tooltip" : ""}`}
+                  onClick={handleCameraFlip}
+                  aria-label={
+                    mediaMode === "voice"
+                      ? "语音模式下摄像头已关闭"
+                      : cameraUnavailable
+                        ? "未检测到可用摄像头"
+                        : `翻转摄像头，当前${cameraMode === "rear" ? "后摄" : "前摄"}`
+                  }
                   aria-describedby={cameraUnavailable ? "cameraUnavailableTooltip" : undefined}
-                  aria-expanded={cameraUnavailable ? undefined : openPanel === "camera"}
-                  aria-disabled={cameraUnavailable ? "true" : undefined}
-                  title={cameraUnavailable ? "未检测到可用摄像头" : "摄像头"}
+                  aria-disabled={mediaMode === "voice" || cameraUnavailable ? "true" : undefined}
+                  title={cameraUnavailable ? "未检测到可用摄像头" : "翻转摄像头"}
                 >
-                  <CameraIcon mode={cameraMode} />
+                  <FlipCameraIcon />
                   {cameraUnavailable ? (
                     <span id="cameraUnavailableTooltip" className="live-dock-tooltip" role="tooltip">
                       未检测到可用摄像头
@@ -430,13 +483,13 @@ export function LiveDesktopPage(props) {
                 </button>
                 <button
                   type="button"
-                  className={`live-dock-button live-dock-button-primary${isPublishing ? " is-live" : ""}`}
+                  className={`live-dock-button live-dock-button-primary${isPublishing ? " is-live" : ""}${isStarting ? " is-starting" : ""}`}
                   onClick={onTogglePublish}
-                  aria-label={isPublishing ? "停止开播" : "开始开播"}
-                  title={isPublishing ? "停止开播" : "开始开播"}
-                  disabled={publishBlocked || (!cameraEnabled && !microphoneEnabled)}
+                  aria-label={publishControlActive ? (isStarting ? "正在开始直播" : "结束直播") : "开始直播"}
+                  title={publishControlActive ? (isStarting ? "正在开始直播" : "结束直播") : "开始直播"}
+                  disabled={isStarting || publishBlocked || (!cameraEnabled && !microphoneEnabled)}
                 >
-                  <BroadcastIcon active={isPublishing} />
+                  <BroadcastIcon active={publishControlActive} />
                 </button>
                 <button
                   type="button"

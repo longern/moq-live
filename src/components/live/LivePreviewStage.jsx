@@ -1,9 +1,20 @@
+import { LoadingSpinner } from "../LoadingSpinner.jsx";
+
 export function LivePreviewStage({
   previewVideoRef,
   previewActive,
   previewHasVideo,
+  previewPending = false,
+  mediaMode = "video",
   mirrorPreview = false
 }) {
+  const showPending = mediaMode === "video" && previewPending && !previewHasVideo;
+  const placeholderText = !previewActive
+    ? (mediaMode === "voice" ? "语音直播" : "打开摄像头预览")
+    : mediaMode === "voice"
+      ? "语音直播"
+      : "未检测到摄像头";
+
   return (
     <div className="publisher-host" id="publisherHost">
       <video
@@ -15,13 +26,13 @@ export function LivePreviewStage({
         muted
         hidden={!previewActive || !previewHasVideo}
       />
-      {!previewActive ? (
+      {!previewActive || !previewHasVideo ? (
         <div className="publisher-placeholder">
-          <p>打开摄像头预览</p>
-        </div>
-      ) : !previewHasVideo ? (
-        <div className="publisher-placeholder">
-          <p>仅检测到麦克风，可进行纯音频开播</p>
+          {showPending ? (
+            <LoadingSpinner className="publisher-preview-spinner" label="正在打开摄像头" />
+          ) : (
+            <p>{placeholderText}</p>
+          )}
         </div>
       ) : null}
     </div>

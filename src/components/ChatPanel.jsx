@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { UserAvatar } from "./UserAvatar.jsx";
 
 function getConnectionLabel(state) {
@@ -67,6 +67,7 @@ export function ChatPanel({
   showComposer = true,
   showWelcome = true,
 }) {
+  const composerInputId = useId();
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -147,9 +148,14 @@ export function ChatPanel({
         composerState.mode === "guest" ? (
           <div className={`chat-composer chat-composer-readOnly${floating ? " chat-composer-floating" : ""}`}>
             <input
+              id={`${composerInputId}-readonly`}
+              name="chat_message_readonly"
+              type="text"
               value=""
               readOnly
               placeholder={composerState.inputPlaceholder}
+              autoComplete="off"
+              inputMode="text"
               onClick={() => {
                 if (authAvailable && !authLoading) {
                   onRequireLogin();
@@ -175,15 +181,22 @@ export function ChatPanel({
         ) : (
           <form
             className={`chat-composer${floating ? " chat-composer-floating" : ""}`}
+            autoComplete="off"
             onSubmit={(event) => {
               event.preventDefault();
               onSend();
             }}
           >
             <input
+              id={composerInputId}
+              name="chat_message"
+              type="text"
               value={draft}
               placeholder={composerState.inputPlaceholder}
               maxLength={280}
+              autoComplete="off"
+              inputMode="text"
+              enterKeyHint="send"
               onInput={onDraftChange}
               disabled={composerState.inputDisabled}
             />

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "../ChatPanel.jsx";
 import { StatusPill } from "../StatusPill.jsx";
+import { UserAvatar } from "../UserAvatar.jsx";
 import {
   BroadcastIcon,
   CameraIcon,
@@ -28,6 +29,7 @@ export function LiveMobilePage(props) {
   const {
     hidden,
     roomLabel,
+    roomAvatarUrl,
     publishBlocked,
     publishBlockedReason,
     publishBadge,
@@ -192,7 +194,20 @@ export function LiveMobilePage(props) {
     <section className="page page-immersive live-mobile-page" data-page="live" data-shell={shellMode} hidden={hidden}>
       <div className="live-mobile-shell">
         <div className="live-mobile-head">
-          <strong className="live-mobile-room">{roomLabel}</strong>
+          <div className="live-mobile-room-chip">
+            <UserAvatar
+              avatarUrl={roomAvatarUrl}
+              displayName={roomLabel}
+              className="live-mobile-room-avatar"
+              imgAlt={roomLabel || "主播头像"}
+              imgWidth={24}
+              imgHeight={24}
+              monogramClassName="is-monogram"
+              placeholderClassName="is-placeholder"
+              iconClassName="live-mobile-room-avatar-icon"
+            />
+            <span className="live-mobile-room">{roomLabel}</span>
+          </div>
           <StatusPill id="publishBadgeOverlay" label={publishBadge.label} state={publishBadge.state} />
         </div>
         <div className="stage-frame live-stage-frame live-stage-frame-mobile">

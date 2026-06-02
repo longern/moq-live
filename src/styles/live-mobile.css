@@ -24,6 +24,22 @@
     display: none;
   }
 
+  @media (orientation: portrait) {
+    body:has(.live-mobile-page:not([hidden])) .app-container {
+      grid-template-rows: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    body:has(.live-mobile-page:not([hidden])) .topbar,
+    body:has(.live-mobile-page:not([hidden])) .mobile-nav {
+      display: none;
+    }
+
+    .live-mobile-page[data-shell="compact"] {
+      height: 100svh;
+    }
+  }
+
   .live-mobile-shell {
     position: relative;
     width: 100%;
@@ -50,9 +66,55 @@
     pointer-events: auto;
   }
 
+  .live-mobile-room-chip {
+    min-width: 0;
+    max-width: min(64vw, 320px);
+    min-height: 36px;
+    padding: 4px 12px 4px 5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    background: rgba(4, 11, 17, 0.62);
+    color: var(--text);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  }
+
+  .live-mobile-room-avatar {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    display: inline-grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+
+  .live-mobile-room-avatar img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
+
+  .live-mobile-room-avatar-icon {
+    width: 15px;
+    height: 15px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.9;
+  }
+
   .live-mobile-room {
     min-width: 0;
-    font-size: 0.98rem;
+    font-size: 0.875rem;
+    font-weight: 400;
     line-height: 1;
     white-space: nowrap;
     overflow: hidden;

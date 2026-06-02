@@ -35,6 +35,10 @@ export function useCompactViewport() {
   return useMediaQuery("(max-width: 760px)");
 }
 
+export function usePortraitViewport() {
+  return useMediaQuery("(orientation: portrait)");
+}
+
 export function useTouchPortraitViewport() {
   return useMediaQuery("(orientation: portrait) and (hover: none) and (pointer: coarse)");
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMediaOrientation } from "../hooks/useMediaOrientation.js";
-import { useCompactViewport, useTouchPortraitViewport } from "../hooks/useMediaQuery.js";
+import { useCompactViewport, usePortraitViewport } from "../hooks/useMediaQuery.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
 
@@ -8,6 +8,7 @@ export function LivePage({
   hidden,
   roomDetails,
   roomLabel,
+  roomAvatarUrl,
   shareTarget,
   watchLink,
   publishBlocked,
@@ -55,7 +56,7 @@ export function LivePage({
   onRoomDetailsChange
 }) {
   const compactViewport = useCompactViewport();
-  const touchPortraitViewport = useTouchPortraitViewport();
+  const portraitViewport = usePortraitViewport();
   const previewOrientation = useMediaOrientation({
     mediaRef: previewVideoRef,
     active: previewActive && previewHasVideo,
@@ -69,11 +70,11 @@ export function LivePage({
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
   const immersiveTouchPortrait =
-    touchPortraitViewport &&
+    portraitViewport &&
     previewActive &&
     previewHasVideo &&
     previewOrientation === "portrait";
-  const useMobileShell = compactViewport || immersiveTouchPortrait;
+  const useMobileShell = compactViewport || portraitViewport;
   const mobileShellMode = immersiveTouchPortrait ? "immersive" : "compact";
 
   useEffect(() => {
@@ -134,6 +135,7 @@ export function LivePage({
   const pageProps = {
     hidden,
     roomLabel,
+    roomAvatarUrl,
     shareTarget,
     watchLink,
     publishBlocked,

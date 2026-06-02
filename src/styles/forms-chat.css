@@ -104,15 +104,15 @@
   grid-template-columns: 20px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .chat-message-card-system {
-  background: rgba(16, 196, 182, 0.08);
-  border-color: var(--status-online-soft);
+  background: transparent;
+  border-color: transparent;
 }
 
 .chat-message-card-system-no-avatar {
@@ -152,6 +152,8 @@
 .chat-message-body p {
   display: inline;
   color: #dce8f4;
+  font-size: 0.875rem;
+  font-weight: 400;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -159,7 +161,8 @@
 .chat-message-body strong {
   margin-right: 6px;
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: 0.875rem;
+  font-weight: 400;
 }
 
 .chat-message-body span {

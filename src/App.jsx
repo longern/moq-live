@@ -148,6 +148,7 @@ export function App() {
     title: ""
   });
   const [watchStreamEnded, setWatchStreamEnded] = useState(false);
+  const [topbarWatchRoom, setTopbarWatchRoom] = useState(watchRoom);
 
   const watchPlaybackRelayUrlRef = useRef("");
   const watchPlaybackNamespaceRef = useRef("");
@@ -216,7 +217,7 @@ export function App() {
   const watchRoomLabel = watchingTestChannel
     ? watchTestChannel.label
     : watchingNamespace
-    ? (directWatchNamespace || "等待输入 namespace")
+    ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "等待输入 namespace")
     : chat.roomMeta.host.displayName
       || watchRoomResolution.hostDisplayName
       || chat.roomMeta.host.handle
@@ -229,7 +230,7 @@ export function App() {
   const watchChatRoomLabel = watchingTestChannel
     ? watchTestChannel.label
     : watchingNamespace
-    ? (directWatchNamespace || "")
+    ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
     : chat.roomMeta.host.displayName
       || watchRoomResolution.hostDisplayName
       || chat.roomMeta.host.handle
@@ -239,7 +240,7 @@ export function App() {
   const watchRoomTitle = watchingTestChannel
     ? watchTestChannel.title
     : watchingNamespace
-    ? (directWatchNamespace || "公共 namespace")
+    ? (directWatchNamespace ? `公共频道 ${directWatchNamespace}` : "公共频道")
     : chat.roomMeta.title
       || watchRoomResolution.title
       || (watchChatRoomLabel ? `${watchChatRoomLabel}的直播间` : watchRoomLabel);
@@ -299,6 +300,10 @@ export function App() {
       setLivePageMounted(true);
     }
   }, [page]);
+
+  useEffect(() => {
+    setTopbarWatchRoom(watchRoom);
+  }, [watchRoom]);
 
   function openSettingsLogin(options) {
     setAuthMenuOpen(false);
@@ -793,6 +798,31 @@ export function App() {
           </a>
 
           <div className="topbar-right">
+            <form
+              className="topbar-watch-form"
+              role="search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                beginWatch(topbarWatchRoom);
+              }}
+            >
+              <input
+                id="topbar-watch-room"
+                name="watch_room"
+                type="text"
+                value={topbarWatchRoom}
+                placeholder="输入主播号"
+                aria-label="输入主播号进入直播间"
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck="false"
+                enterKeyHint="go"
+                onInput={(event) => {
+                  setTopbarWatchRoom(event.currentTarget.value);
+                }}
+              />
+            </form>
             <DesktopNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
             <div className="auth-toolbar">
               <div

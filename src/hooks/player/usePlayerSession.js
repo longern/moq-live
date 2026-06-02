@@ -595,6 +595,37 @@ export function usePlayerSession({
     }
   }
 
+  async function reconnectAudioTrackOnly(ctx) {
+    if (sessionRef.current !== ctx) {
+      return false;
+    }
+
+    const audioTrack = ctx.backend?.audio?.source?.track;
+    if (
+      !audioTrack ||
+      typeof audioTrack.peek !== "function" ||
+      typeof audioTrack.set !== "function"
+    ) {
+      return false;
+    }
+
+    const currentTrack = audioTrack.peek();
+    if (!currentTrack) {
+      return false;
+    }
+
+    audioTrack.set(undefined);
+    await Promise.resolve();
+
+    if (sessionRef.current !== ctx) {
+      return false;
+    }
+
+    audioTrack.set(currentTrack);
+    await applyDesiredPlayerMute({ logFailure: false });
+    return true;
+  }
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       const active = Boolean(document.fullscreenElement);
@@ -742,16 +773,38 @@ export function usePlayerSession({
         audioRecoveryAttemptsRef.current.push(attemptAt);
         updatePlayerStatus("buffering", "音频流中断，正在自动重连。");
         logRef.current?.(
-          `[Player] audio subscribe closed by server; reconnecting statusCode=${detail.statusCode} reason=${detail.reasonPhrase || ""}`,
+          `[Player] audio subscribe closed by server; reconnecting audio statusCode=${detail.statusCode} reason=${detail.reasonPhrase || ""}`,
         );
-        void startPlayer({
-          initialMuted: desiredPlayerMutedRef.current,
-        }).catch((error) => {
-          audioRecoveryInFlightRef.current = false;
-          logRef.current?.(
-            `[Player] audio auto reconnect failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        });
+        void reconnectAudioTrackOnly(ctx)
+          .then((reconnectedAudioOnly) => {
+            if (sessionRef.current !== ctx) {
+              return;
+            }
+
+            if (reconnectedAudioOnly) {
+              audioRecoveryInFlightRef.current = false;
+              if (ctx.started) {
+                updatePlayerStatus("live", "播放中（@moq/watch JS API）。");
+              }
+              logRef.current?.("[Player] audio-only reconnect triggered");
+              return;
+            }
+
+            logRef.current?.(
+              "[Player] audio-only reconnect unavailable; falling back to full player reconnect",
+            );
+            return startPlayer({
+              initialMuted: desiredPlayerMutedRef.current,
+            });
+          })
+          .catch((error) => {
+            logRef.current?.(
+              `[Player] audio auto reconnect failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          })
+          .finally(() => {
+            audioRecoveryInFlightRef.current = false;
+          });
       };
 
       const now = Date.now();

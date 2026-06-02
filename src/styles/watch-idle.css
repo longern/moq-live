@@ -294,6 +294,14 @@
 }
 
 @media (min-width: 761px) {
+  .watch-idle-form {
+    display: none;
+  }
+
+  .watch-room-section {
+    padding-top: 8px;
+  }
+
   .watch-room-grid {
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 14px;

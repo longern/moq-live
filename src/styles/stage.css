@@ -181,6 +181,7 @@ publisher-moq {
   min-height: 42px;
   padding: 0 18px;
   border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
   background: rgba(3, 8, 14, 0.88);
   color: var(--text);
   text-align: center;

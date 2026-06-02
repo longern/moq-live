@@ -167,6 +167,9 @@ export function LiveRoute({
     || authState.user?.email
     || liveRoom
     || "等待生成频道号";
+  const liveRoomAvatarUrl = liveChat.roomMeta.host.avatarUrl
+    || authState.user?.avatarUrl
+    || "";
   const liveShareTarget = authState.user?.handle?.trim() || (liveRoom ? `ns:${liveRoom}` : "");
   const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
   const publishBadge = describePublishState(publisher.publishStatusKind);
@@ -544,6 +547,7 @@ export function LiveRoute({
       room={liveRoom}
       roomDetails={liveRoomDetails}
       roomLabel={liveRoomLabel}
+      roomAvatarUrl={liveRoomAvatarUrl}
       shareTarget={liveShareTarget}
       watchLink={liveWatchLink}
       publishBlocked={publishBlocked}

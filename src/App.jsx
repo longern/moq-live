@@ -14,6 +14,7 @@ import { buildWatchLink, getRelayHostValue, writeRoute } from "./lib/routeState.
 import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from "./lib/watchHistory.js";
 import { describePlayerState, RETAINED_PLAYER_LAYOUT_STATES } from "./lib/status.js";
 import { getWatchTestChannel } from "./lib/watchTestChannels.js";
+import { createApiError, getAppErrorMessage } from "./lib/appErrors.js";
 
 function getAvatarLabel(authState) {
   if (!authState.user) {
@@ -559,7 +560,7 @@ export function App() {
         const payload = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(payload.error || `room resolve failed with ${response.status}`);
+          throw createApiError(payload, "room_resolve_failed", { status: response.status });
         }
 
         if (cancelled) {
@@ -579,7 +580,7 @@ export function App() {
           return;
         }
 
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getAppErrorMessage(error);
         setWatchRoomResolution({
           loading: false,
           error: message,

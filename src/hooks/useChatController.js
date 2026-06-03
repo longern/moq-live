@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createAppError } from "../lib/appErrors.js";
 import { getChatErrorMessage } from "../lib/chatErrors.js";
 
 const RECONNECT_DELAYS_MS = [
@@ -12,6 +13,7 @@ const RECONNECT_DELAYS_MS = [
 const MAX_RECONNECT_ATTEMPTS = RECONNECT_DELAYS_MS.length;
 const CONNECTION_WINDOW_MS = 5 * 60_000;
 const MAX_CONNECTIONS_PER_WINDOW = 20;
+const BROADCAST_CONTROL_CHECK_TIMEOUT_MS = 4_000;
 
 function upsertMessages(currentMessages, incomingMessages) {
   const deduped = new Map(currentMessages.map((message) => [message.id, message]));
@@ -84,12 +86,14 @@ export function useChatController({
   const [streamState, setStreamState] = useState(getDefaultStreamState);
   const [roomMeta, setRoomMeta] = useState(getDefaultRoomMeta);
   const [roomStateReady, setRoomStateReady] = useState(false);
+  const [canControlBroadcast, setCanControlBroadcast] = useState(false);
 
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const reconnectCountdownTimerRef = useRef(null);
   const reconnectAttemptRef = useRef(0);
   const connectionAttemptedAtRef = useRef([]);
+  const broadcastControlRequestsRef = useRef(new Map());
   const logRef = useRef(log);
 
   logRef.current = log;
@@ -103,6 +107,14 @@ export function useChatController({
       clearInterval(reconnectCountdownTimerRef.current);
       reconnectCountdownTimerRef.current = null;
     }
+  }
+
+  function clearBroadcastControlRequests(error = createAppError("broadcast_control_check_cancelled")) {
+    for (const request of broadcastControlRequestsRef.current.values()) {
+      clearTimeout(request.timeoutId);
+      request.reject(error);
+    }
+    broadcastControlRequestsRef.current.clear();
   }
 
   function showReconnectCountdown(delayMs) {
@@ -153,6 +165,8 @@ export function useChatController({
       setStreamState(getDefaultStreamState());
       setRoomMeta(getDefaultRoomMeta());
       setRoomStateReady(false);
+      setCanControlBroadcast(false);
+      clearBroadcastControlRequests();
       reconnectAttemptRef.current = 0;
       connectionAttemptedAtRef.current = [];
       return undefined;
@@ -207,6 +221,7 @@ export function useChatController({
           setOnlineCount(Number(payload.onlineCount) || 0);
           setLoggedInViewers(normalizeLoggedInViewers(payload.loggedInViewers));
           setReadOnly(Boolean(payload.readOnly));
+          setCanControlBroadcast(Boolean(payload.canControlBroadcast));
           setStreamState({
             isLive: Boolean(payload.stream?.isLive),
             startedAt: payload.stream?.startedAt || null
@@ -225,6 +240,17 @@ export function useChatController({
           });
           setRoomStateReady(true);
           setChatError("");
+          return;
+        }
+
+        if (payload.type === "broadcast.control.checked") {
+          const request = broadcastControlRequestsRef.current.get(payload.requestId);
+          if (!request) {
+            return;
+          }
+          clearTimeout(request.timeoutId);
+          broadcastControlRequestsRef.current.delete(payload.requestId);
+          request.resolve(Boolean(payload.canControlBroadcast));
           return;
         }
 
@@ -279,6 +305,7 @@ export function useChatController({
         if (socketRef.current === socket) {
           socketRef.current = null;
         }
+        clearBroadcastControlRequests(createAppError("broadcast_control_connection_closed"));
         if (cancelled) {
           return;
         }
@@ -319,6 +346,7 @@ export function useChatController({
     return () => {
       cancelled = true;
       clearReconnectTimers();
+      clearBroadcastControlRequests();
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
@@ -351,6 +379,31 @@ export function useChatController({
     return true;
   }
 
+  function requestBroadcastControl() {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return Promise.reject(createAppError("broadcast_control_channel_unavailable"));
+    }
+
+    const requestId = `bc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    return new Promise((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        broadcastControlRequestsRef.current.delete(requestId);
+        reject(createAppError("broadcast_control_check_timeout"));
+      }, BROADCAST_CONTROL_CHECK_TIMEOUT_MS);
+
+      broadcastControlRequestsRef.current.set(requestId, {
+        resolve,
+        reject,
+        timeoutId
+      });
+      socket.send(JSON.stringify({
+        type: "broadcast.control.check",
+        requestId
+      }));
+    });
+  }
+
   return {
     messages,
     draft,
@@ -363,7 +416,9 @@ export function useChatController({
     streamState,
     roomMeta,
     roomStateReady,
+    canControlBroadcast,
     sendMessage,
-    sendEvent
+    sendEvent,
+    requestBroadcastControl
   };
 }

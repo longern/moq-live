@@ -4,7 +4,8 @@ import {
   createMediaSessionManager,
   stopMediaStream,
 } from "../lib/mediaSessionManager.js";
-import { getPublishBlockReason } from "../lib/roomPolicy.js";
+import { createAppError, getAppErrorMessage } from "../lib/appErrors.js";
+import { getPublishBlockError } from "../lib/roomPolicy.js";
 import {
   createSyntheticMedia,
   sampleCanvasMarkerSignature,
@@ -83,6 +84,7 @@ export function usePublisherController({
   relayUrlRef,
   roomRef,
   generateRoomId,
+  assertCanPublish,
   syntheticSessionRef: externalSyntheticSessionRef,
   log,
 }) {
@@ -146,10 +148,21 @@ export function usePublisherController({
   }
 
   function assertPublishAllowed(room) {
-    const reason = getPublishBlockReason(room);
-    if (reason) {
-      updatePublishStatus("error", `失败：${reason}`);
-      throw new Error(reason);
+    const errorLike = getPublishBlockError(room);
+    if (errorLike) {
+      const error = createAppError(errorLike.code, errorLike.details);
+      updatePublishStatus("error", `失败：${getAppErrorMessage(error)}`);
+      throw error;
+    }
+  }
+
+  async function assertBroadcastControl(room) {
+    try {
+      await assertCanPublish?.(room);
+    } catch (error) {
+      const message = getAppErrorMessage(error);
+      updatePublishStatus("error", `失败：${message}`);
+      throw error;
     }
   }
 
@@ -165,7 +178,7 @@ export function usePublisherController({
     return liveSessionManagerRef.current.isCurrentRequest(requestId);
   }
 
-  function waitForSignalValue(signal, predicate, timeoutMs, timeoutMessage) {
+  function waitForSignalValue(signal, predicate, timeoutMs, timeoutCode) {
     if (predicate(signal.peek())) {
       return Promise.resolve(signal.peek());
     }
@@ -173,7 +186,7 @@ export function usePublisherController({
     return new Promise((resolve, reject) => {
       const timeoutId = window.setTimeout(() => {
         dispose();
-        reject(new Error(timeoutMessage));
+        reject(createAppError(timeoutCode));
       }, timeoutMs);
       const dispose = signal.watch((value) => {
         if (!predicate(value)) {
@@ -507,7 +520,7 @@ export function usePublisherController({
         !previewStream?.getVideoTracks?.().length
       ) {
         void startLivePreview().catch((error) => {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = getAppErrorMessage(error);
           updatePublishStatus("error", `预览失败：${message}`);
           log(`camera restore failed: ${message}`);
         });
@@ -520,7 +533,7 @@ export function usePublisherController({
         )
       ) {
         void switchPublishCamera(selectedCameraIdRef.current).catch((error) => {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = getAppErrorMessage(error);
           updatePublishStatus("error", `切换摄像头失败：${message}`);
           log(`camera publish restore failed: ${message}`);
         });
@@ -625,7 +638,7 @@ export function usePublisherController({
       return false;
     }
     if (previewSourceTypeRef.current !== PREVIEW_SOURCE_CAMERA) {
-      throw new Error("当前直播源不是摄像头");
+      throw createAppError("publish_source_not_camera");
     }
     if (!cameraEnabledRef.current) {
       return false;
@@ -664,7 +677,7 @@ export function usePublisherController({
 
       const newPreviewTrack = newStream.getVideoTracks()[0] ?? null;
       if (!newPreviewTrack) {
-        throw new Error("无法获取新摄像头画面");
+        throw createAppError("video_track_unavailable");
       }
 
       const newPublishTrack = newPreviewTrack.clone();
@@ -713,7 +726,7 @@ export function usePublisherController({
       log(`switched publish camera to ${cameraId || "default"}`);
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getAppErrorMessage(error);
       updatePublishStatus("error", `切换摄像头失败：${message}`);
       log(`switch camera failed: ${message}`);
       throw error;
@@ -802,7 +815,7 @@ export function usePublisherController({
       if (!stream) {
         throw lastError instanceof Error
           ? lastError
-          : new Error("未检测到可用的摄像头或麦克风");
+          : createAppError("media_devices_unavailable");
       }
 
       if (!cameraEnabledRef.current) {
@@ -840,8 +853,7 @@ export function usePublisherController({
             }
 
             void startLivePreview().catch((error) => {
-              const message =
-                error instanceof Error ? error.message : String(error);
+              const message = getAppErrorMessage(error);
               updatePublishStatus("error", `预览失败：${message}`);
               log(`preview track restore failed: ${message}`);
             });
@@ -859,7 +871,7 @@ export function usePublisherController({
 
   async function startScreenSharePreview() {
     if (!screenShareSupported) {
-      throw new Error("当前浏览器不支持屏幕共享");
+      throw createAppError("screen_share_not_supported");
     }
 
     const requestId = beginPreviewRequest();
@@ -900,7 +912,7 @@ export function usePublisherController({
     if (!displayStream) {
       throw lastDisplayError instanceof Error
         ? lastDisplayError
-        : new Error("未获取到可共享的屏幕画面");
+        : createAppError("screen_share_unavailable");
     }
 
     if (
@@ -928,7 +940,7 @@ export function usePublisherController({
           stopMediaStream(displayStream);
           throw error instanceof Error
             ? error
-            : new Error("未获取到可用的麦克风");
+            : createAppError("microphone_unavailable");
         }
         log(
           `screen share microphone warning: ${error instanceof Error ? error.message : String(error)}`,
@@ -955,7 +967,7 @@ export function usePublisherController({
 
     if (!videoTrack && !audioTrack) {
       stopMediaStream(displayStream);
-      throw new Error("未获取到可推流的屏幕共享轨道");
+      throw createAppError("screen_share_no_tracks");
     }
 
     const usedTracks = [videoTrack, audioTrack].filter(Boolean);
@@ -991,13 +1003,12 @@ export function usePublisherController({
           stopLivePreview({ resetSource: true });
           if (publisherIsPublishingRef.current) {
             void stopCameraPublish();
-            updatePublishStatus("error", "屏幕共享已结束，请重新开始直播。");
+            updatePublishStatus("error", getAppErrorMessage(createAppError("screen_share_unavailable")));
             return;
           }
 
           void startLivePreview().catch((error) => {
-            const message =
-              error instanceof Error ? error.message : String(error);
+            const message = getAppErrorMessage(error);
             updatePublishStatus("error", `预览失败：${message}`);
             log(`screen share restore failed: ${message}`);
           });
@@ -1054,6 +1065,10 @@ export function usePublisherController({
       return;
     }
 
+    const namespace = ensureRoomId(true);
+    assertPublishAllowed(namespace);
+    await assertBroadcastControl(namespace);
+
     const startToken = publishStartTokenRef.current + 1;
     publishStartTokenRef.current = startToken;
     publisherIsStartingRef.current = true;
@@ -1071,15 +1086,13 @@ export function usePublisherController({
         stream = getLiveMediaStream();
       }
       if (!stream) {
-        throw new Error("未获取到直播预览");
+        throw createAppError("live_preview_unavailable");
       }
       if (publishStartTokenRef.current !== startToken) {
         updatePublishStatus("idle", "直播启动已取消。");
         return;
       }
 
-      const namespace = ensureRoomId(true);
-      assertPublishAllowed(namespace);
       const nextRelayUrl = new URL(relayUrlRef.current).toString();
       const canPublishVideo =
         previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN ||
@@ -1092,7 +1105,7 @@ export function usePublisherController({
         : null;
       const previewAudioTrack = stream.getAudioTracks()[0];
       if (!previewVideoTrack && !previewAudioTrack) {
-        throw new Error("未获取到可推流的音视频轨");
+        throw createAppError("publish_tracks_unavailable");
       }
       const previewVideo = previewVideoRef.current;
       const makeEven = (value) => Math.floor(value / 2) * 2;
@@ -1152,7 +1165,7 @@ export function usePublisherController({
         session.connection.status,
         (status) => status === "connected",
         PUBLISH_CONNECT_TIMEOUT_MS,
-        "连接 relay 超时",
+        "publish_connect_timeout",
       );
       if (publishStartTokenRef.current !== startToken) {
         closePublishSession(session);
@@ -1180,7 +1193,7 @@ export function usePublisherController({
       }
       updatePublishStatus(
         "error",
-        `失败：${error instanceof Error ? error.message : String(error)}`,
+        `失败：${getAppErrorMessage(error)}`,
       );
       throw error;
     } finally {
@@ -1224,7 +1237,7 @@ export function usePublisherController({
       updatePublishStatus("idle", "直播已停止。");
       log(`camera publish stopped: namespace=${roomRef.current || "unset"}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getAppErrorMessage(error);
       updatePublishStatus("error", `失败：${message}`);
       log(`camera stop warning: ${message}`);
     }
@@ -1237,9 +1250,10 @@ export function usePublisherController({
 
     const namespace = ensureRoomId(true);
     assertPublishAllowed(namespace);
+    await assertBroadcastControl(namespace);
     const nextRelayUrl = new URL(relayUrlRef.current).toString();
     if (!namespace) {
-      throw new Error("Namespace 不能为空");
+      throw createAppError("namespace_required");
     }
 
     updatePublishStatus("preparing", "正在启动合成推流。");
@@ -1281,7 +1295,7 @@ export function usePublisherController({
         publisher.connection.status,
         (status) => status === "connected",
         PUBLISH_CONNECT_TIMEOUT_MS,
-        "连接 relay 超时",
+        "publish_connect_timeout",
       );
     } catch (error) {
       closePublishSession(publisher);
@@ -1365,8 +1379,7 @@ export function usePublisherController({
       if (shouldRestartPreview) {
         stopLivePreview();
         void startLivePreview().catch((error) => {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          const message = getAppErrorMessage(error);
           updatePublishStatus("error", `预览失败：${message}`);
           log(`preview failed: ${message}`);
         });
@@ -1439,8 +1452,7 @@ export function usePublisherController({
       if (!document.hidden) {
         if (pageRef.current === "live" && !publisherIsPublishingRef.current) {
           void startLivePreview().catch((error) => {
-            const message =
-              error instanceof Error ? error.message : String(error);
+            const message = getAppErrorMessage(error);
             updatePublishStatus("error", `预览失败：${message}`);
             log(`preview resume failed: ${message}`);
           });

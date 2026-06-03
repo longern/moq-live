@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createApiError, createAppError } from "../lib/appErrors.js";
 
 export function useAuthController({ log, onAuthenticated }) {
   const [authState, setAuthState] = useState({
@@ -16,7 +17,7 @@ export function useAuthController({ log, onAuthenticated }) {
         credentials: "same-origin"
       });
       if (!response.ok) {
-        throw new Error(`auth endpoint returned ${response.status}`);
+        throw createAppError("auth_endpoint_failed", { status: response.status });
       }
       const payload = await response.json();
       const nextState = {
@@ -55,7 +56,7 @@ export function useAuthController({ log, onAuthenticated }) {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(payload.error || `profile update failed with ${response.status}`);
+      throw createApiError(payload, "profile_update_failed", { status: response.status });
     }
 
     if (payload.user) {
@@ -78,7 +79,7 @@ export function useAuthController({ log, onAuthenticated }) {
         credentials: "same-origin"
       });
       if (!response.ok) {
-        throw new Error(`logout failed with ${response.status}`);
+        throw createAppError("logout_failed", { status: response.status });
       }
       setAuthState((current) => ({
         ...current,
@@ -111,7 +112,7 @@ export function useAuthController({ log, onAuthenticated }) {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(payload.error || `avatar upload failed with ${response.status}`);
+      throw createApiError(payload, "avatar_upload_failed", { status: response.status });
     }
 
     if (payload.user) {
@@ -135,7 +136,7 @@ export function useAuthController({ log, onAuthenticated }) {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(payload.error || `avatar delete failed with ${response.status}`);
+      throw createApiError(payload, "avatar_delete_failed", { status: response.status });
     }
 
     if (payload.user) {

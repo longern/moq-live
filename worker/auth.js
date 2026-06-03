@@ -3,7 +3,8 @@ const textEncoder = new TextEncoder();
 const SESSION_COOKIE_NAME = "moq_session";
 const MICROSOFT_OAUTH_COOKIE_NAME = "moq_oauth_microsoft";
 const DEFAULT_SESSION_TTL_DAYS = 30;
-const MICROSOFT_OPENID_CONFIG_URL = "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration";
+const MICROSOFT_OPENID_CONFIG_URL =
+  "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration";
 const NICKNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const HANDLE_CHANGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 const MIN_NICKNAME_LENGTH = 2;
@@ -20,14 +21,14 @@ const ROOM_COVER_TYPES = {
   "image/avif": "avif",
   "image/jpeg": "jpg",
   "image/png": "png",
-  "image/webp": "webp"
+  "image/webp": "webp",
 };
 const USER_AVATAR_TYPES = ROOM_COVER_TYPES;
 const TABLES = {
   users: "moq_users",
   rooms: "moq_rooms",
   userIdentities: "moq_user_identities",
-  sessions: "moq_sessions"
+  sessions: "moq_sessions",
 };
 
 let openIdConfigCache = null;
@@ -43,7 +44,7 @@ export function json(data, init = {}) {
   }
   return new Response(JSON.stringify(data), {
     ...init,
-    headers
+    headers,
   });
 }
 
@@ -56,7 +57,7 @@ export function redirect(url, init = {}) {
   return new Response(null, {
     ...init,
     status: init.status ?? 302,
-    headers
+    headers,
   });
 }
 
@@ -74,14 +75,20 @@ export function getAuthConfig(env) {
   const cookieSecret = env.AUTH_COOKIE_SECRET;
 
   if (!clientId || !clientSecret || !cookieSecret) {
-    throw new Error("Missing auth configuration. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and AUTH_COOKIE_SECRET.");
+    throw new Error(
+      "Missing auth configuration. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and AUTH_COOKIE_SECRET.",
+    );
   }
 
   return {
     clientId,
     clientSecret,
     cookieSecret,
-    sessionTtlDays: Number.parseInt(env.AUTH_SESSION_TTL_DAYS ?? `${DEFAULT_SESSION_TTL_DAYS}`, 10) || DEFAULT_SESSION_TTL_DAYS
+    sessionTtlDays:
+      Number.parseInt(
+        env.AUTH_SESSION_TTL_DAYS ?? `${DEFAULT_SESSION_TTL_DAYS}`,
+        10,
+      ) || DEFAULT_SESSION_TTL_DAYS,
   };
 }
 
@@ -156,7 +163,7 @@ export function createDeleteCookie(name, secure = true) {
     secure,
     sameSite: "Lax",
     maxAge: 0,
-    expires: new Date(0)
+    expires: new Date(0),
   });
 }
 
@@ -181,12 +188,12 @@ export async function createMicrosoftOAuthState(secret, redirectTo) {
     nonce: randomToken(18),
     codeVerifier: randomToken(48),
     redirectTo: sanitizeRedirectTo(redirectTo),
-    expiresAt: Date.now() + 10 * 60 * 1000
+    expiresAt: Date.now() + 10 * 60 * 1000,
   };
 
   return {
     payload,
-    cookieValue: await signPayload(payload, secret)
+    cookieValue: await signPayload(payload, secret),
   };
 }
 
@@ -209,10 +216,13 @@ export async function createSession(db, userId, metadata, sessionTtlDays) {
   const tokenHash = await sha256Hex(token);
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + sessionTtlDays * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(
+    Date.now() + sessionTtlDays * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
-  await db.prepare(
-    `INSERT INTO ${TABLES.sessions} (
+  await db
+    .prepare(
+      `INSERT INTO ${TABLES.sessions} (
       id,
       user_id,
       session_token_hash,
@@ -222,21 +232,23 @@ export async function createSession(db, userId, metadata, sessionTtlDays) {
       ip,
       user_agent,
       revoked_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`
-  ).bind(
-    id,
-    userId,
-    tokenHash,
-    expiresAt,
-    createdAt,
-    createdAt,
-    metadata.ip ?? null,
-    metadata.userAgent ?? null
-  ).run();
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    )
+    .bind(
+      id,
+      userId,
+      tokenHash,
+      expiresAt,
+      createdAt,
+      createdAt,
+      metadata.ip ?? null,
+      metadata.userAgent ?? null,
+    )
+    .run();
 
   return {
     token,
-    expiresAt
+    expiresAt,
   };
 }
 
@@ -246,15 +258,14 @@ export async function revokeSession(db, sessionToken) {
   }
 
   const sessionTokenHash = await sha256Hex(sessionToken);
-  await db.prepare(
-    `UPDATE ${TABLES.sessions}
+  await db
+    .prepare(
+      `UPDATE ${TABLES.sessions}
      SET revoked_at = ?, last_seen_at = ?
-     WHERE session_token_hash = ? AND revoked_at IS NULL`
-  ).bind(
-    new Date().toISOString(),
-    new Date().toISOString(),
-    sessionTokenHash
-  ).run();
+     WHERE session_token_hash = ? AND revoked_at IS NULL`,
+    )
+    .bind(new Date().toISOString(), new Date().toISOString(), sessionTokenHash)
+    .run();
 }
 
 export async function getSessionUser(db, request) {
@@ -266,8 +277,9 @@ export async function getSessionUser(db, request) {
 
   const sessionTokenHash = await sha256Hex(sessionToken);
   const now = new Date().toISOString();
-  const row = await db.prepare(
-    `SELECT
+  const row = await db
+    .prepare(
+      `SELECT
       sessions.id AS session_id,
       sessions.user_id AS user_id,
       users.handle AS handle,
@@ -282,22 +294,27 @@ export async function getSessionUser(db, request) {
     WHERE sessions.session_token_hash = ?
       AND sessions.revoked_at IS NULL
       AND sessions.expires_at > ?
-    LIMIT 1`
-  ).bind(sessionTokenHash, now).first();
+    LIMIT 1`,
+    )
+    .bind(sessionTokenHash, now)
+    .first();
 
   if (!row) {
     return null;
   }
 
   const handle = await ensureUserHandle(db, row.user_id, row.handle);
-  await db.prepare(`UPDATE ${TABLES.sessions} SET last_seen_at = ? WHERE id = ?`).bind(now, row.session_id).run();
+  await db
+    .prepare(`UPDATE ${TABLES.sessions} SET last_seen_at = ? WHERE id = ?`)
+    .bind(now, row.session_id)
+    .run();
 
   return {
     token: sessionToken,
     user: buildUserPayload({
       ...row,
-      handle
-    })
+      handle,
+    }),
   };
 }
 
@@ -315,14 +332,18 @@ export async function exchangeMicrosoftCode(request, env, code, codeVerifier) {
   const response = await fetch(openIdConfig.token_endpoint, {
     method: "POST",
     headers: {
-      "content-type": "application/x-www-form-urlencoded"
+      "content-type": "application/x-www-form-urlencoded",
     },
-    body: form.toString()
+    body: form.toString(),
   });
 
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error_description || payload.error || "Microsoft token exchange failed");
+    throw new Error(
+      payload.error_description ||
+        payload.error ||
+        "Microsoft token exchange failed",
+    );
   }
 
   if (!payload.id_token) {
@@ -358,17 +379,17 @@ export async function verifyMicrosoftIdToken(idToken, env, expectedNonce) {
     jwk,
     {
       name: "RSASSA-PKCS1-v1_5",
-      hash: "SHA-256"
+      hash: "SHA-256",
     },
     false,
-    ["verify"]
+    ["verify"],
   );
 
   const verified = await crypto.subtle.verify(
     "RSASSA-PKCS1-v1_5",
     key,
     signature,
-    signedContent
+    signedContent,
   );
 
   if (!verified) {
@@ -408,35 +429,51 @@ export async function verifyMicrosoftIdToken(idToken, env, expectedNonce) {
 
 export async function upsertMicrosoftUser(db, claims) {
   const now = new Date().toISOString();
-  const displayName = claims.name || claims.preferred_username || claims.email || claims.sub;
+  const displayName =
+    claims.name || claims.preferred_username || claims.email || claims.sub;
   const email = claims.email || claims.preferred_username || null;
   const profile = JSON.stringify({
     sub: claims.sub,
     oid: claims.oid ?? null,
     tid: claims.tid ?? null,
     preferred_username: claims.preferred_username ?? null,
-    email
+    email,
   });
 
-  const existingIdentity = await db.prepare(
-    `SELECT user_id
+  const existingIdentity = await db
+    .prepare(
+      `SELECT user_id
      FROM ${TABLES.userIdentities}
      WHERE provider = ? AND provider_subject = ?
-     LIMIT 1`
-  ).bind("microsoft", claims.sub).first();
+     LIMIT 1`,
+    )
+    .bind("microsoft", claims.sub)
+    .first();
 
   if (existingIdentity) {
     await db.batch([
-      db.prepare(
-        `UPDATE ${TABLES.users}
+      db
+        .prepare(
+          `UPDATE ${TABLES.users}
          SET primary_email = ?, updated_at = ?, last_login_at = ?
-         WHERE id = ?`
-      ).bind(email, now, now, existingIdentity.user_id),
-      db.prepare(
-        `UPDATE ${TABLES.userIdentities}
+         WHERE id = ?`,
+        )
+        .bind(email, now, now, existingIdentity.user_id),
+      db
+        .prepare(
+          `UPDATE ${TABLES.userIdentities}
          SET tenant_id = ?, provider_oid = ?, email = ?, raw_profile_json = ?, updated_at = ?
-         WHERE provider = ? AND provider_subject = ?`
-      ).bind(claims.tid ?? null, claims.oid ?? null, email, profile, now, "microsoft", claims.sub)
+         WHERE provider = ? AND provider_subject = ?`,
+        )
+        .bind(
+          claims.tid ?? null,
+          claims.oid ?? null,
+          email,
+          profile,
+          now,
+          "microsoft",
+          claims.sub,
+        ),
     ]);
 
     await ensureUserHandle(db, existingIdentity.user_id);
@@ -450,8 +487,9 @@ export async function upsertMicrosoftUser(db, claims) {
 
     try {
       await db.batch([
-        db.prepare(
-          `INSERT INTO ${TABLES.users} (
+        db
+          .prepare(
+            `INSERT INTO ${TABLES.users} (
             id,
             handle,
             handle_changed_at,
@@ -462,10 +500,12 @@ export async function upsertMicrosoftUser(db, claims) {
             created_at,
             updated_at,
             last_login_at
-          ) VALUES (?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)`
-        ).bind(userId, handle, displayName, email, now, now, now),
-        db.prepare(
-          `INSERT INTO ${TABLES.userIdentities} (
+          ) VALUES (?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)`,
+          )
+          .bind(userId, handle, displayName, email, now, now, now),
+        db
+          .prepare(
+            `INSERT INTO ${TABLES.userIdentities} (
             id,
             user_id,
             provider,
@@ -476,24 +516,29 @@ export async function upsertMicrosoftUser(db, claims) {
             raw_profile_json,
             created_at,
             updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          identityId,
-          userId,
-          "microsoft",
-          claims.sub,
-          claims.tid ?? null,
-          claims.oid ?? null,
-          email,
-          profile,
-          now,
-          now
-        )
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            identityId,
+            userId,
+            "microsoft",
+            claims.sub,
+            claims.tid ?? null,
+            claims.oid ?? null,
+            email,
+            profile,
+            now,
+            now,
+          ),
       ]);
 
       return userId;
     } catch (error) {
-      if (String(error?.message || error).toLowerCase().includes("handle")) {
+      if (
+        String(error?.message || error)
+          .toLowerCase()
+          .includes("handle")
+      ) {
         continue;
       }
       throw error;
@@ -514,7 +559,11 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
   const hasHandleUpdate = Object.hasOwn(nextProfile, "handle");
 
   if (!hasDisplayNameUpdate && !hasHandleUpdate) {
-    throw createHttpError(400, "No profile fields provided", "invalid_profile_update");
+    throw createHttpError(
+      400,
+      "No profile fields provided",
+      "invalid_profile_update",
+    );
   }
 
   let nextDisplayName = currentUser.display_name;
@@ -525,29 +574,36 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
 
   if (hasDisplayNameUpdate) {
     const displayName = sanitizeDisplayName(nextProfile.displayName);
-    const normalizedCurrentDisplayName = normalizeDisplayName(currentUser.display_name || "");
+    const normalizedCurrentDisplayName = normalizeDisplayName(
+      currentUser.display_name || "",
+    );
     if (normalizedCurrentDisplayName !== displayName.normalized) {
-      const nextChangeAt = getDisplayNameNextChangeAt(currentUser.display_name_changed_at);
+      const nextChangeAt = getDisplayNameNextChangeAt(
+        currentUser.display_name_changed_at,
+      );
       if (nextChangeAt && Date.parse(nextChangeAt) > Date.now()) {
         throw createHttpError(
           429,
-          "显示名 7 天内只能修改一次",
           "display_name_change_cooldown",
-          { nextDisplayNameChangeAt: nextChangeAt }
+          "display_name_change_cooldown",
+          { nextDisplayNameChangeAt: nextChangeAt },
         );
       }
 
-      const existingUser = await db.prepare(
-        `SELECT id
+      const existingUser = await db
+        .prepare(
+          `SELECT id
          FROM ${TABLES.users}
          WHERE id <> ?
            AND display_name IS NOT NULL
            AND lower(trim(display_name)) = ?
-         LIMIT 1`
-      ).bind(userId, displayName.normalized).first();
+         LIMIT 1`,
+        )
+        .bind(userId, displayName.normalized)
+        .first();
 
       if (existingUser) {
-        throw createHttpError(409, "显示名已被占用", "display_name_taken");
+        throw createHttpError(409, "display_name_taken", "display_name_taken");
       }
 
       nextDisplayName = displayName.value;
@@ -560,27 +616,32 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
     const handle = sanitizeHandle(nextProfile.handle);
     if ((currentUser.handle || "") !== handle) {
       if (!isDefaultGeneratedHandle(currentUser.handle)) {
-        const nextHandleChangeAt = getHandleNextChangeAt(currentUser.handle_changed_at);
+        const nextHandleChangeAt = getHandleNextChangeAt(
+          currentUser.handle_changed_at,
+        );
         if (nextHandleChangeAt && Date.parse(nextHandleChangeAt) > Date.now()) {
           throw createHttpError(
             429,
-            "自定义 Handle 30 天内只能修改一次",
             "handle_change_cooldown",
-            { nextHandleChangeAt }
+            "handle_change_cooldown",
+            { nextHandleChangeAt },
           );
         }
       }
 
-      const existingUser = await db.prepare(
-        `SELECT id
+      const existingUser = await db
+        .prepare(
+          `SELECT id
          FROM ${TABLES.users}
          WHERE id <> ?
            AND handle = ?
-         LIMIT 1`
-      ).bind(userId, handle).first();
+         LIMIT 1`,
+        )
+        .bind(userId, handle)
+        .first();
 
       if (existingUser) {
-        throw createHttpError(409, "Handle 已被占用", "handle_taken");
+        throw createHttpError(409, "handle_taken", "handle_taken");
       }
 
       nextHandle = handle;
@@ -594,11 +655,21 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
   }
 
   const now = new Date().toISOString();
-  await db.prepare(
-    `UPDATE ${TABLES.users}
+  await db
+    .prepare(
+      `UPDATE ${TABLES.users}
      SET handle = ?, handle_changed_at = ?, display_name = ?, display_name_changed_at = ?, updated_at = ?
-     WHERE id = ?`
-  ).bind(nextHandle, nextHandleChangedAt, nextDisplayName, nextDisplayNameChangedAt, now, userId).run();
+     WHERE id = ?`,
+    )
+    .bind(
+      nextHandle,
+      nextHandleChangedAt,
+      nextDisplayName,
+      nextDisplayNameChangedAt,
+      now,
+      userId,
+    )
+    .run();
 
   const updatedUser = await getUserRowById(db, userId);
   if (!updatedUser) {
@@ -620,45 +691,56 @@ export async function updateUserAvatar(env, db, request, userId) {
   const file = formData?.get("avatar");
 
   if (!(file instanceof File)) {
-    throw createHttpError(400, "缺少头像文件", "missing_avatar_file");
+    throw createHttpError(400, "missing_avatar_file", "missing_avatar_file");
   }
 
   const contentType = String(file.type || "").toLowerCase();
   const extension = USER_AVATAR_TYPES[contentType];
   if (!extension) {
-    throw createHttpError(400, "仅支持 JPG、PNG、WebP、AVIF 格式", "invalid_avatar_type");
+    throw createHttpError(400, "invalid_avatar_type", "invalid_avatar_type");
   }
 
   if (!file.size) {
-    throw createHttpError(400, "头像文件为空", "empty_avatar_file");
+    throw createHttpError(400, "empty_avatar_file", "empty_avatar_file");
   }
 
   if (file.size > MAX_ROOM_COVER_BYTES) {
-    throw createHttpError(413, "头像文件不能超过 5MB", "avatar_file_too_large");
+    throw createHttpError(
+      413,
+      "avatar_file_too_large",
+      "avatar_file_too_large",
+    );
   }
 
   const objectKey = buildUserAvatarObjectKey(userId, extension);
   const avatarUrl = buildUserAvatarUrl(request, objectKey);
-  const previousObjectKey = getMediaObjectKeyFromUrl(currentUser.avatar_url, request.url, "/media/user-avatars/");
+  const previousObjectKey = getMediaObjectKeyFromUrl(
+    currentUser.avatar_url,
+    request.url,
+    "/media/user-avatars/",
+  );
   const body = await file.arrayBuffer();
 
   await bucket.put(objectKey, body, {
     httpMetadata: {
       contentType,
-      cacheControl: "public, max-age=31536000, immutable"
+      cacheControl: "public, max-age=31536000, immutable",
     },
     customMetadata: {
       userId,
-      uploadedBy: userId
-    }
+      uploadedBy: userId,
+    },
   });
 
   try {
-    await db.prepare(
-      `UPDATE ${TABLES.users}
+    await db
+      .prepare(
+        `UPDATE ${TABLES.users}
        SET avatar_url = ?, updated_at = ?
-       WHERE id = ?`
-    ).bind(avatarUrl, new Date().toISOString(), userId).run();
+       WHERE id = ?`,
+      )
+      .bind(avatarUrl, new Date().toISOString(), userId)
+      .run();
   } catch (error) {
     await bucket.delete(objectKey).catch(() => {});
     throw error;
@@ -684,12 +766,19 @@ export async function removeUserAvatar(env, db, userId) {
     throw createHttpError(404, "User not found", "user_not_found");
   }
 
-  const previousObjectKey = getMediaObjectKeyFromUrl(currentUser.avatar_url, "https://moq.local/", "/media/user-avatars/");
-  await db.prepare(
-    `UPDATE ${TABLES.users}
+  const previousObjectKey = getMediaObjectKeyFromUrl(
+    currentUser.avatar_url,
+    "https://moq.local/",
+    "/media/user-avatars/",
+  );
+  await db
+    .prepare(
+      `UPDATE ${TABLES.users}
      SET avatar_url = NULL, updated_at = ?
-     WHERE id = ?`
-  ).bind(new Date().toISOString(), userId).run();
+     WHERE id = ?`,
+    )
+    .bind(new Date().toISOString(), userId)
+    .run();
 
   if (previousObjectKey) {
     await bucket.delete(previousObjectKey).catch(() => {});
@@ -705,14 +794,17 @@ export async function removeUserAvatar(env, db, userId) {
 
 export function buildSessionCookie(token, expiresAt, secure = true) {
   const expires = new Date(expiresAt);
-  const maxAge = Math.max(0, Math.floor((expires.getTime() - Date.now()) / 1000));
+  const maxAge = Math.max(
+    0,
+    Math.floor((expires.getTime() - Date.now()) / 1000),
+  );
   return serializeCookie(SESSION_COOKIE_NAME, token, {
     path: "/",
     httpOnly: true,
     secure,
     sameSite: "Lax",
     expires,
-    maxAge
+    maxAge,
   });
 }
 
@@ -728,7 +820,8 @@ function randomToken(bytes) {
 }
 
 function buildUserPayload(row) {
-  const effectiveDisplayName = row.display_name || row.primary_email || "匿名用户";
+  const effectiveDisplayName =
+    row.display_name || row.primary_email || "匿名用户";
   return {
     id: row.user_id,
     handle: row.handle || "",
@@ -736,15 +829,18 @@ function buildUserPayload(row) {
     nextHandleChangeAt: getHandleNextChangeAt(row.handle_changed_at),
     displayName: effectiveDisplayName,
     displayNameChangedAt: row.display_name_changed_at,
-    nextDisplayNameChangeAt: getDisplayNameNextChangeAt(row.display_name_changed_at),
+    nextDisplayNameChangeAt: getDisplayNameNextChangeAt(
+      row.display_name_changed_at,
+    ),
     email: row.primary_email,
-    avatarUrl: row.avatar_url
+    avatarUrl: row.avatar_url,
   };
 }
 
 async function getUserRowById(db, userId) {
-  return db.prepare(
-    `SELECT
+  return db
+    .prepare(
+      `SELECT
       id AS user_id,
       handle,
       handle_changed_at,
@@ -754,13 +850,16 @@ async function getUserRowById(db, userId) {
       avatar_url
      FROM ${TABLES.users}
      WHERE id = ?
-     LIMIT 1`
-  ).bind(userId).first();
+     LIMIT 1`,
+    )
+    .bind(userId)
+    .first();
 }
 
 async function getRoomRowByHostUserId(db, userId) {
-  return db.prepare(
-    `SELECT
+  return db
+    .prepare(
+      `SELECT
       id,
       host_user_id,
       title,
@@ -769,8 +868,10 @@ async function getRoomRowByHostUserId(db, userId) {
       updated_at
      FROM ${TABLES.rooms}
      WHERE host_user_id = ?
-     LIMIT 1`
-  ).bind(userId).first();
+     LIMIT 1`,
+    )
+    .bind(userId)
+    .first();
 }
 
 async function requireUserRoomRow(db, userId) {
@@ -786,42 +887,38 @@ function buildRoomPayload(row) {
     id: row.id,
     title: row.title || "",
     coverUrl: row.cover_url || "",
-    updatedAt: row.updated_at || ""
+    updatedAt: row.updated_at || "",
   };
 }
 
 function sanitizeDisplayName(value) {
   if (typeof value !== "string") {
-    throw createHttpError(400, "显示名不能为空", "invalid_display_name");
+    throw createHttpError(400, "invalid_display_name", "invalid_display_name");
   }
 
   const displayName = value.trim().replace(/\s+/g, " ");
   const length = Array.from(displayName).length;
   if (!displayName) {
-    throw createHttpError(400, "显示名不能为空", "invalid_display_name");
+    throw createHttpError(400, "invalid_display_name", "invalid_display_name");
   }
   if (length < MIN_NICKNAME_LENGTH || length > MAX_NICKNAME_LENGTH) {
-    throw createHttpError(400, `显示名长度需在 ${MIN_NICKNAME_LENGTH}-${MAX_NICKNAME_LENGTH} 个字符之间`, "invalid_display_name");
+    throw createHttpError(400, "invalid_display_name", "invalid_display_name");
   }
 
   return {
     value: displayName,
-    normalized: normalizeDisplayName(displayName)
+    normalized: normalizeDisplayName(displayName),
   };
 }
 
 function sanitizeHandle(value) {
   if (typeof value !== "string") {
-    throw createHttpError(400, "Handle 不能为空", "invalid_handle");
+    throw createHttpError(400, "invalid_handle", "invalid_handle");
   }
 
   const handle = value.trim();
   if (!HANDLE_PATTERN.test(handle)) {
-    throw createHttpError(
-      400,
-      `Handle 只能包含小写字母、数字、下划线，长度需在 ${MIN_HANDLE_LENGTH}-${MAX_HANDLE_LENGTH} 个字符之间，不能为纯数字，且不能以下划线开头或结尾`,
-      "invalid_handle"
-    );
+    throw createHttpError(400, "invalid_handle", "invalid_handle");
   }
 
   return handle;
@@ -841,30 +938,39 @@ async function ensureUserHandle(db, userId, currentHandle = undefined) {
   }
 
   if (currentHandle === undefined) {
-    const row = await db.prepare(
-      `SELECT handle
+    const row = await db
+      .prepare(
+        `SELECT handle
        FROM ${TABLES.users}
        WHERE id = ?
-       LIMIT 1`
-    ).bind(userId).first();
+       LIMIT 1`,
+      )
+      .bind(userId)
+      .first();
     if (row?.handle) {
       return row.handle;
     }
   }
 
   const handle = await generateAvailableDefaultHandle(db);
-  await db.prepare(
-    `UPDATE ${TABLES.users}
+  await db
+    .prepare(
+      `UPDATE ${TABLES.users}
      SET handle = ?, updated_at = ?
-     WHERE id = ? AND (handle IS NULL OR handle = '')`
-  ).bind(handle, new Date().toISOString(), userId).run();
+     WHERE id = ? AND (handle IS NULL OR handle = '')`,
+    )
+    .bind(handle, new Date().toISOString(), userId)
+    .run();
 
-  const updatedRow = await db.prepare(
-    `SELECT handle
+  const updatedRow = await db
+    .prepare(
+      `SELECT handle
      FROM ${TABLES.users}
      WHERE id = ?
-     LIMIT 1`
-  ).bind(userId).first();
+     LIMIT 1`,
+    )
+    .bind(userId)
+    .first();
 
   if (!updatedRow?.handle) {
     throw new Error("Failed to persist user handle");
@@ -889,12 +995,15 @@ function getHandleNextChangeAt(changedAt) {
 async function generateAvailableDefaultHandle(db) {
   for (let attempt = 0; attempt < 32; attempt += 1) {
     const handle = `${DEFAULT_HANDLE_PREFIX}${randomHandleSuffix(DEFAULT_HANDLE_SUFFIX_LENGTH)}`;
-    const existingUser = await db.prepare(
-      `SELECT id
+    const existingUser = await db
+      .prepare(
+        `SELECT id
        FROM ${TABLES.users}
        WHERE handle = ?
-       LIMIT 1`
-    ).bind(handle).first();
+       LIMIT 1`,
+      )
+      .bind(handle)
+      .first();
     if (!existingUser) {
       return handle;
     }
@@ -914,12 +1023,15 @@ function randomHandleSuffix(length) {
 }
 
 async function ensureUserRoom(db, userId) {
-  const existingRoom = await db.prepare(
-    `SELECT id
+  const existingRoom = await db
+    .prepare(
+      `SELECT id
      FROM ${TABLES.rooms}
      WHERE host_user_id = ?
-     LIMIT 1`
-  ).bind(userId).first();
+     LIMIT 1`,
+    )
+    .bind(userId)
+    .first();
 
   if (existingRoom?.id) {
     return existingRoom.id;
@@ -927,23 +1039,29 @@ async function ensureUserRoom(db, userId) {
 
   const now = new Date().toISOString();
   const roomId = crypto.randomUUID();
-  await db.prepare(
-    `INSERT OR IGNORE INTO ${TABLES.rooms} (
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO ${TABLES.rooms} (
       id,
       host_user_id,
       title,
       cover_url,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?)`
-  ).bind(roomId, userId, "", "", now, now).run();
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(roomId, userId, "", "", now, now)
+    .run();
 
-  const room = await db.prepare(
-    `SELECT id
+  const room = await db
+    .prepare(
+      `SELECT id
      FROM ${TABLES.rooms}
      WHERE host_user_id = ?
-     LIMIT 1`
-  ).bind(userId).first();
+     LIMIT 1`,
+    )
+    .bind(userId)
+    .first();
 
   if (!room?.id) {
     throw new Error("Failed to ensure user room");
@@ -975,45 +1093,52 @@ export async function updateUserRoomCover(env, db, request, userId) {
   const file = formData?.get("cover");
 
   if (!(file instanceof File)) {
-    throw createHttpError(400, "缺少封面文件", "missing_cover_file");
+    throw createHttpError(400, "missing_cover_file", "missing_cover_file");
   }
 
   const contentType = String(file.type || "").toLowerCase();
   const extension = ROOM_COVER_TYPES[contentType];
   if (!extension) {
-    throw createHttpError(400, "仅支持 JPG、PNG、WebP、AVIF 格式", "invalid_cover_type");
+    throw createHttpError(400, "invalid_cover_type", "invalid_cover_type");
   }
 
   if (!file.size) {
-    throw createHttpError(400, "封面文件为空", "empty_cover_file");
+    throw createHttpError(400, "empty_cover_file", "empty_cover_file");
   }
 
   if (file.size > MAX_ROOM_COVER_BYTES) {
-    throw createHttpError(413, "封面文件不能超过 5MB", "cover_file_too_large");
+    throw createHttpError(413, "cover_file_too_large", "cover_file_too_large");
   }
 
   const objectKey = buildRoomCoverObjectKey(currentRoom.id, extension);
   const coverUrl = buildRoomCoverUrl(request, objectKey);
-  const previousObjectKey = getMediaObjectKeyFromUrl(currentRoom.cover_url, request.url, "/media/room-covers/");
+  const previousObjectKey = getMediaObjectKeyFromUrl(
+    currentRoom.cover_url,
+    request.url,
+    "/media/room-covers/",
+  );
   const body = await file.arrayBuffer();
 
   await bucket.put(objectKey, body, {
     httpMetadata: {
       contentType,
-      cacheControl: "public, max-age=31536000, immutable"
+      cacheControl: "public, max-age=31536000, immutable",
     },
     customMetadata: {
       roomId: currentRoom.id,
-      uploadedBy: userId
-    }
+      uploadedBy: userId,
+    },
   });
 
   try {
-    await db.prepare(
-      `UPDATE ${TABLES.rooms}
+    await db
+      .prepare(
+        `UPDATE ${TABLES.rooms}
        SET cover_url = ?, updated_at = ?
-       WHERE id = ?`
-    ).bind(coverUrl, new Date().toISOString(), currentRoom.id).run();
+       WHERE id = ?`,
+      )
+      .bind(coverUrl, new Date().toISOString(), currentRoom.id)
+      .run();
   } catch (error) {
     await bucket.delete(objectKey).catch(() => {});
     throw error;
@@ -1030,13 +1155,20 @@ export async function updateUserRoomCover(env, db, request, userId) {
 export async function removeUserRoomCover(env, db, userId) {
   const bucket = getMediaBucket(env);
   const currentRoom = await requireUserRoomRow(db, userId);
-  const previousObjectKey = getMediaObjectKeyFromUrl(currentRoom.cover_url, "https://moq.local/", "/media/room-covers/");
+  const previousObjectKey = getMediaObjectKeyFromUrl(
+    currentRoom.cover_url,
+    "https://moq.local/",
+    "/media/room-covers/",
+  );
 
-  await db.prepare(
-    `UPDATE ${TABLES.rooms}
+  await db
+    .prepare(
+      `UPDATE ${TABLES.rooms}
      SET cover_url = '', updated_at = ?
-     WHERE id = ?`
-  ).bind(new Date().toISOString(), currentRoom.id).run();
+     WHERE id = ?`,
+    )
+    .bind(new Date().toISOString(), currentRoom.id)
+    .run();
 
   if (previousObjectKey) {
     await bucket.delete(previousObjectKey).catch(() => {});
@@ -1060,7 +1192,7 @@ function getDisplayNameNextChangeAt(changedAt) {
 }
 
 function createHttpError(status, message, code, details = undefined) {
-  const error = new Error(message);
+  const error = new Error(code || message);
   error.status = status;
   error.code = code;
   error.details = details;
@@ -1069,7 +1201,11 @@ function createHttpError(status, message, code, details = undefined) {
 
 function getMediaBucket(env) {
   if (!env.APP_MEDIA) {
-    throw createHttpError(500, "Missing APP_MEDIA binding", "missing_app_media_binding");
+    throw createHttpError(
+      500,
+      "Missing APP_MEDIA binding",
+      "missing_app_media_binding",
+    );
   }
 
   return env.APP_MEDIA;
@@ -1110,17 +1246,27 @@ function getMediaObjectKeyFromUrl(mediaUrl, fallbackBase, prefix) {
 }
 
 async function sha256Hex(input) {
-  const digest = await crypto.subtle.digest("SHA-256", textEncoder.encode(input));
-  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    textEncoder.encode(input),
+  );
+  return [...new Uint8Array(digest)]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 async function sha256Base64Url(input) {
-  const digest = await crypto.subtle.digest("SHA-256", textEncoder.encode(input));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    textEncoder.encode(input),
+  );
   return uint8ArrayToBase64Url(new Uint8Array(digest));
 }
 
 async function signPayload(payload, secret) {
-  const body = uint8ArrayToBase64Url(textEncoder.encode(JSON.stringify(payload)));
+  const body = uint8ArrayToBase64Url(
+    textEncoder.encode(JSON.stringify(payload)),
+  );
   const signature = await hmacSha256Base64Url(secret, body);
   return `${body}.${signature}`;
 }
@@ -1149,13 +1295,17 @@ async function hmacSha256Base64Url(secret, message) {
     textEncoder.encode(secret),
     {
       name: "HMAC",
-      hash: "SHA-256"
+      hash: "SHA-256",
     },
     false,
-    ["sign"]
+    ["sign"],
   );
 
-  const signature = await crypto.subtle.sign("HMAC", key, textEncoder.encode(message));
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    textEncoder.encode(message),
+  );
   return uint8ArrayToBase64Url(new Uint8Array(signature));
 }
 
@@ -1179,7 +1329,10 @@ function uint8ArrayToBase64Url(value) {
   for (const item of value) {
     binary += String.fromCharCode(item);
   }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 async function getMicrosoftOpenIdConfig() {
@@ -1189,8 +1342,8 @@ async function getMicrosoftOpenIdConfig() {
 
   const response = await fetch(MICROSOFT_OPENID_CONFIG_URL, {
     headers: {
-      accept: "application/json"
-    }
+      accept: "application/json",
+    },
   });
   if (!response.ok) {
     throw new Error("Failed to load Microsoft OpenID configuration");
@@ -1199,7 +1352,7 @@ async function getMicrosoftOpenIdConfig() {
   const value = await response.json();
   openIdConfigCache = {
     value,
-    expiresAt: Date.now() + 60 * 60 * 1000
+    expiresAt: Date.now() + 60 * 60 * 1000,
   };
   return value;
 }
@@ -1209,8 +1362,8 @@ async function getMicrosoftJwk(keyId) {
     const openIdConfig = await getMicrosoftOpenIdConfig();
     const response = await fetch(openIdConfig.jwks_uri, {
       headers: {
-        accept: "application/json"
-      }
+        accept: "application/json",
+      },
     });
     if (!response.ok) {
       throw new Error("Failed to load Microsoft signing keys");
@@ -1218,7 +1371,7 @@ async function getMicrosoftJwk(keyId) {
     const payload = await response.json();
     jwksCache = {
       keys: payload.keys ?? [],
-      expiresAt: Date.now() + 60 * 60 * 1000
+      expiresAt: Date.now() + 60 * 60 * 1000,
     };
   }
 
@@ -1232,13 +1385,20 @@ function isValidMicrosoftIssuer(issuer) {
 
   try {
     const url = new URL(issuer);
-    return url.hostname === "login.microsoftonline.com" && url.pathname.endsWith("/v2.0");
+    return (
+      url.hostname === "login.microsoftonline.com" &&
+      url.pathname.endsWith("/v2.0")
+    );
   } catch {
     return false;
   }
 }
 
-export async function buildMicrosoftAuthorizationUrl(request, env, statePayload) {
+export async function buildMicrosoftAuthorizationUrl(
+  request,
+  env,
+  statePayload,
+) {
   const authConfig = getAuthConfig(env);
   const openIdConfig = await getMicrosoftOpenIdConfig();
   const url = new URL(openIdConfig.authorization_endpoint);
@@ -1249,7 +1409,10 @@ export async function buildMicrosoftAuthorizationUrl(request, env, statePayload)
   url.searchParams.set("scope", "openid profile email");
   url.searchParams.set("state", statePayload.state);
   url.searchParams.set("nonce", statePayload.nonce);
-  url.searchParams.set("code_challenge", await sha256Base64Url(statePayload.codeVerifier));
+  url.searchParams.set(
+    "code_challenge",
+    await sha256Base64Url(statePayload.codeVerifier),
+  );
   url.searchParams.set("code_challenge_method", "S256");
   return url.toString();
 }

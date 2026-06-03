@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Image } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
+import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 
 function RoomCoverPlaceholder() {
   return (
@@ -112,7 +113,7 @@ export function WatchIdlePage({
         const payload = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(payload.error || `rooms endpoint returned ${response.status}`);
+          throw createApiError(payload, "room_list_failed", { status: response.status });
         }
 
         if (cancelled) {
@@ -131,7 +132,7 @@ export function WatchIdlePage({
 
         setRoomsState({
           loading: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: getAppErrorMessage(error),
           items: []
         });
       }

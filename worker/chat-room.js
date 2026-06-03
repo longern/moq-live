@@ -42,6 +42,11 @@ export class ChatRoomDO {
     const isRoomOwner = request.headers.get("x-chat-room-owner") === "1";
     const readOnly = request.headers.get("x-chat-read-only") !== "0";
     const user = parseUserHeader(request.headers.get("x-chat-user"));
+    const canControlBroadcast =
+      role === "broadcaster" &&
+      isRoomOwner &&
+      Boolean(user?.id) &&
+      !this.hasActiveBroadcastController(user.id);
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
@@ -51,6 +56,7 @@ export class ChatRoomDO {
       room,
       role,
       isRoomOwner,
+      canControlBroadcast,
       readOnly,
       user,
       sentAt: []
@@ -60,6 +66,7 @@ export class ChatRoomDO {
       type: "chat.snapshot",
       room,
       readOnly,
+      canControlBroadcast,
       ...this.getPresenceSnapshot(),
       messages: this.recentMessages,
       stream: this.roomState.stream,
@@ -107,6 +114,11 @@ export class ChatRoomDO {
 
     if (payload?.type === "room.updated") {
       await this.handleRoomUpdated(ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "broadcast.control.check") {
+      this.handleBroadcastControlCheck(ws, session, payload);
       return;
     }
 
@@ -171,6 +183,20 @@ export class ChatRoomDO {
       onlineCount: anonymousViewerCount + loggedInViewers.length,
       loggedInViewers
     };
+  }
+
+  hasActiveBroadcastController(userId) {
+    for (const socket of this.ctx.getWebSockets()) {
+      const session = normalizeAttachment(socket.deserializeAttachment());
+      if (
+        session?.role === "broadcaster" &&
+        session.canControlBroadcast &&
+        session.user?.id === userId
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   broadcast(payload) {
@@ -285,7 +311,7 @@ export class ChatRoomDO {
   }
 
   async handleStreamStarted(ws, session, payload) {
-    if (!session.isRoomOwner) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
       this.sendError(ws, "forbidden_stream_update");
       return;
     }
@@ -314,7 +340,7 @@ export class ChatRoomDO {
   }
 
   async handleStreamStopped(ws, session) {
-    if (!session.isRoomOwner) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
       this.sendError(ws, "forbidden_stream_update");
       return;
     }
@@ -339,7 +365,7 @@ export class ChatRoomDO {
   }
 
   async handleRoomUpdated(ws, session, payload) {
-    if (!session.isRoomOwner) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
       this.sendError(ws, "forbidden_room_update");
       return;
     }
@@ -373,6 +399,24 @@ export class ChatRoomDO {
       type: "room.updated",
       roomMeta: nextRoomMeta
     });
+  }
+
+  handleBroadcastControlCheck(ws, session, payload) {
+    const requestId = sanitizeRequestId(payload?.requestId);
+    const canControlBroadcast =
+      session.isRoomOwner &&
+      session.role === "broadcaster" &&
+      session.canControlBroadcast;
+
+    this.send(ws, {
+      type: "broadcast.control.checked",
+      requestId,
+      canControlBroadcast
+    });
+
+    if (!canControlBroadcast) {
+      this.sendError(ws, "broadcast_control_read_only", { requestId });
+    }
   }
 
   async persistStorageOrNotify(ws, key, value) {
@@ -442,10 +486,15 @@ function normalizeAttachment(attachment) {
     room: typeof attachment.room === "string" ? attachment.room : "",
     role: attachment.role === "broadcaster" ? "broadcaster" : "viewer",
     isRoomOwner: attachment.isRoomOwner === true,
+    canControlBroadcast: attachment.canControlBroadcast === true,
     readOnly: attachment.readOnly !== false ? true : false,
     user: attachment.user && typeof attachment.user === "object" ? attachment.user : null,
     sentAt: Array.isArray(attachment.sentAt) ? attachment.sentAt.filter((value) => typeof value === "number") : []
   };
+}
+
+function sanitizeRequestId(value) {
+  return String(value ?? "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
 }
 
 function parseUserHeader(headerValue) {

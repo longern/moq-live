@@ -7,6 +7,7 @@ import {
   isNoCatalogDataMessage,
   withTimeout,
 } from "./playerControllerUtils.js";
+import { createAppError, getAppErrorMessage } from "../../lib/appErrors.js";
 
 const PLAYER_TARGET_LATENCY_MS = 600;
 const AUDIO_TRACK_NAME = "audio/data";
@@ -360,7 +361,7 @@ export function usePlayerSession({
       const nextRelayUrl = new URL(relayUrlRef.current).toString();
       const namespace = roomRef.current.trim();
       if (!namespace) {
-        throw new Error("Namespace 不能为空");
+        throw createAppError("namespace_required");
       }
       nextSession = {
         key: `${namespace}-${token}`,
@@ -370,7 +371,7 @@ export function usePlayerSession({
         namespace,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getAppErrorMessage(error);
       updatePlayerStatus("error", `失败：${message}`);
       logRef.current?.(
         `失败：${error instanceof Error ? (error.stack ?? error.message) : message}`,
@@ -384,7 +385,7 @@ export function usePlayerSession({
         return;
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getAppErrorMessage({ code: "moq_watch_load_failed" });
       updatePlayerStatus("error", `失败：${message}`);
       logRef.current?.(
         `failed to load @moq/watch: ${error instanceof Error ? (error.stack ?? error.message) : message}`,

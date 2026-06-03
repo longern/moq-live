@@ -3,6 +3,7 @@ import { useMediaOrientation } from "../hooks/useMediaOrientation.js";
 import { useCompactViewport, usePortraitViewport } from "../hooks/useMediaQuery.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
+import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 
 const LIVE_PAGE_EXIT_MS = 280;
 
@@ -180,14 +181,14 @@ export function LivePage({
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload.error || `cover upload failed with ${response.status}`);
+        throw createApiError(payload, "cover_upload_failed", { status: response.status });
       }
 
       setRoomCoverUrl(payload.room?.coverUrl || "");
       onRoomDetailsChange?.(payload.room || null);
       setRoomCoverStatus("直播封面已更新");
     } catch (error) {
-      setRoomCoverError(error instanceof Error ? error.message : String(error));
+      setRoomCoverError(getAppErrorMessage(error));
     } finally {
       setRoomCoverBusy(false);
     }

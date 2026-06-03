@@ -5,6 +5,7 @@ import { usePublisherController } from "../hooks/usePublisherController.js";
 import { buildWatchLink, generateRoomId } from "../lib/routeState.js";
 import { describePublishState } from "../lib/status.js";
 import { getPublishBlockReason, isPublishBlocked } from "../lib/roomPolicy.js";
+import { createApiError, createAppError, getAppErrorMessage } from "../lib/appErrors.js";
 
 function splitCameraOptions(cameraOptions) {
   const front = [];
@@ -190,7 +191,7 @@ function useLiveRoomActivation({ page, userId, log }) {
             });
             return;
           }
-          throw new Error(payload.error || `my room endpoint returned ${response.status}`);
+          throw createApiError(payload, "room_resolve_failed", { status: response.status });
         }
 
         if (cancelled) {
@@ -215,7 +216,7 @@ function useLiveRoomActivation({ page, userId, log }) {
           return;
         }
 
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getAppErrorMessage(error);
         setLiveChatRoomResolution({
           loading: false,
           error: message,
@@ -255,7 +256,7 @@ function useLiveRoomActivation({ page, userId, log }) {
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload.error || `room creation returned ${response.status}`);
+        throw createApiError(payload, "room_creation_failed", { status: response.status });
       }
 
       setLiveChatRoomResolution({
@@ -272,7 +273,7 @@ function useLiveRoomActivation({ page, userId, log }) {
         error: "",
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getAppErrorMessage(error);
       setLiveActivation((current) => ({
         ...current,
         creating: false,
@@ -440,22 +441,28 @@ export function LiveRoute({
   );
   const publisherPage = liveGateActive ? "watch" : page;
 
-  const publisher = usePublisherController({
-    page: publisherPage,
-    pageRef,
-    relayUrlRef,
-    roomRef: liveRoomRef,
-    generateRoomId: () => setLiveRoomValue(generateRoomId()),
-    syntheticSessionRef,
-    log,
-  });
-
   const liveChatEnabled = Boolean(authState.user?.id) && page === "live" && !liveGateActive;
   const liveChat = useChatController({
     room: liveChatRoomId,
     enabled: liveChatEnabled && Boolean(liveChatRoomId),
     authKey: authState.user?.id ?? "anonymous",
     role: "broadcaster",
+    log,
+  });
+
+  const publisher = usePublisherController({
+    page: publisherPage,
+    pageRef,
+    relayUrlRef,
+    roomRef: liveRoomRef,
+    generateRoomId: () => setLiveRoomValue(generateRoomId()),
+    assertCanPublish: async () => {
+      const canControlBroadcast = await liveChat.requestBroadcastControl();
+      if (!canControlBroadcast) {
+        throw createAppError("broadcast_control_read_only");
+      }
+    },
+    syntheticSessionRef,
     log,
   });
 
@@ -471,8 +478,18 @@ export function LiveRoute({
   const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
   const publishBadge = describePublishState(publisher.publishStatusKind);
   const liveStreamActive = publisher.publisherIsPublishing || publisher.syntheticPublishing;
-  const publishBlocked = isPublishBlocked(liveRoom);
-  const publishBlockedReason = getPublishBlockReason(liveRoom);
+  const publishPolicyBlocked = isPublishBlocked(liveRoom);
+  const publishControlBlocked =
+    liveChatEnabled &&
+    liveChat.connectionState === "connected" &&
+    liveChat.roomStateReady &&
+    !liveChat.canControlBroadcast;
+  const publishBlocked = publishPolicyBlocked || publishControlBlocked;
+  const publishBlockedReason = publishPolicyBlocked
+    ? getPublishBlockReason(liveRoom)
+    : publishControlBlocked
+      ? getAppErrorMessage({ code: "broadcast_control_read_only" })
+      : "";
   const cameraMode = getCameraMode(
     publisher.cameraOptions,
     publisher.selectedCameraId,
@@ -497,7 +514,7 @@ export function LiveRoute({
     }
 
     if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
-      throw new Error("当前浏览器不支持系统分享");
+      throw createAppError("share_not_supported");
     }
 
     try {
@@ -564,7 +581,7 @@ export function LiveRoute({
           publisher.setCameraEnabled(true);
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getAppErrorMessage(error);
         log(`camera switch failed: ${message}`);
       }
       return;
@@ -669,13 +686,13 @@ export function LiveRoute({
           return;
         }
         void publisher.startCameraPublish().catch((error) => {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = getAppErrorMessage(error);
           log(`camera publish failed: ${message}`);
         });
       }}
       onStartPublish={() => {
         void publisher.startCameraPublish().catch((error) => {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = getAppErrorMessage(error);
           log(`camera publish failed: ${message}`);
         });
       }}
@@ -684,13 +701,13 @@ export function LiveRoute({
       }}
       onShare={() => {
         void shareLiveRoom().catch((error) => {
-          log(`share failed: ${error instanceof Error ? error.message : String(error)}`);
+          log(`share failed: ${getAppErrorMessage(error)}`);
         });
       }}
       onStartSynthetic={() => {
         selectPageWithGuard("live");
         void publisher.startSyntheticPublish().catch((error) => {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = getAppErrorMessage(error);
           log(`synthetic publish failed: ${message}`);
         });
       }}
@@ -707,13 +724,13 @@ export function LiveRoute({
       previewSourceType={publisher.previewSourceType}
       onStartScreenShare={() => {
         void publisher.startScreenShare().catch((error) => {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = getAppErrorMessage(error);
           log(`screen share failed: ${message}`);
         });
       }}
       onStopScreenShare={() => {
         void publisher.stopScreenShare().catch((error) => {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = getAppErrorMessage(error);
           log(`screen share stop failed: ${message}`);
         });
       }}

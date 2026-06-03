@@ -1,3 +1,5 @@
+import { createAppError } from "./appErrors.js";
+
 const LANDSCAPE_WIDTH = 1280;
 const LANDSCAPE_HEIGHT = 720;
 const PORTRAIT_WIDTH = 720;
@@ -85,7 +87,7 @@ export function createSyntheticMedia(namespace, options = {}) {
 
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    throw new Error("无法创建 canvas 上下文");
+    throw createAppError("synthetic_canvas_context_unavailable");
   }
 
   let rafId = 0;
@@ -162,12 +164,12 @@ export function createSyntheticMedia(namespace, options = {}) {
   const videoStream = canvas.captureStream(fps);
   const videoTrack = videoStream.getVideoTracks()[0];
   if (!videoTrack) {
-    throw new Error("无法创建合成视频轨");
+    throw createAppError("synthetic_video_track_unavailable");
   }
 
   const AudioDataCtor = globalThis.AudioData;
   if (typeof AudioDataCtor !== "function") {
-    throw new Error("当前浏览器不支持基于帧生成的合成音频源");
+    throw createAppError("synthetic_audio_source_unsupported");
   }
 
   const sampleRate = 48_000;

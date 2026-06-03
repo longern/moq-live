@@ -10,6 +10,7 @@ import {
 import { LoginDrawer } from "./LoginDrawer.jsx";
 import { MobilePanelPresence, useMobilePanelViewport } from "./MobilePanelPresence.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
+import { createAppError, getAppErrorMessage } from "../lib/appErrors.js";
 
 function formatHistoryTime(value) {
   const date = new Date(value);
@@ -64,7 +65,7 @@ function loadImageFromFile(file) {
     };
     image.onerror = () => {
       URL.revokeObjectURL(objectUrl);
-      reject(new Error("头像图片无法读取"));
+      reject(createAppError("avatar_image_unreadable"));
     };
     image.src = objectUrl;
   });
@@ -74,7 +75,7 @@ function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) {
-        reject(new Error("头像图片处理失败"));
+        reject(createAppError("avatar_image_process_failed"));
         return;
       }
       resolve(blob);
@@ -90,7 +91,7 @@ async function resizeAvatarFile(file, size = 192) {
   const context = canvas.getContext("2d");
 
   if (!context) {
-    throw new Error("浏览器不支持头像缩放");
+    throw createAppError("avatar_resize_unsupported");
   }
 
   const sourceSize = Math.min(image.naturalWidth || image.width, image.naturalHeight || image.height);
@@ -922,7 +923,7 @@ export function SettingsPage({
       setDisplayNameEditing(false);
       setMobileEditPanel((current) => (current === "displayName" ? null : current));
     } catch (error) {
-      setDisplayNameError(error instanceof Error ? error.message : String(error));
+      setDisplayNameError(getAppErrorMessage(error));
     } finally {
       setDisplayNameSaving(false);
     }
@@ -945,7 +946,7 @@ export function SettingsPage({
       setHandleEditing(false);
       setMobileEditPanel((current) => (current === "handle" ? null : current));
     } catch (error) {
-      setHandleError(error instanceof Error ? error.message : String(error));
+      setHandleError(getAppErrorMessage(error));
     } finally {
       setHandleSaving(false);
     }
@@ -1039,7 +1040,7 @@ export function SettingsPage({
       await onUpdateAvatar(resizedFile);
       setAvatarStatus("头像已更新");
     } catch (error) {
-      setAvatarError(error instanceof Error ? error.message : String(error));
+      setAvatarError(getAppErrorMessage(error));
     } finally {
       setAvatarSaving(false);
     }

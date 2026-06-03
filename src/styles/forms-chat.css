@@ -149,7 +149,7 @@
   min-width: 0;
 }
 
-.chat-message-body p {
+.chat-message-line {
   display: inline;
   color: #dce8f4;
   font-size: 0.875rem;
@@ -158,27 +158,28 @@
   overflow-wrap: anywhere;
 }
 
-.chat-message-body strong {
+.chat-message-text {
+  color: #dce8f4;
+}
+
+.chat-message-author {
   margin-right: 6px;
-  color: var(--text);
+  color: #c7d0ff;
+  color: color-mix(in srgb, var(--primary) 32%, white);
   font-size: 0.875rem;
   font-weight: 400;
 }
 
-.chat-message-body span {
-  color: #dce8f4;
-}
-
-.chat-message-body-system strong {
+.chat-message-body-system .chat-message-author {
   margin-right: 6px;
   color: #9af2d1;
 }
 
-.chat-message-body-system span {
+.chat-message-body-system .chat-message-text {
   color: #d8fff4;
 }
 
-.chat-message-body-system p {
+.chat-message-line-system {
   display: block;
   width: auto;
   overflow-wrap: break-word;

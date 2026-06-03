@@ -105,7 +105,7 @@
 .auth-panel-login {
   inset: 50% auto auto 50%;
   width: min(460px, calc(100vw - 32px));
-  max-height: min(560px, calc(100vh - 32px));
+  max-height: min(560px, calc(100svh - 32px));
   transform: translate(-50%, -50%);
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 28px;

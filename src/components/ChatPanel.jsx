@@ -122,9 +122,11 @@ export function ChatPanel({
               placeholderClassName="is-placeholder"
             />
             <div className="chat-message-body">
-              <p>
-                <strong>{message.user?.displayName || message.user?.email || "匿名用户"}</strong>
-                <span>{message.text}</span>
+              <p className="chat-message-line">
+                <span className="chat-message-author">
+                  {message.user?.displayName || message.user?.email || "匿名用户"}
+                </span>
+                <span className="chat-message-text">{message.text}</span>
               </p>
             </div>
           </article>
@@ -133,9 +135,9 @@ export function ChatPanel({
         {showWelcomeMessage ? (
           <article className="chat-message-card chat-message-card-system chat-message-card-system-no-avatar">
             <div className="chat-message-body chat-message-body-system">
-              <p>
-                <strong>系统</strong>
-                <span>{welcomeText}</span>
+              <p className="chat-message-line chat-message-line-system">
+                <span className="chat-message-author">系统</span>
+                <span className="chat-message-text">{welcomeText}</span>
               </p>
             </div>
           </article>

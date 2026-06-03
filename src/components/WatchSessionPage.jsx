@@ -15,6 +15,7 @@ import {
 import { ChatPanel } from "./ChatPanel.jsx";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { StatusPill } from "./StatusPill.jsx";
+import { SwipeableDrawer } from "./SwipeableDrawer.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 
 const WatchTestCanvas = import.meta.env.DEV
@@ -64,19 +65,18 @@ export function WatchSessionPage({
 }) {
   const watchLinkText = watchLink || "等待生成观看链接";
   const [controlsVisible, setControlsVisible] = useState(false);
-  const [moreMounted, setMoreMounted] = useState(false);
-  const [moreVisible, setMoreVisible] = useState(false);
+  const [immersiveControlsHidden, setImmersiveControlsHidden] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [shareMenuMounted, setShareMenuMounted] = useState(false);
   const [shareMenuVisible, setShareMenuVisible] = useState(false);
   const [shareMenuPosition, setShareMenuPosition] = useState({ left: 0, top: 0 });
   const hideTimerRef = useRef(null);
   const touchModeRef = useRef(false);
-  const closeTimerRef = useRef(null);
-  const openFrameRef = useRef(null);
   const shareCloseTimerRef = useRef(null);
   const shareOpenFrameRef = useRef(null);
   const shareButtonRef = useRef(null);
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const immersivePortrait = playerOrientation === "portrait";
 
   function clearHideTimer() {
     if (hideTimerRef.current) {
@@ -103,12 +103,6 @@ export function WatchSessionPage({
   }, []);
 
   useEffect(() => () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-    }
-    if (openFrameRef.current) {
-      cancelAnimationFrame(openFrameRef.current);
-    }
     if (shareCloseTimerRef.current) {
       clearTimeout(shareCloseTimerRef.current);
     }
@@ -120,6 +114,13 @@ export function WatchSessionPage({
   useEffect(() => {
     if (!playerSession || playerBadge.state === "error") {
       hideControls();
+      setImmersiveControlsHidden(false);
+      return;
+    }
+
+    if (immersivePortrait) {
+      hideControls();
+      setImmersiveControlsHidden(false);
       return;
     }
 
@@ -134,7 +135,7 @@ export function WatchSessionPage({
     return () => {
       clearHideTimer();
     };
-  }, [playerSession, playerBadge.state]);
+  }, [immersivePortrait, playerSession, playerBadge.state]);
 
   function revealControls() {
     if (!playerSession || playerBadge.state === "error") {
@@ -163,6 +164,11 @@ export function WatchSessionPage({
     if (!touchModeRef.current || !playerSession || playerBadge.state === "error") {
       return;
     }
+    if (immersivePortrait) {
+      clearHideTimer();
+      setImmersiveControlsHidden((current) => !current);
+      return;
+    }
     if (controlsVisible) {
       hideControls();
       return;
@@ -171,35 +177,11 @@ export function WatchSessionPage({
   }
 
   function openMoreSheet() {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-    if (openFrameRef.current) {
-      cancelAnimationFrame(openFrameRef.current);
-      openFrameRef.current = null;
-    }
-    setMoreMounted(true);
-    setMoreVisible(false);
-    openFrameRef.current = requestAnimationFrame(() => {
-      setMoreVisible(true);
-      openFrameRef.current = null;
-    });
+    setMoreOpen(true);
   }
 
   function closeMoreSheet() {
-    if (openFrameRef.current) {
-      cancelAnimationFrame(openFrameRef.current);
-      openFrameRef.current = null;
-    }
-    setMoreVisible(false);
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-    }
-    closeTimerRef.current = window.setTimeout(() => {
-      setMoreMounted(false);
-      closeTimerRef.current = null;
-    }, 260);
+    setMoreOpen(false);
   }
 
   function positionShareMenu() {
@@ -294,13 +276,6 @@ export function WatchSessionPage({
   }
 
   useEffect(() => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  }, [moreMounted]);
-
-  useEffect(() => {
     if (!shareMenuMounted) {
       return;
     }
@@ -318,7 +293,9 @@ export function WatchSessionPage({
   }, [shareMenuMounted]);
 
   function renderMobileHud(className = "", persistent = false) {
-    const visible = persistent || controlsVisible || playerBadge.state === "error";
+    const visible = immersivePortrait
+      ? !immersiveControlsHidden || playerBadge.state === "error"
+      : persistent || controlsVisible || playerBadge.state === "error";
 
     return (
       <div className={`stage-mobile-hud${visible ? " is-visible" : ""}${className ? ` ${className}` : ""}`}>
@@ -407,7 +384,9 @@ export function WatchSessionPage({
                 onClick={(event) => {
                   event.stopPropagation();
                   onDismissTapToUnmute();
-                  revealControls();
+                  if (!immersivePortrait) {
+                    revealControls();
+                  }
                 }}
               >
                 点按以取消静音
@@ -415,7 +394,12 @@ export function WatchSessionPage({
             ) : null}
             {playerOrientation === "portrait" ? renderMobileHud("stage-mobile-hud-overlay", true) : null}
             {playerOrientation === "portrait" ? (
-              <div className="watch-portrait-chat-overlay">
+              <div
+                className={`watch-portrait-chat-overlay${immersiveControlsHidden ? " is-hidden" : ""}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+              >
                 <ChatPanel
                   roomLabel={chatRoomLabel}
                   authAvailable={authAvailable}
@@ -435,7 +419,7 @@ export function WatchSessionPage({
                 />
               </div>
             ) : null}
-            {playerBadge.state !== "error" ? (
+            {playerBadge.state !== "error" && playerOrientation !== "portrait" ? (
               <div className={`stage-controls${controlsVisible ? " is-visible" : ""}`}>
                 <div className="stage-controls-fade" />
                 <button
@@ -547,45 +531,41 @@ export function WatchSessionPage({
           />
         </aside>
       </div>
-      {moreMounted ? (
-        <>
-          <button
-            type="button"
-            className={`watch-mobile-more-backdrop${moreVisible ? " is-open" : ""}`}
-            aria-label="关闭更多操作"
-            onClick={closeMoreSheet}
-          />
-          <section className={`watch-mobile-more-panel${moreVisible ? " is-open" : ""}`}>
-            <div className="watch-mobile-more-header">
-              <strong>{roomLabel}</strong>
-              <span>{playerBadge.label}</span>
-            </div>
-            <div className="summary-item">
-              <strong>观看链接</strong>
-              <span data-watch-link>{watchLinkText}</span>
-            </div>
-            <button
-              type="button"
-              className="secondary"
-              onClick={async () => {
-                if (!watchLink) {
-                  closeMoreSheet();
-                  return;
-                }
-                try {
-                  await navigator.clipboard.writeText(watchLink);
-                  closeMoreSheet();
-                } catch {
-                  closeMoreSheet();
-                }
-              }}
-              disabled={!watchLink}
-            >
-              复制观看链接
-            </button>
-          </section>
-        </>
-      ) : null}
+      <SwipeableDrawer
+        open={moreOpen}
+        onClose={closeMoreSheet}
+        ariaLabel="关闭更多操作"
+        className="watch-mobile-more-drawer"
+        panelClassName="watch-mobile-more-panel"
+      >
+        <div className="watch-mobile-more-header">
+          <strong>{roomLabel}</strong>
+          <span>{playerBadge.label}</span>
+        </div>
+        <div className="summary-item">
+          <strong>观看链接</strong>
+          <span data-watch-link>{watchLinkText}</span>
+        </div>
+        <button
+          type="button"
+          className="secondary"
+          onClick={async () => {
+            if (!watchLink) {
+              closeMoreSheet();
+              return;
+            }
+            try {
+              await navigator.clipboard.writeText(watchLink);
+              closeMoreSheet();
+            } catch {
+              closeMoreSheet();
+            }
+          }}
+          disabled={!watchLink}
+        >
+          复制观看链接
+        </button>
+      </SwipeableDrawer>
       {shareMenuMounted ? (
         <>
           <button

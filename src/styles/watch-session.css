@@ -305,7 +305,7 @@
   .watch-layout,
   .live-layout {
     --stage-min-height: 360px;
-    --stage-max-height: max(360px, calc(100vh - 12rem));
+    --stage-max-height: max(360px, calc(100svh - 12rem));
     --stage-aspect-ratio: 16 / 9;
     --stage-aspect-width: 16;
     --stage-aspect-height: 9;

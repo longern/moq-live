@@ -3,7 +3,10 @@ import { ChatPanel } from "../ChatPanel.jsx";
 import { StatusPill } from "../StatusPill.jsx";
 import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
+import { formatAudienceCount } from "../../lib/audience.js";
 import {
+  AudienceIcon,
+  ChatIcon,
   CloseIcon,
   EndBroadcastIcon,
   FlipCameraIcon,
@@ -16,6 +19,8 @@ import { LivePreviewStage } from "./LivePreviewStage.jsx";
 
 export function LiveMobilePage(props) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
+  const [audienceOpen, setAudienceOpen] = useState(false);
   const [cameraNoticeVisible, setCameraNoticeVisible] = useState(false);
   const cameraNoticeTimerRef = useRef(null);
   const {
@@ -48,6 +53,7 @@ export function LiveMobilePage(props) {
     chatDraft,
     chatConnectionState,
     chatOnlineCount,
+    chatLoggedInViewers = [],
     chatReadOnly,
     chatError,
     authAvailable,
@@ -69,6 +75,17 @@ export function LiveMobilePage(props) {
   const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
   const mediaMode = props.mediaMode;
   const publishControlActive = isPublishing || isStarting;
+  const immersiveShell = shellMode === "immersive";
+  const voiceMode = mediaMode === "voice";
+  const hasInlineChatComposer = false;
+  const showChatDrawerEntry = !hasInlineChatComposer;
+  const showPassiveChatPreview = showChatDrawerEntry;
+  const showAudienceHeader = immersiveShell && isPublishing;
+  const showModeSwitch = !publishControlActive;
+  const showStartButton = !isPublishing;
+  const showCameraControl = !voiceMode;
+  const audienceCountText = formatAudienceCount(chatOnlineCount);
+  const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
 
   useEffect(() => () => {
     if (cameraNoticeTimerRef.current) {
@@ -76,12 +93,52 @@ export function LiveMobilePage(props) {
     }
   }, []);
 
+  useEffect(() => {
+    if (!showChatDrawerEntry) {
+      setChatDrawerOpen(false);
+    }
+  }, [showChatDrawerEntry]);
+
+  useEffect(() => {
+    if (!showAudienceHeader) {
+      setAudienceOpen(false);
+    }
+  }, [showAudienceHeader]);
+
   function openMoreSheet() {
+    setChatDrawerOpen(false);
+    setAudienceOpen(false);
     setMoreOpen(true);
   }
 
   function closeMoreSheet() {
     setMoreOpen(false);
+  }
+
+  function openChatDrawer() {
+    if (!showChatDrawerEntry) {
+      return;
+    }
+    setMoreOpen(false);
+    setAudienceOpen(false);
+    setChatDrawerOpen(true);
+  }
+
+  function closeChatDrawer() {
+    setChatDrawerOpen(false);
+  }
+
+  function openAudienceSheet() {
+    if (!showAudienceHeader) {
+      return;
+    }
+    setMoreOpen(false);
+    setChatDrawerOpen(false);
+    setAudienceOpen(true);
+  }
+
+  function closeAudienceSheet() {
+    setAudienceOpen(false);
   }
 
   function showCameraUnavailableNotice() {
@@ -96,7 +153,7 @@ export function LiveMobilePage(props) {
   }
 
   function handleCameraAction() {
-    if (mediaMode === "voice") {
+    if (voiceMode) {
       return;
     }
 
@@ -117,49 +174,84 @@ export function LiveMobilePage(props) {
     >
       <div className="live-mobile-shell">
         <div className="live-mobile-head">
-          <button
-            type="button"
-            className={`live-page-close${publishControlActive ? " is-live-control" : ""}`}
-            onClick={publishControlActive ? onTogglePublish : props.onRequestClose}
-            aria-label={publishControlActive ? (isStarting ? "取消开播" : "结束直播") : "退出开播页"}
-          >
-            {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
-          </button>
-          {!publishControlActive ? (
-            <div className="live-mode-switch" role="group" aria-label="开播模式">
+          <div className="live-mobile-head-left">
+            <button
+              type="button"
+              className={`live-page-close${publishControlActive ? " is-live-control" : ""}`}
+              onClick={publishControlActive ? onTogglePublish : props.onRequestClose}
+              aria-label={publishControlActive ? (isStarting ? "取消开播" : "结束直播") : "退出开播页"}
+            >
+              {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
+            </button>
+            {showAudienceHeader ? (
+              <div className="live-mobile-room-chip live-mobile-room-chip-head">
+                <UserAvatar
+                  avatarUrl={roomAvatarUrl}
+                  displayName={roomLabel}
+                  className="live-mobile-room-avatar"
+                  imgAlt={roomLabel || "主播头像"}
+                  imgWidth={24}
+                  imgHeight={24}
+                  monogramClassName="is-monogram"
+                  placeholderClassName="is-placeholder"
+                  iconClassName="live-mobile-room-avatar-icon"
+                />
+                <span className="live-mobile-room">{roomLabel}</span>
+              </div>
+            ) : (
+              <UserAvatar
+                avatarUrl={roomAvatarUrl}
+                displayName={roomLabel}
+                className="live-mobile-head-avatar"
+                imgAlt={roomLabel || "主播头像"}
+                imgWidth={30}
+                imgHeight={30}
+                monogramClassName="is-monogram"
+                placeholderClassName="is-placeholder"
+                iconClassName="live-mobile-head-avatar-icon"
+              />
+            )}
+          </div>
+          <div className="live-mobile-head-center">
+            {showModeSwitch ? (
+              <div className="live-mode-switch" role="group" aria-label="开播模式">
+                <button
+                  type="button"
+                  className={mediaMode === "video" ? "is-active" : ""}
+                  onClick={() => props.onSelectLiveMode?.("video")}
+                  aria-pressed={mediaMode === "video"}
+                >
+                  视频
+                </button>
+                <button
+                  type="button"
+                  className={mediaMode === "voice" ? "is-active" : ""}
+                  onClick={() => props.onSelectLiveMode?.("voice")}
+                  aria-pressed={mediaMode === "voice"}
+                >
+                  语音
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div className="live-mobile-head-right">
+            {showAudienceHeader ? (
               <button
                 type="button"
-                className={mediaMode === "video" ? "is-active" : ""}
-                onClick={() => props.onSelectLiveMode?.("video")}
-                aria-pressed={mediaMode === "video"}
+                className="live-mobile-audience-chip"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openAudienceSheet();
+                }}
+                aria-label={`${audienceCountText}人在线，查看在线用户`}
               >
-                视频
+                <AudienceIcon />
+                <span>{audienceCountText}</span>
               </button>
-              <button
-                type="button"
-                className={mediaMode === "voice" ? "is-active" : ""}
-                onClick={() => props.onSelectLiveMode?.("voice")}
-                aria-pressed={mediaMode === "voice"}
-              >
-                语音
-              </button>
-            </div>
-          ) : null}
-          <StatusPill id="publishBadgeOverlay" label={publishBadge.label} state={publishBadge.state} />
-        </div>
-        <div className="live-mobile-room-chip">
-          <UserAvatar
-            avatarUrl={roomAvatarUrl}
-            displayName={roomLabel}
-            className="live-mobile-room-avatar"
-            imgAlt={roomLabel || "主播头像"}
-            imgWidth={24}
-            imgHeight={24}
-            monogramClassName="is-monogram"
-            placeholderClassName="is-placeholder"
-            iconClassName="live-mobile-room-avatar-icon"
-          />
-          <span className="live-mobile-room">{roomLabel}</span>
+            ) : (
+              <StatusPill id="publishBadgeOverlay" label={publishBadge.label} state={publishBadge.state} />
+            )}
+          </div>
         </div>
         <div className="stage-frame live-stage-frame live-stage-frame-mobile">
           <LivePreviewStage
@@ -182,44 +274,44 @@ export function LiveMobilePage(props) {
             </div>
           ) : null}
           <div className="live-mobile-bottom-stack">
-            <div className="live-mobile-chat-overlay">
-              <ChatPanel
-                authAvailable={authAvailable}
-                authLoading={authLoading}
-                authUser={authUser}
-                messages={chatMessages}
-                draft={chatDraft}
-                onDraftChange={onChatDraftChange}
-                onSend={onChatSend}
-                onRequireLogin={onChatRequireLogin}
-                connectionState={chatConnectionState}
-                onlineCount={chatOnlineCount}
-                readOnly={chatReadOnly}
-                chatError={chatError}
-                variant="floating"
-                className="chat-panel-live-mobile"
-                title="评论"
-                showComposer={false}
-                showWelcome={false}
-              />
-            </div>
+            {showPassiveChatPreview ? (
+              <div className="live-mobile-chat-overlay">
+                <ChatPanel
+                  authAvailable={authAvailable}
+                  authLoading={authLoading}
+                  authUser={authUser}
+                  messages={chatMessages}
+                  draft={chatDraft}
+                  onDraftChange={onChatDraftChange}
+                  onSend={onChatSend}
+                  onRequireLogin={onChatRequireLogin}
+                  connectionState={chatConnectionState}
+                  onlineCount={chatOnlineCount}
+                  readOnly={chatReadOnly}
+                  chatError={chatError}
+                  variant="floating"
+                  className="chat-panel-live-mobile"
+                  title="评论"
+                  showComposer={false}
+                  showWelcome={false}
+                />
+              </div>
+            ) : null}
             <div className="live-mobile-actions">
               <div className="live-mobile-utility-row" aria-label="开播辅助操作">
-                <button
-                  type="button"
-                  className={`live-fab live-fab-icon${mediaMode === "voice" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable" : ""}`}
-                  onClick={handleCameraAction}
-                  aria-label={
-                    mediaMode === "voice"
-                      ? "语音模式下摄像头已关闭"
-                      : cameraUnavailable
-                        ? "未检测到可用摄像头"
-                        : `翻转摄像头，当前${cameraMode === "rear" ? "后摄" : "前摄"}`
-                  }
-                  aria-disabled={mediaMode === "voice" || cameraUnavailable ? "true" : undefined}
-                >
-                  <FlipCameraIcon />
-                </button>
+                {showCameraControl ? (
+                  <button
+                    type="button"
+                    className={`live-fab live-fab-icon${cameraUnavailable ? " is-unavailable" : ""}`}
+                    onClick={handleCameraAction}
+                    aria-label={cameraUnavailable
+                      ? "未检测到可用摄像头"
+                      : `翻转摄像头，当前${cameraMode === "rear" ? "后摄" : "前摄"}`}
+                    aria-disabled={cameraUnavailable ? "true" : undefined}
+                  >
+                    <FlipCameraIcon />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={`live-fab live-fab-icon${microphoneEnabled ? "" : " is-muted"}`}
@@ -237,6 +329,23 @@ export function LiveMobilePage(props) {
                 >
                   <ShareIcon />
                 </button>
+                {showChatDrawerEntry ? (
+                  <button
+                    type="button"
+                    className={`live-fab live-fab-icon${chatDrawerOpen ? " is-active" : ""}`}
+                    onClick={() => {
+                      if (chatDrawerOpen) {
+                        closeChatDrawer();
+                        return;
+                      }
+                      openChatDrawer();
+                    }}
+                    aria-label={chatDrawerOpen ? "关闭评论" : "打开评论"}
+                    aria-expanded={chatDrawerOpen}
+                  >
+                    <ChatIcon />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={`live-fab live-fab-icon${moreOpen ? " is-active" : ""}`}
@@ -252,7 +361,7 @@ export function LiveMobilePage(props) {
                   <MoreIcon />
                 </button>
               </div>
-              {!isPublishing ? (
+              {showStartButton ? (
                 <button
                   type="button"
                   className={`live-fab live-fab-primary${isStarting ? " is-starting" : ""}`}
@@ -266,6 +375,74 @@ export function LiveMobilePage(props) {
             </div>
           </div>
         </div>
+
+        {showChatDrawerEntry ? (
+          <SwipeableDrawer
+            open={chatDrawerOpen}
+            onClose={closeChatDrawer}
+            ariaLabel="关闭评论"
+            className="live-mobile-drawer live-mobile-chat-drawer"
+            panelClassName="live-mobile-chat-panel"
+          >
+            <ChatPanel
+              authAvailable={authAvailable}
+              authLoading={authLoading}
+              authUser={authUser}
+              messages={chatMessages}
+              draft={chatDraft}
+              onDraftChange={onChatDraftChange}
+              onSend={onChatSend}
+              onRequireLogin={onChatRequireLogin}
+              connectionState={chatConnectionState}
+              onlineCount={chatOnlineCount}
+              readOnly={chatReadOnly}
+              chatError={chatError}
+              title="评论"
+              showWelcome={false}
+              className="chat-panel-live-drawer"
+            />
+          </SwipeableDrawer>
+        ) : null}
+
+        {showAudienceHeader ? (
+          <SwipeableDrawer
+            open={audienceOpen}
+            onClose={closeAudienceSheet}
+            ariaLabel="关闭在线用户"
+            className="live-mobile-drawer live-mobile-audience-drawer"
+            panelClassName="live-mobile-audience-panel"
+          >
+            <div className="live-audience-head">
+              <strong>在线用户</strong>
+              <span>{audienceCountText} 人</span>
+            </div>
+            {loggedInViewers.length > 0 ? (
+              <div className="live-audience-list">
+                {loggedInViewers.map((viewer) => {
+                  const displayName = viewer.displayName || "已登录用户";
+                  return (
+                    <div className="live-audience-row" key={viewer.id}>
+                      <UserAvatar
+                        avatarUrl={viewer.avatarUrl}
+                        displayName={displayName}
+                        className="live-audience-avatar"
+                        imgAlt={`${displayName}头像`}
+                        imgWidth={48}
+                        imgHeight={48}
+                        monogramClassName="is-monogram"
+                        placeholderClassName="is-placeholder"
+                        iconClassName="live-audience-avatar-icon"
+                      />
+                      <span>{displayName}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="live-audience-empty">暂无在线用户</div>
+            )}
+          </SwipeableDrawer>
+        ) : null}
 
         <SwipeableDrawer
           open={moreOpen}

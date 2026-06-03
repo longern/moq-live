@@ -12,7 +12,7 @@ import { usePlayerController } from "./hooks/usePlayerController.js";
 import { useRouteController } from "./hooks/useRouteController.js";
 import { buildWatchLink, getRelayHostValue, writeRoute } from "./lib/routeState.js";
 import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from "./lib/watchHistory.js";
-import { describePlayerState } from "./lib/status.js";
+import { describePlayerState, RETAINED_PLAYER_LAYOUT_STATES } from "./lib/status.js";
 import { getWatchTestChannel } from "./lib/watchTestChannels.js";
 
 function getAvatarLabel(authState) {
@@ -37,6 +37,49 @@ function getNamespaceWatchValue(value) {
 
 function getHandleWatchValue(value) {
   return value.trim().replace(/^@+/, "").toLowerCase();
+}
+
+function getWatchPlayerLayoutScopeKey({
+  normalizedWatchInput,
+  watchTestChannel,
+  watchingNamespace,
+  directWatchNamespace,
+  watchHandle,
+}) {
+  if (!normalizedWatchInput) {
+    return "";
+  }
+
+  if (watchTestChannel) {
+    return `test:${watchTestChannel.id}`;
+  }
+
+  if (watchingNamespace) {
+    return `namespace:${directWatchNamespace || normalizedWatchInput.toLowerCase()}`;
+  }
+
+  return `room:${watchHandle || normalizedWatchInput.toLowerCase()}`;
+}
+
+function shouldUseWatchPlayerShell({
+  page,
+  watchJoined,
+  playerSession,
+  playerStatusKind,
+  playerOrientation,
+}) {
+  if (page !== "watch" || !watchJoined) {
+    return false;
+  }
+
+  if (playerSession) {
+    return true;
+  }
+
+  return (
+    playerOrientation === "portrait" &&
+    RETAINED_PLAYER_LAYOUT_STATES.has(playerStatusKind)
+  );
 }
 
 export function App() {
@@ -151,6 +194,13 @@ export function App() {
     : watchingNamespace
       ? directWatchNamespace
       : resolvedWatchRoomId;
+  const watchPlayerLayoutScopeKey = getWatchPlayerLayoutScopeKey({
+    normalizedWatchInput,
+    watchTestChannel,
+    watchingNamespace,
+    directWatchNamespace,
+    watchHandle,
+  });
 
   const player = usePlayerController({
     initialAutorun: false,
@@ -158,7 +208,8 @@ export function App() {
     roomRef: watchPlaybackNamespaceRef,
     setLogText,
     log,
-    syntheticSessionRef
+    syntheticSessionRef,
+    layoutScopeKey: watchPlayerLayoutScopeKey,
   });
   const watchChatEnabled = page === "watch" && !watchingTestChannel && Boolean(watchChatRoom) && !authState.loading;
 
@@ -270,8 +321,15 @@ export function App() {
   const effectivePlayerStatus = watchTestChannel?.statusMessage ?? player.playerStatus;
   const playerBadge = describePlayerState(effectivePlayerStatusKind);
   const buildLabel = `Build ${__BUILD_HASH__}`;
-  const mobileWatchSessionActive = page === "watch" && Boolean(effectivePlayerSession);
-  const mobileWatchJoinedClass = mobileWatchSessionActive ? " app-container-watch-joined" : "";
+  const watchPlayerShellActive = shouldUseWatchPlayerShell({
+    page,
+    watchJoined,
+    playerSession: effectivePlayerSession,
+    playerStatusKind: effectivePlayerStatusKind,
+    playerOrientation: effectivePlayerOrientation,
+  });
+  const watchRoomShellActive = page === "watch" && watchJoined;
+  const mobileWatchJoinedClass = watchRoomShellActive ? " app-container-watch-joined" : "";
   const requireLoginForLive = false;
   const avatarLabel = getAvatarLabel(authState);
   const avatarStateClass = authState.loading
@@ -985,6 +1043,7 @@ export function App() {
             chatDraft={chat.draft}
             chatConnectionState={chat.connectionState}
             chatOnlineCount={chat.onlineCount}
+            chatLoggedInViewers={chat.loggedInViewers}
             chatReadOnly={chat.readOnly}
             chatError={chat.chatError}
             onChatDraftChange={(event) => {
@@ -1050,7 +1109,7 @@ export function App() {
         </main>
       </div>
 
-      {mobileWatchSessionActive ? null : (
+      {watchRoomShellActive ? null : (
         <MobileNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
       )}
       <MobilePanelPresence open={loginPromptOpen}>

@@ -16,6 +16,7 @@ export function usePlayerController({
   setLogText,
   log,
   syntheticSessionRef,
+  layoutScopeKey = "",
 }) {
   const audioPlaybackSupported = isPlayerAudioSupported();
 
@@ -30,6 +31,8 @@ export function usePlayerController({
   const layout = usePlayerLayout({
     playerRef: session.playerRef,
     playerSession: session.playerSession,
+    playerStatusKind: session.playerStatusKind,
+    layoutScopeKey,
     audioPlaybackSupported,
   });
 
@@ -54,7 +57,10 @@ export function usePlayerController({
 
   async function startPlayer(options = {}) {
     autoplayPrompt.noteStartIntent(Boolean(options.initiatedByUser));
-    await session.startPlayer();
+    await session.startPlayer({
+      ...options,
+      layoutScopeKey,
+    });
   }
 
   async function stopPlayer(options = {}) {
@@ -109,6 +115,7 @@ export function usePlayerController({
     playerPaused: session.playerPaused,
     playerMuted: session.playerMuted,
     showTapToUnmute: autoplayPrompt.showTapToUnmute,
+    playerMediaSize: layout.playerMediaSize,
     playerOrientation: layout.playerOrientation,
     playerSession: session.playerSession,
     playerRef: session.playerRef,

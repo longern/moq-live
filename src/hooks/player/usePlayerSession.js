@@ -331,6 +331,11 @@ export function usePlayerSession({
 
   async function startPlayer(options = {}) {
     const { initialMuted = false } = options;
+    const nextLayoutScopeKey =
+      options.layoutScopeKey
+      ?? sessionRef.current?.layoutScopeKey
+      ?? playerSessionStateRef.current?.layoutScopeKey
+      ?? "";
     const targetMuted = !audioPlaybackSupported || initialMuted;
     const token = ++playbackTokenRef.current;
     await stopPlayer({
@@ -359,6 +364,7 @@ export function usePlayerSession({
       }
       nextSession = {
         key: `${namespace}-${token}`,
+        layoutScopeKey: nextLayoutScopeKey,
         token,
         relayUrl: nextRelayUrl,
         namespace,

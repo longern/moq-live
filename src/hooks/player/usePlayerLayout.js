@@ -1,11 +1,71 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { RETAINED_PLAYER_LAYOUT_STATES } from "../../lib/status.js";
+
+const DEFAULT_PLAYER_ORIENTATION = "landscape";
+
+function getMediaSize(playerEl) {
+  if (playerEl instanceof HTMLCanvasElement) {
+    return {
+      width: playerEl.width,
+      height: playerEl.height,
+    };
+  }
+
+  return {
+    width: playerEl.videoWidth || playerEl.clientWidth,
+    height: playerEl.videoHeight || playerEl.clientHeight,
+  };
+}
+
+function getMediaOrientation({ width, height }) {
+  return height > width ? "portrait" : "landscape";
+}
+
+function hasRenderableMediaSize(size) {
+  return Boolean(size?.width && size?.height);
+}
 
 export function usePlayerLayout({
   playerRef,
   playerSession,
+  playerStatusKind,
+  layoutScopeKey = "",
   audioPlaybackSupported,
 }) {
-  const [playerOrientation, setPlayerOrientation] = useState("landscape");
+  const [layoutSnapshot, setLayoutSnapshot] = useState({
+    scopeKey: layoutScopeKey,
+    sessionKey: "",
+    mediaSize: null,
+    orientation: DEFAULT_PLAYER_ORIENTATION,
+  });
+  const lastSessionKeyRef = useRef("");
+
+  useEffect(() => {
+    lastSessionKeyRef.current = "";
+    setLayoutSnapshot({
+      scopeKey: layoutScopeKey,
+      sessionKey: "",
+      mediaSize: null,
+      orientation: DEFAULT_PLAYER_ORIENTATION,
+    });
+  }, [layoutScopeKey]);
+
+  useEffect(() => {
+    const sessionKey = playerSession?.key ?? "";
+    if (
+      sessionKey &&
+      playerSession?.layoutScopeKey === layoutScopeKey &&
+      sessionKey !== lastSessionKeyRef.current
+    ) {
+      lastSessionKeyRef.current = sessionKey;
+      setLayoutSnapshot({
+        scopeKey: layoutScopeKey,
+        sessionKey,
+        mediaSize: null,
+        orientation: DEFAULT_PLAYER_ORIENTATION,
+      });
+    }
+  }, [layoutScopeKey, playerSession?.key, playerSession?.layoutScopeKey]);
 
   useEffect(() => {
     const playerEl = playerRef.current;
@@ -14,15 +74,38 @@ export function usePlayerLayout({
     }
 
     const updateMediaLayout = () => {
-      const mediaWidth = playerEl instanceof HTMLCanvasElement
-        ? playerEl.width
-        : playerEl.videoWidth || playerEl.clientWidth;
-      const mediaHeight = playerEl instanceof HTMLCanvasElement
-        ? playerEl.height
-        : playerEl.videoHeight || playerEl.clientHeight;
-      if (mediaWidth && mediaHeight) {
-        setPlayerOrientation(mediaHeight > mediaWidth ? "portrait" : "landscape");
+      if (playerSession.layoutScopeKey !== layoutScopeKey) {
+        return;
       }
+
+      if (RETAINED_PLAYER_LAYOUT_STATES.has(playerStatusKind)) {
+        return;
+      }
+
+      const mediaSize = getMediaSize(playerEl);
+      if (!hasRenderableMediaSize(mediaSize)) {
+        return;
+      }
+
+      const orientation = getMediaOrientation(mediaSize);
+      setLayoutSnapshot((current) => {
+        if (
+          current.scopeKey === layoutScopeKey &&
+          current.sessionKey === playerSession.key &&
+          current.orientation === orientation &&
+          current.mediaSize?.width === mediaSize.width &&
+          current.mediaSize?.height === mediaSize.height
+        ) {
+          return current;
+        }
+
+        return {
+          scopeKey: layoutScopeKey,
+          sessionKey: playerSession.key,
+          mediaSize,
+          orientation,
+        };
+      });
     };
 
     updateMediaLayout();
@@ -51,16 +134,22 @@ export function usePlayerLayout({
       playerEl.removeEventListener("resize", updateMediaLayout);
       resizeObserver?.disconnect();
     };
-  }, [audioPlaybackSupported, playerRef, playerSession]);
+  }, [audioPlaybackSupported, layoutScopeKey, playerRef, playerSession, playerStatusKind]);
 
   useEffect(
     () => () => {
-      setPlayerOrientation("landscape");
+      setLayoutSnapshot({
+        scopeKey: "",
+        sessionKey: "",
+        mediaSize: null,
+        orientation: DEFAULT_PLAYER_ORIENTATION,
+      });
     },
     [],
   );
 
   return {
-    playerOrientation,
+    playerMediaSize: layoutSnapshot.mediaSize,
+    playerOrientation: layoutSnapshot.orientation,
   };
 }

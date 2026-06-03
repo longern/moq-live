@@ -84,7 +84,7 @@
 .chat-message-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
   max-height: min(48vh, 460px);
   min-height: 220px;
   padding-right: 4px;
@@ -101,7 +101,7 @@
 .chat-message-card {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
-  gap: 8px;
+  gap: 4px;
   align-items: start;
   padding: 2px 0;
   border: 0;

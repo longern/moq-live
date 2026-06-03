@@ -60,7 +60,7 @@ export class ChatRoomDO {
       type: "chat.snapshot",
       room,
       readOnly,
-      onlineCount: this.getAudienceCount(),
+      ...this.getPresenceSnapshot(),
       messages: this.recentMessages,
       stream: this.roomState.stream,
       roomMeta: this.roomState.roomMeta
@@ -133,15 +133,44 @@ export class ChatRoomDO {
   broadcastPresence() {
     this.broadcast({
       type: "presence.snapshot",
-      onlineCount: this.getAudienceCount()
+      ...this.getPresenceSnapshot()
     });
   }
 
-  getAudienceCount() {
-    return this.ctx.getWebSockets().reduce((count, socket) => {
+  getPresenceSnapshot() {
+    const loggedInViewersById = new Map();
+    let anonymousViewerCount = 0;
+
+    for (const socket of this.ctx.getWebSockets()) {
       const session = normalizeAttachment(socket.deserializeAttachment());
-      return session?.role === "broadcaster" ? count : count + 1;
-    }, 0);
+      if (!session || session.role === "broadcaster") {
+        continue;
+      }
+
+      if (!session.user?.id) {
+        anonymousViewerCount += 1;
+        continue;
+      }
+
+      if (loggedInViewersById.has(session.user.id)) {
+        continue;
+      }
+
+      loggedInViewersById.set(session.user.id, {
+        id: session.user.id,
+        displayName: session.user.displayName || "已登录用户",
+        avatarUrl: session.user.avatarUrl || ""
+      });
+    }
+
+    const loggedInViewers = Array.from(loggedInViewersById.values()).sort((left, right) => (
+      left.displayName.localeCompare(right.displayName, "zh-Hans-CN")
+    ));
+
+    return {
+      onlineCount: anonymousViewerCount + loggedInViewers.length,
+      loggedInViewers
+    };
   }
 
   broadcast(payload) {

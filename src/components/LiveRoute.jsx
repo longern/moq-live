@@ -721,6 +721,7 @@ export function LiveRoute({
       chatDraft={liveChat.draft}
       chatConnectionState={liveChatEnabled ? liveChat.connectionState : "closed"}
       chatOnlineCount={liveChat.onlineCount}
+      chatLoggedInViewers={liveChat.loggedInViewers}
       chatReadOnly={liveChat.readOnly}
       chatError={liveChatEnabled ? liveChat.chatError : ""}
       authAvailable={authState.available}

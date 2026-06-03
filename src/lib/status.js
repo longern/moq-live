@@ -16,6 +16,8 @@ const PUBLISH_BADGES = {
   error: { label: "开播异常", state: "error" },
 };
 
+export const RETAINED_PLAYER_LAYOUT_STATES = new Set(["ended", "error", "left", "offair"]);
+
 export function describePlayerState(kind = "idle") {
   return PLAYER_BADGES[kind] || PLAYER_BADGES.idle;
 }

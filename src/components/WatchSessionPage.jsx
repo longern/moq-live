@@ -9,6 +9,7 @@ import {
   Play,
   Radio,
   Share,
+  Users,
   Volume2,
   VolumeX
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { StatusPill } from "./StatusPill.jsx";
 import { SwipeableDrawer } from "./SwipeableDrawer.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
+import { formatAudienceCount } from "../lib/audience.js";
 
 const WatchTestCanvas = import.meta.env.DEV
   ? lazy(() => import("./WatchTestCanvas.jsx").then((module) => ({ default: module.WatchTestCanvas })))
@@ -56,6 +58,7 @@ export function WatchSessionPage({
   chatDraft,
   chatConnectionState,
   chatOnlineCount,
+  chatLoggedInViewers = [],
   chatReadOnly,
   chatError,
   testPlayback,
@@ -67,6 +70,7 @@ export function WatchSessionPage({
   const [controlsVisible, setControlsVisible] = useState(false);
   const [immersiveControlsHidden, setImmersiveControlsHidden] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [audienceOpen, setAudienceOpen] = useState(false);
   const [shareMenuMounted, setShareMenuMounted] = useState(false);
   const [shareMenuVisible, setShareMenuVisible] = useState(false);
   const [shareMenuPosition, setShareMenuPosition] = useState({ left: 0, top: 0 });
@@ -77,6 +81,9 @@ export function WatchSessionPage({
   const shareButtonRef = useRef(null);
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const immersivePortrait = playerOrientation === "portrait";
+  const audienceCountText = formatAudienceCount(chatOnlineCount);
+  const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
+  const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
 
   function clearHideTimer() {
     if (hideTimerRef.current) {
@@ -182,6 +189,14 @@ export function WatchSessionPage({
 
   function closeMoreSheet() {
     setMoreOpen(false);
+  }
+
+  function openAudienceSheet() {
+    setAudienceOpen(true);
+  }
+
+  function closeAudienceSheet() {
+    setAudienceOpen(false);
   }
 
   function positionShareMenu() {
@@ -311,12 +326,34 @@ export function WatchSessionPage({
           >
             <ChevronLeft aria-hidden="true" />
           </button>
-          <div className="stage-mobile-meta stage-mobile-meta-left">
-            <strong>{roomLabel}</strong>
+          <div className="watch-mobile-host-chip">
+            <UserAvatar
+              avatarUrl={hostAvatarUrl}
+              displayName={hostChipLabel}
+              className="watch-mobile-host-avatar"
+              imgAlt={hostChipLabel || "主播头像"}
+              imgWidth={24}
+              imgHeight={24}
+              monogramClassName="is-monogram"
+              placeholderClassName="is-placeholder"
+              iconClassName="watch-mobile-host-avatar-icon"
+            />
+            <span className="watch-mobile-host-name">{hostChipLabel}</span>
           </div>
         </div>
         <div className="stage-mobile-hud-actions">
-          <StatusPill id="playerBadgeOverlay" label={playerBadge.label} state={playerBadge.state} />
+          <button
+            type="button"
+            className="watch-mobile-audience-chip"
+            onClick={(event) => {
+              event.stopPropagation();
+              openAudienceSheet();
+            }}
+            aria-label={`${audienceCountText}人在线，查看已登录观众`}
+          >
+            <Users aria-hidden="true" />
+            <span>{audienceCountText}</span>
+          </button>
           <button
             type="button"
             className="stage-mobile-more"
@@ -565,6 +602,43 @@ export function WatchSessionPage({
         >
           复制观看链接
         </button>
+      </SwipeableDrawer>
+      <SwipeableDrawer
+        open={audienceOpen}
+        onClose={closeAudienceSheet}
+        ariaLabel="关闭观众列表"
+        className="watch-audience-drawer"
+        panelClassName="watch-audience-panel"
+      >
+        <div className="watch-audience-head">
+          <strong>在线用户</strong>
+          <span>{audienceCountText} 人</span>
+        </div>
+        {loggedInViewers.length > 0 ? (
+          <div className="watch-audience-list">
+            {loggedInViewers.map((viewer) => {
+              const displayName = viewer.displayName || "已登录用户";
+              return (
+                <div className="watch-audience-row" key={viewer.id}>
+                  <UserAvatar
+                    avatarUrl={viewer.avatarUrl}
+                    displayName={displayName}
+                    className="watch-audience-avatar"
+                    imgAlt={`${displayName}头像`}
+                    imgWidth={48}
+                    imgHeight={48}
+                    monogramClassName="is-monogram"
+                    placeholderClassName="is-placeholder"
+                    iconClassName="watch-audience-avatar-icon"
+                  />
+                  <span>{displayName}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="watch-audience-empty">暂无在线用户</div>
+        )}
       </SwipeableDrawer>
       {shareMenuMounted ? (
         <>

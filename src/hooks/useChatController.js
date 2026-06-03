@@ -48,6 +48,21 @@ function getDefaultRoomMeta() {
   };
 }
 
+function normalizeLoggedInViewers(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((viewer) => ({
+      id: String(viewer?.id ?? "").trim(),
+      displayName: String(viewer?.displayName ?? "").trim(),
+      avatarUrl: String(viewer?.avatarUrl ?? "").trim()
+    }))
+    .filter((viewer) => viewer.id)
+    .slice(0, 100);
+}
+
 function getReconnectDelayMs(attempt) {
   return RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
 }
@@ -63,6 +78,7 @@ export function useChatController({
   const [draft, setDraft] = useState("");
   const [connectionState, setConnectionState] = useState("idle");
   const [onlineCount, setOnlineCount] = useState(0);
+  const [loggedInViewers, setLoggedInViewers] = useState([]);
   const [readOnly, setReadOnly] = useState(true);
   const [chatError, setChatError] = useState("");
   const [streamState, setStreamState] = useState(getDefaultStreamState);
@@ -131,6 +147,7 @@ export function useChatController({
       setDraft("");
       setConnectionState("idle");
       setOnlineCount(0);
+      setLoggedInViewers([]);
       setReadOnly(true);
       setChatError("");
       setStreamState(getDefaultStreamState());
@@ -188,6 +205,7 @@ export function useChatController({
           reconnectAttemptRef.current = 0;
           setMessages(Array.isArray(payload.messages) ? payload.messages : []);
           setOnlineCount(Number(payload.onlineCount) || 0);
+          setLoggedInViewers(normalizeLoggedInViewers(payload.loggedInViewers));
           setReadOnly(Boolean(payload.readOnly));
           setStreamState({
             isLive: Boolean(payload.stream?.isLive),
@@ -217,6 +235,7 @@ export function useChatController({
 
         if (payload.type === "presence.snapshot") {
           setOnlineCount(Number(payload.onlineCount) || 0);
+          setLoggedInViewers(normalizeLoggedInViewers(payload.loggedInViewers));
           return;
         }
 
@@ -338,6 +357,7 @@ export function useChatController({
     setDraft,
     connectionState,
     onlineCount,
+    loggedInViewers,
     readOnly,
     chatError,
     streamState,

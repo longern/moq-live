@@ -1,6 +1,7 @@
 import {
   Circle,
   Link,
+  MessageCircle,
   Mic,
   MicOff,
   MonitorUp,
@@ -9,6 +10,7 @@ import {
   Power,
   Share,
   SwitchCamera,
+  Users,
   X,
 } from "lucide-react";
 
@@ -47,6 +49,14 @@ export function ScreenShareIcon() {
 
 export function LinkIcon() {
   return <Link {...iconProps} />;
+}
+
+export function ChatIcon() {
+  return <MessageCircle {...iconProps} />;
+}
+
+export function AudienceIcon() {
+  return <Users {...iconProps} />;
 }
 
 export function MoreIcon() {

@@ -255,47 +255,6 @@ publisher-moq {
   line-height: 1.55;
 }
 
-.stage-overlay {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 14px;
-  pointer-events: none;
-}
-
-.overlay-card {
-  max-width: min(100%, 460px);
-  padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(3, 8, 14, 0.72);
-  backdrop-filter: blur(10px);
-}
-
-.overlay-label {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--muted);
-  font-size: 0.76rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.overlay-value {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: "IBM Plex Mono", "SF Mono", monospace;
-  font-size: 0.82rem;
-}
-
-.settings-stack {
-  display: grid;
-  gap: 14px;
-  align-content: start;
-}
-
 .stage-column,
 .control-column {
   display: grid;

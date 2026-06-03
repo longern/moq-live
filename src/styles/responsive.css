@@ -105,7 +105,6 @@
     padding: 0;
   }
 
-  .watch-layout .watch-leave-block,
   .watch-layout .control-column > .control-block:not(.chat-panel-block) {
     flex: 0 0 auto;
     padding: 18px;
@@ -201,8 +200,7 @@
     margin-inline: 18px;
   }
 
-  .live-layout .chat-message-card,
-  .live-layout .chat-empty-state {
+  .live-layout .chat-message-card {
     margin-right: 0;
   }
 }
@@ -495,14 +493,6 @@
     display: none;
   }
 
-  .watch-layout .watch-leave-block {
-    display: none;
-  }
-
-  .watch-layout .watch-link-block {
-    display: none;
-  }
-
   .watch-layout:has(.watch-stage-frame.is-portrait) .info-strip-mobile {
     display: none;
   }
@@ -564,8 +554,7 @@
       );
   }
 
-  .watch-layout .control-column[data-joined="true"] .info-strip-mobile,
-  .watch-layout .control-column[data-joined="true"] .watch-leave-block {
+  .watch-layout .control-column[data-joined="true"] .info-strip-mobile {
     display: none;
   }
 

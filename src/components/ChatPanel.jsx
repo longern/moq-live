@@ -148,7 +148,7 @@ export function ChatPanel({
 
       {showComposer ? (
         composerState.mode === "guest" ? (
-          <div className={`chat-composer chat-composer-readOnly${floating ? " chat-composer-floating" : ""}`}>
+          <div className={`chat-composer chat-composer-readonly${floating ? " chat-composer-floating" : ""}`}>
             <input
               id={`${composerInputId}-readonly`}
               name="chat_message_readonly"

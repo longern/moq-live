@@ -39,8 +39,7 @@
   line-height: 1.35;
 }
 
-.chat-panel-online-count,
-.chat-panel-note {
+.chat-panel-online-count {
   color: var(--muted);
   font-size: 0.84rem;
   line-height: 1.45;
@@ -195,16 +194,8 @@
 
 .watch-layout .control-column .chat-panel-block .chat-composer,
 .watch-layout .control-column .chat-panel-block .chat-composer-readonly,
-.watch-layout .control-column .chat-panel-block .chat-panel-note,
 .watch-layout .control-column .chat-panel-block .inline-warning {
   flex: 0 0 auto;
-  margin-inline: 16px;
-}
-
-.watch-layout .control-column .chat-panel-block .chat-empty-state {
-  min-height: 0;
-  height: 100%;
-  border-radius: 18px;
   margin-inline: 16px;
 }
 

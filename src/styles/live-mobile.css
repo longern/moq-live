@@ -384,20 +384,3 @@ body:has(.live-mobile-page[data-shell="immersive"]:not([hidden])) .mobile-nav {
 .live-mobile-more-panel {
   gap: 10px;
 }
-
-.live-mobile-more-header {
-  display: grid;
-  gap: 4px;
-  padding: 4px 2px 6px;
-}
-
-.live-mobile-more-header strong {
-  font-size: 1rem;
-  line-height: 1.2;
-}
-
-.live-mobile-more-header span {
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.4;
-}

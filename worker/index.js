@@ -26,6 +26,7 @@ import {
   updateUserAvatar,
   updateUserProfile,
   updateUserRoomCover,
+  updateUserRoomTitle,
   upsertMicrosoftUser,
   verifyMicrosoftIdToken
 } from "./auth.js";
@@ -58,6 +59,9 @@ export default {
       }
       if (url.pathname === "/api/me/room" && request.method === "POST") {
         return await handleMyRoomCreate(env, request);
+      }
+      if (url.pathname === "/api/me/room" && request.method === "PATCH") {
+        return await handleMyRoomUpdate(env, request);
       }
       if (url.pathname === "/api/me/room/cover" && request.method === "POST") {
         return await handleMyRoomCoverUpload(env, request);
@@ -160,6 +164,19 @@ async function handleMyRoomCreate(env, request) {
     ok: true,
     room
   }, { status: 201 });
+}
+
+async function handleMyRoomUpdate(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const payload = await request.json().catch(() => ({}));
+  const room = await updateUserRoomTitle(db, session.user.id, payload?.title ?? "");
+  return json({ ok: true, room });
 }
 
 async function handleMyRoomCoverUpload(env, request) {

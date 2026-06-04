@@ -6,14 +6,15 @@ import {
   CloseIcon,
   EndBroadcastIcon,
   FlipCameraIcon,
-  LinkIcon,
   MicrophoneIcon,
   MoreIcon,
+  QualityIcon,
   ScreenShareIcon,
   ShareIcon
 } from "./liveIcons.jsx";
-import { LiveCoverManager } from "./LiveCoverManager.jsx";
+import { LiveMoreMenu } from "./LiveMoreMenu.jsx";
 import { LivePreviewStage } from "./LivePreviewStage.jsx";
+import { LiveQualityMenu } from "./LiveQualityMenu.jsx";
 
 function getCameraStatusLabel(cameraMode) {
   if (cameraMode === "off") {
@@ -134,58 +135,38 @@ function ShareLinkPanel({
 }
 
 function MorePanel({
-  syntheticPublishing,
-  publishBlocked,
-  publishStatus,
-  onStartSynthetic,
-  onStopSynthetic,
   roomCoverUrl,
   roomCoverLoading,
   roomCoverBusy,
   roomCoverError,
   roomCoverStatus,
   roomCoverInputRef,
+  roomTitle,
   onPickCover,
   onOpenCoverPicker,
+  onSaveRoomTitle,
+  onShare,
+  shareSupported,
+  watchLink,
+  onClose,
 }) {
   return (
-    <>
-      <div className="live-desktop-panel-head">
-        <strong>更多</strong>
-        <span>{syntheticPublishing ? "当前合成源已启动" : publishStatus}</span>
-      </div>
-      <LiveCoverManager
-        roomCoverUrl={roomCoverUrl}
-        roomCoverLoading={roomCoverLoading}
-        roomCoverBusy={roomCoverBusy}
-        roomCoverError={roomCoverError}
-        roomCoverStatus={roomCoverStatus}
-        roomCoverInputRef={roomCoverInputRef}
-        onPickCover={onPickCover}
-        onOpenPicker={onOpenCoverPicker}
-        showNote={true}
-      />
-      <div className="action-row">
-        <button
-          type="button"
-          className="success"
-          id="startSynthetic"
-          onClick={onStartSynthetic}
-          disabled={publishBlocked || syntheticPublishing}
-        >
-          启动合成源
-        </button>
-        <button
-          type="button"
-          className="secondary"
-          id="stopSynthetic"
-          onClick={onStopSynthetic}
-          disabled={!syntheticPublishing}
-        >
-          停止合成源
-        </button>
-      </div>
-    </>
+    <LiveMoreMenu
+      roomCoverUrl={roomCoverUrl}
+      roomCoverLoading={roomCoverLoading}
+      roomCoverBusy={roomCoverBusy}
+      roomCoverError={roomCoverError}
+      roomCoverStatus={roomCoverStatus}
+      roomCoverInputRef={roomCoverInputRef}
+      roomTitle={roomTitle}
+      onPickCover={onPickCover}
+      onOpenCoverPicker={onOpenCoverPicker}
+      onSaveRoomTitle={onSaveRoomTitle}
+      onShare={onShare}
+      shareSupported={shareSupported}
+      watchLink={watchLink}
+      onClose={onClose}
+    />
   );
 }
 
@@ -197,12 +178,13 @@ export function LiveDesktopPage(props) {
     roomLabel,
     publishBlocked,
     publishBlockedReason,
-    publishStatus,
     publishBadge,
     cameraOptions,
     microphoneOptions,
+    publishQualityOptions = [],
     selectedCameraId,
     selectedMicrophoneId,
+    publishQualityId,
     cameraEnabled,
     microphoneEnabled,
     cameraMode,
@@ -214,19 +196,17 @@ export function LiveDesktopPage(props) {
     previewSourceType,
     screenShareSupported,
     screenShareActive,
-    syntheticPublishing,
     previewVideoRef,
     mirrorPreview,
     onCameraChange,
     onMicrophoneChange,
+    onPublishQualityChange,
     onCycleCamera,
     onToggleMicrophone,
     onTogglePublish,
     onShare,
     onStartScreenShare,
     onStopScreenShare,
-    onStartSynthetic,
-    onStopSynthetic,
     chatMessages,
     chatDraft,
     chatConnectionState,
@@ -248,13 +228,15 @@ export function LiveDesktopPage(props) {
     roomCoverError,
     roomCoverStatus,
     roomCoverInputRef,
+    roomTitle,
+    onSaveRoomTitle,
     onPickCover,
     onOpenCoverPicker,
-    closing,
     onRequestClose,
     onSelectLiveMode
   } = props;
   const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
+  const hasSingleMicrophone = (microphoneOptions?.length ?? 0) === 1;
   const mediaMode = props.mediaMode;
   const publishControlActive = isPublishing || isStarting;
   const screenShareUnavailableReason = !screenShareSupported
@@ -314,6 +296,16 @@ export function LiveDesktopPage(props) {
     onCycleCamera();
   }
 
+  function handleMicrophoneClick() {
+    if (hasSingleMicrophone) {
+      setOpenPanel("");
+      onToggleMicrophone();
+      return;
+    }
+
+    setOpenPanel((current) => (current === "microphone" ? "" : "microphone"));
+  }
+
   const activePanel = openPanel === "camera" ? (
     <CameraPanel
       cameraMode={cameraMode}
@@ -333,6 +325,12 @@ export function LiveDesktopPage(props) {
       onMicrophoneChange={onMicrophoneChange}
       onToggleMicrophone={onToggleMicrophone}
     />
+  ) : openPanel === "quality" ? (
+    <LiveQualityMenu
+      publishQualityOptions={publishQualityOptions}
+      publishQualityId={publishQualityId}
+      onPublishQualityChange={onPublishQualityChange}
+    />
   ) : openPanel === "link" ? (
     <ShareLinkPanel
       watchLink={watchLink}
@@ -342,25 +340,26 @@ export function LiveDesktopPage(props) {
     />
   ) : openPanel === "more" ? (
     <MorePanel
-      syntheticPublishing={syntheticPublishing}
-      publishBlocked={publishBlocked}
-      publishStatus={publishStatus}
-      onStartSynthetic={onStartSynthetic}
-      onStopSynthetic={onStopSynthetic}
       roomCoverUrl={roomCoverUrl}
       roomCoverLoading={roomCoverLoading}
       roomCoverBusy={roomCoverBusy}
       roomCoverError={roomCoverError}
       roomCoverStatus={roomCoverStatus}
       roomCoverInputRef={roomCoverInputRef}
+      roomTitle={roomTitle}
       onPickCover={onPickCover}
       onOpenCoverPicker={onOpenCoverPicker}
+      onSaveRoomTitle={onSaveRoomTitle}
+      onShare={onShare}
+      shareSupported={shareSupported}
+      watchLink={watchLink}
+      onClose={() => setOpenPanel("")}
     />
   ) : null;
   const activePanelClassName = openPanel === "microphone" ? "is-microphone-panel" : "";
 
   return (
-    <section className={`page page-immersive live-desktop-page${closing ? " is-closing" : ""}`} data-page="live" hidden={hidden}>
+    <section className="page page-immersive live-desktop-page" data-page="live" hidden={hidden}>
       <div className="live-page-top">
         <button
           type="button"
@@ -404,11 +403,6 @@ export function LiveDesktopPage(props) {
               mirrorPreview={mirrorPreview}
             />
           </div>
-          {props.activationContent ? (
-            <div className="live-activation-overlay">
-              {props.activationContent}
-            </div>
-          ) : null}
           <div className="live-desktop-overlay">
             {openPanel ? (
               <button
@@ -458,10 +452,10 @@ export function LiveDesktopPage(props) {
                 <button
                   type="button"
                   className={`live-dock-button${openPanel === "microphone" ? " is-active" : ""}${microphoneEnabled ? "" : " is-muted"}`}
-                  onClick={() => setOpenPanel((current) => (current === "microphone" ? "" : "microphone"))}
-                  aria-label="麦克风设置"
-                  aria-expanded={openPanel === "microphone"}
-                  title="麦克风"
+                  onClick={handleMicrophoneClick}
+                  aria-label={hasSingleMicrophone ? (microphoneEnabled ? "关闭麦克风" : "打开麦克风") : "麦克风设置"}
+                  aria-expanded={hasSingleMicrophone ? undefined : openPanel === "microphone"}
+                  title={hasSingleMicrophone ? (microphoneEnabled ? "关闭麦克风" : "打开麦克风") : "麦克风"}
                 >
                   <MicrophoneIcon enabled={microphoneEnabled} />
                 </button>
@@ -493,13 +487,23 @@ export function LiveDesktopPage(props) {
                 </button>
                 <button
                   type="button"
+                  className={`live-dock-button${openPanel === "quality" ? " is-active" : ""}`}
+                  onClick={() => setOpenPanel((current) => (current === "quality" ? "" : "quality"))}
+                  aria-label="画质设置"
+                  aria-expanded={openPanel === "quality"}
+                  title="画质"
+                >
+                  <QualityIcon />
+                </button>
+                <button
+                  type="button"
                   className={`live-dock-button${openPanel === "link" ? " is-active" : ""}`}
                   onClick={() => setOpenPanel((current) => (current === "link" ? "" : "link"))}
                   aria-label="链接与分享"
                   aria-expanded={openPanel === "link"}
                   title="链接"
                 >
-                  <LinkIcon />
+                  <ShareIcon />
                 </button>
                 <button
                   type="button"
@@ -510,16 +514,6 @@ export function LiveDesktopPage(props) {
                   title="更多"
                 >
                   <MoreIcon />
-                </button>
-                <button
-                  type="button"
-                  className="live-dock-button"
-                  onClick={onShare}
-                  aria-label="分享直播间"
-                  title="分享直播间"
-                  disabled={!shareSupported || !watchLink}
-                >
-                  <ShareIcon />
                 </button>
               </div>
             </div>

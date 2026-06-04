@@ -18,8 +18,14 @@ const navItems = [
   }
 ];
 
-function NavButton({ item, currentPage, onSelect, mobile = false }) {
+function NavButton({ item, currentPage, onSelect, onPreloadLive, mobile = false }) {
   const active = currentPage === item.id;
+  const preloadProps = item.id === "live"
+    ? {
+        onPointerDown: onPreloadLive,
+        onFocus: onPreloadLive,
+      }
+    : {};
 
   return (
     <button
@@ -28,6 +34,7 @@ function NavButton({ item, currentPage, onSelect, mobile = false }) {
       data-nav-target={item.id}
       aria-selected={String(active)}
       onClick={() => onSelect(item.id)}
+      {...preloadProps}
     >
       {mobile ? (
         <>
@@ -54,8 +61,14 @@ function getNavHref(pageId) {
   return `${url.pathname}${url.search}`;
 }
 
-function NavLink({ item, currentPage, onSelect }) {
+function NavLink({ item, currentPage, onSelect, onPreloadLive }) {
   const active = currentPage === item.id;
+  const preloadProps = item.id === "live"
+    ? {
+        onPointerEnter: onPreloadLive,
+        onFocus: onPreloadLive,
+      }
+    : {};
 
   return (
     <a
@@ -63,6 +76,7 @@ function NavLink({ item, currentPage, onSelect }) {
       className={`nav-button${active ? " is-active" : ""}`}
       data-nav-target={item.id}
       aria-current={active ? "page" : undefined}
+      {...preloadProps}
       onClick={(event) => {
         event.preventDefault();
         onSelect(item.id);
@@ -73,21 +87,34 @@ function NavLink({ item, currentPage, onSelect }) {
   );
 }
 
-export function DesktopNavigation({ currentPage, onSelect }) {
+export function DesktopNavigation({ currentPage, onSelect, onPreloadLive }) {
   return (
     <nav className="desktop-nav" aria-label="Primary">
       {navItems.filter((item) => item.id !== "settings").map((item) => (
-        <NavLink key={item.id} item={item} currentPage={currentPage} onSelect={onSelect} />
+        <NavLink
+          key={item.id}
+          item={item}
+          currentPage={currentPage}
+          onSelect={onSelect}
+          onPreloadLive={onPreloadLive}
+        />
       ))}
     </nav>
   );
 }
 
-export function MobileNavigation({ currentPage, onSelect }) {
+export function MobileNavigation({ currentPage, onSelect, onPreloadLive }) {
   return (
     <nav className="mobile-nav" aria-label="Primary">
       {navItems.map((item) => (
-        <NavButton key={item.id} item={item} currentPage={currentPage} onSelect={onSelect} mobile />
+        <NavButton
+          key={item.id}
+          item={item}
+          currentPage={currentPage}
+          onSelect={onSelect}
+          onPreloadLive={onPreloadLive}
+          mobile
+        />
       ))}
     </nav>
   );

@@ -15,11 +15,73 @@ const VIDEO_TARGET_WIDTH = 1280;
 const VIDEO_TARGET_HEIGHT = 720;
 const VIDEO_TARGET_FRAMERATE = 30;
 const VIDEO_TARGET_BITRATE = 2_500_000;
+const PUBLISH_QUALITY_OPTIONS = [
+  {
+    id: "smooth",
+    label: "流畅",
+    detail: "360p · 900 Kbps",
+    width: 640,
+    height: 360,
+    frameRate: 24,
+    maxBitrate: 900_000,
+  },
+  {
+    id: "hd",
+    label: "高清",
+    detail: "720p · 2.5 Mbps",
+    width: VIDEO_TARGET_WIDTH,
+    height: VIDEO_TARGET_HEIGHT,
+    frameRate: VIDEO_TARGET_FRAMERATE,
+    maxBitrate: VIDEO_TARGET_BITRATE,
+  },
+  {
+    id: "fullhd",
+    label: "超清",
+    detail: "1080p · 4.5 Mbps",
+    width: 1920,
+    height: 1080,
+    frameRate: 30,
+    maxBitrate: 4_500_000,
+  },
+];
+const DEFAULT_PUBLISH_QUALITY_ID = "hd";
 const PREVIEW_SOURCE_CAMERA = "camera";
 const PREVIEW_SOURCE_SCREEN = "screen";
 const PREVIEW_SOURCE_SYNTHETIC = "synthetic";
 const DEFAULT_PREVIEW_SOURCE = PREVIEW_SOURCE_CAMERA;
 const PUBLISH_CONNECT_TIMEOUT_MS = 10_000;
+
+function getPublishQuality(id) {
+  return (
+    PUBLISH_QUALITY_OPTIONS.find((option) => option.id === id) ??
+    PUBLISH_QUALITY_OPTIONS.find((option) => option.id === DEFAULT_PUBLISH_QUALITY_ID) ??
+    PUBLISH_QUALITY_OPTIONS[0]
+  );
+}
+
+function getPublishQualityConfig(id) {
+  const quality = getPublishQuality(id);
+  return {
+    maxPixels: quality.width * quality.height,
+    maxBitrate: quality.maxBitrate,
+    frameRate: quality.frameRate,
+  };
+}
+
+function buildVideoConstraints(deviceId = "", qualityId = DEFAULT_PUBLISH_QUALITY_ID) {
+  const quality = getPublishQuality(qualityId);
+  const constraints = {
+    width: { ideal: quality.width },
+    height: { ideal: quality.height },
+    frameRate: { ideal: quality.frameRate },
+  };
+
+  if (deviceId) {
+    constraints.deviceId = { exact: deviceId };
+  }
+
+  return constraints;
+}
 
 function hasUsableMediaStream(stream) {
   if (!stream) {
@@ -96,6 +158,7 @@ export function usePublisherController({
   const [microphoneOptions, setMicrophoneOptions] = useState([]);
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState("");
+  const [publishQualityId, setPublishQualityIdState] = useState(DEFAULT_PUBLISH_QUALITY_ID);
   const [cameraEnabled, setCameraEnabledState] = useState(true);
   const [microphoneEnabled, setMicrophoneEnabledState] = useState(true);
   const [previewActive, setPreviewActive] = useState(false);
@@ -121,12 +184,14 @@ export function usePublisherController({
   const publishStartTokenRef = useRef(0);
   const appliedCameraIdRef = useRef("");
   const appliedMicrophoneIdRef = useRef("");
+  const appliedPublishQualityIdRef = useRef(DEFAULT_PUBLISH_QUALITY_ID);
   const previewSourceTypeRef = useRef(DEFAULT_PREVIEW_SOURCE);
   const appliedMicrophoneEnabledRef = useRef(true);
   const cameraEnabledRef = useRef(cameraEnabled);
   const microphoneEnabledRef = useRef(microphoneEnabled);
   const selectedCameraIdRef = useRef(selectedCameraId);
   const selectedMicrophoneIdRef = useRef(selectedMicrophoneId);
+  const publishQualityIdRef = useRef(publishQualityId);
 
   publisherIsPublishingRef.current = publisherIsPublishing;
   publisherIsStartingRef.current = publisherIsStarting;
@@ -135,10 +200,39 @@ export function usePublisherController({
   microphoneEnabledRef.current = microphoneEnabled;
   selectedCameraIdRef.current = selectedCameraId;
   selectedMicrophoneIdRef.current = selectedMicrophoneId;
+  publishQualityIdRef.current = publishQualityId;
 
   function updatePublishStatus(kind, message) {
     setPublishStatusKind(kind);
     setPublishStatus(message);
+  }
+
+  function applyPublishQualityToSession(session, qualityId = publishQualityIdRef.current) {
+    session?.broadcast?.video?.hd?.config?.set?.(getPublishQualityConfig(qualityId));
+  }
+
+  async function setPublishQualityId(nextQualityId) {
+    const nextQuality = getPublishQuality(nextQualityId);
+    const normalizedQualityId = nextQuality.id;
+
+    publishQualityIdRef.current = normalizedQualityId;
+    setPublishQualityIdState(normalizedQualityId);
+    applyPublishQualityToSession(livePublisherRef.current, normalizedQualityId);
+    applyPublishQualityToSession(pendingPublisherRef.current, normalizedQualityId);
+    applyPublishQualityToSession(syntheticSessionRef.current?.publisher, normalizedQualityId);
+
+    if (
+      livePublisherRef.current &&
+      publisherIsPublishingRef.current &&
+      previewSourceTypeRef.current === PREVIEW_SOURCE_CAMERA &&
+      cameraEnabledRef.current
+    ) {
+      await switchPublishCamera(selectedCameraIdRef.current, normalizedQualityId);
+      return;
+    }
+
+    appliedPublishQualityIdRef.current = normalizedQualityId;
+    log(`publish quality set: ${normalizedQualityId}`);
   }
 
   function ensureRoomId(force = false) {
@@ -265,8 +359,10 @@ export function usePublisherController({
     videoTrack,
     audioTrack,
     maxPixels,
+    qualityId = publishQualityIdRef.current,
     audioMuted = !microphoneEnabledRef.current,
   }) {
+    const qualityConfig = getPublishQualityConfig(qualityId);
     const connection = new MoqPublish.Lite.Connection.Reload({
       enabled: true,
       url: new URL(relayUrl),
@@ -281,9 +377,8 @@ export function usePublisherController({
         hd: {
           enabled: Boolean(videoTrack),
           config: {
-            maxPixels,
-            maxBitrate: VIDEO_TARGET_BITRATE,
-            frameRate: VIDEO_TARGET_FRAMERATE,
+            ...qualityConfig,
+            maxPixels: maxPixels || qualityConfig.maxPixels,
           },
         },
         sd: {
@@ -628,11 +723,12 @@ export function usePublisherController({
   function setLivePreviewStream(stream, sourceType) {
     appliedCameraIdRef.current = selectedCameraIdRef.current;
     appliedMicrophoneIdRef.current = selectedMicrophoneIdRef.current;
+    appliedPublishQualityIdRef.current = publishQualityIdRef.current;
     appliedMicrophoneEnabledRef.current = microphoneEnabledRef.current;
     updatePreviewState(stream, sourceType);
   }
 
-  async function switchPublishCamera(cameraId) {
+  async function switchPublishCamera(cameraId, qualityId = publishQualityIdRef.current) {
     const session = livePublisherRef.current;
     if (!session || !publisherIsPublishingRef.current) {
       return false;
@@ -646,18 +742,7 @@ export function usePublisherController({
 
     const requestId = beginPreviewRequest({ stopActive: false });
     const constraints = {
-      video: cameraId
-        ? {
-            deviceId: { exact: cameraId },
-            width: { ideal: VIDEO_TARGET_WIDTH },
-            height: { ideal: VIDEO_TARGET_HEIGHT },
-            frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
-          }
-        : {
-            width: { ideal: VIDEO_TARGET_WIDTH },
-            height: { ideal: VIDEO_TARGET_HEIGHT },
-            frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
-          },
+      video: buildVideoConstraints(cameraId, qualityId),
       audio: false,
     };
 
@@ -682,6 +767,7 @@ export function usePublisherController({
 
       const newPublishTrack = newPreviewTrack.clone();
       newPublishTrack.enabled = true;
+      applyPublishQualityToSession(session, qualityId);
       const oldPublishTracks = session.publishTracks.filter(
         (track) => track.kind === "video",
       );
@@ -722,8 +808,9 @@ export function usePublisherController({
       setCameraEnabledState(true);
       setPreviewHasVideo(true);
       appliedCameraIdRef.current = cameraId;
+      appliedPublishQualityIdRef.current = qualityId;
       updatePublishStatus("live", `直播已启动：${roomRef.current || "unset"}`);
-      log(`switched publish camera to ${cameraId || "default"}`);
+      log(`switched publish camera to ${cameraId || "default"} quality=${qualityId}`);
       return true;
     } catch (error) {
       const message = getAppErrorMessage(error);
@@ -777,18 +864,7 @@ export function usePublisherController({
     try {
       const videoConstraints = !wantsCamera
         ? false
-        : cameraId
-          ? {
-              deviceId: { exact: cameraId },
-              width: { ideal: VIDEO_TARGET_WIDTH },
-              height: { ideal: VIDEO_TARGET_HEIGHT },
-              frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
-            }
-          : {
-              width: { ideal: VIDEO_TARGET_WIDTH },
-              height: { ideal: VIDEO_TARGET_HEIGHT },
-              frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
-            };
+        : buildVideoConstraints(cameraId, publishQualityIdRef.current);
       const audioConstraints = !wantsMicrophone
         ? false
         : buildMicrophoneAudioConstraints(microphoneId);
@@ -878,21 +954,14 @@ export function usePublisherController({
 
     let displayStream = null;
     let lastDisplayError = null;
+    const displayVideoConstraints = buildVideoConstraints("", publishQualityIdRef.current);
     for (const constraints of [
       {
-        video: {
-          frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
-          width: { ideal: VIDEO_TARGET_WIDTH },
-          height: { ideal: VIDEO_TARGET_HEIGHT },
-        },
+        video: displayVideoConstraints,
         audio: buildSharedAudioConstraints(),
       },
       {
-        video: {
-          frameRate: { ideal: VIDEO_TARGET_FRAMERATE },
-          width: { ideal: VIDEO_TARGET_WIDTH },
-          height: { ideal: VIDEO_TARGET_HEIGHT },
-        },
+        video: displayVideoConstraints,
         audio: false,
       },
     ]) {
@@ -1148,6 +1217,7 @@ export function usePublisherController({
         videoTrack: publishVideoTrack,
         audioTrack: publishAudioTrack,
         maxPixels: width && height ? width * height : VIDEO_TARGET_WIDTH * VIDEO_TARGET_HEIGHT,
+        qualityId: publishQualityIdRef.current,
       });
       pendingPublisherRef.current = session;
       session.cleanupPublishTracks = () => {
@@ -1278,6 +1348,7 @@ export function usePublisherController({
       videoTrack: publishVideoTrack,
       audioTrack: publishAudioTrack,
       maxPixels: syntheticWidth * syntheticHeight,
+      qualityId: publishQualityIdRef.current,
       audioMuted: false,
     });
     publisher.cleanupPublishTracks = () => {
@@ -1372,9 +1443,11 @@ export function usePublisherController({
         !hasUsableMediaStream(currentStream) ||
         (previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN
           ? appliedMicrophoneIdRef.current !== selectedMicrophoneId ||
-            appliedMicrophoneEnabledRef.current !== microphoneEnabled
+            appliedMicrophoneEnabledRef.current !== microphoneEnabled ||
+            appliedPublishQualityIdRef.current !== publishQualityId
           : appliedCameraIdRef.current !== selectedCameraId ||
-            appliedMicrophoneIdRef.current !== selectedMicrophoneId);
+            appliedMicrophoneIdRef.current !== selectedMicrophoneId ||
+            appliedPublishQualityIdRef.current !== publishQualityId);
 
       if (shouldRestartPreview) {
         stopLivePreview();
@@ -1394,6 +1467,7 @@ export function usePublisherController({
     page,
     selectedCameraId,
     selectedMicrophoneId,
+    publishQualityId,
     cameraEnabled,
     microphoneEnabled,
     publisherIsPublishing,
@@ -1491,8 +1565,10 @@ export function usePublisherController({
     publisherIsStarting,
     cameraOptions,
     microphoneOptions,
+    publishQualityOptions: PUBLISH_QUALITY_OPTIONS,
     selectedCameraId,
     selectedMicrophoneId,
+    publishQualityId,
     cameraEnabled,
     microphoneEnabled,
     previewActive,
@@ -1506,6 +1582,7 @@ export function usePublisherController({
     syntheticSessionRef,
     setSelectedCameraId,
     setSelectedMicrophoneId,
+    setPublishQualityId,
     setCameraEnabled,
     setMicrophoneEnabled,
     switchPublishCamera,

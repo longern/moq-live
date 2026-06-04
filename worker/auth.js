@@ -17,6 +17,7 @@ const HANDLE_PATTERN = /^(?!\d+$)[a-z0-9](?:[a-z0-9_]{4,22}[a-z0-9])?$/;
 const DEFAULT_HANDLE_PATTERN = /^pid_[a-z0-9]{8}$/;
 const HANDLE_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const MAX_ROOM_COVER_BYTES = 5 * 1024 * 1024;
+const MAX_ROOM_TITLE_LENGTH = 80;
 const ROOM_COVER_TYPES = {
   "image/avif": "avif",
   "image/jpeg": "jpg",
@@ -911,6 +912,19 @@ function sanitizeDisplayName(value) {
   };
 }
 
+function sanitizeRoomTitle(value) {
+  if (typeof value !== "string") {
+    throw createHttpError(400, "invalid_room_title", "invalid_room_title");
+  }
+
+  const title = value.trim().replace(/\s+/g, " ");
+  if (Array.from(title).length > MAX_ROOM_TITLE_LENGTH) {
+    throw createHttpError(400, "invalid_room_title", "invalid_room_title");
+  }
+
+  return title;
+}
+
 function sanitizeHandle(value) {
   if (typeof value !== "string") {
     throw createHttpError(400, "invalid_handle", "invalid_handle");
@@ -1084,6 +1098,27 @@ export async function createUserRoom(db, userId) {
     throw new Error("Failed to create user room");
   }
   return buildRoomPayload(room);
+}
+
+export async function updateUserRoomTitle(db, userId, rawTitle) {
+  const currentRoom = await requireUserRoomRow(db, userId);
+  const title = sanitizeRoomTitle(rawTitle);
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `UPDATE ${TABLES.rooms}
+       SET title = ?, updated_at = ?
+       WHERE id = ? AND host_user_id = ?`,
+    )
+    .bind(title, now, currentRoom.id, userId)
+    .run();
+
+  return buildRoomPayload({
+    ...currentRoom,
+    title,
+    updated_at: now,
+  });
 }
 
 export async function updateUserRoomCover(env, db, request, userId) {

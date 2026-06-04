@@ -1,5 +1,7 @@
 import {
+  ChevronRight,
   Circle,
+  Image,
   Link,
   MessageCircle,
   Mic,
@@ -9,7 +11,9 @@ import {
   Pause,
   Power,
   Share,
+  SlidersHorizontal,
   SwitchCamera,
+  Type,
   Users,
   X,
 } from "lucide-react";
@@ -41,6 +45,22 @@ export function BroadcastIcon({ active }) {
 
 export function ShareIcon() {
   return <Share {...iconProps} />;
+}
+
+export function QualityIcon() {
+  return <SlidersHorizontal {...iconProps} />;
+}
+
+export function CoverIcon() {
+  return <Image {...iconProps} />;
+}
+
+export function TitleIcon() {
+  return <Type {...iconProps} />;
+}
+
+export function MenuChevronIcon() {
+  return <ChevronRight {...iconProps} />;
 }
 
 export function ScreenShareIcon() {

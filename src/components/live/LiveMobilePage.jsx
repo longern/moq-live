@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "../ChatPanel.jsx";
-import { StatusPill } from "../StatusPill.jsx";
 import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
 import { formatAudienceCount } from "../../lib/audience.js";
@@ -12,15 +11,18 @@ import {
   FlipCameraIcon,
   MicrophoneIcon,
   MoreIcon,
+  QualityIcon,
   ShareIcon
 } from "./liveIcons.jsx";
-import { LiveCoverManager } from "./LiveCoverManager.jsx";
+import { LiveMoreMenu } from "./LiveMoreMenu.jsx";
 import { LivePreviewStage } from "./LivePreviewStage.jsx";
+import { LiveQualityMenu } from "./LiveQualityMenu.jsx";
 
 export function LiveMobilePage(props) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
+  const [qualityDrawerOpen, setQualityDrawerOpen] = useState(false);
   const [cameraNoticeVisible, setCameraNoticeVisible] = useState(false);
   const cameraNoticeTimerRef = useRef(null);
   const {
@@ -29,8 +31,9 @@ export function LiveMobilePage(props) {
     roomAvatarUrl,
     publishBlocked,
     publishBlockedReason,
-    publishBadge,
     cameraOptions,
+    publishQualityOptions = [],
+    publishQualityId,
     cameraMode,
     microphoneEnabled,
     isPublishing,
@@ -42,13 +45,11 @@ export function LiveMobilePage(props) {
     mirrorPreview,
     onCycleCamera,
     onToggleMicrophone,
+    onPublishQualityChange,
     onTogglePublish,
     onShare,
     shareSupported,
     watchLink,
-    syntheticPublishing,
-    onStartSynthetic,
-    onStopSynthetic,
     chatMessages,
     chatDraft,
     chatConnectionState,
@@ -68,6 +69,8 @@ export function LiveMobilePage(props) {
     roomCoverError,
     roomCoverStatus,
     roomCoverInputRef,
+    roomTitle,
+    onSaveRoomTitle,
     onPickCover,
     onOpenCoverPicker,
     shellMode = "compact"
@@ -80,7 +83,7 @@ export function LiveMobilePage(props) {
   const hasInlineChatComposer = false;
   const showChatDrawerEntry = !hasInlineChatComposer;
   const showPassiveChatPreview = showChatDrawerEntry;
-  const showAudienceHeader = immersiveShell && isPublishing;
+  const showLiveHeader = isPublishing;
   const showModeSwitch = !publishControlActive;
   const showStartButton = !isPublishing;
   const showCameraControl = !voiceMode;
@@ -100,14 +103,15 @@ export function LiveMobilePage(props) {
   }, [showChatDrawerEntry]);
 
   useEffect(() => {
-    if (!showAudienceHeader) {
+    if (!showLiveHeader) {
       setAudienceOpen(false);
     }
-  }, [showAudienceHeader]);
+  }, [showLiveHeader]);
 
   function openMoreSheet() {
     setChatDrawerOpen(false);
     setAudienceOpen(false);
+    setQualityDrawerOpen(false);
     setMoreOpen(true);
   }
 
@@ -121,6 +125,7 @@ export function LiveMobilePage(props) {
     }
     setMoreOpen(false);
     setAudienceOpen(false);
+    setQualityDrawerOpen(false);
     setChatDrawerOpen(true);
   }
 
@@ -129,16 +134,28 @@ export function LiveMobilePage(props) {
   }
 
   function openAudienceSheet() {
-    if (!showAudienceHeader) {
+    if (!showLiveHeader) {
       return;
     }
     setMoreOpen(false);
     setChatDrawerOpen(false);
+    setQualityDrawerOpen(false);
     setAudienceOpen(true);
   }
 
   function closeAudienceSheet() {
     setAudienceOpen(false);
+  }
+
+  function openQualitySheet() {
+    setMoreOpen(false);
+    setChatDrawerOpen(false);
+    setAudienceOpen(false);
+    setQualityDrawerOpen(true);
+  }
+
+  function closeQualitySheet() {
+    setQualityDrawerOpen(false);
   }
 
   function showCameraUnavailableNotice() {
@@ -167,7 +184,7 @@ export function LiveMobilePage(props) {
 
   return (
     <section
-      className={`page page-immersive live-mobile-page${props.closing ? " is-closing" : ""}`}
+      className="page page-immersive live-mobile-page"
       data-page="live"
       data-shell={shellMode}
       hidden={hidden}
@@ -183,7 +200,7 @@ export function LiveMobilePage(props) {
             >
               {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
             </button>
-            {showAudienceHeader ? (
+            {showLiveHeader ? (
               <div className="live-mobile-room-chip live-mobile-room-chip-head">
                 <UserAvatar
                   avatarUrl={roomAvatarUrl}
@@ -235,7 +252,7 @@ export function LiveMobilePage(props) {
             ) : null}
           </div>
           <div className="live-mobile-head-right">
-            {showAudienceHeader ? (
+            {showLiveHeader ? (
               <button
                 type="button"
                 className="live-mobile-audience-chip"
@@ -248,9 +265,16 @@ export function LiveMobilePage(props) {
                 <AudienceIcon />
                 <span>{audienceCountText}</span>
               </button>
-            ) : (
-              <StatusPill id="publishBadgeOverlay" label={publishBadge.label} state={publishBadge.state} />
-            )}
+            ) : null}
+            <button
+              type="button"
+              className="live-mobile-head-share"
+              onClick={onShare}
+              aria-label="分享直播间"
+              disabled={!shareSupported || !watchLink}
+            >
+              <ShareIcon />
+            </button>
           </div>
         </div>
         <div className="stage-frame live-stage-frame live-stage-frame-mobile">
@@ -267,11 +291,6 @@ export function LiveMobilePage(props) {
           ) : null}
           {cameraNoticeVisible ? (
             <div className="live-mobile-toast" role="status">未检测到可用摄像头</div>
-          ) : null}
-          {props.activationContent ? (
-            <div className="live-activation-overlay">
-              {props.activationContent}
-            </div>
           ) : null}
           <div className="live-mobile-bottom-stack">
             {showPassiveChatPreview ? (
@@ -322,12 +341,12 @@ export function LiveMobilePage(props) {
                 </button>
                 <button
                   type="button"
-                  className="live-fab live-fab-icon"
-                  onClick={onShare}
-                  aria-label="分享直播间"
-                  disabled={!shareSupported || !watchLink}
+                  className={`live-fab live-fab-icon${qualityDrawerOpen ? " is-active" : ""}`}
+                  onClick={qualityDrawerOpen ? closeQualitySheet : openQualitySheet}
+                  aria-label={qualityDrawerOpen ? "关闭画质设置" : "画质设置"}
+                  aria-expanded={qualityDrawerOpen}
                 >
-                  <ShareIcon />
+                  <QualityIcon />
                 </button>
                 {showChatDrawerEntry ? (
                   <button
@@ -404,7 +423,7 @@ export function LiveMobilePage(props) {
           </SwipeableDrawer>
         ) : null}
 
-        {showAudienceHeader ? (
+        {showLiveHeader ? (
           <SwipeableDrawer
             open={audienceOpen}
             onClose={closeAudienceSheet}
@@ -445,48 +464,43 @@ export function LiveMobilePage(props) {
         ) : null}
 
         <SwipeableDrawer
+          open={qualityDrawerOpen}
+          onClose={closeQualitySheet}
+          ariaLabel="关闭画质设置"
+          className="live-mobile-drawer"
+          panelClassName="live-mobile-quality-panel"
+        >
+          <LiveQualityMenu
+            publishQualityOptions={publishQualityOptions}
+            publishQualityId={publishQualityId}
+            onPublishQualityChange={onPublishQualityChange}
+            onAfterSelect={closeQualitySheet}
+          />
+        </SwipeableDrawer>
+
+        <SwipeableDrawer
           open={moreOpen}
           onClose={closeMoreSheet}
           ariaLabel="关闭更多操作"
           className="live-mobile-drawer"
           panelClassName="live-mobile-more-panel"
         >
-          <LiveCoverManager
+          <LiveMoreMenu
             roomCoverUrl={roomCoverUrl}
             roomCoverLoading={roomCoverLoading}
             roomCoverBusy={roomCoverBusy}
             roomCoverError={roomCoverError}
             roomCoverStatus={roomCoverStatus}
             roomCoverInputRef={roomCoverInputRef}
+            roomTitle={roomTitle}
             onPickCover={onPickCover}
-            onOpenPicker={onOpenCoverPicker}
+            onOpenCoverPicker={onOpenCoverPicker}
+            onSaveRoomTitle={onSaveRoomTitle}
+            onShare={onShare}
+            shareSupported={shareSupported}
+            watchLink={watchLink}
+            onClose={closeMoreSheet}
           />
-          <button
-            type="button"
-            className={syntheticPublishing ? "secondary" : "success"}
-            onClick={() => {
-              if (syntheticPublishing) {
-                onStopSynthetic();
-              } else {
-                onStartSynthetic();
-              }
-              closeMoreSheet();
-            }}
-            disabled={publishBlocked}
-          >
-            {syntheticPublishing ? "停止合成源" : "使用合成源"}
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => {
-              onShare();
-              closeMoreSheet();
-            }}
-            disabled={!shareSupported || !watchLink}
-          >
-            分享直播间
-          </button>
         </SwipeableDrawer>
       </div>
     </section>

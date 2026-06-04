@@ -1,13 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { DesktopNavigation, MobileNavigation } from "./components/Navigation.jsx";
 import { LoginDrawer } from "./components/LoginDrawer.jsx";
 import { MobilePanelPresence } from "./components/MobilePanelPresence.jsx";
 import { UserAvatar } from "./components/UserAvatar.jsx";
 import { SettingsPage } from "./components/SettingsPage.jsx";
-import { LiveRoute } from "./components/LiveRoute.jsx";
 import { WatchPage } from "./components/WatchPage.jsx";
+import { LiveActivationGate } from "./components/live/LiveActivationGate.jsx";
+import { LiveActivationLoading } from "./components/live/LiveActivationLoading.jsx";
 import { useAuthController } from "./hooks/useAuthController.js";
 import { useChatController } from "./hooks/useChatController.js";
+import { useLiveRoomActivation } from "./hooks/useLiveRoomActivation.js";
+import { useCompactViewport, usePortraitViewport } from "./hooks/useMediaQuery.js";
 import { usePlayerController } from "./hooks/usePlayerController.js";
 import { useRouteController } from "./hooks/useRouteController.js";
 import { buildWatchLink, getRelayHostValue, writeRoute } from "./lib/routeState.js";
@@ -83,6 +87,57 @@ function shouldUseWatchPlayerShell({
   );
 }
 
+let liveRouteModulePromise = null;
+
+function loadLiveRoute() {
+  if (!liveRouteModulePromise) {
+    liveRouteModulePromise = import("./components/LiveRoute.jsx")
+      .then((module) => ({ default: module.LiveRoute }))
+      .catch((error) => {
+        liveRouteModulePromise = null;
+        throw error;
+      });
+  }
+
+  return liveRouteModulePromise;
+}
+
+const LiveRoute = lazy(loadLiveRoute);
+
+const LIVE_ROUTE_FRAME_EXIT_MS = 280;
+
+function LiveRouteFrame({ children, closing, shellMode }) {
+  return (
+    <section
+      className={`page page-immersive live-route-frame${closing ? " is-closing" : ""}`}
+      data-page="live"
+      data-shell={shellMode}
+    >
+      {children}
+    </section>
+  );
+}
+
+function LiveRouteActivationContent({ children, onClose }) {
+  return (
+    <div className="live-route-activation-content" role="status" aria-live="polite">
+      <div className="live-page-top">
+        <button
+          type="button"
+          className="live-page-close"
+          onClick={onClose}
+          aria-label="退出开播页"
+        >
+          <X />
+        </button>
+      </div>
+      <div className="live-route-activation-body">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const siteTitle = __APP_TITLE__;
   const [logText, setLogText] = useState("");
@@ -90,6 +145,8 @@ export function App() {
   const [settingsLoginPanelRequestKey, setSettingsLoginPanelRequestKey] = useState(0);
   const [watchHistoryItems, setWatchHistoryItems] = useState(() => readWatchHistory());
   const [authMenuOpen, setAuthMenuOpen] = useState(false);
+  const [liveRouteReady, setLiveRouteReady] = useState(false);
+  const [liveRouteClosing, setLiveRouteClosing] = useState(false);
   const [livePageMounted, setLivePageMounted] = useState(
     () => new URLSearchParams(window.location.search).get("p") === "l"
   );
@@ -101,6 +158,7 @@ export function App() {
   const logRef = useRef(null);
   const authMenuRef = useRef(null);
   const authMenuCloseTimerRef = useRef(null);
+  const liveRouteCloseTimerRef = useRef(null);
   const handledWatchStreamStartRef = useRef({ roomId: "", startedAt: "" });
   const watchLiveSeenRef = useRef({ roomId: "", hasBeenLive: false });
   const pendingProtectedPageRef = useRef(null);
@@ -120,6 +178,16 @@ export function App() {
     setLogText((current) => `${current}${line}\n`);
   }
 
+  function preloadLiveRoute() {
+    void loadLiveRoute().catch((error) => {
+      log(`preload live route failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
+
+  const compactViewport = useCompactViewport();
+  const portraitViewport = usePortraitViewport();
+  const liveRouteShellMode = compactViewport || portraitViewport ? "mobile" : "desktop";
+
   useEffect(() => {
     window.__MOQ_APP_LOG__ = (message) => {
       log(String(message));
@@ -131,6 +199,35 @@ export function App() {
       } else {
         delete window.__MOQ_APP_LOG__;
       }
+    };
+  }, []);
+
+  useEffect(() => () => {
+    if (liveRouteCloseTimerRef.current) {
+      clearTimeout(liveRouteCloseTimerRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const startPreload = () => {
+      if (!cancelled) {
+        preloadLiveRoute();
+      }
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(startPreload, { timeout: 4500 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    const timeoutId = window.setTimeout(startPreload, 1800);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
     };
   }, []);
 
@@ -168,6 +265,17 @@ export function App() {
     updateHandle,
     updateAvatar
   } = useAuthController({ log });
+  const {
+    liveActivation,
+    liveChatRoomId,
+    liveRoomDetails,
+    setLiveRoomDetails,
+    activateLiveRoom,
+  } = useLiveRoomActivation({
+    page,
+    userId: authState.user?.id || "",
+    log,
+  });
 
   const [watchRoomResolution, setWatchRoomResolution] = useState({
     loading: false,
@@ -358,6 +466,10 @@ export function App() {
 
   function selectPagePreservingLiveBackdrop(nextPage, options) {
     if (nextPage === "live" && pageRef.current !== "live") {
+      setLivePageMounted(true);
+      setLiveRouteReady(false);
+      setLiveRouteClosing(false);
+      preloadLiveRoute();
       setLiveBackdropPage(pageRef.current === "settings" ? "settings" : "watch");
     }
 
@@ -371,7 +483,12 @@ export function App() {
     setSettingsLoginPanelRequestKey((current) => current + 1);
   }
 
-  function returnToWatchHome() {
+  function returnToWatchHomeNow() {
+    if (liveRouteCloseTimerRef.current) {
+      clearTimeout(liveRouteCloseTimerRef.current);
+      liveRouteCloseTimerRef.current = null;
+    }
+    setLiveRouteClosing(false);
     pendingProtectedPageRef.current = null;
     autorunRef.current = false;
     setLoginPromptOpen(false);
@@ -380,6 +497,22 @@ export function App() {
     setWatchRoomValue("");
     selectPagePreservingLiveBackdrop("watch", { updateAutorun: false });
     void player.stopPlayer();
+  }
+
+  function returnToWatchHome() {
+    if (pageRef.current !== "live") {
+      returnToWatchHomeNow();
+      return;
+    }
+
+    if (liveRouteCloseTimerRef.current) {
+      clearTimeout(liveRouteCloseTimerRef.current);
+    }
+    setLiveRouteClosing(true);
+    liveRouteCloseTimerRef.current = window.setTimeout(() => {
+      liveRouteCloseTimerRef.current = null;
+      returnToWatchHomeNow();
+    }, LIVE_ROUTE_FRAME_EXIT_MS);
   }
 
   function closeAuthMenu() {
@@ -840,6 +973,51 @@ export function App() {
     beginWatch(item.room);
   }
 
+  const liveGateActive = page === "live" && (
+    authState.loading
+    || (Boolean(authState.user?.id) && (
+      liveActivation.loading
+      || !liveActivation.checked
+      || liveActivation.missing
+      || Boolean(liveActivation.error)
+    ))
+  );
+  let liveActivationContent = null;
+
+  if (page === "live" && authState.loading) {
+    liveActivationContent = <LiveActivationLoading />;
+  }
+
+  if (!liveActivationContent && page === "live" && authState.user?.id) {
+    if (liveActivation.loading || !liveActivation.checked) {
+      liveActivationContent = <LiveActivationLoading />;
+    } else if (liveActivation.missing) {
+      liveActivationContent = (
+        <LiveActivationGate
+          title="开通直播功能"
+          message="开通后会为你的账号创建直播间，并用于主播分享、封面和聊天室管理。"
+          error={liveActivation.error}
+          busy={liveActivation.creating}
+          primaryLabel="开通"
+          secondaryLabel="暂不开通"
+          onPrimary={() => {
+            void activateLiveRoom();
+          }}
+          onSecondary={returnToWatchHome}
+        />
+      );
+    } else if (liveActivation.error) {
+      liveActivationContent = <LiveActivationLoading />;
+    }
+  }
+
+  const liveRouteCanRender = livePageMounted && !liveGateActive;
+  const liveRouteLoadingContent = livePageMounted && !liveRouteReady && !liveGateActive
+    ? <LiveActivationLoading />
+    : null;
+  const liveActivationShellContent = liveActivationContent || liveRouteLoadingContent;
+  const liveRouteFrameActive = page === "live" && (Boolean(liveActivationShellContent) || liveRouteCanRender);
+
   return (
     <>
       <div className={`app-container${mobileWatchJoinedClass}`}>
@@ -887,7 +1065,11 @@ export function App() {
                 }}
               />
             </form>
-            <DesktopNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
+            <DesktopNavigation
+              currentPage={page}
+              onSelect={(nextPage) => selectPageWithGuard(nextPage)}
+              onPreloadLive={preloadLiveRoute}
+            />
             <div className="auth-toolbar">
               <div
                 ref={authMenuRef}
@@ -1058,25 +1240,43 @@ export function App() {
             }}
           />
 
-          {livePageMounted ? (
-            <LiveRoute
-              hidden={page !== "live"}
-              page={page}
-              pageRef={pageRef}
-              relayUrl={relayUrl}
-              relayUrlRef={relayUrlRef}
-              liveRoom={liveRoom}
-              liveRoomRef={liveRoomRef}
-              setLiveRoomValue={setLiveRoomValue}
-              selectPageWithGuard={selectPageWithGuard}
-              authState={authState}
-              log={log}
-              onRequireLogin={() => {
-                setLoginPromptOpen(true);
-              }}
-              onReturnHome={returnToWatchHome}
-              syntheticSessionRef={syntheticSessionRef}
-            />
+          {liveRouteFrameActive ? (
+            <LiveRouteFrame closing={liveRouteClosing} shellMode={liveRouteShellMode}>
+              {liveActivationShellContent ? (
+                <LiveRouteActivationContent onClose={returnToWatchHome}>
+                  {liveActivationShellContent}
+                </LiveRouteActivationContent>
+              ) : null}
+
+              {liveRouteCanRender ? (
+                <Suspense fallback={null}>
+                  <LiveRoute
+                    hidden={page !== "live"}
+                    page={page}
+                    pageRef={pageRef}
+                    relayUrl={relayUrl}
+                    relayUrlRef={relayUrlRef}
+                    liveRoom={liveRoom}
+                    liveRoomRef={liveRoomRef}
+                    liveChatRoomId={liveChatRoomId}
+                    liveRoomDetails={liveRoomDetails}
+                    setLiveRoomDetails={setLiveRoomDetails}
+                    setLiveRoomValue={setLiveRoomValue}
+                    selectPageWithGuard={selectPageWithGuard}
+                    authState={authState}
+                    log={log}
+                    onRequireLogin={() => {
+                      setLoginPromptOpen(true);
+                    }}
+                    onReturnHome={returnToWatchHome}
+                    syntheticSessionRef={syntheticSessionRef}
+                    onRouteReady={() => {
+                      setLiveRouteReady(true);
+                    }}
+                  />
+                </Suspense>
+              ) : null}
+            </LiveRouteFrame>
           ) : null}
 
           <SettingsPage
@@ -1111,7 +1311,11 @@ export function App() {
       </div>
 
       {watchRoomShellActive ? null : (
-        <MobileNavigation currentPage={page} onSelect={(nextPage) => selectPageWithGuard(nextPage)} />
+        <MobileNavigation
+          currentPage={page}
+          onSelect={(nextPage) => selectPageWithGuard(nextPage)}
+          onPreloadLive={preloadLiveRoute}
+        />
       )}
       <MobilePanelPresence open={loginPromptOpen}>
         {({ transitionClassName }) => (

@@ -5,11 +5,8 @@ import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 
-const LIVE_PAGE_EXIT_MS = 280;
-
 export function LivePage({
   hidden,
-  activationContent,
   roomDetails,
   roomLabel,
   roomAvatarUrl,
@@ -20,8 +17,10 @@ export function LivePage({
   publishBadge,
   cameraOptions,
   microphoneOptions,
+  publishQualityOptions,
   selectedCameraId,
   selectedMicrophoneId,
+  publishQualityId,
   cameraEnabled,
   microphoneEnabled,
   cameraMode,
@@ -37,6 +36,7 @@ export function LivePage({
   previewVideoRef,
   onCameraChange,
   onMicrophoneChange,
+  onPublishQualityChange,
   onCycleCamera,
   onToggleMicrophone,
   onTogglePublish,
@@ -75,9 +75,6 @@ export function LivePage({
   const [roomCoverBusy, setRoomCoverBusy] = useState(false);
   const [roomCoverError, setRoomCoverError] = useState("");
   const [roomCoverStatus, setRoomCoverStatus] = useState("");
-  const [closing, setClosing] = useState(false);
-  const [renderHidden, setRenderHidden] = useState(hidden);
-  const closeTimerRef = useRef(null);
   const roomCoverInputRef = useRef(null);
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mediaMode = cameraEnabled ? "video" : "voice";
@@ -90,57 +87,12 @@ export function LivePage({
   const useMobileShell = compactViewport || portraitViewport;
   const mobileShellMode = immersiveTouchPortrait ? "immersive" : "compact";
 
-  useEffect(() => () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!hidden) {
-      if (closeTimerRef.current) {
-        clearTimeout(closeTimerRef.current);
-        closeTimerRef.current = null;
-      }
-      setRenderHidden(false);
-      setClosing(false);
-      return;
-    }
-
-    if (renderHidden) {
-      return;
-    }
-
-    setClosing(true);
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-    }
-    closeTimerRef.current = window.setTimeout(() => {
-      setRenderHidden(true);
-      setClosing(false);
-      closeTimerRef.current = null;
-    }, LIVE_PAGE_EXIT_MS);
-  }, [hidden, renderHidden]);
-
   function requestClose() {
-    if (closing) {
-      return;
-    }
-
-    setClosing(true);
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-    }
-    closeTimerRef.current = window.setTimeout(() => {
-      closeTimerRef.current = null;
-      setRenderHidden(true);
-      setClosing(false);
-      onRequestClose?.();
-    }, LIVE_PAGE_EXIT_MS);
+    onRequestClose?.();
   }
 
   useEffect(() => {
-    if (!authUser?.id || renderHidden) {
+    if (!authUser?.id || hidden) {
       setRoomCoverUrl("");
       setRoomCoverLoading(false);
       setRoomCoverBusy(false);
@@ -152,7 +104,7 @@ export function LivePage({
     setRoomCoverUrl(roomDetails?.coverUrl || "");
     setRoomCoverLoading(false);
     setRoomCoverError("");
-  }, [authUser?.id, renderHidden, roomDetails?.coverUrl, roomDetails?.id]);
+  }, [authUser?.id, hidden, roomDetails?.coverUrl, roomDetails?.id]);
 
   function openRoomCoverPicker() {
     roomCoverInputRef.current?.click();
@@ -194,10 +146,27 @@ export function LivePage({
     }
   }
 
+  async function handleRoomTitleSave(title) {
+    const response = await fetch("/api/me/room", {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ title }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw createApiError(payload, "room_title_update_failed", { status: response.status });
+    }
+
+    onRoomDetailsChange?.(payload.room || null);
+    return payload;
+  }
+
   const pageProps = {
-    hidden: renderHidden,
-    closing,
-    activationContent,
+    hidden,
     roomLabel,
     roomAvatarUrl,
     shareTarget,
@@ -207,8 +176,10 @@ export function LivePage({
     publishBadge,
     cameraOptions,
     microphoneOptions,
+    publishQualityOptions,
     selectedCameraId,
     selectedMicrophoneId,
+    publishQualityId,
     cameraEnabled,
     mediaMode,
     microphoneEnabled,
@@ -226,6 +197,7 @@ export function LivePage({
     mirrorPreview,
     onCameraChange,
     onMicrophoneChange,
+    onPublishQualityChange,
     onCycleCamera,
     onToggleMicrophone,
     onTogglePublish,
@@ -259,7 +231,9 @@ export function LivePage({
     roomCoverStatus,
     roomCoverInputRef,
     onPickCover: handleRoomCoverPick,
-    onOpenCoverPicker: openRoomCoverPicker
+    onOpenCoverPicker: openRoomCoverPicker,
+    roomTitle: roomDetails?.title || "",
+    onSaveRoomTitle: handleRoomTitleSave
   };
 
   if (useMobileShell) {

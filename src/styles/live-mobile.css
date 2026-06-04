@@ -3,17 +3,10 @@
   --watch-float-bg: rgba(6, 14, 22, var(--watch-float-bg-alpha));
   --watch-float-border: rgba(255, 255, 255, 0.075);
   --watch-float-shadow: rgba(0, 0, 0, 0.16);
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 70;
-  height: 100svh;
+  height: 100%;
   overflow: hidden;
-  animation: live-mobile-page-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change: transform;
-}
-
-.live-mobile-page.is-closing {
-  animation: live-mobile-page-exit 240ms ease both;
 }
 
 .live-mobile-page[data-shell="compact"] {
@@ -24,27 +17,7 @@
   height: 100svh;
 }
 
-body:has(.live-mobile-page[data-shell="immersive"]:not([hidden]))
-  .app-container {
-  grid-template-rows: minmax(0, 1fr);
-}
-
-body:has(.live-mobile-page[data-shell="immersive"]:not([hidden])) .topbar,
-body:has(.live-mobile-page[data-shell="immersive"]:not([hidden])) .mobile-nav {
-  display: none;
-}
-
 @media (orientation: portrait) {
-  body:has(.live-mobile-page:not([hidden])) .app-container {
-    grid-template-rows: minmax(0, 1fr);
-    gap: 0;
-  }
-
-  body:has(.live-mobile-page:not([hidden])) .topbar,
-  body:has(.live-mobile-page:not([hidden])) .mobile-nav {
-    display: none;
-  }
-
   .live-mobile-page[data-shell="compact"] {
     height: 100svh;
   }
@@ -94,6 +67,45 @@ body:has(.live-mobile-page[data-shell="immersive"]:not([hidden])) .mobile-nav {
 
 .live-mobile-head-right {
   justify-content: flex-end;
+  gap: 8px;
+}
+
+.live-mobile-head-share {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.live-mobile-head-share:hover:not(:disabled),
+.live-mobile-head-share:focus-visible {
+  background: transparent;
+  transform: none;
+}
+
+.live-mobile-head-share:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.live-mobile-head-share:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.live-mobile-head-share svg {
+  width: 19px;
+  height: 19px;
+  stroke-width: 1.9;
 }
 
 .live-mobile-head .live-page-close {
@@ -163,13 +175,6 @@ body:has(.live-mobile-page[data-shell="immersive"]:not([hidden])) .mobile-nav {
   stroke: currentColor;
   fill: none;
   stroke-width: 1.9;
-}
-
-.live-mobile-head .state-pill {
-  position: static;
-  top: auto;
-  right: auto;
-  transform: none;
 }
 
 .live-mobile-audience-chip {
@@ -490,6 +495,10 @@ body:has(.live-mobile-page[data-shell="immersive"]:not([hidden])) .mobile-nav {
 
 .live-mobile-more-panel {
   gap: 10px;
+}
+
+.live-mobile-quality-panel {
+  gap: 12px;
 }
 
 .live-mobile-page .live-mobile-chat-panel {

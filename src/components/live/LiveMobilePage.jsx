@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "../ChatPanel.jsx";
+import { FloatingToast } from "../FloatingToast.jsx";
 import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
 import { formatAudienceCount } from "../../lib/audience.js";
@@ -33,7 +34,11 @@ export function LiveMobilePage(props) {
     publishBlockedReason,
     cameraOptions,
     publishQualityOptions = [],
+    publishProtocolOptions = [],
     publishQualityId,
+    publishProtocol,
+    webRtcPublishUrl,
+    webRtcPlaybackUrl,
     cameraMode,
     microphoneEnabled,
     isPublishing,
@@ -46,6 +51,9 @@ export function LiveMobilePage(props) {
     onCycleCamera,
     onToggleMicrophone,
     onPublishQualityChange,
+    onPublishProtocolChange,
+    onWebRtcPublishUrlChange,
+    onWebRtcPlaybackUrlChange,
     onTogglePublish,
     onShare,
     shareSupported,
@@ -290,7 +298,7 @@ export function LiveMobilePage(props) {
             <div className="live-mobile-warning">{publishBlockedReason}</div>
           ) : null}
           {cameraNoticeVisible ? (
-            <div className="live-mobile-toast" role="status">未检测到可用摄像头</div>
+            <FloatingToast className="live-mobile-toast">未检测到可用摄像头</FloatingToast>
           ) : null}
           <div className="live-mobile-bottom-stack">
             {showPassiveChatPreview ? (
@@ -473,7 +481,14 @@ export function LiveMobilePage(props) {
           <LiveQualityMenu
             publishQualityOptions={publishQualityOptions}
             publishQualityId={publishQualityId}
+            publishProtocolOptions={publishProtocolOptions}
+            publishProtocol={publishProtocol}
+            webRtcPublishUrl={webRtcPublishUrl}
+            webRtcPlaybackUrl={webRtcPlaybackUrl}
             onPublishQualityChange={onPublishQualityChange}
+            onPublishProtocolChange={onPublishProtocolChange}
+            onWebRtcPublishUrlChange={onWebRtcPublishUrlChange}
+            onWebRtcPlaybackUrlChange={onWebRtcPlaybackUrlChange}
             onAfterSelect={closeQualitySheet}
           />
         </SwipeableDrawer>

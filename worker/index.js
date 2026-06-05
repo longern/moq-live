@@ -332,6 +332,7 @@ async function handleRoomResolve(env, request) {
     `SELECT
       rooms.id AS room_id,
       rooms.title AS room_title,
+      rooms.cover_url AS room_cover_url,
       users.handle AS host_handle,
       users.display_name AS host_display_name,
       users.primary_email AS host_email
@@ -351,6 +352,7 @@ async function handleRoomResolve(env, request) {
     room: {
       id: row.room_id,
       title: row.room_title || "",
+      coverUrl: normalizeMediaUrlForRequest(request, row.room_cover_url || ""),
       host: {
         handle: row.host_handle || "",
         displayName: row.host_display_name || "",
@@ -358,6 +360,24 @@ async function handleRoomResolve(env, request) {
       }
     }
   });
+}
+
+function normalizeMediaUrlForRequest(request, value) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) {
+    return "";
+  }
+
+  try {
+    const requestUrl = new URL(request.url);
+    const mediaUrl = new URL(rawValue, requestUrl);
+    if (mediaUrl.pathname.startsWith("/media/room-covers/")) {
+      return `${requestUrl.origin}${mediaUrl.pathname}${mediaUrl.search}`;
+    }
+    return mediaUrl.toString();
+  } catch {
+    return rawValue;
+  }
 }
 
 async function handleProfileUpdate(env, request) {

@@ -19,6 +19,12 @@ import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from ".
 import { describePlayerState, RETAINED_PLAYER_LAYOUT_STATES } from "./lib/status.js";
 import { getWatchTestChannel } from "./lib/watchTestChannels.js";
 import { createApiError, getAppErrorMessage } from "./lib/appErrors.js";
+import {
+  DEFAULT_STREAM_PROTOCOL,
+  STREAM_PROTOCOL_MOQ,
+  STREAM_PROTOCOL_WEBRTC,
+  normalizeStreamProtocol,
+} from "./lib/streamProtocol.js";
 
 function getAvatarLabel(authState) {
   if (!authState.user) {
@@ -159,7 +165,7 @@ export function App() {
   const authMenuRef = useRef(null);
   const authMenuCloseTimerRef = useRef(null);
   const liveRouteCloseTimerRef = useRef(null);
-  const handledWatchStreamStartRef = useRef({ roomId: "", startedAt: "" });
+  const handledWatchPlaybackRef = useRef({ roomId: "", startedAt: "", protocol: "" });
   const watchLiveSeenRef = useRef({ roomId: "", hasBeenLive: false });
   const pendingProtectedPageRef = useRef(null);
   const syntheticSessionRef = useRef(null);
@@ -283,13 +289,16 @@ export function App() {
     roomId: "",
     hostHandle: "",
     hostDisplayName: "",
-    title: ""
+    title: "",
+    coverUrl: ""
   });
   const [watchStreamEnded, setWatchStreamEnded] = useState(false);
   const [topbarWatchRoom, setTopbarWatchRoom] = useState("");
 
   const watchPlaybackRelayUrlRef = useRef("");
   const watchPlaybackNamespaceRef = useRef("");
+  const watchPlaybackProtocolRef = useRef(DEFAULT_STREAM_PROTOCOL);
+  const watchPlaybackWebRtcUrlRef = useRef("");
 
   const normalizedWatchInput = watchRoom.trim();
   const watchTestChannel = getWatchTestChannel(normalizedWatchInput);
@@ -315,6 +324,8 @@ export function App() {
     initialAutorun: false,
     relayUrlRef: watchPlaybackRelayUrlRef,
     roomRef: watchPlaybackNamespaceRef,
+    streamProtocolRef: watchPlaybackProtocolRef,
+    webRtcUrlRef: watchPlaybackWebRtcUrlRef,
     setLogText,
     log,
     syntheticSessionRef,
@@ -340,6 +351,17 @@ export function App() {
     : watchingNamespace
     ? directWatchNamespace
     : chat.roomMeta.stream.namespace || "";
+  const resolvedWatchProtocol = watchingTestChannel || watchingNamespace
+    ? STREAM_PROTOCOL_MOQ
+    : normalizeStreamProtocol(chat.roomMeta.stream.protocol);
+  const resolvedWatchWebRtcUrl = watchingTestChannel || watchingNamespace
+    ? ""
+    : chat.roomMeta.stream.webRtcUrl || "";
+  const watchUsesMoqPlayback = resolvedWatchProtocol === STREAM_PROTOCOL_MOQ;
+  const watchUsesWebRtcPlayback = resolvedWatchProtocol === STREAM_PROTOCOL_WEBRTC;
+  const resolvedWatchPlaybackReady = watchUsesMoqPlayback
+    ? Boolean(resolvedWatchRelayUrl && resolvedWatchNamespace)
+    : Boolean(resolvedWatchWebRtcUrl);
   const watchJoined = page === "watch" && watchRouteCommitted && Boolean(normalizedWatchInput);
   const watchStageLoading = !watchingTestChannel
     && (
@@ -347,6 +369,7 @@ export function App() {
         ? Boolean(directWatchNamespace)
         : watchRoomResolution.loading
           || (!watchRoomResolution.error && (!resolvedWatchRoomId || !chat.roomStateReady))
+          || (chat.streamState.isLive && !resolvedWatchPlaybackReady)
     );
   const watchStageMessage = watchingTestChannel
     ? ""
@@ -359,13 +382,15 @@ export function App() {
         : !resolvedWatchRoomId ||!chat.roomStateReady
           ? "加载中"
             : chat.streamState.isLive
-              ? ""
+              ? (resolvedWatchPlaybackReady ? "" : "加载中")
               : watchStreamEnded
                 ? "直播已结束"
                 : "直播暂未开始";
 
   watchPlaybackRelayUrlRef.current = resolvedWatchRelayUrl;
   watchPlaybackNamespaceRef.current = resolvedWatchNamespace;
+  watchPlaybackProtocolRef.current = resolvedWatchProtocol;
+  watchPlaybackWebRtcUrlRef.current = resolvedWatchWebRtcUrl;
 
   const watchRoomLabel = watchingTestChannel
     ? watchTestChannel.label
@@ -408,6 +433,8 @@ export function App() {
       || watchHandle
       || "";
   const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : chat.roomMeta.host.avatarUrl || "";
+  const watchRoomCoverUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.coverUrl || "";
+  const siteIconUrl = "/icons/icon-192.png";
   const watchHostIcon = watchingNamespace ? "public-channel" : "";
   const watchShareTarget = watchingTestChannel
     ? ""
@@ -669,7 +696,8 @@ export function App() {
         roomId: "",
         hostHandle: "",
         hostDisplayName: "",
-        title: ""
+        title: "",
+        coverUrl: ""
       });
       return;
     }
@@ -683,7 +711,8 @@ export function App() {
         roomId: "",
         hostHandle: "",
         hostDisplayName: "",
-        title: ""
+        title: "",
+        coverUrl: ""
       });
 
       try {
@@ -706,7 +735,8 @@ export function App() {
           roomId: payload.room?.id || "",
           hostHandle: payload.room?.host?.handle || watchHandle,
           hostDisplayName: payload.room?.host?.displayName || "",
-          title: payload.room?.title || ""
+          title: payload.room?.title || "",
+          coverUrl: payload.room?.coverUrl || ""
         });
       } catch (error) {
         if (cancelled) {
@@ -720,7 +750,8 @@ export function App() {
           roomId: "",
           hostHandle: "",
           hostDisplayName: "",
-          title: ""
+          title: "",
+          coverUrl: ""
         });
         log(`watch resolve failed: ${message}`);
       }
@@ -821,6 +852,7 @@ export function App() {
 
     if (
       !player.playerSession
+      || player.playerSession.protocol !== STREAM_PROTOCOL_MOQ
       || player.playerSession.relayUrl !== resolvedWatchRelayUrl
       || player.playerSession.namespace !== resolvedWatchNamespace
     ) {
@@ -831,6 +863,7 @@ export function App() {
     page,
     player.playerSession,
     resolvedWatchNamespace,
+    resolvedWatchProtocol,
     resolvedWatchRelayUrl,
     watchRouteCommitted,
     watchingNamespace
@@ -844,28 +877,42 @@ export function App() {
       || !resolvedWatchRoomId
       || !chat.roomStateReady
       || !chat.streamState.isLive
-      || !chat.roomMeta.stream.relayUrl
-      || !chat.roomMeta.stream.namespace
+      || !resolvedWatchPlaybackReady
     ) {
       return;
     }
 
     if (
       !player.playerSession
-      || player.playerSession.relayUrl !== chat.roomMeta.stream.relayUrl
-      || player.playerSession.namespace !== chat.roomMeta.stream.namespace
+      || player.playerSession.protocol !== resolvedWatchProtocol
+      || (
+        watchUsesMoqPlayback &&
+        (
+          player.playerSession.relayUrl !== resolvedWatchRelayUrl
+          || player.playerSession.namespace !== resolvedWatchNamespace
+        )
+      )
+      || (
+        watchUsesWebRtcPlayback &&
+        player.playerSession.webRtcUrl !== resolvedWatchWebRtcUrl
+      )
     ) {
       void player.startPlayer();
     }
   }, [
-    chat.roomMeta.stream.namespace,
-    chat.roomMeta.stream.relayUrl,
     chat.roomStateReady,
     chat.streamState.isLive,
     page,
     player.playerSession,
     resolvedWatchRoomId,
+    resolvedWatchNamespace,
+    resolvedWatchPlaybackReady,
+    resolvedWatchProtocol,
+    resolvedWatchRelayUrl,
+    resolvedWatchWebRtcUrl,
     watchRouteCommitted,
+    watchUsesMoqPlayback,
+    watchUsesWebRtcPlayback,
     watchingNamespace
   ]);
 
@@ -876,30 +923,34 @@ export function App() {
       || watchingNamespace
       || !resolvedWatchRoomId
       || !chat.streamState.isLive
-      || !chat.roomMeta.stream.relayUrl
-      || !chat.roomMeta.stream.namespace
+      || !resolvedWatchPlaybackReady
     ) {
       return;
     }
 
     const startedAt = chat.streamState.startedAt || "__live__";
-    const current = handledWatchStreamStartRef.current;
-    if (current.roomId === resolvedWatchRoomId && current.startedAt === startedAt) {
+    const current = handledWatchPlaybackRef.current;
+    if (
+      current.roomId === resolvedWatchRoomId &&
+      current.startedAt === startedAt &&
+      current.protocol === resolvedWatchProtocol
+    ) {
       return;
     }
 
-    handledWatchStreamStartRef.current = {
+    handledWatchPlaybackRef.current = {
       roomId: resolvedWatchRoomId,
-      startedAt
+      startedAt,
+      protocol: resolvedWatchProtocol
     };
     void player.startPlayer();
   }, [
-    chat.roomMeta.stream.namespace,
-    chat.roomMeta.stream.relayUrl,
     chat.streamState.isLive,
     chat.streamState.startedAt,
     page,
     resolvedWatchRoomId,
+    resolvedWatchPlaybackReady,
+    resolvedWatchProtocol,
     watchRouteCommitted,
     watchingNamespace
   ]);
@@ -917,7 +968,7 @@ export function App() {
       return;
     }
 
-    handledWatchStreamStartRef.current = { roomId: "", startedAt: "" };
+    handledWatchPlaybackRef.current = { roomId: "", startedAt: "", protocol: "" };
     void player.stopPlayer({
       finalStatus: "直播已结束",
       finalKind: "ended",
@@ -1159,6 +1210,7 @@ export function App() {
 
         <main className="page-shell">
           <WatchPage
+            siteTitle={siteTitle}
             hidden={!showWatchPage}
             watchJoined={watchJoined}
             roomLabel={watchRoomLabel}
@@ -1166,6 +1218,8 @@ export function App() {
             hostDisplayName={watchHostDisplayName}
             hostAvatarUrl={watchHostAvatarUrl}
             hostIcon={watchHostIcon}
+            roomCoverUrl={watchRoomCoverUrl}
+            siteIconUrl={siteIconUrl}
             watchLink={watchPageLink}
             stageLoading={watchStageLoading}
             stageMessage={watchStageMessage}

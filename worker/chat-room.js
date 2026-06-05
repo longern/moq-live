@@ -5,6 +5,8 @@ const RATE_LIMIT_WINDOW_MS = 5_000;
 const RATE_LIMIT_MAX_MESSAGES = 4;
 const MAX_ROOM_TITLE_LENGTH = 80;
 const DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE = "Exceeded allowed rows written in Durable Objects free tier.";
+const STREAM_PROTOCOL_MOQ = "moq";
+const STREAM_PROTOCOL_WEBRTC = "webrtc";
 
 export class ChatRoomDO {
   constructor(ctx) {
@@ -318,6 +320,7 @@ export class ChatRoomDO {
 
     const nextStream = {
       isLive: true,
+      protocol: sanitizeStreamProtocol(payload.stream?.protocol),
       startedAt: sanitizeIsoTimestamp(payload.stream?.startedAt) ?? new Date().toISOString()
     };
     if (this.roomState.stream.isLive) {
@@ -374,7 +377,9 @@ export class ChatRoomDO {
       title: sanitizeRoomTitle(payload.roomMeta?.title),
       stream: {
         relayUrl: sanitizeUrl(payload.roomMeta?.stream?.relayUrl),
-        namespace: sanitizeNamespace(payload.roomMeta?.stream?.namespace)
+        namespace: sanitizeNamespace(payload.roomMeta?.stream?.namespace),
+        protocol: sanitizeStreamProtocol(payload.roomMeta?.stream?.protocol),
+        webRtcUrl: sanitizeUrl(payload.roomMeta?.stream?.webRtcUrl)
       },
       host: {
         id: sanitizeEntityId(payload.roomMeta?.host?.id),
@@ -439,13 +444,16 @@ function getDefaultRoomState() {
   return {
     stream: {
       isLive: false,
+      protocol: STREAM_PROTOCOL_MOQ,
       startedAt: null
     },
     roomMeta: {
       title: "",
       stream: {
         relayUrl: "",
-        namespace: ""
+        namespace: "",
+        protocol: STREAM_PROTOCOL_MOQ,
+        webRtcUrl: ""
       },
       host: {
         id: "",
@@ -460,13 +468,16 @@ function normalizeRoomState(roomState) {
   return {
     stream: {
       isLive: Boolean(roomState?.stream?.isLive),
+      protocol: sanitizeStreamProtocol(roomState?.stream?.protocol),
       startedAt: sanitizeIsoTimestamp(roomState?.stream?.startedAt)
     },
     roomMeta: {
       title: sanitizeRoomTitle(roomState?.roomMeta?.title),
       stream: {
         relayUrl: sanitizeUrl(roomState?.roomMeta?.stream?.relayUrl),
-        namespace: sanitizeNamespace(roomState?.roomMeta?.stream?.namespace)
+        namespace: sanitizeNamespace(roomState?.roomMeta?.stream?.namespace),
+        protocol: sanitizeStreamProtocol(roomState?.roomMeta?.stream?.protocol),
+        webRtcUrl: sanitizeUrl(roomState?.roomMeta?.stream?.webRtcUrl)
       },
       host: {
         id: sanitizeEntityId(roomState?.roomMeta?.host?.id),
@@ -557,11 +568,17 @@ function sanitizeNamespace(value) {
   return String(value ?? "").trim().slice(0, 128);
 }
 
+function sanitizeStreamProtocol(value) {
+  return value === STREAM_PROTOCOL_WEBRTC ? STREAM_PROTOCOL_WEBRTC : STREAM_PROTOCOL_MOQ;
+}
+
 function areRoomMetaEqual(left, right) {
   return (
     String(left?.title ?? "") === String(right?.title ?? "") &&
     String(left?.stream?.relayUrl ?? "") === String(right?.stream?.relayUrl ?? "") &&
     String(left?.stream?.namespace ?? "") === String(right?.stream?.namespace ?? "") &&
+    String(left?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) === String(right?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) &&
+    String(left?.stream?.webRtcUrl ?? "") === String(right?.stream?.webRtcUrl ?? "") &&
     String(left?.host?.id ?? "") === String(right?.host?.id ?? "") &&
     String(left?.host?.displayName ?? "") === String(right?.host?.displayName ?? "") &&
     String(left?.host?.avatarUrl ?? "") === String(right?.host?.avatarUrl ?? "")

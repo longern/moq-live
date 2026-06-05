@@ -1,7 +1,7 @@
 .swipeable-drawer-backdrop {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  z-index: var(--z-drawer-backdrop);
   border: 0;
   border-radius: 0;
   background: rgba(4, 11, 17, 0.52);
@@ -22,7 +22,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 21;
+  z-index: var(--z-drawer-panel);
   display: flex;
   flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom);

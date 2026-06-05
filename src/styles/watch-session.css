@@ -1,18 +1,212 @@
 .watch-layout .control-column,
 .live-layout .control-column {
-  padding: 18px 18px 18px 0;
+  padding: 16px 16px 16px 0;
 }
 
 .control-block {
   display: grid;
   gap: 12px;
-  padding-bottom: 18px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
 
 .control-block:last-child {
   padding-bottom: 0;
   border-bottom: 0;
+}
+
+.watch-session-toast {
+  position: fixed;
+  left: 50%;
+  top: 64%;
+  z-index: var(--z-toast);
+  transform: translate(-50%, -50%);
+}
+
+.watch-share-image-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.watch-share-image-layer.is-closing {
+  pointer-events: none;
+}
+
+.watch-share-image-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(5, 10, 18, 0.62);
+  cursor: default;
+  animation: watch-share-image-backdrop-in 180ms ease both;
+}
+
+.watch-share-image-layer.is-closing .watch-share-image-backdrop {
+  animation: watch-share-image-backdrop-out 160ms ease both;
+}
+
+.watch-share-image-dialog {
+  position: relative;
+  width: min(360px, calc(100vw - 36px));
+  max-height: min(760px, calc(100svh - 36px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
+  animation: watch-share-image-dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.watch-share-image-layer.is-closing .watch-share-image-dialog {
+  animation: watch-share-image-dialog-out 180ms ease both;
+}
+
+.watch-share-image-head {
+  min-height: 52px;
+  padding: 10px 10px 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(242, 247, 251, 0.96);
+}
+
+.watch-share-image-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.watch-share-image-close {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: rgba(242, 247, 251, 0.9);
+}
+
+.watch-share-image-close svg {
+  width: 19px;
+  height: 19px;
+}
+
+.watch-share-image-preview {
+  min-height: 320px;
+  padding: 0 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.watch-share-image-preview img {
+  display: block;
+  width: min(100%, 320px);
+  max-height: calc(100svh - 190px);
+  object-fit: contain;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+}
+
+.watch-share-image-spinner {
+  color: rgba(242, 247, 251, 0.9);
+}
+
+.watch-share-image-actions {
+  padding: 0 12px 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.watch-share-image-actions button {
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 4px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(242, 247, 251, 0.92);
+  box-shadow: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.watch-share-image-actions button:hover:not(:disabled),
+.watch-share-image-actions button:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+  transform: none;
+}
+
+.watch-share-image-actions button:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(0.98);
+}
+
+.watch-share-image-actions button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.watch-share-image-actions button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.watch-share-image-actions svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+}
+
+@keyframes watch-share-image-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes watch-share-image-backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes watch-share-image-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+@keyframes watch-share-image-dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watch-share-image-backdrop,
+  .watch-share-image-dialog,
+  .watch-share-image-layer.is-closing .watch-share-image-backdrop,
+  .watch-share-image-layer.is-closing .watch-share-image-dialog {
+    animation-duration: 1ms;
+  }
 }
 
 .control-head {

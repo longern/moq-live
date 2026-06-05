@@ -2,35 +2,47 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   Copy,
+  Download,
   Maximize,
   Minimize,
   MoreHorizontal,
   Pause,
+  PictureInPicture2,
   Play,
+  QrCode,
   Radio,
   Share,
   Users,
   Volume2,
-  VolumeX
+  VolumeX,
+  X
 } from "lucide-react";
 import { ChatPanel } from "./ChatPanel.jsx";
+import { FloatingToast } from "./FloatingToast.jsx";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { StatusPill } from "./StatusPill.jsx";
 import { SwipeableDrawer } from "./SwipeableDrawer.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 import { formatAudienceCount } from "../lib/audience.js";
+import { buildWatchShareImage } from "../lib/shareImage.js";
+import { STREAM_PROTOCOL_WEBRTC } from "../lib/streamProtocol.js";
 
 const WatchTestCanvas = import.meta.env.DEV
   ? lazy(() => import("./WatchTestCanvas.jsx").then((module) => ({ default: module.WatchTestCanvas })))
   : null;
 
+const IMAGE_SHARE_EXIT_MS = 180;
+
 export function WatchSessionPage({
   hidden,
   roomLabel,
   roomTitle,
+  siteTitle,
   hostDisplayName,
   hostAvatarUrl,
   hostIcon,
+  roomCoverUrl,
+  siteIconUrl,
   watchLink,
   stageLoading,
   stageMessage,
@@ -66,11 +78,18 @@ export function WatchSessionPage({
   onChatSend,
   onChatRequireLogin
 }) {
-  const watchLinkText = watchLink || "等待生成观看链接";
   const [controlsVisible, setControlsVisible] = useState(false);
   const [immersiveControlsHidden, setImmersiveControlsHidden] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
+  const [elementPipSupported, setElementPipSupported] = useState(false);
+  const [videoPipSupported, setVideoPipSupported] = useState(false);
+  const [pictureInPictureActive, setPictureInPictureActive] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [imageShareMounted, setImageShareMounted] = useState(false);
+  const [imageShareClosing, setImageShareClosing] = useState(false);
+  const [shareImageUrl, setShareImageUrl] = useState("");
+  const [shareImageLoading, setShareImageLoading] = useState(false);
   const [shareMenuMounted, setShareMenuMounted] = useState(false);
   const [shareMenuVisible, setShareMenuVisible] = useState(false);
   const [shareMenuPosition, setShareMenuPosition] = useState({ left: 0, top: 0 });
@@ -78,12 +97,19 @@ export function WatchSessionPage({
   const touchModeRef = useRef(false);
   const shareCloseTimerRef = useRef(null);
   const shareOpenFrameRef = useRef(null);
+  const imageShareCloseTimerRef = useRef(null);
   const shareButtonRef = useRef(null);
+  const pipWindowRef = useRef(null);
+  const pipPlaceholderRef = useRef(null);
+  const pipVideoRef = useRef(null);
+  const pipVideoStreamRef = useRef(null);
+  const toastTimerRef = useRef(null);
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const immersivePortrait = playerOrientation === "portrait";
   const audienceCountText = formatAudienceCount(chatOnlineCount);
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
   const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
+  const imageShareReady = Boolean(shareImageUrl && !shareImageLoading);
 
   function clearHideTimer() {
     if (hideTimerRef.current) {
@@ -107,16 +133,54 @@ export function WatchSessionPage({
 
   useEffect(() => {
     touchModeRef.current = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    setElementPipSupported(
+      typeof window.documentPictureInPicture?.requestWindow === "function"
+    );
+    setVideoPipSupported(
+      Boolean(
+        document.pictureInPictureEnabled &&
+        typeof HTMLVideoElement !== "undefined" &&
+        typeof HTMLVideoElement.prototype.requestPictureInPicture === "function"
+      )
+    );
   }, []);
 
   useEffect(() => () => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     if (shareCloseTimerRef.current) {
       clearTimeout(shareCloseTimerRef.current);
     }
     if (shareOpenFrameRef.current) {
       cancelAnimationFrame(shareOpenFrameRef.current);
     }
+    if (imageShareCloseTimerRef.current) {
+      clearTimeout(imageShareCloseTimerRef.current);
+    }
+    restoreElementPictureInPicture();
+    restoreVideoPictureInPicture();
   }, []);
+
+  function showToast(message) {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToastMessage(message);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage("");
+      toastTimerRef.current = null;
+    }, 1600);
+  }
+
+  async function writeClipboardText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   useEffect(() => {
     if (!playerSession || playerBadge.state === "error") {
@@ -263,11 +327,11 @@ export function WatchSessionPage({
       closeShareMenu();
       return;
     }
-    try {
-      await navigator.clipboard.writeText(watchLink);
-    } finally {
-      closeShareMenu();
+    const copied = await writeClipboardText(watchLink);
+    if (copied) {
+      showToast("复制成功");
     }
+    closeShareMenu();
   }
 
   async function shareWatchLink() {
@@ -287,6 +351,311 @@ export function WatchSessionPage({
       }
     } finally {
       closeShareMenu();
+    }
+  }
+
+  async function getShareImageBlob() {
+    if (!shareImageUrl) {
+      return null;
+    }
+
+    const response = await fetch(shareImageUrl);
+    return response.blob();
+  }
+
+  function getShareImageFileName() {
+    const name = (roomTitle || roomLabel || "直播间")
+      .replace(/[\\/:*?"<>|]+/g, "")
+      .trim();
+    return `${name || "直播间"}分享图.png`;
+  }
+
+  async function shareWatchImage() {
+    if (!shareImageUrl) {
+      return;
+    }
+
+    try {
+      const blob = await getShareImageBlob();
+      if (!blob) {
+        return;
+      }
+      const file = new File([blob], getShareImageFileName(), { type: "image/png" });
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: roomTitle || roomLabel,
+          text: `${hostDisplayName || roomLabel}的直播间`,
+        });
+        return;
+      }
+      await shareWatchLink();
+    } catch (error) {
+      if (!(error instanceof Error && error.name === "AbortError")) {
+        console.error("watch room share image failed", error);
+        showToast("分享失败");
+      }
+    }
+  }
+
+  async function copyWatchImage() {
+    if (!shareImageUrl || typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+      showToast("复制失败");
+      return;
+    }
+
+    try {
+      const blob = await getShareImageBlob();
+      if (!blob) {
+        showToast("复制失败");
+        return;
+      }
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": blob,
+        }),
+      ]);
+      showToast("复制成功");
+    } catch (error) {
+      console.error("watch room share image copy failed", error);
+      showToast("复制失败");
+    }
+  }
+
+  function saveWatchImage() {
+    if (!shareImageUrl) {
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = shareImageUrl;
+    link.download = getShareImageFileName();
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function closeImageShareModal() {
+    if (imageShareCloseTimerRef.current) {
+      clearTimeout(imageShareCloseTimerRef.current);
+    }
+    setImageShareClosing(true);
+    imageShareCloseTimerRef.current = window.setTimeout(() => {
+      setImageShareMounted(false);
+      setImageShareClosing(false);
+      imageShareCloseTimerRef.current = null;
+    }, IMAGE_SHARE_EXIT_MS);
+  }
+
+  async function openImageShareModal() {
+    if (!watchLink) {
+      closeShareMenu();
+      closeMoreSheet();
+      return;
+    }
+
+    closeShareMenu();
+    closeMoreSheet();
+    if (imageShareCloseTimerRef.current) {
+      clearTimeout(imageShareCloseTimerRef.current);
+      imageShareCloseTimerRef.current = null;
+    }
+    setImageShareMounted(true);
+    setImageShareClosing(false);
+    setShareImageUrl("");
+    setShareImageLoading(true);
+
+    try {
+      const imageUrl = await buildWatchShareImage({
+        watchLink,
+        roomLabel,
+        roomTitle,
+        hostDisplayName,
+        hostAvatarUrl,
+        roomCoverUrl,
+        siteIconUrl,
+        siteTitle,
+      });
+      setShareImageUrl(imageUrl);
+    } catch (error) {
+      console.error("watch room share image failed", error);
+      setImageShareOpen(false);
+      showToast("生成失败");
+    } finally {
+      setShareImageLoading(false);
+    }
+  }
+
+  function copyStyleSheetsToPictureInPicture(pipWindow) {
+    const pipHead = pipWindow.document.head;
+    document.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
+      pipHead.appendChild(node.cloneNode(true));
+    });
+  }
+
+  function restoreElementPictureInPicture() {
+    const pipWindow = pipWindowRef.current;
+    const placeholder = pipPlaceholderRef.current;
+    const stageEl = stageRef?.current;
+
+    if (placeholder?.parentNode && stageEl) {
+      placeholder.parentNode.insertBefore(stageEl, placeholder);
+      placeholder.remove();
+    }
+
+    pipPlaceholderRef.current = null;
+    pipWindowRef.current = null;
+    setPictureInPictureActive(false);
+
+    if (pipWindow && !pipWindow.closed) {
+      pipWindow.close();
+    }
+  }
+
+  async function restoreVideoPictureInPicture() {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      }
+    } catch (error) {
+      console.error("video picture-in-picture restore failed", error);
+    }
+
+    cleanupVideoPictureInPicture();
+  }
+
+  function cleanupVideoPictureInPicture() {
+    const pipVideo = pipVideoRef.current;
+    const pipVideoStream = pipVideoStreamRef.current;
+
+    if (pipVideoStream) {
+      pipVideoStream.getTracks().forEach((track) => track.stop());
+    }
+
+    if (pipVideo) {
+      pipVideo.pause();
+      pipVideo.removeAttribute("src");
+      pipVideo.srcObject = null;
+      pipVideo.remove();
+    }
+
+    pipVideoRef.current = null;
+    pipVideoStreamRef.current = null;
+    setPictureInPictureActive(false);
+  }
+
+  function createCanvasPictureInPictureVideo(canvasEl) {
+    if (typeof canvasEl.captureStream !== "function") {
+      return null;
+    }
+
+    const stream = canvasEl.captureStream(30);
+    const pipVideo = document.createElement("video");
+    pipVideo.autoplay = true;
+    pipVideo.muted = true;
+    pipVideo.playsInline = true;
+    pipVideo.srcObject = stream;
+    pipVideo.style.position = "fixed";
+    pipVideo.style.left = "0";
+    pipVideo.style.bottom = "0";
+    pipVideo.style.width = "1px";
+    pipVideo.style.height = "1px";
+    pipVideo.style.opacity = "0";
+    pipVideo.style.pointerEvents = "none";
+    document.body.appendChild(pipVideo);
+    pipVideoRef.current = pipVideo;
+    pipVideoStreamRef.current = stream;
+    return pipVideo;
+  }
+
+  function getVideoPictureInPictureElement() {
+    const playerEl = playerRef?.current;
+
+    if (typeof HTMLVideoElement !== "undefined" && playerEl instanceof HTMLVideoElement) {
+      return playerEl;
+    }
+
+    if (typeof HTMLCanvasElement !== "undefined" && playerEl instanceof HTMLCanvasElement) {
+      return createCanvasPictureInPictureVideo(playerEl);
+    }
+
+    return null;
+  }
+
+  async function openVideoPictureInPicture() {
+    if (
+      !document.pictureInPictureEnabled ||
+      typeof HTMLVideoElement === "undefined" ||
+      typeof HTMLVideoElement.prototype.requestPictureInPicture !== "function"
+    ) {
+      return false;
+    }
+
+    try {
+      const pipVideo = getVideoPictureInPictureElement();
+      if (!pipVideo) {
+        return false;
+      }
+      await pipVideo.play();
+      pipVideo.addEventListener("leavepictureinpicture", cleanupVideoPictureInPicture, { once: true });
+      await pipVideo.requestPictureInPicture();
+      setPictureInPictureActive(true);
+      return true;
+    } catch (error) {
+      console.error("video picture-in-picture failed", error);
+      cleanupVideoPictureInPicture();
+      return false;
+    }
+  }
+
+  async function openElementPictureInPicture() {
+    const stageEl = stageRef?.current;
+    const requestWindow = window.documentPictureInPicture?.requestWindow;
+
+    if (!stageEl || typeof requestWindow !== "function") {
+      return false;
+    }
+
+    try {
+      const rect = stageEl.getBoundingClientRect();
+      const pipWindow = await requestWindow.call(window.documentPictureInPicture, {
+        width: Math.round(Math.min(Math.max(rect.width || 360, 320), 720)),
+        height: Math.round(Math.min(Math.max(rect.height || 240, 240), 540)),
+      });
+      const placeholder = document.createComment("watch-stage-picture-in-picture-placeholder");
+      stageEl.parentNode?.insertBefore(placeholder, stageEl);
+
+      pipWindowRef.current = pipWindow;
+      pipPlaceholderRef.current = placeholder;
+
+      copyStyleSheetsToPictureInPicture(pipWindow);
+      pipWindow.document.body.className = "watch-element-pip-body";
+      pipWindow.document.body.appendChild(stageEl);
+      pipWindow.addEventListener("pagehide", restoreElementPictureInPicture, { once: true });
+      setPictureInPictureActive(true);
+      return true;
+    } catch (error) {
+      console.error("element picture-in-picture failed", error);
+      restoreElementPictureInPicture();
+      return false;
+    }
+  }
+
+  async function openPictureInPicture() {
+    if (pictureInPictureActive) {
+      restoreElementPictureInPicture();
+      await restoreVideoPictureInPicture();
+      closeMoreSheet();
+      return;
+    }
+
+    try {
+      const openedElementPip = await openElementPictureInPicture();
+      if (!openedElementPip) {
+        await openVideoPictureInPicture();
+      }
+    } finally {
+      closeMoreSheet();
     }
   }
 
@@ -392,13 +761,24 @@ export function WatchSessionPage({
                   />
                 </Suspense>
               ) : playerSession ? (
-                <canvas
-                  ref={playerRef}
-                  className="player-moq"
-                  width="1280"
-                  height="720"
-                  aria-label={`${playerSession.namespace} 直播画面`}
-                />
+                playerSession.protocol === STREAM_PROTOCOL_WEBRTC ? (
+                  <video
+                    ref={playerRef}
+                    className="player-webrtc"
+                    autoPlay
+                    playsInline
+                    muted={playerMuted}
+                    title={`${playerSession.namespace} 直播画面`}
+                  />
+                ) : (
+                  <canvas
+                    ref={playerRef}
+                    className="player-moq"
+                    width="1280"
+                    height="720"
+                    aria-label={`${playerSession.namespace} 直播画面`}
+                  />
+                )
               ) : (
                 <div className="placeholder">
                   {stageLoading ? (
@@ -579,30 +959,127 @@ export function WatchSessionPage({
           <strong>{roomLabel}</strong>
           <span>{playerBadge.label}</span>
         </div>
-        <div className="summary-item">
-          <strong>观看链接</strong>
-          <span data-watch-link>{watchLinkText}</span>
+        <div className="watch-mobile-more-actions" role="group" aria-label="更多观看操作">
+          <button
+            type="button"
+            className="watch-mobile-more-action"
+            onClick={async () => {
+              await shareWatchLink();
+              closeMoreSheet();
+            }}
+            disabled={!watchLink || !shareSupported}
+            aria-label="分享观看链接"
+          >
+            <span className="watch-mobile-more-action-icon">
+              <Share aria-hidden="true" />
+            </span>
+            <span>分享</span>
+          </button>
+          <button
+            type="button"
+            className="watch-mobile-more-action"
+            onClick={openImageShareModal}
+            disabled={!watchLink}
+            aria-label="图片分享"
+          >
+            <span className="watch-mobile-more-action-icon">
+              <QrCode aria-hidden="true" />
+            </span>
+            <span>图片分享</span>
+          </button>
+          <button
+            type="button"
+            className="watch-mobile-more-action"
+            onClick={async () => {
+              await copyWatchLink();
+              closeMoreSheet();
+            }}
+            disabled={!watchLink}
+            aria-label="复制观看链接"
+          >
+            <span className="watch-mobile-more-action-icon">
+              <Copy aria-hidden="true" />
+            </span>
+            <span>复制链接</span>
+          </button>
+          <button
+            type="button"
+            className="watch-mobile-more-action"
+            onClick={openPictureInPicture}
+            disabled={!(elementPipSupported || videoPipSupported) || !playerSession}
+            aria-label={pictureInPictureActive ? "关闭小窗播放" : "小窗播放"}
+          >
+            <span className="watch-mobile-more-action-icon">
+              <PictureInPicture2 aria-hidden="true" />
+            </span>
+            <span>{pictureInPictureActive ? "关闭小窗" : "小窗播放"}</span>
+          </button>
         </div>
-        <button
-          type="button"
-          className="secondary"
-          onClick={async () => {
-            if (!watchLink) {
-              closeMoreSheet();
-              return;
-            }
-            try {
-              await navigator.clipboard.writeText(watchLink);
-              closeMoreSheet();
-            } catch {
-              closeMoreSheet();
-            }
-          }}
-          disabled={!watchLink}
-        >
-          复制观看链接
-        </button>
       </SwipeableDrawer>
+      {toastMessage ? (
+        <FloatingToast className="watch-session-toast">{toastMessage}</FloatingToast>
+      ) : null}
+      {imageShareMounted ? (
+        <div className={`watch-share-image-layer${imageShareClosing ? " is-closing" : ""}`}>
+          <button
+            type="button"
+            className="watch-share-image-backdrop"
+            aria-label="关闭图片分享"
+            onClick={closeImageShareModal}
+          />
+          <section
+            className="watch-share-image-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="图片分享"
+          >
+            <div className="watch-share-image-head">
+              <h3>图片分享</h3>
+              <button
+                type="button"
+                className="watch-share-image-close"
+                aria-label="关闭图片分享"
+                onClick={closeImageShareModal}
+              >
+                <X aria-hidden="true" />
+              </button>
+            </div>
+            <div className="watch-share-image-preview">
+              {shareImageLoading ? (
+                <LoadingSpinner className="watch-share-image-spinner" />
+              ) : shareImageUrl ? (
+                <img src={shareImageUrl} alt={`${roomLabel}直播间二维码分享图`} />
+              ) : null}
+            </div>
+            <div className="watch-share-image-actions">
+              <button
+                type="button"
+                onClick={shareWatchImage}
+                disabled={!imageShareReady || !shareSupported}
+              >
+                <Share aria-hidden="true" />
+                <span>分享</span>
+              </button>
+              <button
+                type="button"
+                onClick={copyWatchImage}
+                disabled={!imageShareReady}
+              >
+                <Copy aria-hidden="true" />
+                <span>复制图片</span>
+              </button>
+              <button
+                type="button"
+                onClick={saveWatchImage}
+                disabled={!imageShareReady}
+              >
+                <Download aria-hidden="true" />
+                <span>保存图片</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       <SwipeableDrawer
         open={audienceOpen}
         onClose={closeAudienceSheet}

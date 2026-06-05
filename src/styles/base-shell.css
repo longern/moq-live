@@ -35,15 +35,24 @@
   --warm: var(--status-warning);
   --shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
   --mobile-nav-height: 56px;
-  --z-menu: 30;
-  --z-panel-backdrop: 29;
-  --z-panel: 30;
-  --z-auth-backdrop: 31;
-  --z-auth-panel: 32;
-  --z-edit-panel-backdrop: 33;
-  --z-edit-panel: 34;
-  --z-share-backdrop: 80;
-  --z-share-panel: 81;
+  --z-page-overlay: 70;
+  --z-page-sticky: 20;
+  --z-drawer-backdrop: 40;
+  --z-drawer-panel: 41;
+  --z-menu-backdrop: 60;
+  --z-menu-panel: 61;
+  --z-panel-backdrop: 80;
+  --z-panel: 81;
+  --z-auth-backdrop: 90;
+  --z-auth-panel: 91;
+  --z-edit-panel-backdrop: 100;
+  --z-edit-panel: 101;
+  --z-modal-backdrop: 120;
+  --z-modal-panel: 121;
+  --z-toast: 140;
+  --z-menu: var(--z-menu-panel);
+  --z-share-backdrop: var(--z-menu-backdrop);
+  --z-share-panel: var(--z-menu-panel);
 }
 
 * {

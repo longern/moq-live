@@ -8,6 +8,12 @@ import {
   withTimeout,
 } from "./playerControllerUtils.js";
 import { createAppError, getAppErrorMessage } from "../../lib/appErrors.js";
+import {
+  DEFAULT_STREAM_PROTOCOL,
+  STREAM_PROTOCOL_WEBRTC,
+  normalizeStreamProtocol,
+} from "../../lib/streamProtocol.js";
+import { createWhepPlaybackSession } from "../../lib/whepClient.js";
 
 const PLAYER_TARGET_LATENCY_MS = 600;
 const AUDIO_TRACK_NAME = "audio/data";
@@ -97,6 +103,8 @@ function formatVideoFrameStats(stats, now) {
 export function usePlayerSession({
   relayUrlRef,
   roomRef,
+  streamProtocolRef,
+  webRtcUrlRef,
   setLogText,
   log,
   audioPlaybackSupported,
@@ -347,35 +355,62 @@ export function usePlayerSession({
     });
     setLogText("");
 
-    if (!globalThis.WebTransport) {
-      updatePlayerStatus(
-        "error",
-        getAppleOsUpgradeMessage() ?? "浏览器版本过旧",
-      );
-      logRef.current?.("Browser does not support WebTransport");
-      return;
-    }
-
     let nextSession;
     try {
-      const nextRelayUrl = new URL(relayUrlRef.current).toString();
+      const protocol = normalizeStreamProtocol(streamProtocolRef?.current ?? DEFAULT_STREAM_PROTOCOL);
       const namespace = roomRef.current.trim();
       if (!namespace) {
         throw createAppError("namespace_required");
       }
-      nextSession = {
-        key: `${namespace}-${token}`,
-        layoutScopeKey: nextLayoutScopeKey,
-        token,
-        relayUrl: nextRelayUrl,
-        namespace,
-      };
+      if (protocol === STREAM_PROTOCOL_WEBRTC) {
+        const webRtcUrl = new URL(webRtcUrlRef?.current ?? "").toString();
+        nextSession = {
+          key: `${protocol}-${namespace}-${token}`,
+          layoutScopeKey: nextLayoutScopeKey,
+          token,
+          protocol,
+          namespace,
+          webRtcUrl,
+        };
+      } else {
+        const nextRelayUrl = new URL(relayUrlRef.current).toString();
+        nextSession = {
+          key: `${protocol}-${namespace}-${token}`,
+          layoutScopeKey: nextLayoutScopeKey,
+          token,
+          protocol,
+          relayUrl: nextRelayUrl,
+          namespace,
+        };
+      }
     } catch (error) {
       const message = getAppErrorMessage(error);
       updatePlayerStatus("error", `失败：${message}`);
       logRef.current?.(
         `失败：${error instanceof Error ? (error.stack ?? error.message) : message}`,
       );
+      return;
+    }
+
+    if (nextSession.protocol === STREAM_PROTOCOL_WEBRTC) {
+      setPlayerSession(nextSession);
+      audioRecoveryInFlightRef.current = false;
+      setFullscreenActive(false);
+      setFullscreenRotate(false);
+      setPlayerPaused(false);
+      desiredPlayerMutedRef.current = false;
+      setPlayerMutedState(false);
+      updatePlayerStatus("connecting", "正在连接视频流。");
+      logRef.current?.(`created WHEP player: url=${nextSession.webRtcUrl}`);
+      return;
+    }
+
+    if (!globalThis.WebTransport) {
+      updatePlayerStatus(
+        "error",
+        getAppleOsUpgradeMessage() ?? "浏览器版本过旧",
+      );
+      logRef.current?.("Browser does not support WebTransport");
       return;
     }
 
@@ -661,8 +696,71 @@ export function usePlayerSession({
     const playerEl = playerRef.current;
     if (
       !playerSession ||
+      playerSession.protocol !== STREAM_PROTOCOL_WEBRTC ||
+      !playerEl ||
+      playerSession.token !== playbackTokenRef.current
+    ) {
+      return undefined;
+    }
+
+    let disposed = false;
+    let whepSession = null;
+    const ctx = {
+      ...playerSession,
+      player: playerEl,
+      connection: null,
+      listeners: [],
+      signalDisposers: [],
+      tickerId: null,
+    };
+    sessionRef.current = ctx;
+    window.player = ctx;
+
+    async function connectWhep() {
+      try {
+        whepSession = await createWhepPlaybackSession({
+          url: playerSession.webRtcUrl,
+          videoElement: playerEl,
+        });
+        if (disposed || sessionRef.current !== ctx) {
+          whepSession.close();
+          return;
+        }
+        ctx.connection = whepSession;
+        await applyDesiredPlayerMute({ logFailure: false });
+        await playerEl.play?.().catch(() => {});
+        setPlayerPaused(false);
+        updatePlayerStatus("live", "播放中。");
+        setPlaybackStartToken((current) => current + 1);
+        logRef.current?.("WHEP playback started");
+      } catch (error) {
+        if (disposed || sessionRef.current !== ctx) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        updatePlayerStatus("error", `失败：${message}`);
+        logRef.current?.(`WHEP playback failed: ${message}`);
+      }
+    }
+
+    void connectWhep();
+
+    return () => {
+      disposed = true;
+      if (sessionRef.current === ctx) {
+        sessionRef.current = null;
+      }
+      whepSession?.close();
+    };
+  }, [playerSession]);
+
+  useEffect(() => {
+    const playerEl = playerRef.current;
+    if (
+      !playerSession ||
       !playerEl ||
       !moqWatchModule ||
+      playerSession.protocol === STREAM_PROTOCOL_WEBRTC ||
       playerSession.token !== playbackTokenRef.current
     ) {
       return;

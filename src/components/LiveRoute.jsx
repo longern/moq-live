@@ -6,6 +6,60 @@ import { buildWatchLink, generateRoomId } from "../lib/routeState.js";
 import { describePublishState } from "../lib/status.js";
 import { getPublishBlockReason, isPublishBlocked } from "../lib/roomPolicy.js";
 import { createAppError, getAppErrorMessage } from "../lib/appErrors.js";
+import { normalizeStreamProtocol } from "../lib/streamProtocol.js";
+
+const STREAM_SETTINGS_STORAGE_PREFIX = "moq-live:stream-settings";
+
+function getStreamSettingsStorageKey(userId) {
+  if (userId) {
+    return `${STREAM_SETTINGS_STORAGE_PREFIX}:user:${userId}`;
+  }
+  return `${STREAM_SETTINGS_STORAGE_PREFIX}:local`;
+}
+
+function readStoredStreamSettings(storageKey) {
+  if (typeof window === "undefined" || !storageKey) {
+    return null;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(storageKey);
+    if (!storedValue) {
+      return null;
+    }
+    const parsed = JSON.parse(storedValue);
+    return {
+      protocol: typeof parsed?.protocol === "string" ? normalizeStreamProtocol(parsed.protocol) : "",
+      publishUrl: typeof parsed?.publishUrl === "string" ? parsed.publishUrl : "",
+      playbackUrl: typeof parsed?.playbackUrl === "string" ? parsed.playbackUrl : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredStreamSettings(storageKey, { protocol = "", publishUrl = "", playbackUrl = "" }) {
+  if (typeof window === "undefined" || !storageKey) {
+    return;
+  }
+
+  try {
+    const nextProtocol = protocol ? normalizeStreamProtocol(protocol) : "";
+    const nextPublishUrl = String(publishUrl);
+    const nextPlaybackUrl = String(playbackUrl);
+    if (!nextProtocol && !nextPublishUrl && !nextPlaybackUrl) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+    window.localStorage.setItem(storageKey, JSON.stringify({
+      protocol: nextProtocol,
+      publishUrl: nextPublishUrl,
+      playbackUrl: nextPlaybackUrl,
+    }));
+  } catch {
+    // Ignore storage failures; the URLs remain usable for the current session.
+  }
+}
 
 function splitCameraOptions(cameraOptions) {
   const front = [];
@@ -57,6 +111,8 @@ function useLiveRoomChatSync({
   liveChat,
   liveStreamActive,
   relayUrl,
+  publishProtocol,
+  webRtcUrl,
   user,
 }) {
   const announcedLiveStateRef = useRef({ room: "", isLive: null });
@@ -90,7 +146,10 @@ function useLiveRoomChatSync({
     const sent = sendChatEventRef.current?.({
       type: liveStreamActive ? "stream.started" : "stream.stopped",
       stream: liveStreamActive
-        ? { startedAt: new Date().toISOString() }
+        ? {
+            startedAt: new Date().toISOString(),
+            protocol: publishProtocol,
+          }
         : undefined,
     });
 
@@ -106,6 +165,7 @@ function useLiveRoomChatSync({
     liveChat.streamState.isLive,
     liveRoom,
     liveStreamActive,
+    publishProtocol,
   ]);
 
   useEffect(() => {
@@ -116,6 +176,8 @@ function useLiveRoomChatSync({
     const nextStream = {
       relayUrl,
       namespace: liveRoom,
+      protocol: publishProtocol,
+      webRtcUrl,
     };
     const nextHost = {
       id: user?.id || "",
@@ -128,6 +190,8 @@ function useLiveRoomChatSync({
       &&
       liveChat.roomMeta.stream.relayUrl === nextStream.relayUrl
       && liveChat.roomMeta.stream.namespace === nextStream.namespace
+      && liveChat.roomMeta.stream.protocol === nextStream.protocol
+      && liveChat.roomMeta.stream.webRtcUrl === nextStream.webRtcUrl
       && liveChat.roomMeta.host.id === nextHost.id
       && liveChat.roomMeta.host.displayName === nextHost.displayName
       && liveChat.roomMeta.host.avatarUrl === nextHost.avatarUrl
@@ -148,11 +212,15 @@ function useLiveRoomChatSync({
     liveChat.roomStateReady,
     liveChat.roomMeta.title,
     liveChat.roomMeta.stream.namespace,
+    liveChat.roomMeta.stream.protocol,
     liveChat.roomMeta.stream.relayUrl,
+    liveChat.roomMeta.stream.webRtcUrl,
     liveChat.roomMeta.host.avatarUrl,
     liveChat.roomMeta.host.displayName,
     liveChat.roomMeta.host.id,
     relayUrl,
+    publishProtocol,
+    webRtcUrl,
     liveRoom,
     liveRoomDetails?.title,
     user?.avatarUrl,
@@ -194,12 +262,17 @@ export function LiveRoute({
     role: "broadcaster",
     log,
   });
+  const webRtcPublishUrlRef = useRef("");
+  const webRtcPlaybackUrlRef = useRef("");
+  const appliedWebRtcDefaultsRef = useRef({ publishUrl: "", playbackUrl: "" });
 
   const publisher = usePublisherController({
     page,
     pageRef,
     relayUrlRef,
     roomRef: liveRoomRef,
+    webRtcPublishUrlRef,
+    webRtcPlaybackUrlRef,
     generateRoomId: () => setLiveRoomValue(generateRoomId()),
     assertCanPublish: async () => {
       const canControlBroadcast = await liveChat.requestBroadcastControl();
@@ -210,6 +283,59 @@ export function LiveRoute({
     syntheticSessionRef,
     log,
   });
+  const streamSettingsStorageKey = getStreamSettingsStorageKey(authState.user?.id);
+
+  useEffect(() => {
+    const nextPublishUrl = liveRoomDetails?.webRtcPublishUrl || "";
+    const nextPlaybackUrl = liveRoomDetails?.webRtcPlaybackUrl || liveRoomDetails?.webRtcUrl || "";
+    if (
+      nextPublishUrl &&
+      nextPublishUrl !== appliedWebRtcDefaultsRef.current.publishUrl &&
+      !publisher.webRtcPublishUrl
+    ) {
+      appliedWebRtcDefaultsRef.current.publishUrl = nextPublishUrl;
+      publisher.setWebRtcPublishUrl(nextPublishUrl);
+    }
+    if (
+      nextPlaybackUrl &&
+      nextPlaybackUrl !== appliedWebRtcDefaultsRef.current.playbackUrl &&
+      !publisher.webRtcPlaybackUrl
+    ) {
+      appliedWebRtcDefaultsRef.current.playbackUrl = nextPlaybackUrl;
+      publisher.setWebRtcPlaybackUrl(nextPlaybackUrl);
+    }
+  }, [
+    liveRoomDetails?.webRtcPlaybackUrl,
+    liveRoomDetails?.webRtcPublishUrl,
+    liveRoomDetails?.webRtcUrl,
+    publisher.webRtcPlaybackUrl,
+    publisher.webRtcPublishUrl,
+  ]);
+
+  useEffect(() => {
+    const storedSettings = readStoredStreamSettings(streamSettingsStorageKey);
+    if (!storedSettings) {
+      return;
+    }
+    if (storedSettings.protocol && storedSettings.protocol !== publisher.publishProtocol) {
+      void publisher.setPublishProtocol(storedSettings.protocol).catch((error) => {
+        const message = getAppErrorMessage(error);
+        log(`publish protocol restore failed: ${message}`);
+      });
+    }
+    if (storedSettings.publishUrl && storedSettings.publishUrl !== publisher.webRtcPublishUrl) {
+      publisher.setWebRtcPublishUrl(storedSettings.publishUrl);
+    }
+    if (storedSettings.playbackUrl && storedSettings.playbackUrl !== publisher.webRtcPlaybackUrl) {
+      publisher.setWebRtcPlaybackUrl(storedSettings.playbackUrl);
+    }
+  }, [
+    log,
+    publisher.publishProtocol,
+    publisher.webRtcPlaybackUrl,
+    publisher.webRtcPublishUrl,
+    streamSettingsStorageKey,
+  ]);
 
   const liveRoomLabel = liveChat.roomMeta.host.displayName
     || authState.user?.displayName
@@ -223,6 +349,12 @@ export function LiveRoute({
   const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
   const publishBadge = describePublishState(publisher.publishStatusKind);
   const liveStreamActive = publisher.publisherIsPublishing || publisher.syntheticPublishing;
+  const publishProtocol = normalizeStreamProtocol(publisher.publishProtocol);
+  const webRtcPublishUrl = publisher.webRtcPublishUrl || "";
+  const webRtcPlaybackUrl = publisher.webRtcPlaybackUrl || "";
+  webRtcPublishUrlRef.current = webRtcPublishUrl.trim();
+  webRtcPlaybackUrlRef.current = webRtcPlaybackUrl.trim();
+  const webRtcUrl = webRtcPlaybackUrl.trim();
   const publishPolicyBlocked = isPublishBlocked(liveRoom);
   const publishControlBlocked =
     liveChatEnabled &&
@@ -247,6 +379,8 @@ export function LiveRoute({
     liveChat,
     liveStreamActive,
     relayUrl,
+    publishProtocol,
+    webRtcUrl,
     user: authState.user,
   });
 
@@ -343,6 +477,34 @@ export function LiveRoute({
     }
   }
 
+  function changeWebRtcPublishUrl(nextUrl) {
+    publisher.setWebRtcPublishUrl(nextUrl);
+    writeStoredStreamSettings(streamSettingsStorageKey, {
+      protocol: publisher.publishProtocol,
+      publishUrl: nextUrl,
+      playbackUrl: publisher.webRtcPlaybackUrl,
+    });
+  }
+
+  function changeWebRtcPlaybackUrl(nextUrl) {
+    publisher.setWebRtcPlaybackUrl(nextUrl);
+    writeStoredStreamSettings(streamSettingsStorageKey, {
+      protocol: publisher.publishProtocol,
+      publishUrl: publisher.webRtcPublishUrl,
+      playbackUrl: nextUrl,
+    });
+  }
+
+  async function changePublishProtocol(protocol) {
+    const nextProtocol = normalizeStreamProtocol(protocol);
+    writeStoredStreamSettings(streamSettingsStorageKey, {
+      protocol: nextProtocol,
+      publishUrl: publisher.webRtcPublishUrl,
+      playbackUrl: publisher.webRtcPlaybackUrl,
+    });
+    await publisher.setPublishProtocol(nextProtocol);
+  }
+
   return (
     <LivePage
       hidden={hidden}
@@ -359,9 +521,13 @@ export function LiveRoute({
       cameraOptions={publisher.cameraOptions}
       microphoneOptions={publisher.microphoneOptions}
       publishQualityOptions={publisher.publishQualityOptions}
+      publishProtocolOptions={publisher.publishProtocolOptions}
       selectedCameraId={publisher.selectedCameraId}
       selectedMicrophoneId={publisher.selectedMicrophoneId}
       publishQualityId={publisher.publishQualityId}
+      publishProtocol={publisher.publishProtocol}
+      webRtcPublishUrl={publisher.webRtcPublishUrl}
+      webRtcPlaybackUrl={publisher.webRtcPlaybackUrl}
       cameraEnabled={publisher.cameraEnabled}
       microphoneEnabled={publisher.microphoneEnabled}
       cameraMode={cameraMode}
@@ -385,6 +551,14 @@ export function LiveRoute({
           log(`publish quality switch failed: ${message}`);
         });
       }}
+      onPublishProtocolChange={(protocol) => {
+        void changePublishProtocol(protocol).catch((error) => {
+          const message = getAppErrorMessage(error);
+          log(`publish protocol switch failed: ${message}`);
+        });
+      }}
+      onWebRtcPublishUrlChange={changeWebRtcPublishUrl}
+      onWebRtcPlaybackUrlChange={changeWebRtcPlaybackUrl}
       onCycleCamera={cycleCameraMode}
       onToggleMicrophone={() => {
         publisher.setMicrophoneEnabled(!publisher.microphoneEnabled);

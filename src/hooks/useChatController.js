@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createAppError } from "../lib/appErrors.js";
 import { getChatErrorMessage } from "../lib/chatErrors.js";
+import {
+  DEFAULT_STREAM_PROTOCOL,
+  normalizeStreamProtocol,
+} from "../lib/streamProtocol.js";
 
 const RECONNECT_DELAYS_MS = [
   1_000,
@@ -31,6 +35,7 @@ function upsertMessages(currentMessages, incomingMessages) {
 function getDefaultStreamState() {
   return {
     isLive: false,
+    protocol: DEFAULT_STREAM_PROTOCOL,
     startedAt: null
   };
 }
@@ -40,7 +45,9 @@ function getDefaultRoomMeta() {
     title: "",
     stream: {
       relayUrl: "",
-      namespace: ""
+      namespace: "",
+      protocol: DEFAULT_STREAM_PROTOCOL,
+      webRtcUrl: ""
     },
     host: {
       id: "",
@@ -224,13 +231,16 @@ export function useChatController({
           setCanControlBroadcast(Boolean(payload.canControlBroadcast));
           setStreamState({
             isLive: Boolean(payload.stream?.isLive),
+            protocol: normalizeStreamProtocol(payload.stream?.protocol),
             startedAt: payload.stream?.startedAt || null
           });
           setRoomMeta({
             title: payload.roomMeta?.title || "",
             stream: {
               relayUrl: payload.roomMeta?.stream?.relayUrl || "",
-              namespace: payload.roomMeta?.stream?.namespace || ""
+              namespace: payload.roomMeta?.stream?.namespace || "",
+              protocol: normalizeStreamProtocol(payload.roomMeta?.stream?.protocol),
+              webRtcUrl: payload.roomMeta?.stream?.webRtcUrl || ""
             },
             host: {
               id: payload.roomMeta?.host?.id || "",
@@ -268,6 +278,7 @@ export function useChatController({
         if (payload.type === "stream.started") {
           setStreamState({
             isLive: true,
+            protocol: normalizeStreamProtocol(payload.stream?.protocol),
             startedAt: payload.stream?.startedAt || new Date().toISOString()
           });
           return;
@@ -283,7 +294,9 @@ export function useChatController({
             title: payload.roomMeta?.title || "",
             stream: {
               relayUrl: payload.roomMeta?.stream?.relayUrl || "",
-              namespace: payload.roomMeta?.stream?.namespace || ""
+              namespace: payload.roomMeta?.stream?.namespace || "",
+              protocol: normalizeStreamProtocol(payload.roomMeta?.stream?.protocol),
+              webRtcUrl: payload.roomMeta?.stream?.webRtcUrl || ""
             },
             host: {
               id: payload.roomMeta?.host?.id || "",

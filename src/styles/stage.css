@@ -1,5 +1,6 @@
 .stage-frame {
   position: relative;
+  isolation: isolate;
   min-height: 0;
   aspect-ratio: 16 / 9;
   border-radius: 24px;
@@ -38,6 +39,22 @@
   aspect-ratio: 9 / 16;
 }
 
+.watch-element-pip-body {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.watch-element-pip-body .watch-stage-frame {
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  aspect-ratio: auto;
+}
+
 .page-immersive .placeholder,
 .page-immersive .publisher-placeholder {
   padding: 0;
@@ -56,6 +73,7 @@
 }
 
 .player-moq,
+.player-webrtc,
 .publisher-preview,
 publisher-moq {
   display: block;
@@ -74,6 +92,12 @@ publisher-moq {
   height: auto;
   object-fit: contain;
   object-position: center;
+}
+
+.player-webrtc {
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 
 .publisher-preview {

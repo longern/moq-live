@@ -108,7 +108,7 @@
 
   .watch-layout .control-column > .control-block:not(.chat-panel-block) {
     flex: 0 0 auto;
-    padding: 18px;
+    padding: 16px;
   }
 
   .watch-layout .control-column .chat-panel-block {
@@ -116,11 +116,11 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    padding: 18px 0;
+    padding: 16px 0;
   }
 
   .watch-layout .control-column > .control-block:first-child {
-    margin-top: 18px;
+    margin-top: 16px;
   }
 
   .watch-layout .control-column > .chat-panel-block:first-child {
@@ -177,28 +177,28 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 18px 0;
+    padding: 16px 0;
     border-bottom: 0;
   }
 
   .live-layout .chat-panel-head {
     flex: 0 0 auto;
     margin: 0;
-    padding-inline: 18px;
+    padding-inline: 16px;
   }
 
   .live-layout .chat-message-list {
     flex: 1 1 auto;
     max-height: none;
     min-height: 0;
-    padding: 0 18px 6px;
+    padding: 0 16px 6px;
   }
 
   .live-layout .chat-composer,
   .live-layout .chat-composer-readonly,
   .live-layout .inline-warning {
     flex: 0 0 auto;
-    margin-inline: 18px;
+    margin-inline: 16px;
   }
 
   .live-layout .chat-message-card {
@@ -688,6 +688,7 @@
   input,
   select {
     min-height: 44px;
+    padding: 9px 12px;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.05);
   }
@@ -723,6 +724,7 @@
   button.success {
     width: 100%;
     min-height: 44px;
+    padding: 0 16px;
     font-weight: 650;
   }
 
@@ -759,6 +761,61 @@
   .watch-mobile-more-panel {
     gap: 12px;
     padding: 16px;
+  }
+
+  .watch-mobile-more-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .watch-mobile-more-action {
+    min-width: 0;
+    min-height: 76px;
+    padding: 8px 6px;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 7px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: rgba(235, 244, 251, 0.92);
+    box-shadow: none;
+    font-size: 0.76rem;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+
+  .watch-mobile-more-action:hover:not(:disabled),
+  .watch-mobile-more-action:focus-visible {
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .watch-mobile-more-action:focus-visible {
+    outline: 2px solid var(--primary-ring);
+    outline-offset: 2px;
+  }
+
+  .watch-mobile-more-action:disabled {
+    cursor: default;
+    opacity: 0.42;
+  }
+
+  .watch-mobile-more-action-icon {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .watch-mobile-more-action-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 1.9;
   }
 
   .watch-audience-panel {

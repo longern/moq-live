@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChatPanel } from "../ChatPanel.jsx";
 import { StatusPill } from "../StatusPill.jsx";
+import { UserAvatar } from "../UserAvatar.jsx";
 import {
   BroadcastIcon,
   CloseIcon,
@@ -176,15 +177,20 @@ export function LiveDesktopPage(props) {
     hidden,
     room,
     roomLabel,
+    roomAvatarUrl,
     publishBlocked,
     publishBlockedReason,
     publishBadge,
     cameraOptions,
     microphoneOptions,
     publishQualityOptions = [],
+    publishProtocolOptions = [],
     selectedCameraId,
     selectedMicrophoneId,
     publishQualityId,
+    publishProtocol,
+    webRtcPublishUrl,
+    webRtcPlaybackUrl,
     cameraEnabled,
     microphoneEnabled,
     cameraMode,
@@ -201,6 +207,9 @@ export function LiveDesktopPage(props) {
     onCameraChange,
     onMicrophoneChange,
     onPublishQualityChange,
+    onPublishProtocolChange,
+    onWebRtcPublishUrlChange,
+    onWebRtcPlaybackUrlChange,
     onCycleCamera,
     onToggleMicrophone,
     onTogglePublish,
@@ -250,6 +259,7 @@ export function LiveDesktopPage(props) {
     : screenShareActive
       ? "停止屏幕分享"
       : "屏幕分享";
+  const desktopHostId = shareTarget || room || roomLabel;
 
   useEffect(() => {
     if (!openPanel) {
@@ -329,7 +339,14 @@ export function LiveDesktopPage(props) {
     <LiveQualityMenu
       publishQualityOptions={publishQualityOptions}
       publishQualityId={publishQualityId}
+      publishProtocolOptions={publishProtocolOptions}
+      publishProtocol={publishProtocol}
+      webRtcPublishUrl={webRtcPublishUrl}
+      webRtcPlaybackUrl={webRtcPlaybackUrl}
       onPublishQualityChange={onPublishQualityChange}
+      onPublishProtocolChange={onPublishProtocolChange}
+      onWebRtcPublishUrlChange={onWebRtcPublishUrlChange}
+      onWebRtcPlaybackUrlChange={onWebRtcPlaybackUrlChange}
     />
   ) : openPanel === "link" ? (
     <ShareLinkPanel
@@ -361,14 +378,30 @@ export function LiveDesktopPage(props) {
   return (
     <section className="page page-immersive live-desktop-page" data-page="live" hidden={hidden}>
       <div className="live-page-top">
-        <button
-          type="button"
-          className={`live-page-close${publishControlActive ? " is-live-control" : ""}`}
-          onClick={publishControlActive ? onTogglePublish : onRequestClose}
-          aria-label={publishControlActive ? (isStarting ? "取消开播" : "结束直播") : "退出开播页"}
-        >
-          {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
-        </button>
+        <div className="live-desktop-head-left">
+          <button
+            type="button"
+            className={`live-page-close${publishControlActive ? " is-live-control" : ""}`}
+            onClick={publishControlActive ? onTogglePublish : onRequestClose}
+            aria-label={publishControlActive ? (isStarting ? "取消开播" : "结束直播") : "退出开播页"}
+          >
+            {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
+          </button>
+          <div className="live-desktop-head-identity">
+            <UserAvatar
+              avatarUrl={roomAvatarUrl}
+              displayName={roomLabel}
+              className="live-desktop-head-avatar"
+              imgAlt={roomLabel || "主播头像"}
+              imgWidth={30}
+              imgHeight={30}
+              monogramClassName="is-monogram"
+              placeholderClassName="is-placeholder"
+              iconClassName="live-desktop-head-avatar-icon"
+            />
+            <span>{desktopHostId}</span>
+          </div>
+        </div>
         {!publishControlActive ? (
           <div className="live-mode-switch" role="group" aria-label="开播模式">
             <button
@@ -412,19 +445,11 @@ export function LiveDesktopPage(props) {
                 onClick={() => setOpenPanel("")}
               />
             ) : null}
-            <div className="live-desktop-meta">
-              <div className="live-desktop-room">
-                <span>直播间</span>
-                <strong data-room-label>{roomLabel}</strong>
-              </div>
-            </div>
-
+            {publishBlocked ? (
+              <p className="inline-warning live-desktop-warning">{publishBlockedReason}</p>
+            ) : null}
             <div className="live-desktop-dock">
               <LiveDesktopPanel className={activePanelClassName}>{activePanel}</LiveDesktopPanel>
-
-              {publishBlocked ? (
-                <p className="inline-warning live-desktop-warning">{publishBlockedReason}</p>
-              ) : null}
 
               <div className="live-desktop-actions" role="toolbar" aria-label="开播控制">
                 <button

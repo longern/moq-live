@@ -5,17 +5,15 @@ function joinClassNames(...classNames) {
 export function LiveMenuList({
   children,
   className = "",
-  role,
   ariaLabel,
 }) {
   return (
-    <div
+    <ul
       className={joinClassNames("live-menu-list", className)}
-      role={role}
       aria-label={ariaLabel}
     >
       {children}
-    </div>
+    </ul>
   );
 }
 
@@ -26,12 +24,14 @@ export function LiveMenuItem({
   ...buttonProps
 }) {
   return (
-    <button
-      type="button"
-      className={joinClassNames("live-menu-item", active ? "is-active" : "", className)}
-      {...buttonProps}
-    >
-      {children}
-    </button>
+    <li className="live-menu-list-item">
+      <button
+        type="button"
+        className={joinClassNames("live-menu-item", active ? "is-active" : "", className)}
+        {...buttonProps}
+      >
+        {children}
+      </button>
+    </li>
   );
 }

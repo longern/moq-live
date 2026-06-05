@@ -10,6 +10,13 @@ import {
   createSyntheticMedia,
   sampleCanvasMarkerSignature,
 } from "../lib/syntheticMedia.js";
+import {
+  DEFAULT_STREAM_PROTOCOL,
+  STREAM_PROTOCOL_WEBRTC,
+  STREAM_PROTOCOL_OPTIONS,
+  normalizeStreamProtocol,
+} from "../lib/streamProtocol.js";
+import { createWhipPublishSession } from "../lib/whipClient.js";
 
 const VIDEO_TARGET_WIDTH = 1280;
 const VIDEO_TARGET_HEIGHT = 720;
@@ -50,6 +57,7 @@ const PREVIEW_SOURCE_SCREEN = "screen";
 const PREVIEW_SOURCE_SYNTHETIC = "synthetic";
 const DEFAULT_PREVIEW_SOURCE = PREVIEW_SOURCE_CAMERA;
 const PUBLISH_CONNECT_TIMEOUT_MS = 10_000;
+const MUSIC_AUDIO_TRACKS = new WeakSet();
 
 function getPublishQuality(id) {
   return (
@@ -140,11 +148,46 @@ function buildMicrophoneAudioConstraints(deviceId = "") {
   return Object.keys(constraints).length > 0 ? constraints : true;
 }
 
+function setAudioTrackContentHint(track, contentHint) {
+  if (!track || !("contentHint" in track)) {
+    return;
+  }
+
+  try {
+    track.contentHint = contentHint;
+  } catch {
+    // Some browsers expose contentHint but reject values for specific sources.
+  }
+}
+
+function markMusicAudioTrack(track) {
+  if (!track) {
+    return;
+  }
+
+  MUSIC_AUDIO_TRACKS.add(track);
+  setAudioTrackContentHint(track, "music");
+}
+
+function isMusicAudioTrack(track) {
+  return Boolean(track && MUSIC_AUDIO_TRACKS.has(track));
+}
+
+function buildMoqAudioSource(track, kind = "auto") {
+  if (!track) {
+    return undefined;
+  }
+
+  return kind === "music" ? { track, kind } : track;
+}
+
 export function usePublisherController({
   page,
   pageRef,
   relayUrlRef,
   roomRef,
+  webRtcPublishUrlRef,
+  webRtcPlaybackUrlRef,
   generateRoomId,
   assertCanPublish,
   syntheticSessionRef: externalSyntheticSessionRef,
@@ -159,6 +202,9 @@ export function usePublisherController({
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState("");
   const [publishQualityId, setPublishQualityIdState] = useState(DEFAULT_PUBLISH_QUALITY_ID);
+  const [publishProtocol, setPublishProtocolState] = useState(DEFAULT_STREAM_PROTOCOL);
+  const [webRtcPublishUrl, setWebRtcPublishUrlState] = useState("");
+  const [webRtcPlaybackUrl, setWebRtcPlaybackUrlState] = useState("");
   const [cameraEnabled, setCameraEnabledState] = useState(true);
   const [microphoneEnabled, setMicrophoneEnabledState] = useState(true);
   const [previewActive, setPreviewActive] = useState(false);
@@ -192,6 +238,9 @@ export function usePublisherController({
   const selectedCameraIdRef = useRef(selectedCameraId);
   const selectedMicrophoneIdRef = useRef(selectedMicrophoneId);
   const publishQualityIdRef = useRef(publishQualityId);
+  const publishProtocolRef = useRef(publishProtocol);
+  const webRtcPublishUrlValueRef = useRef(webRtcPublishUrl);
+  const webRtcPlaybackUrlValueRef = useRef(webRtcPlaybackUrl);
 
   publisherIsPublishingRef.current = publisherIsPublishing;
   publisherIsStartingRef.current = publisherIsStarting;
@@ -201,6 +250,9 @@ export function usePublisherController({
   selectedCameraIdRef.current = selectedCameraId;
   selectedMicrophoneIdRef.current = selectedMicrophoneId;
   publishQualityIdRef.current = publishQualityId;
+  publishProtocolRef.current = publishProtocol;
+  webRtcPublishUrlValueRef.current = webRtcPublishUrl;
+  webRtcPlaybackUrlValueRef.current = webRtcPlaybackUrl;
 
   function updatePublishStatus(kind, message) {
     setPublishStatusKind(kind);
@@ -233,6 +285,25 @@ export function usePublisherController({
 
     appliedPublishQualityIdRef.current = normalizedQualityId;
     log(`publish quality set: ${normalizedQualityId}`);
+  }
+
+  async function setPublishProtocol(nextProtocol) {
+    const normalizedProtocol = normalizeStreamProtocol(nextProtocol);
+    publishProtocolRef.current = normalizedProtocol;
+    setPublishProtocolState(normalizedProtocol);
+    log(`publish protocol set: ${normalizedProtocol}`);
+  }
+
+  function setWebRtcPublishUrl(nextUrl) {
+    const value = String(nextUrl ?? "");
+    webRtcPublishUrlValueRef.current = value;
+    setWebRtcPublishUrlState(value);
+  }
+
+  function setWebRtcPlaybackUrl(nextUrl) {
+    const value = String(nextUrl ?? "");
+    webRtcPlaybackUrlValueRef.current = value;
+    setWebRtcPlaybackUrlState(value);
   }
 
   function ensureRoomId(force = false) {
@@ -358,11 +429,13 @@ export function usePublisherController({
     namespace,
     videoTrack,
     audioTrack,
+    audioKind = "auto",
     maxPixels,
     qualityId = publishQualityIdRef.current,
     audioMuted = !microphoneEnabledRef.current,
   }) {
     const qualityConfig = getPublishQualityConfig(qualityId);
+    const audioSource = buildMoqAudioSource(audioTrack, audioKind);
     const connection = new MoqPublish.Lite.Connection.Reload({
       enabled: true,
       url: new URL(relayUrl),
@@ -387,7 +460,7 @@ export function usePublisherController({
       },
       audio: {
         enabled: Boolean(audioTrack),
-        source: audioTrack || undefined,
+        source: audioSource,
         muted: audioMuted,
         volume: 1,
       },
@@ -447,6 +520,9 @@ export function usePublisherController({
     }
 
     const fallbackTrack = sourceTrack.clone?.() ?? sourceTrack;
+    if (isMusicAudioTrack(sourceTrack)) {
+      markMusicAudioTrack(fallbackTrack);
+    }
     const AudioContextCtor =
       globalThis.AudioContext || globalThis.webkitAudioContext;
     if (typeof AudioContextCtor !== "function") {
@@ -492,6 +568,9 @@ export function usePublisherController({
       }
 
       mixedTrack.enabled = sourceTrack.enabled;
+      if (isMusicAudioTrack(sourceTrack)) {
+        markMusicAudioTrack(mixedTrack);
+      }
       return {
         track: mixedTrack,
         cleanup: () => {
@@ -998,6 +1077,7 @@ export function usePublisherController({
     let microphoneTrack = null;
 
     if (audioTrack) {
+      markMusicAudioTrack(audioTrack);
       await relaxSharedAudioTrack(audioTrack);
     }
 
@@ -1173,6 +1253,9 @@ export function usePublisherController({
         ? stream.getVideoTracks()[0]
         : null;
       const previewAudioTrack = stream.getAudioTracks()[0];
+      const previewAudioKind = isMusicAudioTrack(previewAudioTrack)
+        ? "music"
+        : "auto";
       if (!previewVideoTrack && !previewAudioTrack) {
         throw createAppError("publish_tracks_unavailable");
       }
@@ -1211,14 +1294,47 @@ export function usePublisherController({
         publishAudioTrack.enabled = microphoneEnabledRef.current;
       }
 
-      session = createPublishSession({
-        relayUrl: nextRelayUrl,
-        namespace,
-        videoTrack: publishVideoTrack,
-        audioTrack: publishAudioTrack,
-        maxPixels: width && height ? width * height : VIDEO_TARGET_WIDTH * VIDEO_TARGET_HEIGHT,
-        qualityId: publishQualityIdRef.current,
-      });
+      if (publishProtocolRef.current === STREAM_PROTOCOL_WEBRTC) {
+        const nextWebRtcPublishUrl = (
+          webRtcPublishUrlRef?.current ||
+          webRtcPublishUrlValueRef.current ||
+          ""
+        ).trim();
+        if (!nextWebRtcPublishUrl) {
+          throw createAppError("webrtc_publish_url_missing");
+        }
+        const nextWebRtcPlaybackUrl = (
+          webRtcPlaybackUrlRef?.current ||
+          webRtcPlaybackUrlValueRef.current ||
+          ""
+        ).trim();
+        if (!nextWebRtcPlaybackUrl) {
+          throw createAppError("webrtc_playback_url_missing");
+        }
+        const publishTracks = [publishVideoTrack, publishAudioTrack].filter(Boolean);
+        const whipSession = await createWhipPublishSession({
+          url: nextWebRtcPublishUrl,
+          tracks: publishTracks,
+        });
+        session = {
+          protocol: STREAM_PROTOCOL_WEBRTC,
+          publishTracks,
+          connection: whipSession,
+          close() {
+            whipSession.close();
+          },
+        };
+      } else {
+        session = createPublishSession({
+          relayUrl: nextRelayUrl,
+          namespace,
+          videoTrack: publishVideoTrack,
+          audioTrack: publishAudioTrack,
+          audioKind: previewAudioKind,
+          maxPixels: width && height ? width * height : VIDEO_TARGET_WIDTH * VIDEO_TARGET_HEIGHT,
+          qualityId: publishQualityIdRef.current,
+        });
+      }
       pendingPublisherRef.current = session;
       session.cleanupPublishTracks = () => {
         session.publishTracks.forEach((track) => {
@@ -1231,12 +1347,14 @@ export function usePublisherController({
         stableAudio.cleanup?.();
       };
 
-      await waitForSignalValue(
-        session.connection.status,
-        (status) => status === "connected",
-        PUBLISH_CONNECT_TIMEOUT_MS,
-        "publish_connect_timeout",
-      );
+      if (publishProtocolRef.current !== STREAM_PROTOCOL_WEBRTC) {
+        await waitForSignalValue(
+          session.connection.status,
+          (status) => status === "connected",
+          PUBLISH_CONNECT_TIMEOUT_MS,
+          "publish_connect_timeout",
+        );
+      }
       if (publishStartTokenRef.current !== startToken) {
         closePublishSession(session);
         updatePublishStatus("idle", "直播启动已取消。");
@@ -1566,9 +1684,13 @@ export function usePublisherController({
     cameraOptions,
     microphoneOptions,
     publishQualityOptions: PUBLISH_QUALITY_OPTIONS,
+    publishProtocolOptions: STREAM_PROTOCOL_OPTIONS,
     selectedCameraId,
     selectedMicrophoneId,
     publishQualityId,
+    publishProtocol,
+    webRtcPublishUrl,
+    webRtcPlaybackUrl,
     cameraEnabled,
     microphoneEnabled,
     previewActive,
@@ -1583,6 +1705,9 @@ export function usePublisherController({
     setSelectedCameraId,
     setSelectedMicrophoneId,
     setPublishQualityId,
+    setPublishProtocol,
+    setWebRtcPublishUrl,
+    setWebRtcPlaybackUrl,
     setCameraEnabled,
     setMicrophoneEnabled,
     switchPublishCamera,

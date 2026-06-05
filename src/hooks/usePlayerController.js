@@ -13,6 +13,8 @@ export function usePlayerController({
   initialAutorun,
   relayUrlRef,
   roomRef,
+  streamProtocolRef,
+  webRtcUrlRef,
   setLogText,
   log,
   syntheticSessionRef,
@@ -23,6 +25,8 @@ export function usePlayerController({
   const session = usePlayerSession({
     relayUrlRef,
     roomRef,
+    streamProtocolRef,
+    webRtcUrlRef,
     setLogText,
     log,
     audioPlaybackSupported,

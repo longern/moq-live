@@ -122,6 +122,8 @@ export function usePlayerController({
     playerMediaSize: layout.playerMediaSize,
     playerOrientation: layout.playerOrientation,
     playerSession: session.playerSession,
+    playerStarted: session.playerStarted,
+    playerFreezeFrameUrl: session.playerFreezeFrameUrl,
     playerRef: session.playerRef,
     watchStageRef: session.watchStageRef,
     startPlayer,

@@ -57,7 +57,9 @@ const PREVIEW_SOURCE_SCREEN = "screen";
 const PREVIEW_SOURCE_SYNTHETIC = "synthetic";
 const DEFAULT_PREVIEW_SOURCE = PREVIEW_SOURCE_CAMERA;
 const PUBLISH_CONNECT_TIMEOUT_MS = 10_000;
+const MICROPHONE_PUBLISH_GAIN = 1.6;
 const MUSIC_AUDIO_TRACKS = new WeakSet();
+const MICROPHONE_AUDIO_TRACKS = new WeakSet();
 
 function getPublishQuality(id) {
   return (
@@ -137,9 +139,19 @@ function buildSharedAudioConstraints() {
 }
 
 function buildMicrophoneAudioConstraints(deviceId = "") {
-  const sharedConstraints = buildSharedAudioConstraints();
-  const constraints =
-    sharedConstraints === true ? {} : { ...sharedConstraints };
+  const supported =
+    navigator.mediaDevices?.getSupportedConstraints?.() ?? {};
+  const constraints = {};
+
+  if (supported.echoCancellation) {
+    constraints.echoCancellation = true;
+  }
+  if (supported.noiseSuppression) {
+    constraints.noiseSuppression = true;
+  }
+  if (supported.autoGainControl) {
+    constraints.autoGainControl = true;
+  }
 
   if (deviceId) {
     constraints.deviceId = { exact: deviceId };
@@ -171,6 +183,19 @@ function markMusicAudioTrack(track) {
 
 function isMusicAudioTrack(track) {
   return Boolean(track && MUSIC_AUDIO_TRACKS.has(track));
+}
+
+function markMicrophoneAudioTrack(track) {
+  if (!track) {
+    return;
+  }
+
+  MICROPHONE_AUDIO_TRACKS.add(track);
+  setAudioTrackContentHint(track, "speech");
+}
+
+function isMicrophoneAudioTrack(track) {
+  return Boolean(track && MICROPHONE_AUDIO_TRACKS.has(track));
 }
 
 function buildMoqAudioSource(track, kind = "auto") {
@@ -546,6 +571,8 @@ export function usePublisherController({
     const fallbackTrack = sourceTrack.clone?.() ?? sourceTrack;
     if (isMusicAudioTrack(sourceTrack)) {
       markMusicAudioTrack(fallbackTrack);
+    } else if (isMicrophoneAudioTrack(sourceTrack)) {
+      markMicrophoneAudioTrack(fallbackTrack);
     }
     const AudioContextCtor =
       globalThis.AudioContext || globalThis.webkitAudioContext;
@@ -570,7 +597,9 @@ export function usePublisherController({
         new MediaStream([sourceTrack]),
       );
       microphoneGain = audioContext.createGain();
-      microphoneGain.gain.value = 1;
+      microphoneGain.gain.value = isMicrophoneAudioTrack(sourceTrack)
+        ? MICROPHONE_PUBLISH_GAIN
+        : 1;
       destination = audioContext.createMediaStreamDestination();
 
       sourceNode.connect(microphoneGain);
@@ -594,6 +623,8 @@ export function usePublisherController({
       mixedTrack.enabled = sourceTrack.enabled;
       if (isMusicAudioTrack(sourceTrack)) {
         markMusicAudioTrack(mixedTrack);
+      } else if (isMicrophoneAudioTrack(sourceTrack)) {
+        markMicrophoneAudioTrack(mixedTrack);
       }
       return {
         track: mixedTrack,
@@ -958,7 +989,9 @@ export function usePublisherController({
     };
     const microphoneStream =
       await navigator.mediaDevices.getUserMedia(microphoneConstraints);
-    return microphoneStream.getAudioTracks()[0] ?? null;
+    const microphoneTrack = microphoneStream.getAudioTracks()[0] ?? null;
+    markMicrophoneAudioTrack(microphoneTrack);
+    return microphoneTrack;
   }
 
   function shouldUsePortraitSyntheticPreview() {
@@ -1020,6 +1053,9 @@ export function usePublisherController({
 
       if (!cameraEnabledRef.current) {
         removeVideoTracksFromStream(stream);
+      }
+      for (const track of stream.getAudioTracks()) {
+        markMicrophoneAudioTrack(track);
       }
 
       if (
@@ -1146,6 +1182,10 @@ export function usePublisherController({
     // Fall back to microphone only when the browser did not provide display audio.
     if (!audioTrack && microphoneTrack) {
       audioTrack = microphoneTrack;
+      microphoneTrack = null;
+    }
+    if (microphoneTrack) {
+      microphoneTrack.stop();
     }
 
     if (

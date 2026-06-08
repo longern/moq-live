@@ -93,6 +93,81 @@ function shouldUseWatchPlayerShell({
   );
 }
 
+function getDesiredWatchPlaybackTarget({
+  page,
+  watchRouteCommitted,
+  watchingNamespace,
+  directWatchNamespace,
+  resolvedWatchRoomId,
+  roomStateReady,
+  isLive,
+  playbackReady,
+  protocol,
+  relayUrl,
+  namespace,
+  webRtcUrl,
+  startedAt,
+}) {
+  if (page !== "watch" || !watchRouteCommitted) {
+    return null;
+  }
+
+  if (watchingNamespace) {
+    if (!directWatchNamespace) {
+      return null;
+    }
+    const roomId = `namespace:${directWatchNamespace.toLowerCase()}`;
+    return {
+      roomId,
+      startedAt: "__namespace__",
+      protocol: STREAM_PROTOCOL_MOQ,
+      relayUrl,
+      namespace,
+      webRtcUrl: "",
+    };
+  }
+
+  if (!resolvedWatchRoomId || !roomStateReady || !isLive || !playbackReady) {
+    return null;
+  }
+
+  const targetStartedAt = startedAt || "__live__";
+  return {
+    roomId: resolvedWatchRoomId,
+    startedAt: targetStartedAt,
+    protocol,
+    relayUrl,
+    namespace,
+    webRtcUrl,
+  };
+}
+
+function playerSessionMatchesWatchTarget(playerSession, target) {
+  if (!playerSession || !target || playerSession.protocol !== target.protocol) {
+    return false;
+  }
+
+  if (target.protocol === STREAM_PROTOCOL_WEBRTC) {
+    return (
+      playerSession.webRtcUrl === target.webRtcUrl &&
+      playerSession.namespace === target.namespace
+    );
+  }
+
+  return (
+    playerSession.relayUrl === target.relayUrl &&
+    playerSession.namespace === target.namespace
+  );
+}
+
+function watchPlaybackRecordMatches(record, target) {
+  return (
+    record.roomId === target.roomId &&
+    record.startedAt === target.startedAt &&
+    record.protocol === target.protocol
+  );
+}
+
 let liveRouteModulePromise = null;
 
 function loadLiveRoute() {
@@ -292,6 +367,7 @@ export function App() {
     hostDisplayName: "",
     hostAvatarUrl: "",
     title: "",
+    welcomeMessage: "",
     coverUrl: ""
   });
   const [watchFollowState, setWatchFollowState] = useState({
@@ -440,6 +516,7 @@ export function App() {
     : watchRoomResolution.hostUserId || "";
   const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.hostAvatarUrl || "";
   const watchRoomCoverUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.coverUrl || "";
+  const watchWelcomeMessage = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.welcomeMessage || "";
   const siteIconUrl = "/icons/icon-192.png";
   const watchHostIcon = watchingNamespace ? "public-channel" : "";
   const watchShareTarget = watchingTestChannel
@@ -458,6 +535,8 @@ export function App() {
       }
     : null;
   const effectivePlayerSession = testPlayerSession ?? player.playerSession;
+  const effectivePlayerStarted = watchingTestChannel ? true : player.playerStarted;
+  const effectivePlayerFreezeFrameUrl = watchingTestChannel ? "" : player.playerFreezeFrameUrl;
   const effectivePlayerOrientation = watchTestChannel?.orientation ?? player.playerOrientation;
   const effectivePlayerStatusKind = watchingTestChannel ? "live" : player.playerStatusKind;
   const effectivePlayerStatus = watchTestChannel?.statusMessage ?? player.playerStatus;
@@ -755,6 +834,7 @@ export function App() {
         hostDisplayName: "",
         hostAvatarUrl: "",
         title: "",
+        welcomeMessage: "",
         coverUrl: ""
       });
       return;
@@ -772,6 +852,7 @@ export function App() {
         hostDisplayName: "",
         hostAvatarUrl: "",
         title: "",
+        welcomeMessage: "",
         coverUrl: ""
       });
 
@@ -798,6 +879,7 @@ export function App() {
           hostDisplayName: payload.room?.host?.displayName || "",
           hostAvatarUrl: payload.room?.host?.avatarUrl || "",
           title: payload.room?.title || "",
+          welcomeMessage: payload.room?.welcomeMessage || "",
           coverUrl: payload.room?.coverUrl || ""
         });
       } catch (error) {
@@ -815,6 +897,7 @@ export function App() {
           hostDisplayName: "",
           hostAvatarUrl: "",
           title: "",
+          welcomeMessage: "",
           coverUrl: ""
         });
         log(`watch resolve failed: ${message}`);
@@ -973,159 +1056,99 @@ export function App() {
   }, [authState.loading, authState.user, page, requireLoginForLive]);
 
   useEffect(() => {
-    if (!player.playerSession) {
+    const currentSession = player.playerSession;
+    const desiredWatchPlayback = getDesiredWatchPlaybackTarget({
+      page,
+      watchRouteCommitted,
+      watchingNamespace,
+      directWatchNamespace,
+      resolvedWatchRoomId,
+      roomStateReady: chat.roomStateReady,
+      isLive: chat.streamState.isLive,
+      playbackReady: resolvedWatchPlaybackReady,
+      protocol: resolvedWatchProtocol,
+      relayUrl: resolvedWatchRelayUrl,
+      namespace: resolvedWatchNamespace,
+      webRtcUrl: resolvedWatchWebRtcUrl,
+      startedAt: chat.streamState.startedAt,
+    });
+
+    if (!desiredWatchPlayback) {
+      if (!currentSession) {
+        return;
+      }
+
+      if (page !== "watch" || !watchRoom) {
+        handledWatchPlaybackRef.current = { roomId: "", startedAt: "", protocol: "" };
+        void player.stopPlayer();
+        return;
+      }
+
+      const streamEnded =
+        watchRouteCommitted &&
+        !watchingNamespace &&
+        resolvedWatchRoomId &&
+        chat.roomStateReady &&
+        !chat.streamState.isLive;
+      if (streamEnded) {
+        handledWatchPlaybackRef.current = { roomId: "", startedAt: "", protocol: "" };
+        void player.stopPlayer({
+          finalStatus: "直播已结束",
+          finalKind: "ended",
+          logMessage: "stopped player because stream ended",
+        });
+      }
       return;
     }
 
-    if (page === "watch" && watchRoom) {
-      return;
-    }
+    const current = handledWatchPlaybackRef.current;
+    const sessionMatchesTarget = playerSessionMatchesWatchTarget(
+      currentSession,
+      desiredWatchPlayback,
+    );
+    const targetAlreadyHandled = watchPlaybackRecordMatches(
+      current,
+      desiredWatchPlayback,
+    );
+    const shouldRestartCurrentPlayback =
+      current.roomId === desiredWatchPlayback.roomId &&
+      Boolean(current.startedAt) &&
+      current.startedAt !== desiredWatchPlayback.startedAt &&
+      current.protocol === desiredWatchPlayback.protocol;
 
-    void player.stopPlayer();
-  }, [page, player.playerSession, watchRoom]);
-
-  useEffect(() => {
-    if (
-      page !== "watch"
-      || !watchRouteCommitted
-      || !watchingNamespace
-      || !directWatchNamespace
-    ) {
-      return;
-    }
-
-    if (
-      !player.playerSession
-      || player.playerSession.protocol !== STREAM_PROTOCOL_MOQ
-      || player.playerSession.relayUrl !== resolvedWatchRelayUrl
-      || player.playerSession.namespace !== resolvedWatchNamespace
-    ) {
+    if (!currentSession || !sessionMatchesTarget || shouldRestartCurrentPlayback) {
+      handledWatchPlaybackRef.current = {
+        roomId: desiredWatchPlayback.roomId,
+        startedAt: desiredWatchPlayback.startedAt,
+        protocol: desiredWatchPlayback.protocol,
+      };
       void player.startPlayer();
+      return;
+    }
+
+    if (!targetAlreadyHandled) {
+      handledWatchPlaybackRef.current = {
+        roomId: desiredWatchPlayback.roomId,
+        startedAt: desiredWatchPlayback.startedAt,
+        protocol: desiredWatchPlayback.protocol,
+      };
     }
   }, [
+    chat.roomStateReady,
+    chat.streamState.isLive,
+    chat.streamState.startedAt,
     directWatchNamespace,
     page,
     player.playerSession,
     resolvedWatchNamespace,
-    resolvedWatchProtocol,
-    resolvedWatchRelayUrl,
-    watchRouteCommitted,
-    watchingNamespace
-  ]);
-
-  useEffect(() => {
-    if (
-      page !== "watch"
-      || !watchRouteCommitted
-      || watchingNamespace
-      || !resolvedWatchRoomId
-      || !chat.roomStateReady
-      || !chat.streamState.isLive
-      || !resolvedWatchPlaybackReady
-    ) {
-      return;
-    }
-
-    if (
-      !player.playerSession
-      || player.playerSession.protocol !== resolvedWatchProtocol
-      || (
-        watchUsesMoqPlayback &&
-        (
-          player.playerSession.relayUrl !== resolvedWatchRelayUrl
-          || player.playerSession.namespace !== resolvedWatchNamespace
-        )
-      )
-      || (
-        watchUsesWebRtcPlayback &&
-        player.playerSession.webRtcUrl !== resolvedWatchWebRtcUrl
-      )
-    ) {
-      void player.startPlayer();
-    }
-  }, [
-    chat.roomStateReady,
-    chat.streamState.isLive,
-    page,
-    player.playerSession,
-    resolvedWatchRoomId,
-    resolvedWatchNamespace,
     resolvedWatchPlaybackReady,
     resolvedWatchProtocol,
     resolvedWatchRelayUrl,
+    resolvedWatchRoomId,
     resolvedWatchWebRtcUrl,
+    watchRoom,
     watchRouteCommitted,
-    watchUsesMoqPlayback,
-    watchUsesWebRtcPlayback,
-    watchingNamespace
-  ]);
-
-  useEffect(() => {
-    if (
-      page !== "watch"
-      || !watchRouteCommitted
-      || watchingNamespace
-      || !resolvedWatchRoomId
-      || !chat.streamState.isLive
-      || !resolvedWatchPlaybackReady
-    ) {
-      return;
-    }
-
-    const startedAt = chat.streamState.startedAt || "__live__";
-    const current = handledWatchPlaybackRef.current;
-    if (
-      current.roomId === resolvedWatchRoomId &&
-      current.startedAt === startedAt &&
-      current.protocol === resolvedWatchProtocol
-    ) {
-      return;
-    }
-
-    handledWatchPlaybackRef.current = {
-      roomId: resolvedWatchRoomId,
-      startedAt,
-      protocol: resolvedWatchProtocol
-    };
-    void player.startPlayer();
-  }, [
-    chat.streamState.isLive,
-    chat.streamState.startedAt,
-    page,
-    resolvedWatchRoomId,
-    resolvedWatchPlaybackReady,
-    resolvedWatchProtocol,
-    watchRouteCommitted,
-    watchingNamespace
-  ]);
-
-  useEffect(() => {
-    if (
-      page !== "watch"
-      || !watchRouteCommitted
-      || watchingNamespace
-      || !resolvedWatchRoomId
-      || !chat.roomStateReady
-      || chat.streamState.isLive
-      || !player.playerSession
-    ) {
-      return;
-    }
-
-    handledWatchPlaybackRef.current = { roomId: "", startedAt: "", protocol: "" };
-    void player.stopPlayer({
-      finalStatus: "直播已结束",
-      finalKind: "ended",
-      logMessage: "stopped player because stream ended",
-    });
-  }, [
-    chat.roomStateReady,
-    chat.streamState.isLive,
-    page,
-    player.playerSession,
-    resolvedWatchRoomId,
-    watchRouteCommitted,
-    watchingNamespace
+    watchingNamespace,
   ]);
 
   useEffect(() => {
@@ -1359,6 +1382,7 @@ export function App() {
             watchJoined={watchJoined}
             roomLabel={watchRoomLabel}
             roomTitle={watchRoomTitle}
+            welcomeMessage={watchWelcomeMessage}
             hostUserId={watchHostUserId}
             hostHandle={watchRoomResolution.hostHandle}
             hostDisplayName={watchHostDisplayName}
@@ -1423,6 +1447,8 @@ export function App() {
             }}
             stageRef={player.watchStageRef}
             playerSession={effectivePlayerSession}
+            playerStarted={effectivePlayerStarted}
+            playerFreezeFrameUrl={effectivePlayerFreezeFrameUrl}
             playerRef={player.playerRef}
             testPlayback={watchTestChannel}
             authAvailable={authState.available}

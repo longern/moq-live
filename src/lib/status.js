@@ -3,6 +3,7 @@ const PLAYER_BADGES = {
   connecting: { label: "连接中", state: "warm" },
   live: { label: "直播中", state: "live" },
   buffering: { label: "缓冲中", state: "warm" },
+  paused: { label: "已暂停", state: "idle" },
   offair: { label: "未推流", state: "idle" },
   ended: { label: "已下播", state: "idle" },
   left: { label: "已离开", state: "idle" },

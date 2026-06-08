@@ -12,3 +12,6 @@ CREATE TABLE IF NOT EXISTS moq_user_follows (
 
 CREATE INDEX IF NOT EXISTS idx_moq_user_follows_followed
   ON moq_user_follows(followed_user_id, created_at DESC);
+
+ALTER TABLE moq_rooms
+  ADD COLUMN welcome_message TEXT NOT NULL DEFAULT '';

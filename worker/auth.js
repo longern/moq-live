@@ -18,6 +18,7 @@ const DEFAULT_HANDLE_PATTERN = /^pid_[a-z0-9]{8}$/;
 const HANDLE_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const MAX_ROOM_COVER_BYTES = 5 * 1024 * 1024;
 const MAX_ROOM_TITLE_LENGTH = 80;
+const MAX_ROOM_WELCOME_MESSAGE_LENGTH = 160;
 const ROOM_COVER_TYPES = {
   "image/avif": "avif",
   "image/jpeg": "jpg",
@@ -864,6 +865,7 @@ async function getRoomRowByHostUserId(db, userId) {
       id,
       host_user_id,
       title,
+      welcome_message,
       cover_url,
       created_at,
       updated_at
@@ -887,6 +889,7 @@ function buildRoomPayload(row) {
   return {
     id: row.id,
     title: row.title || "",
+    welcomeMessage: row.welcome_message || "",
     coverUrl: row.cover_url || "",
     updatedAt: row.updated_at || "",
   };
@@ -923,6 +926,19 @@ function sanitizeRoomTitle(value) {
   }
 
   return title;
+}
+
+function sanitizeRoomWelcomeMessage(value) {
+  if (typeof value !== "string") {
+    throw createHttpError(400, "invalid_room_welcome_message", "invalid_room_welcome_message");
+  }
+
+  const welcomeMessage = value.trim().replace(/\s+/g, " ");
+  if (Array.from(welcomeMessage).length > MAX_ROOM_WELCOME_MESSAGE_LENGTH) {
+    throw createHttpError(400, "invalid_room_welcome_message", "invalid_room_welcome_message");
+  }
+
+  return welcomeMessage;
 }
 
 function sanitizeHandle(value) {
@@ -1117,6 +1133,34 @@ export async function updateUserRoomTitle(db, userId, rawTitle) {
   return buildRoomPayload({
     ...currentRoom,
     title,
+    updated_at: now,
+  });
+}
+
+export async function updateUserRoomSettings(db, userId, payload = {}) {
+  const currentRoom = await requireUserRoomRow(db, userId);
+  const roomPatch = payload && typeof payload === "object" ? payload : {};
+  const nextTitle = Object.hasOwn(roomPatch, "title")
+    ? sanitizeRoomTitle(roomPatch.title)
+    : currentRoom.title || "";
+  const nextWelcomeMessage = Object.hasOwn(roomPatch, "welcomeMessage")
+    ? sanitizeRoomWelcomeMessage(roomPatch.welcomeMessage)
+    : currentRoom.welcome_message || "";
+  const now = new Date().toISOString();
+
+  await db
+    .prepare(
+      `UPDATE ${TABLES.rooms}
+       SET title = ?, welcome_message = ?, updated_at = ?
+       WHERE id = ? AND host_user_id = ?`,
+    )
+    .bind(nextTitle, nextWelcomeMessage, now, currentRoom.id, userId)
+    .run();
+
+  return buildRoomPayload({
+    ...currentRoom,
+    title: nextTitle,
+    welcome_message: nextWelcomeMessage,
     updated_at: now,
   });
 }

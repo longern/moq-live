@@ -227,6 +227,30 @@ export function LivePage({
     return payload;
   }
 
+  async function handleRoomWelcomeMessageSave(welcomeMessage) {
+    if (roomInfoBlockedReason) {
+      showToast(roomInfoBlockedReason);
+      return null;
+    }
+
+    const response = await fetch("/api/me/room", {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ welcomeMessage }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw createApiError(payload, "room_welcome_update_failed", { status: response.status });
+    }
+
+    onRoomDetailsChange?.(payload.room || null);
+    return payload;
+  }
+
   const pageProps = {
     hidden,
     roomLabel,
@@ -303,7 +327,9 @@ export function LivePage({
     onPickCover: handleRoomCoverPick,
     onOpenCoverPicker: openRoomCoverPicker,
     roomTitle: roomDetails?.title || "",
+    roomWelcomeMessage: roomDetails?.welcomeMessage || "",
     onSaveRoomTitle: handleRoomTitleSave,
+    onSaveRoomWelcomeMessage: handleRoomWelcomeMessageSave,
     onRoomInfoBlocked: () => showToast(roomInfoBlockedReason)
   };
   const visibleToastMessage = roomInfoBlockedReason || toastMessage;

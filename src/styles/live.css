@@ -876,7 +876,8 @@
   font-size: 0.86rem;
 }
 
-.live-more-title-field input {
+.live-more-title-field input,
+.live-more-title-field textarea {
   min-height: 42px;
   padding: 0 12px;
   border: 0;
@@ -888,8 +889,17 @@
   outline: none;
 }
 
+.live-more-title-field textarea {
+  min-height: 104px;
+  padding: 11px 12px;
+  line-height: 1.42;
+  resize: none;
+}
+
 .live-more-title-field input:focus,
-.live-more-title-field input:focus-visible {
+.live-more-title-field input:focus-visible,
+.live-more-title-field textarea:focus,
+.live-more-title-field textarea:focus-visible {
   border: 0;
   box-shadow: none;
   outline: none;

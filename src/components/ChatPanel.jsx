@@ -64,6 +64,7 @@ export function ChatPanel({
   variant = "default",
   className = "",
   title = "聊天室",
+  welcomeMessage = "",
   showComposer = true,
   showWelcome = true,
 }) {
@@ -93,9 +94,10 @@ export function ChatPanel({
   ].filter(Boolean).join(" ");
   const showWelcomeMessage =
     showWelcome && connectionState === "connected" && messages.length === 0;
-  const welcomeText = roomLabel
+  const configuredWelcomeText = String(welcomeMessage || "").trim();
+  const welcomeText = configuredWelcomeText || (roomLabel
     ? `欢迎来到 ${roomLabel} 的直播间`
-    : "欢迎来到直播间";
+    : "欢迎来到直播间");
 
   return (
     <section className={panelClassName}>

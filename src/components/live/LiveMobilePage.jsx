@@ -78,7 +78,9 @@ export function LiveMobilePage(props) {
     roomCoverStatus,
     roomCoverInputRef,
     roomTitle,
+    roomWelcomeMessage,
     onSaveRoomTitle,
+    onSaveRoomWelcomeMessage,
     roomInfoBlockedReason,
     onRoomInfoBlocked,
     onPickCover,
@@ -511,9 +513,11 @@ export function LiveMobilePage(props) {
             roomCoverStatus={roomCoverStatus}
             roomCoverInputRef={roomCoverInputRef}
             roomTitle={roomTitle}
+            roomWelcomeMessage={roomWelcomeMessage}
             onPickCover={onPickCover}
             onOpenCoverPicker={onOpenCoverPicker}
             onSaveRoomTitle={onSaveRoomTitle}
+            onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
             roomInfoBlockedReason={roomInfoBlockedReason}
             onRoomInfoBlocked={onRoomInfoBlocked}
             onShare={onShare}

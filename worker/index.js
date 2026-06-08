@@ -26,7 +26,7 @@ import {
   updateUserAvatar,
   updateUserProfile,
   updateUserRoomCover,
-  updateUserRoomTitle,
+  updateUserRoomSettings,
   upsertMicrosoftUser,
   verifyMicrosoftIdToken
 } from "./auth.js";
@@ -178,7 +178,7 @@ async function handleMyRoomUpdate(env, request) {
   }
 
   const payload = await request.json().catch(() => ({}));
-  const room = await updateUserRoomTitle(db, session.user.id, payload?.title ?? "");
+  const room = await updateUserRoomSettings(db, session.user.id, payload);
   return json({ ok: true, room });
 }
 
@@ -293,6 +293,7 @@ async function handleRooms(env) {
       rooms.id AS room_id,
       rooms.title AS room_title,
       rooms.cover_url AS room_cover_url,
+      rooms.welcome_message AS room_welcome_message,
       rooms.updated_at AS room_updated_at,
       users.handle AS host_handle,
       users.display_name AS host_display_name,
@@ -311,6 +312,7 @@ async function handleRooms(env) {
     rooms: rows.map((row) => ({
       id: row.room_id,
       title: row.room_title || "",
+      welcomeMessage: row.room_welcome_message || "",
       coverUrl: row.room_cover_url || "",
       updatedAt: row.room_updated_at || "",
       host: {
@@ -336,6 +338,7 @@ async function handleRoomResolve(env, request) {
       rooms.id AS room_id,
       rooms.title AS room_title,
       rooms.cover_url AS room_cover_url,
+      rooms.welcome_message AS room_welcome_message,
       users.id AS host_user_id,
       users.handle AS host_handle,
       users.display_name AS host_display_name,
@@ -357,6 +360,7 @@ async function handleRoomResolve(env, request) {
     room: {
       id: row.room_id,
       title: row.room_title || "",
+      welcomeMessage: row.room_welcome_message || "",
       coverUrl: normalizeMediaUrlForRequest(request, row.room_cover_url || ""),
       host: {
         id: row.host_user_id || "",

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getAppErrorMessage } from "../../lib/appErrors.js";
 import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
 import {
+  ChatIcon,
   CoverIcon,
   MenuChevronIcon,
   ShareIcon,
@@ -37,9 +38,11 @@ export function LiveMoreMenu({
   roomCoverStatus,
   roomCoverInputRef,
   roomTitle,
+  roomWelcomeMessage,
   onPickCover,
   onOpenCoverPicker,
   onSaveRoomTitle,
+  onSaveRoomWelcomeMessage,
   roomInfoBlockedReason = "",
   onRoomInfoBlocked,
   onShare,
@@ -52,14 +55,25 @@ export function LiveMoreMenu({
   const [titleSaving, setTitleSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
   const [titleStatus, setTitleStatus] = useState("");
+  const [welcomeDraft, setWelcomeDraft] = useState(roomWelcomeMessage || "");
+  const [welcomeSaving, setWelcomeSaving] = useState(false);
+  const [welcomeError, setWelcomeError] = useState("");
+  const [welcomeStatus, setWelcomeStatus] = useState("");
   const coverBusy = roomCoverBusy || roomCoverLoading;
   const titleUnchanged = titleDraft.trim().replace(/\s+/g, " ") === (roomTitle || "").trim().replace(/\s+/g, " ");
+  const welcomeUnchanged = welcomeDraft.trim().replace(/\s+/g, " ") === (roomWelcomeMessage || "").trim().replace(/\s+/g, " ");
 
   useEffect(() => {
     setTitleDraft(roomTitle || "");
     setTitleError("");
     setTitleStatus("");
   }, [roomTitle]);
+
+  useEffect(() => {
+    setWelcomeDraft(roomWelcomeMessage || "");
+    setWelcomeError("");
+    setWelcomeStatus("");
+  }, [roomWelcomeMessage]);
 
   function handleShare() {
     onShare();
@@ -93,6 +107,39 @@ export function LiveMoreMenu({
     }
   }
 
+  async function handleWelcomeSubmit(event) {
+    event.preventDefault();
+    if (!onSaveRoomWelcomeMessage || welcomeSaving || welcomeUnchanged) {
+      return;
+    }
+    if (roomInfoBlockedReason) {
+      onRoomInfoBlocked?.();
+      return;
+    }
+
+    setWelcomeSaving(true);
+    setWelcomeError("");
+    setWelcomeStatus("");
+
+    try {
+      const result = await onSaveRoomWelcomeMessage(welcomeDraft);
+      if (!result) {
+        return;
+      }
+      setWelcomeStatus("欢迎语已保存");
+    } catch (error) {
+      setWelcomeError(getAppErrorMessage(error));
+    } finally {
+      setWelcomeSaving(false);
+    }
+  }
+
+  const editorTitle = activeEditor === "cover"
+    ? "直播封面"
+    : activeEditor === "welcome"
+      ? "欢迎语"
+      : "直播标题";
+
   return (
     <>
       <input
@@ -124,6 +171,11 @@ export function LiveMoreMenu({
                 disabled={!shareSupported || !watchLink}
                 ariaLabel="分享直播间"
               />
+              <LiveMoreMenuItem
+                icon={<ChatIcon />}
+                label="欢迎语"
+                onClick={() => setActiveEditor("welcome")}
+              />
             </LiveMenuList>
           </div>
 
@@ -137,7 +189,7 @@ export function LiveMoreMenu({
               >
                 <MenuChevronIcon />
               </button>
-              <strong>{activeEditor === "cover" ? "直播封面" : "直播标题"}</strong>
+              <strong>{editorTitle}</strong>
             </div>
 
             {activeEditor === "cover" ? (
@@ -169,6 +221,34 @@ export function LiveMoreMenu({
                 {roomCoverError ? <p className="inline-warning">{roomCoverError}</p> : null}
                 {roomCoverStatus ? <p className="status">{roomCoverStatus}</p> : null}
               </div>
+            ) : activeEditor === "welcome" ? (
+              <form className="live-more-title-form" onSubmit={handleWelcomeSubmit}>
+                <label className="live-more-title-field">
+                  <span>欢迎语</span>
+                  <textarea
+                    value={welcomeDraft}
+                    onChange={(event) => {
+                      setWelcomeDraft(event.currentTarget.value);
+                      setWelcomeError("");
+                      setWelcomeStatus("");
+                    }}
+                    maxLength={160}
+                    placeholder="填写进入直播间时显示的欢迎语"
+                    disabled={welcomeSaving}
+                    rows={4}
+                  />
+                </label>
+                <div className="live-more-title-count">{Array.from(welcomeDraft).length}/160</div>
+                <button
+                  type="submit"
+                  className="live-more-primary-action"
+                  disabled={welcomeSaving || welcomeUnchanged}
+                >
+                  {welcomeSaving ? "保存中" : "保存欢迎语"}
+                </button>
+                {welcomeError ? <p className="inline-warning">{welcomeError}</p> : null}
+                {welcomeStatus ? <p className="status">{welcomeStatus}</p> : null}
+              </form>
             ) : (
               <form className="live-more-title-form" onSubmit={handleTitleSubmit}>
                 <label className="live-more-title-field">

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   attach,
   detachAll,
@@ -13,7 +13,10 @@ import {
   STREAM_PROTOCOL_WEBRTC,
   normalizeStreamProtocol,
 } from "../../lib/streamProtocol.js";
-import { createWhepPlaybackSession } from "../../lib/whepClient.js";
+import {
+  pauseWhepPlayerSession,
+  startWhepPlayerSession,
+} from "./whepPlayerSession.js";
 
 const PLAYER_TARGET_LATENCY_MS = 600;
 const AUDIO_TRACK_NAME = "audio/data";
@@ -22,6 +25,7 @@ const AUDIO_RECOVERY_MIN_INTERVAL_MS = 10_000;
 const AUDIO_RECOVERY_WINDOW_MS = 5 * 60 * 1000;
 const AUDIO_RECOVERY_STABLE_RESET_MS = 2 * 60 * 1000;
 const AUDIO_RECOVERY_MAX_ATTEMPTS = 12;
+const WHEP_UI_WATCHDOG_TIMEOUT_MS = 25_000;
 
 export function getAppleOsUpgradeMessage(navigatorLike = globalThis.navigator) {
   if (!navigatorLike || typeof navigatorLike !== "object") {
@@ -115,6 +119,8 @@ export function usePlayerSession({
   const [playerPaused, setPlayerPaused] = useState(false);
   const [playerMuted, setPlayerMutedState] = useState(!audioPlaybackSupported);
   const [playerSession, setPlayerSession] = useState(null);
+  const [playerStarted, setPlayerStarted] = useState(false);
+  const [playerFreezeFrameUrl, setPlayerFreezeFrameUrl] = useState("");
   const [fullscreenRotate, setFullscreenRotate] = useState(false);
   const [playbackStartToken, setPlaybackStartToken] = useState(0);
   const [moqWatchModule, setMoqWatchModule] = useState(null);
@@ -126,6 +132,7 @@ export function usePlayerSession({
   const playbackTokenRef = useRef(0);
   const sessionRef = useRef(null);
   const playerSessionStateRef = useRef(null);
+  const startInFlightRef = useRef(null);
   const orientationLockedRef = useRef(false);
   const audioFallbackLoggedRef = useRef(false);
   const desiredPlayerMutedRef = useRef(!audioPlaybackSupported);
@@ -244,6 +251,9 @@ export function usePlayerSession({
 
     if ("volume" in playerEl) {
       playerEl.volume = volume;
+      if ("muted" in playerEl) {
+        playerEl.muted = volume <= 0.001;
+      }
       return true;
     }
 
@@ -284,6 +294,7 @@ export function usePlayerSession({
 
     if (!hadPlayer) {
       setPlayerSession(null);
+      setPlayerFreezeFrameUrl("");
       setPlayerStatusKind("idle");
       setFullscreenActive(false);
       setFullscreenRotate(false);
@@ -299,6 +310,14 @@ export function usePlayerSession({
       clearInterval(current.tickerId);
       current.tickerId = null;
     }
+    if (current?.statsTickerId) {
+      clearInterval(current.statsTickerId);
+      current.statsTickerId = null;
+    }
+    if (current?.timeoutIds) {
+      current.timeoutIds.forEach((timeoutId) => clearTimeout(timeoutId));
+      current.timeoutIds.length = 0;
+    }
     if (current) {
       detachAll(current);
     }
@@ -312,7 +331,7 @@ export function usePlayerSession({
           current.broadcast.close();
         }
         if (current?.connection) {
-          current.connection.close();
+          await withTimeout(current.connection.close(), 1200);
         }
         if (typeof currentPlayer.destroy === "function") {
           await withTimeout(currentPlayer.destroy(), 1200);
@@ -325,6 +344,8 @@ export function usePlayerSession({
     }
 
     setPlayerSession(null);
+    setPlayerStarted(false);
+    setPlayerFreezeFrameUrl("");
     setFullscreenActive(false);
     setFullscreenRotate(false);
     setPlayerPaused(false);
@@ -346,16 +367,9 @@ export function usePlayerSession({
       ?? playerSessionStateRef.current?.layoutScopeKey
       ?? "";
     const targetMuted = !audioPlaybackSupported || initialMuted;
-    const token = ++playbackTokenRef.current;
-    await stopPlayer({
-      token,
-      finalStatus: "等待开始。",
-      finalKind: "idle",
-      logMessage: "reset player before restart",
-    });
-    setLogText("");
 
-    let nextSession;
+    let nextSessionBase;
+    let startSignature;
     try {
       const protocol = normalizeStreamProtocol(streamProtocolRef?.current ?? DEFAULT_STREAM_PROTOCOL);
       const namespace = roomRef.current.trim();
@@ -364,24 +378,32 @@ export function usePlayerSession({
       }
       if (protocol === STREAM_PROTOCOL_WEBRTC) {
         const webRtcUrl = new URL(webRtcUrlRef?.current ?? "").toString();
-        nextSession = {
-          key: `${protocol}-${namespace}-${token}`,
+        nextSessionBase = {
           layoutScopeKey: nextLayoutScopeKey,
-          token,
           protocol,
           namespace,
           webRtcUrl,
         };
+        startSignature = [
+          protocol,
+          namespace,
+          webRtcUrl,
+          nextLayoutScopeKey,
+        ].join("|");
       } else {
         const nextRelayUrl = new URL(relayUrlRef.current).toString();
-        nextSession = {
-          key: `${protocol}-${namespace}-${token}`,
+        nextSessionBase = {
           layoutScopeKey: nextLayoutScopeKey,
-          token,
           protocol,
           relayUrl: nextRelayUrl,
           namespace,
         };
+        startSignature = [
+          protocol,
+          namespace,
+          nextRelayUrl,
+          nextLayoutScopeKey,
+        ].join("|");
       }
     } catch (error) {
       const message = getAppErrorMessage(error);
@@ -392,59 +414,115 @@ export function usePlayerSession({
       return;
     }
 
-    if (nextSession.protocol === STREAM_PROTOCOL_WEBRTC) {
+    const inFlight = startInFlightRef.current;
+    if (inFlight?.signature === startSignature) {
+      logRef.current?.(`ignored duplicate player start: ${startSignature}`);
+      return inFlight.promise;
+    }
+
+    const startPromise = (async () => {
+      const token = ++playbackTokenRef.current;
+      await stopPlayer({
+        token,
+        finalStatus: "等待开始。",
+        finalKind: "idle",
+        logMessage: "reset player before restart",
+      });
+      if (token !== playbackTokenRef.current) {
+        logRef.current?.(
+          `aborted stale player start after stop: token=${token} current=${playbackTokenRef.current}`,
+        );
+        return;
+      }
+      setLogText("");
+
+      const nextSession = {
+        ...nextSessionBase,
+        key: `${nextSessionBase.protocol}-${nextSessionBase.namespace}-${token}`,
+        token,
+      };
+
+      if (nextSession.protocol === STREAM_PROTOCOL_WEBRTC) {
+        setPlayerSession(nextSession);
+        audioRecoveryInFlightRef.current = false;
+        setFullscreenActive(false);
+        setFullscreenRotate(false);
+        setPlayerPaused(false);
+        desiredPlayerMutedRef.current = false;
+        setPlayerMutedState(false);
+        updatePlayerStatus("connecting", "正在连接视频流。");
+        logRef.current?.(`created WHEP player: url=${nextSession.webRtcUrl}`);
+        return;
+      }
+
+      if (!globalThis.WebTransport) {
+        if (token === playbackTokenRef.current) {
+          updatePlayerStatus(
+            "error",
+            getAppleOsUpgradeMessage() ?? "浏览器版本过旧",
+          );
+          logRef.current?.("Browser does not support WebTransport");
+        }
+        return;
+      }
+
+      try {
+        await loadMoqWatchModule();
+        if (token !== playbackTokenRef.current) {
+          logRef.current?.(
+            `aborted stale MoQ start after module load: token=${token} current=${playbackTokenRef.current}`,
+          );
+          return;
+        }
+      } catch (error) {
+        if (token !== playbackTokenRef.current) {
+          return;
+        }
+        const message = getAppErrorMessage({ code: "moq_watch_load_failed" });
+        updatePlayerStatus("error", `失败：${message}`);
+        logRef.current?.(
+          `failed to load @moq/watch: ${error instanceof Error ? (error.stack ?? error.message) : message}`,
+        );
+        return;
+      }
+
+      if (token !== playbackTokenRef.current) {
+        logRef.current?.(
+          `aborted stale MoQ start before session commit: token=${token} current=${playbackTokenRef.current}`,
+        );
+        return;
+      }
+
       setPlayerSession(nextSession);
       audioRecoveryInFlightRef.current = false;
       setFullscreenActive(false);
       setFullscreenRotate(false);
       setPlayerPaused(false);
-      desiredPlayerMutedRef.current = false;
-      setPlayerMutedState(false);
-      updatePlayerStatus("connecting", "正在连接视频流。");
-      logRef.current?.(`created WHEP player: url=${nextSession.webRtcUrl}`);
-      return;
-    }
-
-    if (!globalThis.WebTransport) {
-      updatePlayerStatus(
-        "error",
-        getAppleOsUpgradeMessage() ?? "浏览器版本过旧",
-      );
-      logRef.current?.("Browser does not support WebTransport");
-      return;
-    }
-
-    try {
-      await loadMoqWatchModule();
-      if (token !== playbackTokenRef.current) {
-        return;
+      desiredPlayerMutedRef.current = targetMuted;
+      setPlayerMutedState(targetMuted);
+      if (!audioPlaybackSupported && !audioFallbackLoggedRef.current) {
+        logRef.current?.(
+          `audio playback disabled: ${getPlayerAudioSupportReason()}; auto-muted player`,
+        );
+        audioFallbackLoggedRef.current = true;
       }
-    } catch (error) {
-      const message = getAppErrorMessage({ code: "moq_watch_load_failed" });
-      updatePlayerStatus("error", `失败：${message}`);
+      updatePlayerStatus("connecting", "播放器已创建，正在连接 relay。");
       logRef.current?.(
-        `failed to load @moq/watch: ${error instanceof Error ? (error.stack ?? error.message) : message}`,
+        `created @moq/watch player: url=${nextSession.relayUrl} namespace=${nextSession.namespace}`,
       );
-      return;
-    }
+    })();
 
-    setPlayerSession(nextSession);
-    audioRecoveryInFlightRef.current = false;
-    setFullscreenActive(false);
-    setFullscreenRotate(false);
-    setPlayerPaused(false);
-    desiredPlayerMutedRef.current = targetMuted;
-    setPlayerMutedState(targetMuted);
-    if (!audioPlaybackSupported && !audioFallbackLoggedRef.current) {
-      logRef.current?.(
-        `audio playback disabled: ${getPlayerAudioSupportReason()}; auto-muted player`,
-      );
-      audioFallbackLoggedRef.current = true;
+    startInFlightRef.current = {
+      promise: startPromise,
+      signature: startSignature,
+    };
+    try {
+      await startPromise;
+    } finally {
+      if (startInFlightRef.current?.promise === startPromise) {
+        startInFlightRef.current = null;
+      }
     }
-    updatePlayerStatus("connecting", "播放器已创建，正在连接 relay。");
-    logRef.current?.(
-      `created @moq/watch player: url=${nextSession.relayUrl} namespace=${nextSession.namespace}`,
-    );
   }
 
   async function pausePlayer() {
@@ -453,8 +531,21 @@ export function usePlayerSession({
       return;
     }
 
-    if (sessionRef.current?.backend?.paused) {
-      sessionRef.current.backend.paused.set(true);
+    const current = sessionRef.current;
+    if (current?.protocol === STREAM_PROTOCOL_WEBRTC) {
+      await pauseWhepPlayerSession({
+        ctx: current,
+        playerEl,
+        setPlayerFreezeFrameUrl,
+        setPlayerPaused,
+        updatePlayerStatus,
+        log: logRef.current,
+      });
+      return;
+    }
+
+    if (current?.backend?.paused) {
+      current.backend.paused.set(true);
     }
     if (typeof playerEl.pause === "function") {
       await playerEl.pause();
@@ -463,6 +554,14 @@ export function usePlayerSession({
   }
 
   async function resumePlayer() {
+    const current = sessionRef.current;
+    const resumingWhep = current?.protocol === STREAM_PROTOCOL_WEBRTC;
+    setPlayerFreezeFrameUrl("");
+    if (resumingWhep) {
+      setPlayerStarted(false);
+      setPlayerPaused(false);
+      updatePlayerStatus("connecting", "正在恢复播放。");
+    }
     await startPlayer({
       initialMuted: desiredPlayerMutedRef.current,
     });
@@ -692,67 +791,110 @@ export function usePlayerSession({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!playerSession || playerSession.protocol !== STREAM_PROTOCOL_WEBRTC) {
+      return undefined;
+    }
+
     const playerEl = playerRef.current;
+    if (!playerEl) {
+      updatePlayerStatus("error", "播放器挂载失败");
+      logRef.current?.("WHEP start blocked: player element missing after commit");
+      return undefined;
+    }
+
+    if (playerSession.token !== playbackTokenRef.current) {
+      logRef.current?.(
+        `ignored stale WHEP session: session=${playerSession.token} current=${playbackTokenRef.current}`,
+      );
+      return undefined;
+    }
+
+    logRef.current?.(`starting WHEP session: token=${playerSession.token}`);
+    return startWhepPlayerSession({
+      playerSession,
+      playerEl,
+      playbackTokenRef,
+      sessionRef,
+      logRef,
+      updatePlayerStatus,
+      setPlayerStarted,
+      setPlayerFreezeFrameUrl,
+      setPlayerPaused,
+      setPlaybackStartToken,
+      applyDesiredPlayerMute,
+      setPlayerMute,
+    });
+  }, [playerSession]);
+
+  useEffect(() => {
     if (
       !playerSession ||
       playerSession.protocol !== STREAM_PROTOCOL_WEBRTC ||
-      !playerEl ||
-      playerSession.token !== playbackTokenRef.current
+      playerStarted ||
+      playerStatusKind === "error" ||
+      playerStatusKind === "paused"
     ) {
       return undefined;
     }
 
-    let disposed = false;
-    let whepSession = null;
-    const ctx = {
-      ...playerSession,
-      player: playerEl,
-      connection: null,
-      listeners: [],
-      signalDisposers: [],
-      tickerId: null,
-    };
-    sessionRef.current = ctx;
-    window.player = ctx;
-
-    async function connectWhep() {
-      try {
-        whepSession = await createWhepPlaybackSession({
-          url: playerSession.webRtcUrl,
-          videoElement: playerEl,
-        });
-        if (disposed || sessionRef.current !== ctx) {
-          whepSession.close();
-          return;
-        }
-        ctx.connection = whepSession;
-        await applyDesiredPlayerMute({ logFailure: false });
-        await playerEl.play?.().catch(() => {});
-        setPlayerPaused(false);
-        updatePlayerStatus("live", "播放中。");
-        setPlaybackStartToken((current) => current + 1);
-        logRef.current?.("WHEP playback started");
-      } catch (error) {
-        if (disposed || sessionRef.current !== ctx) {
-          return;
-        }
-        const message = error instanceof Error ? error.message : String(error);
-        updatePlayerStatus("error", `失败：${message}`);
-        logRef.current?.(`WHEP playback failed: ${message}`);
+    const sessionKey = playerSession.key;
+    const sessionToken = playerSession.token;
+    const timeoutId = window.setTimeout(() => {
+      const currentSession = playerSessionStateRef.current;
+      if (
+        currentSession?.key !== sessionKey ||
+        currentSession?.token !== sessionToken ||
+        playerStarted
+      ) {
+        return;
       }
-    }
 
-    void connectWhep();
+      const ctx = sessionRef.current;
+      const playerEl = playerRef.current;
+      const currentToken = playbackTokenRef.current;
+      if (sessionToken !== currentToken) {
+        updatePlayerStatus("error", "播放会话已过期");
+        logRef.current?.(
+          [
+            "WHEP UI watchdog stale session",
+            `session=${sessionToken}`,
+            `current=${currentToken}`,
+            `hasInFlightStart=${Boolean(startInFlightRef.current)}`,
+            `phase=${ctx?.phase ?? "no-session"}`,
+          ].join(" "),
+        );
+        return;
+      }
+
+      updatePlayerStatus("error", "播放连接超时");
+      logRef.current?.(
+        [
+          "WHEP UI watchdog timeout",
+          `session=${sessionToken}`,
+          `current=${currentToken}`,
+          `phase=${ctx?.phase ?? "no-session"}`,
+          `hasConnection=${Boolean(ctx?.connection)}`,
+          `started=${ctx?.started === true}`,
+          `failed=${ctx?.failed === true}`,
+          `readyState=${playerEl?.readyState ?? "na"}`,
+          `paused=${playerEl?.paused ?? "na"}`,
+          `muted=${playerEl?.muted ?? "na"}`,
+          `video=${playerEl?.videoWidth ?? 0}x${playerEl?.videoHeight ?? 0}`,
+        ].join(" "),
+      );
+
+      if (ctx?.connection) {
+        const connection = ctx.connection;
+        ctx.connection = null;
+        void connection.close();
+      }
+    }, WHEP_UI_WATCHDOG_TIMEOUT_MS);
 
     return () => {
-      disposed = true;
-      if (sessionRef.current === ctx) {
-        sessionRef.current = null;
-      }
-      whepSession?.close();
+      clearTimeout(timeoutId);
     };
-  }, [playerSession]);
+  }, [playerSession, playerStarted, playerStatusKind]);
 
   useEffect(() => {
     const playerEl = playerRef.current;
@@ -819,6 +961,7 @@ export function usePlayerSession({
         return;
       }
       ctx.started = true;
+      setPlayerStarted(true);
       setPlayerPaused(false);
       updatePlayerStatus("live", "播放中（@moq/watch JS API）。");
       setPlaybackStartToken((current) => current + 1);
@@ -1161,6 +1304,8 @@ export function usePlayerSession({
     playerPaused,
     playerMuted,
     playerSession,
+    playerStarted,
+    playerFreezeFrameUrl,
     playbackStartToken,
     playerRef,
     watchStageRef,

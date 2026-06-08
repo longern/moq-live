@@ -143,9 +143,11 @@ function MorePanel({
   roomCoverStatus,
   roomCoverInputRef,
   roomTitle,
+  roomWelcomeMessage,
   onPickCover,
   onOpenCoverPicker,
   onSaveRoomTitle,
+  onSaveRoomWelcomeMessage,
   roomInfoBlockedReason,
   onRoomInfoBlocked,
   onShare,
@@ -162,9 +164,11 @@ function MorePanel({
       roomCoverStatus={roomCoverStatus}
       roomCoverInputRef={roomCoverInputRef}
       roomTitle={roomTitle}
+      roomWelcomeMessage={roomWelcomeMessage}
       onPickCover={onPickCover}
       onOpenCoverPicker={onOpenCoverPicker}
       onSaveRoomTitle={onSaveRoomTitle}
+      onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
       roomInfoBlockedReason={roomInfoBlockedReason}
       onRoomInfoBlocked={onRoomInfoBlocked}
       onShare={onShare}
@@ -242,7 +246,9 @@ export function LiveDesktopPage(props) {
     roomCoverStatus,
     roomCoverInputRef,
     roomTitle,
+    roomWelcomeMessage,
     onSaveRoomTitle,
+    onSaveRoomWelcomeMessage,
     onPickCover,
     onOpenCoverPicker,
     onRequestClose,
@@ -370,9 +376,11 @@ export function LiveDesktopPage(props) {
       roomCoverStatus={roomCoverStatus}
       roomCoverInputRef={roomCoverInputRef}
       roomTitle={roomTitle}
+      roomWelcomeMessage={roomWelcomeMessage}
       onPickCover={onPickCover}
       onOpenCoverPicker={onOpenCoverPicker}
       onSaveRoomTitle={onSaveRoomTitle}
+      onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
       roomInfoBlockedReason={roomInfoBlockedReason}
       onRoomInfoBlocked={onRoomInfoBlocked}
       onShare={onShare}

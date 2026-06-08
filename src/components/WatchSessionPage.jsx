@@ -42,6 +42,7 @@ export function WatchSessionPage({
   hidden,
   roomLabel,
   roomTitle,
+  welcomeMessage,
   siteTitle,
   hostUserId,
   hostHandle,
@@ -72,6 +73,8 @@ export function WatchSessionPage({
   onFullscreen,
   stageRef,
   playerSession,
+  playerStarted = false,
+  playerFreezeFrameUrl = "",
   playerRef,
   authAvailable,
   authLoading,
@@ -127,6 +130,9 @@ export function WatchSessionPage({
   const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
   const imageShareReady = Boolean(shareImageUrl && !shareImageLoading);
   const showHostFollowButton = Boolean(hostUserId && authUser?.id !== hostUserId);
+  const showInitialPlaybackSpinner = Boolean(
+    !playerStarted && playerBadge.state === "warm"
+  );
 
   function clearHideTimer() {
     if (hideTimerRef.current) {
@@ -831,7 +837,7 @@ export function WatchSessionPage({
                     autoPlay
                     playsInline
                     muted={playerMuted}
-                    title={`${playerSession.namespace} 直播画面`}
+                    aria-label={`${hostDisplayName || hostChipLabel} 直播画面`}
                   />
                 ) : (
                   <canvas
@@ -852,6 +858,19 @@ export function WatchSessionPage({
                 </div>
               )}
             </div>
+            {playerFreezeFrameUrl ? (
+              <img
+                className="stage-freeze-frame"
+                src={playerFreezeFrameUrl}
+                alt=""
+                aria-hidden="true"
+              />
+            ) : null}
+            {showInitialPlaybackSpinner ? (
+              <div className="placeholder stage-first-frame-loading" aria-hidden="true">
+                <LoadingSpinner className="stage-loading-spinner" />
+              </div>
+            ) : null}
             {playerBadge.state === "error" ? (
               <div className="stage-error">
                 <p>{playerStatus}</p>
@@ -882,6 +901,7 @@ export function WatchSessionPage({
               >
                 <ChatPanel
                   roomLabel={chatRoomLabel}
+                  welcomeMessage={welcomeMessage}
                   authAvailable={authAvailable}
                   authLoading={authLoading}
                   authUser={authUser}
@@ -997,6 +1017,7 @@ export function WatchSessionPage({
           </div>
           <ChatPanel
             roomLabel={chatRoomLabel}
+            welcomeMessage={welcomeMessage}
             authAvailable={authAvailable}
             authLoading={authLoading}
             authUser={authUser}

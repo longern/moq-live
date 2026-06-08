@@ -203,6 +203,13 @@
   min-width: 0;
 }
 
+@media (min-width: 981px) {
+  .chat-panel-block .chat-composer input,
+  .chat-panel-block .chat-composer button {
+    font-size: 0.875rem;
+  }
+}
+
 .chat-composer input:disabled,
 .chat-composer-floating input:disabled {
   color: rgba(216, 230, 244, 0.58);

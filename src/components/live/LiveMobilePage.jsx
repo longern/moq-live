@@ -79,6 +79,8 @@ export function LiveMobilePage(props) {
     roomCoverInputRef,
     roomTitle,
     onSaveRoomTitle,
+    roomInfoBlockedReason,
+    onRoomInfoBlocked,
     onPickCover,
     onOpenCoverPicker,
     shellMode = "compact"
@@ -194,6 +196,7 @@ export function LiveMobilePage(props) {
     <section
       className="page page-immersive live-mobile-page"
       data-page="live"
+      data-media={mediaMode}
       data-shell={shellMode}
       hidden={hidden}
     >
@@ -294,7 +297,7 @@ export function LiveMobilePage(props) {
             mediaMode={mediaMode}
             mirrorPreview={mirrorPreview}
           />
-          {publishBlocked ? (
+          {publishBlockedReason ? (
             <div className="live-mobile-warning">{publishBlockedReason}</div>
           ) : null}
           {cameraNoticeVisible ? (
@@ -511,6 +514,8 @@ export function LiveMobilePage(props) {
             onPickCover={onPickCover}
             onOpenCoverPicker={onOpenCoverPicker}
             onSaveRoomTitle={onSaveRoomTitle}
+            roomInfoBlockedReason={roomInfoBlockedReason}
+            onRoomInfoBlocked={onRoomInfoBlocked}
             onShare={onShare}
             shareSupported={shareSupported}
             watchLink={watchLink}

@@ -287,10 +287,19 @@ export function App() {
     loading: false,
     error: "",
     roomId: "",
+    hostUserId: "",
     hostHandle: "",
     hostDisplayName: "",
+    hostAvatarUrl: "",
     title: "",
     coverUrl: ""
+  });
+  const [watchFollowState, setWatchFollowState] = useState({
+    hostUserId: "",
+    following: false,
+    loading: false,
+    busy: false,
+    error: ""
   });
   const [watchStreamEnded, setWatchStreamEnded] = useState(false);
   const [topbarWatchRoom, setTopbarWatchRoom] = useState("");
@@ -396,9 +405,7 @@ export function App() {
     ? watchTestChannel.label
     : watchingNamespace
     ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "等待输入 namespace")
-    : chat.roomMeta.host.displayName
-      || watchRoomResolution.hostDisplayName
-      || chat.roomMeta.host.handle
+    : watchRoomResolution.hostDisplayName
       || watchRoomResolution.hostHandle
       || chat.roomMeta.title
       || watchRoomResolution.title
@@ -409,9 +416,7 @@ export function App() {
     ? watchTestChannel.label
     : watchingNamespace
     ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
-    : chat.roomMeta.host.displayName
-      || watchRoomResolution.hostDisplayName
-      || chat.roomMeta.host.handle
+    : watchRoomResolution.hostDisplayName
       || watchRoomResolution.hostHandle
       || watchHandle
       || "";
@@ -426,13 +431,14 @@ export function App() {
     ? watchTestChannel.hostDisplayName
     : watchingNamespace
     ? ""
-    : chat.roomMeta.host.displayName
-      || watchRoomResolution.hostDisplayName
-      || chat.roomMeta.host.handle
+    : watchRoomResolution.hostDisplayName
       || watchRoomResolution.hostHandle
       || watchHandle
       || "";
-  const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : chat.roomMeta.host.avatarUrl || "";
+  const watchHostUserId = watchingNamespace || watchingTestChannel
+    ? ""
+    : watchRoomResolution.hostUserId || "";
+  const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.hostAvatarUrl || "";
   const watchRoomCoverUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.coverUrl || "";
   const siteIconUrl = "/icons/icon-192.png";
   const watchHostIcon = watchingNamespace ? "public-channel" : "";
@@ -619,6 +625,56 @@ export function App() {
     }
   }
 
+  async function toggleWatchFollow() {
+    const targetUserId = watchHostUserId;
+    if (!targetUserId || authState.user?.id === targetUserId || watchFollowState.busy) {
+      return;
+    }
+
+    if (!authState.user?.id) {
+      setLoginPromptOpen(true);
+      return;
+    }
+
+    const currentlyFollowing =
+      watchFollowState.hostUserId === targetUserId && watchFollowState.following;
+    setWatchFollowState((current) => ({
+      hostUserId: targetUserId,
+      following: current.hostUserId === targetUserId ? current.following : false,
+      loading: false,
+      busy: true,
+      error: ""
+    }));
+
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(targetUserId)}/follow`, {
+        method: currentlyFollowing ? "DELETE" : "POST",
+        credentials: "same-origin"
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw createApiError(payload, "follow_update_failed", { status: response.status });
+      }
+      setWatchFollowState({
+        hostUserId: targetUserId,
+        following: Boolean(payload.following),
+        loading: false,
+        busy: false,
+        error: ""
+      });
+    } catch (error) {
+      const message = getAppErrorMessage(error);
+      setWatchFollowState((current) => ({
+        hostUserId: targetUserId,
+        following: current.hostUserId === targetUserId ? current.following : currentlyFollowing,
+        loading: false,
+        busy: false,
+        error: message
+      }));
+      log(`follow update failed: ${message}`);
+    }
+  }
+
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -694,8 +750,10 @@ export function App() {
         loading: false,
         error: "",
         roomId: "",
+        hostUserId: "",
         hostHandle: "",
         hostDisplayName: "",
+        hostAvatarUrl: "",
         title: "",
         coverUrl: ""
       });
@@ -709,8 +767,10 @@ export function App() {
         loading: true,
         error: "",
         roomId: "",
+        hostUserId: "",
         hostHandle: "",
         hostDisplayName: "",
+        hostAvatarUrl: "",
         title: "",
         coverUrl: ""
       });
@@ -733,8 +793,10 @@ export function App() {
           loading: false,
           error: "",
           roomId: payload.room?.id || "",
+          hostUserId: payload.room?.host?.id || "",
           hostHandle: payload.room?.host?.handle || watchHandle,
           hostDisplayName: payload.room?.host?.displayName || "",
+          hostAvatarUrl: payload.room?.host?.avatarUrl || "",
           title: payload.room?.title || "",
           coverUrl: payload.room?.coverUrl || ""
         });
@@ -748,8 +810,10 @@ export function App() {
           loading: false,
           error: message,
           roomId: "",
+          hostUserId: "",
           hostHandle: "",
           hostDisplayName: "",
+          hostAvatarUrl: "",
           title: "",
           coverUrl: ""
         });
@@ -763,6 +827,86 @@ export function App() {
       cancelled = true;
     };
   }, [page, watchHandle, watchRouteCommitted, watchingNamespace, watchingTestChannel]);
+
+  useEffect(() => {
+    if (authState.loading) {
+      return;
+    }
+
+    const targetUserId = watchHostUserId;
+    const viewerUserId = authState.user?.id || "";
+    if (!watchJoined || !targetUserId || targetUserId === viewerUserId) {
+      setWatchFollowState({
+        hostUserId: targetUserId,
+        following: false,
+        loading: false,
+        busy: false,
+        error: ""
+      });
+      return;
+    }
+
+    if (!viewerUserId) {
+      setWatchFollowState({
+        hostUserId: targetUserId,
+        following: false,
+        loading: false,
+        busy: false,
+        error: ""
+      });
+      return;
+    }
+
+    let cancelled = false;
+    setWatchFollowState((current) => ({
+      hostUserId: targetUserId,
+      following: current.hostUserId === targetUserId ? current.following : false,
+      loading: true,
+      busy: false,
+      error: ""
+    }));
+
+    async function loadFollowState() {
+      try {
+        const response = await fetch(`/api/users/${encodeURIComponent(targetUserId)}/follow`, {
+          credentials: "same-origin"
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw createApiError(payload, "follow_status_failed", { status: response.status });
+        }
+        if (cancelled) {
+          return;
+        }
+        setWatchFollowState({
+          hostUserId: targetUserId,
+          following: Boolean(payload.following),
+          loading: false,
+          busy: false,
+          error: ""
+        });
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        const message = getAppErrorMessage(error);
+        setWatchFollowState({
+          hostUserId: targetUserId,
+          following: false,
+          loading: false,
+          busy: false,
+          error: message
+        });
+        log(`follow status failed: ${message}`);
+      }
+    }
+
+    void loadFollowState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authState.loading, authState.user?.id, watchHostUserId, watchJoined]);
 
   useEffect(() => {
     if (page !== "watch" || !watchRouteCommitted || watchingNamespace || !resolvedWatchRoomId) {
@@ -1215,9 +1359,17 @@ export function App() {
             watchJoined={watchJoined}
             roomLabel={watchRoomLabel}
             roomTitle={watchRoomTitle}
+            hostUserId={watchHostUserId}
+            hostHandle={watchRoomResolution.hostHandle}
             hostDisplayName={watchHostDisplayName}
             hostAvatarUrl={watchHostAvatarUrl}
             hostIcon={watchHostIcon}
+            hostFollowing={watchFollowState.hostUserId === watchHostUserId && watchFollowState.following}
+            hostFollowBusy={
+              watchFollowState.hostUserId === watchHostUserId &&
+              (watchFollowState.loading || watchFollowState.busy)
+            }
+            onHostFollowToggle={toggleWatchFollow}
             roomCoverUrl={watchRoomCoverUrl}
             siteIconUrl={siteIconUrl}
             watchLink={watchPageLink}

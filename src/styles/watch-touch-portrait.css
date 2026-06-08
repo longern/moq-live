@@ -205,6 +205,11 @@
     gap: 8px;
   }
 
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-mobile-host-chip:has(.watch-host-follow-button) {
+    max-width: min(72vw, 340px);
+  }
+
   body:has(.watch-stage-frame.is-portrait) .watch-mobile-host-avatar {
     width: 24px;
     height: 24px;
@@ -235,6 +240,7 @@
   }
 
   body:has(.watch-stage-frame.is-portrait) .watch-mobile-host-name {
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -242,6 +248,13 @@
     font-size: 0.875rem;
     font-weight: 400;
     line-height: 1.2;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-host-follow-button-mobile {
+    min-width: 44px;
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 0.72rem;
   }
 
   body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud-actions {
@@ -303,6 +316,65 @@
   body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-panel {
     gap: 12px;
     padding: 16px;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-action {
+    min-width: 0;
+    min-height: 84px;
+    padding: 10px 6px;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: rgba(235, 244, 251, 0.92);
+    box-shadow: none;
+    font-size: 0.76rem;
+    font-weight: 500;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-mobile-more-action:hover:not(:disabled),
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-mobile-more-action:focus-visible {
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  body:has(.watch-stage-frame.is-portrait)
+    .watch-mobile-more-action:focus-visible {
+    outline: 2px solid var(--primary-ring);
+    outline-offset: 2px;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-action:disabled {
+    cursor: default;
+    opacity: 0.42;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-action-icon {
+    width: 46px;
+    height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-action-icon svg {
+    width: 21px;
+    height: 21px;
+    stroke-width: 1.9;
   }
 
   body:has(.watch-stage-frame.is-portrait) .watch-audience-panel {
@@ -434,6 +506,7 @@
     min-height: 0;
     pointer-events: none;
     padding: 0 10px 12px;
+    background: transparent;
     isolation: isolate;
     transition: opacity 160ms ease;
   }
@@ -448,6 +521,7 @@
     position: relative;
     z-index: 1;
     width: 100%;
+    background: transparent;
   }
 
   body:has(.watch-stage-frame.is-portrait)
@@ -460,6 +534,8 @@
     min-height: 0;
     max-height: var(--watch-chat-list-max-height);
     padding: 0 72px 8px 0;
+    overflow: auto;
+    background: transparent;
     -ms-overflow-style: none;
     scrollbar-width: none;
     -webkit-mask-image: linear-gradient(
@@ -488,6 +564,8 @@
     .chat-panel-watch-overlay
     .chat-message-list::-webkit-scrollbar {
     display: none;
+    width: 0;
+    height: 0;
   }
 
   body:has(.watch-stage-frame.is-portrait)
@@ -496,11 +574,11 @@
     max-width: min(84%, 320px);
     grid-template-columns: 18px minmax(0, 1fr);
     gap: 4px;
-    padding: 8px 10px;
+    padding: 3px 6px;
     border: 0;
     border-radius: 16px;
     background: var(--watch-float-bg);
-    box-shadow: 0 12px 24px var(--watch-float-shadow);
+    box-shadow: none;
   }
 
   body:has(.watch-stage-frame.is-portrait)

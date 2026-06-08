@@ -48,11 +48,6 @@ function getDefaultRoomMeta() {
       namespace: "",
       protocol: DEFAULT_STREAM_PROTOCOL,
       webRtcUrl: ""
-    },
-    host: {
-      id: "",
-      displayName: "",
-      avatarUrl: ""
     }
   };
 }
@@ -101,6 +96,7 @@ export function useChatController({
   const reconnectAttemptRef = useRef(0);
   const connectionAttemptedAtRef = useRef([]);
   const broadcastControlRequestsRef = useRef(new Map());
+  const intentionalCloseRef = useRef(false);
   const logRef = useRef(log);
 
   logRef.current = log;
@@ -186,6 +182,7 @@ export function useChatController({
     let socket = null;
 
     const connect = () => {
+      intentionalCloseRef.current = false;
       if (!reserveConnectionAttempt()) {
         setConnectionState("closed");
         setChatError(getChatErrorMessage({ code: "socket_reconnect_stopped" }));
@@ -241,11 +238,6 @@ export function useChatController({
               namespace: payload.roomMeta?.stream?.namespace || "",
               protocol: normalizeStreamProtocol(payload.roomMeta?.stream?.protocol),
               webRtcUrl: payload.roomMeta?.stream?.webRtcUrl || ""
-            },
-            host: {
-              id: payload.roomMeta?.host?.id || "",
-              displayName: payload.roomMeta?.host?.displayName || "",
-              avatarUrl: payload.roomMeta?.host?.avatarUrl || ""
             }
           });
           setRoomStateReady(true);
@@ -260,7 +252,13 @@ export function useChatController({
           }
           clearTimeout(request.timeoutId);
           broadcastControlRequestsRef.current.delete(payload.requestId);
+          setCanControlBroadcast(Boolean(payload.canControlBroadcast));
           request.resolve(Boolean(payload.canControlBroadcast));
+          return;
+        }
+
+        if (payload.type === "broadcast.control.changed") {
+          setCanControlBroadcast(Boolean(payload.canControlBroadcast));
           return;
         }
 
@@ -297,17 +295,17 @@ export function useChatController({
               namespace: payload.roomMeta?.stream?.namespace || "",
               protocol: normalizeStreamProtocol(payload.roomMeta?.stream?.protocol),
               webRtcUrl: payload.roomMeta?.stream?.webRtcUrl || ""
-            },
-            host: {
-              id: payload.roomMeta?.host?.id || "",
-              displayName: payload.roomMeta?.host?.displayName || "",
-              avatarUrl: payload.roomMeta?.host?.avatarUrl || ""
             }
           });
           return;
         }
 
         if (payload.type === "error") {
+          if (payload.code === "forbidden_room_update") {
+            setChatError("");
+            logRef.current?.("chat room update skipped: forbidden_room_update");
+            return;
+          }
           const message = getChatErrorMessage(payload);
           setChatError(message);
           logRef.current?.(`chat warning: ${payload.code || "unknown"}: ${message}`);
@@ -319,7 +317,7 @@ export function useChatController({
           socketRef.current = null;
         }
         clearBroadcastControlRequests(createAppError("broadcast_control_connection_closed"));
-        if (cancelled) {
+        if (cancelled || intentionalCloseRef.current) {
           return;
         }
         setConnectionState("closed");
@@ -361,9 +359,11 @@ export function useChatController({
       clearReconnectTimers();
       clearBroadcastControlRequests();
       if (socketRef.current) {
+        intentionalCloseRef.current = true;
         socketRef.current.close();
         socketRef.current = null;
       } else if (socket) {
+        intentionalCloseRef.current = true;
         socket.close();
       }
     };
@@ -417,6 +417,21 @@ export function useChatController({
     });
   }
 
+  function releaseBroadcastControl() {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      setCanControlBroadcast(false);
+      return false;
+    }
+
+    socket.send(JSON.stringify({
+      type: "broadcast.control.release",
+    }));
+    intentionalCloseRef.current = true;
+    setCanControlBroadcast(false);
+    return true;
+  }
+
   return {
     messages,
     draft,
@@ -432,6 +447,7 @@ export function useChatController({
     canControlBroadcast,
     sendMessage,
     sendEvent,
-    requestBroadcastControl
+    requestBroadcastControl,
+    releaseBroadcastControl
   };
 }

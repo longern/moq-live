@@ -30,6 +30,7 @@ function readStoredStreamSettings(storageKey) {
     const parsed = JSON.parse(storedValue);
     return {
       protocol: typeof parsed?.protocol === "string" ? normalizeStreamProtocol(parsed.protocol) : "",
+      qualityId: typeof parsed?.qualityId === "string" ? parsed.qualityId : "",
       publishUrl: typeof parsed?.publishUrl === "string" ? parsed.publishUrl : "",
       playbackUrl: typeof parsed?.playbackUrl === "string" ? parsed.playbackUrl : "",
     };
@@ -38,21 +39,26 @@ function readStoredStreamSettings(storageKey) {
   }
 }
 
-function writeStoredStreamSettings(storageKey, { protocol = "", publishUrl = "", playbackUrl = "" }) {
+function writeStoredStreamSettings(
+  storageKey,
+  { protocol = "", qualityId = "", publishUrl = "", playbackUrl = "" },
+) {
   if (typeof window === "undefined" || !storageKey) {
     return;
   }
 
   try {
     const nextProtocol = protocol ? normalizeStreamProtocol(protocol) : "";
+    const nextQualityId = String(qualityId);
     const nextPublishUrl = String(publishUrl);
     const nextPlaybackUrl = String(playbackUrl);
-    if (!nextProtocol && !nextPublishUrl && !nextPlaybackUrl) {
+    if (!nextProtocol && !nextQualityId && !nextPublishUrl && !nextPlaybackUrl) {
       window.localStorage.removeItem(storageKey);
       return;
     }
     window.localStorage.setItem(storageKey, JSON.stringify({
       protocol: nextProtocol,
+      qualityId: nextQualityId,
       publishUrl: nextPublishUrl,
       playbackUrl: nextPlaybackUrl,
     }));
@@ -110,10 +116,10 @@ function useLiveRoomChatSync({
   liveRoomDetails,
   liveChat,
   liveStreamActive,
+  canControlBroadcast,
   relayUrl,
   publishProtocol,
   webRtcUrl,
-  user,
 }) {
   const announcedLiveStateRef = useRef({ room: "", isLive: null });
   const sendChatEventRef = useRef(liveChat.sendEvent);
@@ -172,17 +178,15 @@ function useLiveRoomChatSync({
     if (!liveRoom || liveChat.connectionState !== "connected" || !liveChat.roomStateReady) {
       return;
     }
+    if (!canControlBroadcast) {
+      return;
+    }
 
     const nextStream = {
       relayUrl,
       namespace: liveRoom,
       protocol: publishProtocol,
       webRtcUrl,
-    };
-    const nextHost = {
-      id: user?.id || "",
-      displayName: user?.displayName || user?.email || "",
-      avatarUrl: user?.avatarUrl || "",
     };
     const nextTitle = liveRoomDetails?.title || "";
     if (
@@ -192,9 +196,6 @@ function useLiveRoomChatSync({
       && liveChat.roomMeta.stream.namespace === nextStream.namespace
       && liveChat.roomMeta.stream.protocol === nextStream.protocol
       && liveChat.roomMeta.stream.webRtcUrl === nextStream.webRtcUrl
-      && liveChat.roomMeta.host.id === nextHost.id
-      && liveChat.roomMeta.host.displayName === nextHost.displayName
-      && liveChat.roomMeta.host.avatarUrl === nextHost.avatarUrl
     ) {
       return;
     }
@@ -204,29 +205,22 @@ function useLiveRoomChatSync({
       roomMeta: {
         title: nextTitle,
         stream: nextStream,
-        host: nextHost,
       },
     });
   }, [
     liveChat.connectionState,
+    canControlBroadcast,
     liveChat.roomStateReady,
     liveChat.roomMeta.title,
     liveChat.roomMeta.stream.namespace,
     liveChat.roomMeta.stream.protocol,
     liveChat.roomMeta.stream.relayUrl,
     liveChat.roomMeta.stream.webRtcUrl,
-    liveChat.roomMeta.host.avatarUrl,
-    liveChat.roomMeta.host.displayName,
-    liveChat.roomMeta.host.id,
     relayUrl,
     publishProtocol,
     webRtcUrl,
     liveRoom,
     liveRoomDetails?.title,
-    user?.avatarUrl,
-    user?.displayName,
-    user?.email,
-    user?.id,
   ]);
 }
 
@@ -323,6 +317,12 @@ export function LiveRoute({
         log(`publish protocol restore failed: ${message}`);
       });
     }
+    if (storedSettings.qualityId && storedSettings.qualityId !== publisher.publishQualityId) {
+      void publisher.setPublishQualityId(storedSettings.qualityId).catch((error) => {
+        const message = getAppErrorMessage(error);
+        log(`publish quality restore failed: ${message}`);
+      });
+    }
     if (storedSettings.publishUrl && storedSettings.publishUrl !== publisher.webRtcPublishUrl) {
       publisher.setWebRtcPublishUrl(storedSettings.publishUrl);
     }
@@ -331,20 +331,18 @@ export function LiveRoute({
     }
   }, [
     log,
+    publisher.publishQualityId,
     publisher.publishProtocol,
     publisher.webRtcPlaybackUrl,
     publisher.webRtcPublishUrl,
     streamSettingsStorageKey,
   ]);
 
-  const liveRoomLabel = liveChat.roomMeta.host.displayName
-    || authState.user?.displayName
+  const liveRoomLabel = authState.user?.displayName
     || authState.user?.email
     || liveRoom
     || "等待生成频道号";
-  const liveRoomAvatarUrl = liveChat.roomMeta.host.avatarUrl
-    || authState.user?.avatarUrl
-    || "";
+  const liveRoomAvatarUrl = authState.user?.avatarUrl || "";
   const liveShareTarget = authState.user?.handle?.trim() || (liveRoom ? `ns:${liveRoom}` : "");
   const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
   const publishBadge = describePublishState(publisher.publishStatusKind);
@@ -364,9 +362,7 @@ export function LiveRoute({
   const publishBlocked = publishPolicyBlocked || publishControlBlocked;
   const publishBlockedReason = publishPolicyBlocked
     ? getPublishBlockReason(liveRoom)
-    : publishControlBlocked
-      ? getAppErrorMessage({ code: "broadcast_control_read_only" })
-      : "";
+    : "";
   const cameraMode = getCameraMode(
     publisher.cameraOptions,
     publisher.selectedCameraId,
@@ -378,10 +374,10 @@ export function LiveRoute({
     liveRoomDetails,
     liveChat,
     liveStreamActive,
+    canControlBroadcast: liveChat.canControlBroadcast,
     relayUrl,
     publishProtocol,
     webRtcUrl,
-    user: authState.user,
   });
 
   async function shareLiveRoom() {
@@ -481,6 +477,7 @@ export function LiveRoute({
     publisher.setWebRtcPublishUrl(nextUrl);
     writeStoredStreamSettings(streamSettingsStorageKey, {
       protocol: publisher.publishProtocol,
+      qualityId: publisher.publishQualityId,
       publishUrl: nextUrl,
       playbackUrl: publisher.webRtcPlaybackUrl,
     });
@@ -490,19 +487,40 @@ export function LiveRoute({
     publisher.setWebRtcPlaybackUrl(nextUrl);
     writeStoredStreamSettings(streamSettingsStorageKey, {
       protocol: publisher.publishProtocol,
+      qualityId: publisher.publishQualityId,
       publishUrl: publisher.webRtcPublishUrl,
       playbackUrl: nextUrl,
     });
+  }
+
+  async function changePublishQuality(qualityId) {
+    writeStoredStreamSettings(streamSettingsStorageKey, {
+      protocol: publisher.publishProtocol,
+      qualityId,
+      publishUrl: publisher.webRtcPublishUrl,
+      playbackUrl: publisher.webRtcPlaybackUrl,
+    });
+    await publisher.setPublishQualityId(qualityId);
   }
 
   async function changePublishProtocol(protocol) {
     const nextProtocol = normalizeStreamProtocol(protocol);
     writeStoredStreamSettings(streamSettingsStorageKey, {
       protocol: nextProtocol,
+      qualityId: publisher.publishQualityId,
       publishUrl: publisher.webRtcPublishUrl,
       playbackUrl: publisher.webRtcPlaybackUrl,
     });
     await publisher.setPublishProtocol(nextProtocol);
+  }
+
+  async function closeLivePage() {
+    await publisher.cleanupLiveResources();
+    if (liveChat.canControlBroadcast) {
+      liveChat.sendEvent({ type: "stream.stopped" });
+    }
+    liveChat.releaseBroadcastControl();
+    onReturnHome?.();
   }
 
   return (
@@ -516,6 +534,11 @@ export function LiveRoute({
       watchLink={liveWatchLink}
       publishBlocked={publishBlocked}
       publishBlockedReason={publishBlockedReason}
+      roomInfoBlockedReason={
+        publishControlBlocked
+          ? getAppErrorMessage({ code: "broadcast_control_read_only" })
+          : ""
+      }
       publishStatus={publisher.publishStatus}
       publishBadge={publishBadge}
       cameraOptions={publisher.cameraOptions}
@@ -546,7 +569,7 @@ export function LiveRoute({
         publisher.setMicrophoneEnabled(true);
       }}
       onPublishQualityChange={(qualityId) => {
-        void publisher.setPublishQualityId(qualityId).catch((error) => {
+        void changePublishQuality(qualityId).catch((error) => {
           const message = getAppErrorMessage(error);
           log(`publish quality switch failed: ${message}`);
         });
@@ -599,7 +622,11 @@ export function LiveRoute({
         void publisher.stopSyntheticPublish();
       }}
       onRequestClose={() => {
-        onReturnHome?.();
+        void closeLivePage().catch((error) => {
+          log(`live close cleanup failed: ${getAppErrorMessage(error)}`);
+          liveChat.releaseBroadcastControl();
+          onReturnHome?.();
+        });
       }}
       onSelectLiveMode={selectLiveMode}
       screenShareSupported={publisher.screenShareSupported}

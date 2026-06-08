@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useMediaOrientation } from "../hooks/useMediaOrientation.js";
 import { useCompactViewport, usePortraitViewport } from "../hooks/useMediaQuery.js";
+import { useLiveMobileShellMode } from "../hooks/useLiveMobileShellMode.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
+import { FloatingToast } from "./FloatingToast.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 
 export function LivePage({
@@ -14,6 +16,7 @@ export function LivePage({
   watchLink,
   publishBlocked,
   publishBlockedReason,
+  roomInfoBlockedReason = "",
   publishBadge,
   cameraOptions,
   microphoneOptions,
@@ -76,26 +79,65 @@ export function LivePage({
   const previewOrientation = useMediaOrientation({
     mediaRef: previewVideoRef,
     active: previewActive && previewHasVideo,
+    includeTrackSettings: false,
+    includeClientSize: false,
+    resetOnInactive: false,
   });
   const [roomCoverUrl, setRoomCoverUrl] = useState("");
   const [roomCoverLoading, setRoomCoverLoading] = useState(false);
   const [roomCoverBusy, setRoomCoverBusy] = useState(false);
   const [roomCoverError, setRoomCoverError] = useState("");
   const [roomCoverStatus, setRoomCoverStatus] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
   const roomCoverInputRef = useRef(null);
+  const toastTimerRef = useRef(null);
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mediaMode = cameraEnabled ? "video" : "voice";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
-  const immersiveTouchPortrait =
-    portraitViewport &&
-    previewActive &&
-    previewHasVideo &&
-    previewOrientation === "portrait";
   const useMobileShell = compactViewport || portraitViewport;
-  const mobileShellMode = immersiveTouchPortrait ? "immersive" : "compact";
+  const mobileShellMode = useLiveMobileShellMode({
+    cameraEnabled,
+    isPublishing,
+    isStarting,
+    portraitViewport,
+    previewActive,
+    previewHasVideo,
+    previewOrientation,
+    previewPending,
+    previewSourceType,
+  });
 
   function requestClose() {
     onRequestClose?.();
+  }
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+  }, []);
+
+  function showToast(message) {
+    if (!message) {
+      return;
+    }
+    if (message === roomInfoBlockedReason) {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+      setToastMessage("");
+      return;
+    }
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToastMessage(message);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage("");
+      toastTimerRef.current = null;
+    }, 2200);
   }
 
   useEffect(() => {
@@ -114,6 +156,10 @@ export function LivePage({
   }, [authUser?.id, hidden, roomDetails?.coverUrl, roomDetails?.id]);
 
   function openRoomCoverPicker() {
+    if (roomInfoBlockedReason) {
+      showToast(roomInfoBlockedReason);
+      return;
+    }
     roomCoverInputRef.current?.click();
   }
 
@@ -122,6 +168,10 @@ export function LivePage({
     event.currentTarget.value = "";
 
     if (!file) {
+      return;
+    }
+    if (roomInfoBlockedReason) {
+      showToast(roomInfoBlockedReason);
       return;
     }
 
@@ -154,6 +204,11 @@ export function LivePage({
   }
 
   async function handleRoomTitleSave(title) {
+    if (roomInfoBlockedReason) {
+      showToast(roomInfoBlockedReason);
+      return null;
+    }
+
     const response = await fetch("/api/me/room", {
       method: "PATCH",
       credentials: "same-origin",
@@ -180,6 +235,7 @@ export function LivePage({
     watchLink,
     publishBlocked,
     publishBlockedReason,
+    roomInfoBlockedReason,
     publishBadge,
     cameraOptions,
     microphoneOptions,
@@ -247,12 +303,28 @@ export function LivePage({
     onPickCover: handleRoomCoverPick,
     onOpenCoverPicker: openRoomCoverPicker,
     roomTitle: roomDetails?.title || "",
-    onSaveRoomTitle: handleRoomTitleSave
+    onSaveRoomTitle: handleRoomTitleSave,
+    onRoomInfoBlocked: () => showToast(roomInfoBlockedReason)
   };
+  const visibleToastMessage = roomInfoBlockedReason || toastMessage;
 
   if (useMobileShell) {
-    return <LiveMobilePage {...pageProps} shellMode={mobileShellMode} />;
+    return (
+      <>
+        <LiveMobilePage {...pageProps} shellMode={mobileShellMode} />
+        {visibleToastMessage ? (
+          <FloatingToast className="live-page-toast live-page-toast-mobile">{visibleToastMessage}</FloatingToast>
+        ) : null}
+      </>
+    );
   }
 
-  return <LiveDesktopPage {...pageProps} />;
+  return (
+    <>
+      <LiveDesktopPage {...pageProps} />
+      {visibleToastMessage ? (
+        <FloatingToast className="live-page-toast live-page-toast-desktop">{visibleToastMessage}</FloatingToast>
+      ) : null}
+    </>
+  );
 }

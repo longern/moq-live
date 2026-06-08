@@ -3,6 +3,8 @@
   --watch-float-bg: rgba(6, 14, 22, var(--watch-float-bg-alpha));
   --watch-float-border: rgba(255, 255, 255, 0.075);
   --watch-float-shadow: rgba(0, 0, 0, 0.16);
+  --live-chat-list-max-height: min(24vh, 156px);
+  --live-chat-list-fade-size: 30px;
   position: absolute;
   inset: 0;
   height: 100%;
@@ -14,7 +16,12 @@
 }
 
 .live-mobile-page[data-shell="immersive"] {
+  --live-chat-list-max-height: min(34vh, 260px);
   height: 100svh;
+}
+
+.live-mobile-page[data-media="voice"] {
+  --live-chat-list-max-height: min(42vh, 340px);
 }
 
 @media (orientation: portrait) {
@@ -264,11 +271,11 @@
   position: absolute;
   left: 50%;
   bottom: calc(238px + env(safe-area-inset-bottom));
-  z-index: 4;
+  z-index: 6;
   width: fit-content;
-  max-width: calc(100% - 32px);
+  max-width: min(360px, calc(100% - 32px));
   padding: 8px 12px;
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgba(0, 0, 0, 0.66);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: rgba(244, 248, 252, 0.92);
@@ -278,6 +285,7 @@
   font-size: 0.86rem;
   line-height: 1.45;
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .live-mobile-toast {
@@ -286,6 +294,12 @@
   bottom: calc(86px + env(safe-area-inset-bottom));
   z-index: 5;
   transform: translateX(-50%);
+}
+
+.live-page-toast-mobile {
+  top: 64%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
 }
 
 .live-mobile-bottom-stack {
@@ -303,6 +317,14 @@
   pointer-events: none;
 }
 
+.live-mobile-page[data-shell="immersive"] .live-mobile-bottom-stack {
+  max-height: calc(var(--live-chat-list-max-height) + 118px);
+}
+
+.live-mobile-page[data-media="voice"] .live-mobile-bottom-stack {
+  max-height: calc(var(--live-chat-list-max-height) + 118px);
+}
+
 .live-mobile-chat-overlay {
   flex: 1 1 auto;
   min-height: 0;
@@ -318,23 +340,73 @@
   width: 100%;
   align-items: flex-start;
   min-height: 0;
-  max-height: min(24vh, 156px);
+  max-height: var(--live-chat-list-max-height);
   padding: 0 2px 6px 0;
   border: 0;
   border-radius: 0;
   outline: 0;
   background: transparent;
   box-shadow: none;
+  overflow: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.live-mobile-page[data-shell="immersive"]
+  .chat-panel-live-mobile
+  .chat-message-list {
+  padding: 0 72px 8px 0;
+}
+
+.live-mobile-page[data-shell="immersive"]
+  .chat-panel-live-mobile
+  .chat-message-list,
+.live-mobile-page[data-media="voice"]
+  .chat-panel-live-mobile
+  .chat-message-list {
+  -webkit-mask-image: linear-gradient(
+    0deg,
+    #000 0,
+    #000
+      calc(
+        var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)
+      ),
+    rgba(0, 0, 0, 0.42) calc(var(--live-chat-list-max-height) - 12px),
+    transparent var(--live-chat-list-max-height)
+  );
+  mask-image: linear-gradient(
+    0deg,
+    #000 0,
+    #000
+      calc(
+        var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)
+      ),
+    rgba(0, 0, 0, 0.42) calc(var(--live-chat-list-max-height) - 12px),
+    transparent var(--live-chat-list-max-height)
+  );
+}
+
+.chat-panel-live-mobile .chat-message-list::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .chat-panel-live-mobile .chat-message-card {
   max-width: min(84%, 320px);
   grid-template-columns: 16px minmax(0, 1fr);
   gap: 4px;
-  padding: 4px 6px;
-  border-radius: 12px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 16px;
   background: var(--watch-float-bg);
-  border: 1px solid var(--watch-float-border);
+  box-shadow: none;
+}
+
+.live-mobile-page[data-shell="immersive"]
+  .chat-panel-live-mobile
+  .chat-message-card {
+  grid-template-columns: 18px minmax(0, 1fr);
 }
 
 .chat-panel-live-mobile .chat-avatar {
@@ -343,15 +415,34 @@
   margin-top: 1px;
 }
 
+.live-mobile-page[data-shell="immersive"] .chat-panel-live-mobile .chat-avatar {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+}
+
 .chat-panel-live-mobile .chat-message-line {
   display: block;
   font-size: 0.86rem;
   line-height: 1.42;
 }
 
+.live-mobile-page[data-shell="immersive"]
+  .chat-panel-live-mobile
+  .chat-message-line {
+  display: inline;
+  font-size: 0.9rem;
+}
+
 .chat-panel-live-mobile .chat-message-author {
   font-size: 0.86rem;
   line-height: 1.42;
+}
+
+.live-mobile-page[data-shell="immersive"]
+  .chat-panel-live-mobile
+  .chat-message-author {
+  font-size: 0.9rem;
 }
 
 .chat-panel-live-mobile .chat-composer-floating {

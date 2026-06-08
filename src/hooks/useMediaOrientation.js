@@ -1,32 +1,26 @@
 import { useEffect, useState } from "react";
-
-function getElementDimensions(mediaEl) {
-  if (!mediaEl) {
-    return { width: 0, height: 0 };
-  }
-
-  const stream = mediaEl.srcObject;
-  const track = typeof stream?.getVideoTracks === "function"
-    ? stream.getVideoTracks()[0]
-    : null;
-  const settings = track?.getSettings?.() ?? {};
-
-  return {
-    width: mediaEl.videoWidth || settings.width || mediaEl.clientWidth || 0,
-    height: mediaEl.videoHeight || settings.height || mediaEl.clientHeight || 0,
-  };
-}
+import {
+  DEFAULT_MEDIA_ORIENTATION,
+  getMediaElementSize,
+  getMediaOrientation,
+  hasRenderableMediaSize,
+} from "../lib/mediaLayout.js";
 
 export function useMediaOrientation({
   mediaRef,
   active,
-  fallback = "landscape",
+  fallback = DEFAULT_MEDIA_ORIENTATION,
+  includeTrackSettings = true,
+  includeClientSize = true,
+  resetOnInactive = true,
 }) {
   const [orientation, setOrientation] = useState(fallback);
 
   useEffect(() => {
     if (!active) {
-      setOrientation(fallback);
+      if (resetOnInactive) {
+        setOrientation(fallback);
+      }
       return undefined;
     }
 
@@ -35,9 +29,12 @@ export function useMediaOrientation({
 
     const updateOrientation = () => {
       const mediaEl = mediaRef.current;
-      const { width, height } = getElementDimensions(mediaEl);
-      if (width && height) {
-        setOrientation(height > width ? "portrait" : "landscape");
+      const mediaSize = getMediaElementSize(mediaEl, {
+        includeTrackSettings,
+        includeClientSize,
+      });
+      if (hasRenderableMediaSize(mediaSize)) {
+        setOrientation(getMediaOrientation(mediaSize));
       }
     };
 
@@ -82,7 +79,14 @@ export function useMediaOrientation({
       }
       resizeObserver?.disconnect();
     };
-  }, [active, fallback, mediaRef]);
+  }, [
+    active,
+    fallback,
+    includeClientSize,
+    includeTrackSettings,
+    mediaRef,
+    resetOnInactive,
+  ]);
 
   return orientation;
 }

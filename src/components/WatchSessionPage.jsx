@@ -24,8 +24,13 @@ import { StatusPill } from "./StatusPill.jsx";
 import { SwipeableDrawer } from "./SwipeableDrawer.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 import { formatAudienceCount } from "../lib/audience.js";
+import {
+  isPortraitMedia,
+  shouldUsePortraitImmersiveMode,
+} from "../lib/mediaLayout.js";
 import { buildWatchShareImage } from "../lib/shareImage.js";
 import { STREAM_PROTOCOL_WEBRTC } from "../lib/streamProtocol.js";
+import { usePortraitViewport } from "../hooks/useMediaQuery.js";
 
 const WatchTestCanvas = import.meta.env.DEV
   ? lazy(() => import("./WatchTestCanvas.jsx").then((module) => ({ default: module.WatchTestCanvas })))
@@ -38,9 +43,14 @@ export function WatchSessionPage({
   roomLabel,
   roomTitle,
   siteTitle,
+  hostUserId,
+  hostHandle,
   hostDisplayName,
   hostAvatarUrl,
   hostIcon,
+  hostFollowing = false,
+  hostFollowBusy = false,
+  onHostFollowToggle,
   roomCoverUrl,
   siteIconUrl,
   watchLink,
@@ -81,6 +91,7 @@ export function WatchSessionPage({
   const [controlsVisible, setControlsVisible] = useState(false);
   const [immersiveControlsHidden, setImmersiveControlsHidden] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [hostProfileOpen, setHostProfileOpen] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
   const [elementPipSupported, setElementPipSupported] = useState(false);
   const [videoPipSupported, setVideoPipSupported] = useState(false);
@@ -105,11 +116,17 @@ export function WatchSessionPage({
   const pipVideoStreamRef = useRef(null);
   const toastTimerRef = useRef(null);
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
-  const immersivePortrait = playerOrientation === "portrait";
+  const portraitViewport = usePortraitViewport();
+  const portraitMedia = isPortraitMedia(playerOrientation);
+  const immersivePortrait = shouldUsePortraitImmersiveMode({
+    mediaOrientation: playerOrientation,
+    portraitViewport,
+  });
   const audienceCountText = formatAudienceCount(chatOnlineCount);
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
   const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
   const imageShareReady = Boolean(shareImageUrl && !shareImageLoading);
+  const showHostFollowButton = Boolean(hostUserId && authUser?.id !== hostUserId);
 
   function clearHideTimer() {
     if (hideTimerRef.current) {
@@ -253,6 +270,36 @@ export function WatchSessionPage({
 
   function closeMoreSheet() {
     setMoreOpen(false);
+  }
+
+  function openHostProfile(event) {
+    event?.stopPropagation();
+    setHostProfileOpen(true);
+  }
+
+  function closeHostProfile() {
+    setHostProfileOpen(false);
+  }
+
+  function renderHostFollowButton(className = "") {
+    if (!showHostFollowButton) {
+      return null;
+    }
+
+    return (
+      <button
+        type="button"
+        className={`watch-host-follow-button${hostFollowing ? " is-following" : ""}${className ? ` ${className}` : ""}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onHostFollowToggle?.();
+        }}
+        disabled={authLoading || hostFollowBusy || !authAvailable}
+        aria-pressed={authUser ? hostFollowing : undefined}
+      >
+        {hostFollowing ? "已关注" : "关注"}
+      </button>
+    );
   }
 
   function openAudienceSheet() {
@@ -696,18 +743,28 @@ export function WatchSessionPage({
             <ChevronLeft aria-hidden="true" />
           </button>
           <div className="watch-mobile-host-chip">
-            <UserAvatar
-              avatarUrl={hostAvatarUrl}
-              displayName={hostChipLabel}
-              className="watch-mobile-host-avatar"
-              imgAlt={hostChipLabel || "主播头像"}
-              imgWidth={24}
-              imgHeight={24}
-              monogramClassName="is-monogram"
-              placeholderClassName="is-placeholder"
-              iconClassName="watch-mobile-host-avatar-icon"
-            />
-            <span className="watch-mobile-host-name">{hostChipLabel}</span>
+            <button
+              type="button"
+              className="watch-mobile-host-chip-main"
+              onClick={openHostProfile}
+              aria-label={`查看${hostChipLabel}资料`}
+              aria-haspopup="dialog"
+              aria-expanded={hostProfileOpen ? "true" : "false"}
+            >
+              <UserAvatar
+                avatarUrl={hostAvatarUrl}
+                displayName={hostChipLabel}
+                className="watch-mobile-host-avatar"
+                imgAlt={hostChipLabel || "主播头像"}
+                imgWidth={24}
+                imgHeight={24}
+                monogramClassName="is-monogram"
+                placeholderClassName="is-placeholder"
+                iconClassName="watch-mobile-host-avatar-icon"
+              />
+              <span className="watch-mobile-host-name">{hostChipLabel}</span>
+            </button>
+            {renderHostFollowButton("watch-host-follow-button-mobile")}
           </div>
         </div>
         <div className="stage-mobile-hud-actions">
@@ -740,13 +797,19 @@ export function WatchSessionPage({
   }
 
   return (
-    <section className="page page-immersive" data-page="watch" data-joined="true" hidden={hidden}>
+    <section
+      className="page page-immersive"
+      data-page="watch"
+      data-joined="true"
+      data-immersive={immersivePortrait ? "true" : "false"}
+      hidden={hidden}
+    >
       <div className="page-grid watch-layout">
         <section className="stage-column">
-          {playerOrientation !== "portrait" ? renderMobileHud("stage-mobile-hud-top", true) : null}
+          {!immersivePortrait ? renderMobileHud("stage-mobile-hud-top", true) : null}
           <div
             ref={stageRef}
-            className={`stage-frame watch-stage-frame${controlsVisible ? " controls-visible" : ""}${playerOrientation === "portrait" ? " is-portrait" : ""}`}
+            className={`stage-frame watch-stage-frame${controlsVisible ? " controls-visible" : ""}${portraitMedia ? " is-portrait" : ""}`}
             onMouseMove={handleStagePointerMove}
             onMouseLeave={handleStagePointerLeave}
             onClick={handleStageClick}
@@ -809,8 +872,8 @@ export function WatchSessionPage({
                 点按以取消静音
               </button>
             ) : null}
-            {playerOrientation === "portrait" ? renderMobileHud("stage-mobile-hud-overlay", true) : null}
-            {playerOrientation === "portrait" ? (
+            {immersivePortrait ? renderMobileHud("stage-mobile-hud-overlay", true) : null}
+            {immersivePortrait ? (
               <div
                 className={`watch-portrait-chat-overlay${immersiveControlsHidden ? " is-hidden" : ""}`}
                 onClick={(event) => {
@@ -836,7 +899,7 @@ export function WatchSessionPage({
                 />
               </div>
             ) : null}
-            {playerBadge.state !== "error" && playerOrientation !== "portrait" ? (
+            {playerBadge.state !== "error" && !immersivePortrait ? (
               <div className={`stage-controls${controlsVisible ? " is-visible" : ""}`}>
                 <div className="stage-controls-fade" />
                 <button
@@ -898,11 +961,12 @@ export function WatchSessionPage({
                     iconClassName="watch-desktop-room-avatar-icon"
                   />
                 )}
-                <div className="watch-desktop-room-copy">
-                  <strong data-room-label>{roomTitle || roomLabel}</strong>
-                  <p>{hostDisplayName || roomLabel}</p>
-                </div>
-              </div>
+	                <div className="watch-desktop-room-copy">
+	                  <strong data-room-label>{roomTitle || roomLabel}</strong>
+	                  <p>{hostDisplayName || roomLabel}</p>
+	                </div>
+	                {renderHostFollowButton("watch-host-follow-button-desktop")}
+	              </div>
             </div>
             <div className="info-item info-item-pill watch-desktop-status-actions">
               <button
@@ -922,7 +986,7 @@ export function WatchSessionPage({
           </div>
         </section>
 
-        <aside className={`control-column${playerOrientation !== "portrait" ? " watch-control-column-landscape" : ""}`} data-joined="true">
+        <aside className={`control-column${!immersivePortrait ? " watch-control-column-landscape" : ""}`} data-joined="true">
           <div className="info-strip info-strip-mobile">
             <div className="info-item">
               <strong data-room-label>{roomLabel}</strong>
@@ -1015,6 +1079,32 @@ export function WatchSessionPage({
             <span>{pictureInPictureActive ? "关闭小窗" : "小窗播放"}</span>
           </button>
         </div>
+      </SwipeableDrawer>
+      <SwipeableDrawer
+        open={hostProfileOpen}
+        onClose={closeHostProfile}
+        ariaLabel="关闭主播信息"
+        className="watch-host-profile-drawer"
+        panelClassName="watch-host-profile-panel"
+      >
+        <div className="watch-host-profile-head">
+          <UserAvatar
+            avatarUrl={hostAvatarUrl}
+            displayName={hostChipLabel}
+            className="watch-host-profile-avatar"
+            imgAlt={hostChipLabel || "主播头像"}
+            imgWidth={64}
+            imgHeight={64}
+            monogramClassName="is-monogram"
+            placeholderClassName="is-placeholder"
+            iconClassName="watch-host-profile-avatar-icon"
+          />
+          <div className="watch-host-profile-copy">
+            <strong>{hostDisplayName || hostChipLabel}</strong>
+            <span>{hostHandle || roomLabel}</span>
+          </div>
+        </div>
+        {renderHostFollowButton("watch-host-follow-button-profile")}
       </SwipeableDrawer>
       {toastMessage ? (
         <FloatingToast className="watch-session-toast">{toastMessage}</FloatingToast>

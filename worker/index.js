@@ -75,6 +75,9 @@ export default {
       if (url.pathname === "/api/rooms/resolve" && request.method === "GET") {
         return await handleRoomResolve(env, request);
       }
+      if (/^\/api\/users\/[^/]+\/follow$/.test(url.pathname) && ["GET", "POST", "DELETE"].includes(request.method)) {
+        return await handleUserFollow(env, request);
+      }
       if (url.pathname === "/api/me/profile" && request.method === "POST") {
         return await handleProfileUpdate(env, request);
       }
@@ -333,9 +336,11 @@ async function handleRoomResolve(env, request) {
       rooms.id AS room_id,
       rooms.title AS room_title,
       rooms.cover_url AS room_cover_url,
+      users.id AS host_user_id,
       users.handle AS host_handle,
       users.display_name AS host_display_name,
-      users.primary_email AS host_email
+      users.primary_email AS host_email,
+      users.avatar_url AS host_avatar_url
     FROM moq_rooms AS rooms
     INNER JOIN moq_users AS users
       ON users.id = rooms.host_user_id
@@ -354,12 +359,70 @@ async function handleRoomResolve(env, request) {
       title: row.room_title || "",
       coverUrl: normalizeMediaUrlForRequest(request, row.room_cover_url || ""),
       host: {
+        id: row.host_user_id || "",
         handle: row.host_handle || "",
         displayName: row.host_display_name || "",
-        email: row.host_email || ""
+        email: row.host_email || "",
+        avatarUrl: normalizeMediaUrlForRequest(request, row.host_avatar_url || "")
       }
     }
   });
+}
+
+async function handleUserFollow(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const targetUserId = decodeURIComponent(new URL(request.url).pathname.split("/")[3] ?? "").trim();
+  if (!targetUserId) {
+    return json({ ok: false, error: "Missing target user", code: "missing_target_user" }, { status: 400 });
+  }
+
+  if (targetUserId === session.user.id) {
+    return json({ ok: true, following: false });
+  }
+
+  const targetUser = await db.prepare(
+    `SELECT id FROM moq_users WHERE id = ? LIMIT 1`
+  ).bind(targetUserId).first();
+  if (!targetUser?.id) {
+    return json({ ok: false, error: "User not found", code: "user_not_found" }, { status: 404 });
+  }
+
+  if (request.method === "GET") {
+    const row = await db.prepare(
+      `SELECT 1
+       FROM moq_user_follows
+       WHERE follower_user_id = ? AND followed_user_id = ?
+       LIMIT 1`
+    ).bind(session.user.id, targetUserId).first();
+    return json({ ok: true, following: Boolean(row) });
+  }
+
+  if (request.method === "POST") {
+    const now = new Date().toISOString();
+    await db.prepare(
+      `INSERT INTO moq_user_follows (
+        follower_user_id,
+        followed_user_id,
+        notify_live_started,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, 1, ?, ?)
+      ON CONFLICT(follower_user_id, followed_user_id)
+      DO UPDATE SET updated_at = excluded.updated_at`
+    ).bind(session.user.id, targetUserId, now, now).run();
+    return json({ ok: true, following: true });
+  }
+
+  await db.prepare(
+    `DELETE FROM moq_user_follows
+     WHERE follower_user_id = ? AND followed_user_id = ?`
+  ).bind(session.user.id, targetUserId).run();
+  return json({ ok: true, following: false });
 }
 
 function normalizeMediaUrlForRequest(request, value) {

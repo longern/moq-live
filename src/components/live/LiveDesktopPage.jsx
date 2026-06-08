@@ -146,6 +146,8 @@ function MorePanel({
   onPickCover,
   onOpenCoverPicker,
   onSaveRoomTitle,
+  roomInfoBlockedReason,
+  onRoomInfoBlocked,
   onShare,
   shareSupported,
   watchLink,
@@ -163,6 +165,8 @@ function MorePanel({
       onPickCover={onPickCover}
       onOpenCoverPicker={onOpenCoverPicker}
       onSaveRoomTitle={onSaveRoomTitle}
+      roomInfoBlockedReason={roomInfoBlockedReason}
+      onRoomInfoBlocked={onRoomInfoBlocked}
       onShare={onShare}
       shareSupported={shareSupported}
       watchLink={watchLink}
@@ -242,7 +246,9 @@ export function LiveDesktopPage(props) {
     onPickCover,
     onOpenCoverPicker,
     onRequestClose,
-    onSelectLiveMode
+    onSelectLiveMode,
+    roomInfoBlockedReason,
+    onRoomInfoBlocked
   } = props;
   const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
   const hasSingleMicrophone = (microphoneOptions?.length ?? 0) === 1;
@@ -367,6 +373,8 @@ export function LiveDesktopPage(props) {
       onPickCover={onPickCover}
       onOpenCoverPicker={onOpenCoverPicker}
       onSaveRoomTitle={onSaveRoomTitle}
+      roomInfoBlockedReason={roomInfoBlockedReason}
+      onRoomInfoBlocked={onRoomInfoBlocked}
       onShare={onShare}
       shareSupported={shareSupported}
       watchLink={watchLink}
@@ -445,7 +453,7 @@ export function LiveDesktopPage(props) {
                 onClick={() => setOpenPanel("")}
               />
             ) : null}
-            {publishBlocked ? (
+            {publishBlockedReason ? (
               <p className="inline-warning live-desktop-warning">{publishBlockedReason}</p>
             ) : null}
             <div className="live-desktop-dock">

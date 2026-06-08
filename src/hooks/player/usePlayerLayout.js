@@ -1,29 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { RETAINED_PLAYER_LAYOUT_STATES } from "../../lib/status.js";
+import {
+  DEFAULT_MEDIA_ORIENTATION,
+  getMediaElementSize,
+  getMediaOrientation,
+  hasRenderableMediaSize,
+} from "../../lib/mediaLayout.js";
 
-const DEFAULT_PLAYER_ORIENTATION = "landscape";
-
-function getMediaSize(playerEl) {
-  if (playerEl instanceof HTMLCanvasElement) {
-    return {
-      width: playerEl.width,
-      height: playerEl.height,
-    };
-  }
-
-  return {
-    width: playerEl.videoWidth || playerEl.clientWidth,
-    height: playerEl.videoHeight || playerEl.clientHeight,
-  };
-}
-
-function getMediaOrientation({ width, height }) {
-  return height > width ? "portrait" : "landscape";
-}
-
-function hasRenderableMediaSize(size) {
-  return Boolean(size?.width && size?.height);
-}
+const DEFAULT_PLAYER_ORIENTATION = DEFAULT_MEDIA_ORIENTATION;
 
 export function usePlayerLayout({
   playerRef,
@@ -82,7 +66,10 @@ export function usePlayerLayout({
         return;
       }
 
-      const mediaSize = getMediaSize(playerEl);
+      const mediaSize = getMediaElementSize(playerEl, {
+        includeTrackSettings: false,
+        includeClientSize: true,
+      });
       if (!hasRenderableMediaSize(mediaSize)) {
         return;
       }

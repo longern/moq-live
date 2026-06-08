@@ -1,14 +1,24 @@
 const WEBRTC_AUDIO_MAX_BITRATE = 192_000;
 
-export async function createWhipPublishSession({ url, tracks }) {
+export async function createWhipPublishSession({
+  url,
+  tracks,
+  audioMaxBitrate = WEBRTC_AUDIO_MAX_BITRATE,
+  videoMaxBitrate,
+}) {
   const endpoint = new URL(url).toString();
   const peerConnection = new RTCPeerConnection();
   let resourceUrl = "";
+  let videoSender = null;
+  let currentVideoMaxBitrate = videoMaxBitrate;
 
   for (const track of tracks) {
     const sender = peerConnection.addTrack(track);
     if (track.kind === "audio") {
-      await setAudioSenderBitrate(sender, WEBRTC_AUDIO_MAX_BITRATE);
+      await setSenderBitrate(sender, audioMaxBitrate, "audio");
+    } else if (track.kind === "video") {
+      videoSender = sender;
+      await setSenderBitrate(sender, videoMaxBitrate, "video");
     }
   }
 
@@ -42,6 +52,20 @@ export async function createWhipPublishSession({ url, tracks }) {
 
   return {
     peerConnection,
+    async replaceVideoTrack(track) {
+      if (!videoSender || typeof videoSender.replaceTrack !== "function") {
+        return false;
+      }
+      await videoSender.replaceTrack(track ?? null);
+      if (track) {
+        await setSenderBitrate(videoSender, currentVideoMaxBitrate, "video");
+      }
+      return true;
+    },
+    async setVideoMaxBitrate(maxBitrate) {
+      currentVideoMaxBitrate = maxBitrate;
+      await setSenderBitrate(videoSender, currentVideoMaxBitrate, "video");
+    },
     close() {
       peerConnection.close();
       if (resourceUrl) {
@@ -51,7 +75,10 @@ export async function createWhipPublishSession({ url, tracks }) {
   };
 }
 
-async function setAudioSenderBitrate(sender, maxBitrate) {
+async function setSenderBitrate(sender, maxBitrate, mediaKind) {
+  if (!Number.isFinite(maxBitrate) || maxBitrate <= 0) {
+    return;
+  }
   if (
     !sender ||
     typeof sender.getParameters !== "function" ||
@@ -70,7 +97,7 @@ async function setAudioSenderBitrate(sender, maxBitrate) {
   try {
     await sender.setParameters(parameters);
   } catch (error) {
-    console.warn("failed to set WebRTC audio bitrate", error);
+    console.warn(`failed to set WebRTC ${mediaKind} bitrate`, error);
   }
 }
 

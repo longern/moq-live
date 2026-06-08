@@ -40,6 +40,8 @@ export function LiveMoreMenu({
   onPickCover,
   onOpenCoverPicker,
   onSaveRoomTitle,
+  roomInfoBlockedReason = "",
+  onRoomInfoBlocked,
   onShare,
   shareSupported,
   watchLink,
@@ -69,13 +71,20 @@ export function LiveMoreMenu({
     if (!onSaveRoomTitle || titleSaving || titleUnchanged) {
       return;
     }
+    if (roomInfoBlockedReason) {
+      onRoomInfoBlocked?.();
+      return;
+    }
 
     setTitleSaving(true);
     setTitleError("");
     setTitleStatus("");
 
     try {
-      await onSaveRoomTitle(titleDraft);
+      const result = await onSaveRoomTitle(titleDraft);
+      if (!result) {
+        return;
+      }
       setTitleStatus("直播标题已保存");
     } catch (error) {
       setTitleError(getAppErrorMessage(error));

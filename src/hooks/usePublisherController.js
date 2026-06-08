@@ -21,21 +21,21 @@ import { createWhipPublishSession } from "../lib/whipClient.js";
 const VIDEO_TARGET_WIDTH = 1280;
 const VIDEO_TARGET_HEIGHT = 720;
 const VIDEO_TARGET_FRAMERATE = 30;
-const VIDEO_TARGET_BITRATE = 2_500_000;
+const VIDEO_TARGET_BITRATE = 3_000_000;
 const PUBLISH_QUALITY_OPTIONS = [
   {
     id: "smooth",
     label: "流畅",
-    detail: "360p · 900 Kbps",
+    detail: "360p · 1.0 Mbps",
     width: 640,
     height: 360,
     frameRate: 24,
-    maxBitrate: 900_000,
+    maxBitrate: 1_000_000,
   },
   {
     id: "hd",
     label: "高清",
-    detail: "720p · 2.5 Mbps",
+    detail: "720p · 3.0 Mbps",
     width: VIDEO_TARGET_WIDTH,
     height: VIDEO_TARGET_HEIGHT,
     frameRate: VIDEO_TARGET_FRAMERATE,
@@ -44,11 +44,11 @@ const PUBLISH_QUALITY_OPTIONS = [
   {
     id: "fullhd",
     label: "超清",
-    detail: "1080p · 4.5 Mbps",
+    detail: "1080p · 6.0 Mbps",
     width: 1920,
     height: 1080,
     frameRate: 30,
-    maxBitrate: 4_500_000,
+    maxBitrate: 6_000_000,
   },
 ];
 const DEFAULT_PUBLISH_QUALITY_ID = "hd";
@@ -263,24 +263,40 @@ export function usePublisherController({
     session?.broadcast?.video?.hd?.config?.set?.(getPublishQualityConfig(qualityId));
   }
 
+  async function applyWebRtcVideoBitrateToSession(
+    session,
+    qualityId = publishQualityIdRef.current,
+  ) {
+    if (session?.protocol !== STREAM_PROTOCOL_WEBRTC) {
+      return;
+    }
+    const qualityConfig = getPublishQualityConfig(qualityId);
+    await session.connection?.setVideoMaxBitrate?.(qualityConfig.maxBitrate);
+  }
+
   async function setPublishQualityId(nextQualityId) {
     const nextQuality = getPublishQuality(nextQualityId);
     const normalizedQualityId = nextQuality.id;
+    const liveSession = livePublisherRef.current;
 
     publishQualityIdRef.current = normalizedQualityId;
     setPublishQualityIdState(normalizedQualityId);
-    applyPublishQualityToSession(livePublisherRef.current, normalizedQualityId);
+    applyPublishQualityToSession(liveSession, normalizedQualityId);
     applyPublishQualityToSession(pendingPublisherRef.current, normalizedQualityId);
     applyPublishQualityToSession(syntheticSessionRef.current?.publisher, normalizedQualityId);
 
     if (
-      livePublisherRef.current &&
+      liveSession &&
       publisherIsPublishingRef.current &&
       previewSourceTypeRef.current === PREVIEW_SOURCE_CAMERA &&
       cameraEnabledRef.current
     ) {
       await switchPublishCamera(selectedCameraIdRef.current, normalizedQualityId);
       return;
+    }
+
+    if (liveSession && publisherIsPublishingRef.current) {
+      await applyWebRtcVideoBitrateToSession(liveSession, normalizedQualityId);
     }
 
     appliedPublishQualityIdRef.current = normalizedQualityId;
@@ -403,12 +419,20 @@ export function usePublisherController({
       (track) => track.kind === "video",
     ) ?? [];
 
-    try {
-      session.broadcast?.video?.source?.set?.(undefined);
-    } catch (error) {
-      log(
-        `publish video source cleanup warning: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    if (session.protocol === STREAM_PROTOCOL_WEBRTC) {
+      void session.connection?.replaceVideoTrack?.(null).catch((error) => {
+        log(
+          `WebRTC video source cleanup warning: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    } else {
+      try {
+        session.broadcast?.video?.source?.set?.(undefined);
+      } catch (error) {
+        log(
+          `publish video source cleanup warning: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
 
     session.publishTracks = session.publishTracks?.filter(
@@ -828,6 +852,8 @@ export function usePublisherController({
     updatePublishStatus("preparing", "正在切换摄像头。");
 
     let newStream = null;
+    let newPublishTrack = null;
+    let publishTrackAdopted = false;
     try {
       newStream = await navigator.mediaDevices.getUserMedia(constraints);
       if (
@@ -844,13 +870,25 @@ export function usePublisherController({
         throw createAppError("video_track_unavailable");
       }
 
-      const newPublishTrack = newPreviewTrack.clone();
+      newPublishTrack = newPreviewTrack.clone();
       newPublishTrack.enabled = true;
-      applyPublishQualityToSession(session, qualityId);
+      const qualityConfig = getPublishQualityConfig(qualityId);
       const oldPublishTracks = session.publishTracks.filter(
         (track) => track.kind === "video",
       );
-      session.broadcast.video.source.set(newPublishTrack);
+
+      if (session.protocol === STREAM_PROTOCOL_WEBRTC) {
+        const replaced = await session.connection?.replaceVideoTrack?.(newPublishTrack);
+        if (!replaced) {
+          throw createAppError("webrtc_video_sender_unavailable");
+        }
+        await session.connection?.setVideoMaxBitrate?.(qualityConfig.maxBitrate);
+      } else {
+        applyPublishQualityToSession(session, qualityId);
+        session.broadcast.video.source.set(newPublishTrack);
+      }
+
+      publishTrackAdopted = true;
       session.publishTracks = [
         ...session.publishTracks.filter((track) => track.kind !== "video"),
         newPublishTrack,
@@ -897,6 +935,13 @@ export function usePublisherController({
       log(`switch camera failed: ${message}`);
       throw error;
     } finally {
+      if (!publishTrackAdopted) {
+        try {
+          newPublishTrack?.stop?.();
+        } catch {
+          // Ignore cleanup failures for an unused publish clone.
+        }
+      }
       if (newStream) {
         stopMediaStream(newStream);
       }
@@ -1002,11 +1047,11 @@ export function usePublisherController({
               return;
             }
 
-            stopLivePreview();
             if (publisherIsPublishingRef.current) {
               return;
             }
 
+            stopLivePreview();
             void startLivePreview().catch((error) => {
               const message = getAppErrorMessage(error);
               updatePublishStatus("error", `预览失败：${message}`);
@@ -1311,10 +1356,12 @@ export function usePublisherController({
         if (!nextWebRtcPlaybackUrl) {
           throw createAppError("webrtc_playback_url_missing");
         }
+        const qualityConfig = getPublishQualityConfig(publishQualityIdRef.current);
         const publishTracks = [publishVideoTrack, publishAudioTrack].filter(Boolean);
         const whipSession = await createWhipPublishSession({
           url: nextWebRtcPublishUrl,
           tracks: publishTracks,
+          videoMaxBitrate: qualityConfig.maxBitrate,
         });
         session = {
           protocol: STREAM_PROTOCOL_WEBRTC,
@@ -1547,6 +1594,12 @@ export function usePublisherController({
     }
   }
 
+  async function cleanupLiveResources() {
+    await stopSyntheticPublish();
+    await stopCameraPublish();
+    stopLivePreview({ resetSource: true });
+  }
+
   useEffect(() => {
     if (page === "live" && !publisherIsPublishing) {
       if (
@@ -1717,6 +1770,7 @@ export function usePublisherController({
     stopScreenShare,
     startSyntheticPublish,
     stopSyntheticPublish,
+    cleanupLiveResources,
     getSyntheticSignatures: () => ({
       source: sampleCanvasMarkerSignature(
         syntheticSessionRef.current?.syntheticMedia?.canvas ?? null,

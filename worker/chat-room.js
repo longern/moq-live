@@ -61,6 +61,7 @@ export class ChatRoomDO {
       canControlBroadcast,
       readOnly,
       user,
+      connectedAt: Date.now(),
       sentAt: []
     });
 
@@ -124,6 +125,11 @@ export class ChatRoomDO {
       return;
     }
 
+    if (payload?.type === "broadcast.control.release") {
+      this.handleBroadcastControlRelease(ws, session);
+      return;
+    }
+
     this.sendError(ws, "unsupported_event", {
       eventType: typeof payload?.type === "string" ? payload.type : ""
     });
@@ -131,6 +137,7 @@ export class ChatRoomDO {
 
   async webSocketClose(ws, code, reason) {
     ws.close(code, reason);
+    this.refreshBroadcastControlState({ excludeSocket: ws });
     this.broadcastPresence();
   }
 
@@ -140,7 +147,54 @@ export class ChatRoomDO {
     } catch {
       return;
     } finally {
+      this.refreshBroadcastControlState({ excludeSocket: ws });
       this.broadcastPresence();
+    }
+  }
+
+  refreshBroadcastControlState({ excludeSocket = null } = {}) {
+    const broadcasterGroups = new Map();
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket === excludeSocket) {
+        continue;
+      }
+      if (typeof socket.readyState === "number" && socket.readyState !== 1) {
+        continue;
+      }
+      const session = normalizeAttachment(socket.deserializeAttachment());
+      if (
+        !session?.isRoomOwner ||
+        session.role !== "broadcaster" ||
+        !session.user?.id
+      ) {
+        continue;
+      }
+      const group = broadcasterGroups.get(session.user.id) ?? [];
+      group.push({ socket, session });
+      broadcasterGroups.set(session.user.id, group);
+    }
+
+    for (const group of broadcasterGroups.values()) {
+      const activeController =
+        group.find(({ session }) => session.canControlBroadcast) ??
+        group
+          .slice()
+          .sort((left, right) => left.session.connectedAt - right.session.connectedAt)[0];
+      for (const entry of group) {
+        const canControlBroadcast = entry === activeController;
+        if (entry.session.canControlBroadcast === canControlBroadcast) {
+          continue;
+        }
+        const nextSession = {
+          ...entry.session,
+          canControlBroadcast
+        };
+        entry.socket.serializeAttachment(nextSession);
+        this.send(entry.socket, {
+          type: "broadcast.control.changed",
+          canControlBroadcast
+        });
+      }
     }
   }
 
@@ -380,11 +434,6 @@ export class ChatRoomDO {
         namespace: sanitizeNamespace(payload.roomMeta?.stream?.namespace),
         protocol: sanitizeStreamProtocol(payload.roomMeta?.stream?.protocol),
         webRtcUrl: sanitizeUrl(payload.roomMeta?.stream?.webRtcUrl)
-      },
-      host: {
-        id: sanitizeEntityId(payload.roomMeta?.host?.id),
-        displayName: sanitizeRoomTitle(payload.roomMeta?.host?.displayName),
-        avatarUrl: sanitizeUrl(payload.roomMeta?.host?.avatarUrl)
       }
     };
     if (areRoomMetaEqual(this.roomState.roomMeta, nextRoomMeta)) {
@@ -424,6 +473,36 @@ export class ChatRoomDO {
     }
   }
 
+  handleBroadcastControlRelease(ws, session) {
+    if (
+      !session.isRoomOwner ||
+      session.role !== "broadcaster" ||
+      !session.user?.id
+    ) {
+      return;
+    }
+
+    const hadControl = session.canControlBroadcast;
+    ws.serializeAttachment({
+      ...session,
+      canControlBroadcast: false
+    });
+
+    if (hadControl) {
+      this.send(ws, {
+        type: "broadcast.control.changed",
+        canControlBroadcast: false
+      });
+    }
+    try {
+      ws.close(1000, "broadcast_control_released");
+    } catch {
+      // Ignore close failures on already-closing sockets.
+    }
+    this.refreshBroadcastControlState({ excludeSocket: ws });
+    this.broadcastPresence();
+  }
+
   async persistStorageOrNotify(ws, key, value) {
     try {
       await this.ctx.storage.put(key, value);
@@ -454,11 +533,6 @@ function getDefaultRoomState() {
         namespace: "",
         protocol: STREAM_PROTOCOL_MOQ,
         webRtcUrl: ""
-      },
-      host: {
-        id: "",
-        displayName: "",
-        avatarUrl: ""
       }
     }
   };
@@ -478,11 +552,6 @@ function normalizeRoomState(roomState) {
         namespace: sanitizeNamespace(roomState?.roomMeta?.stream?.namespace),
         protocol: sanitizeStreamProtocol(roomState?.roomMeta?.stream?.protocol),
         webRtcUrl: sanitizeUrl(roomState?.roomMeta?.stream?.webRtcUrl)
-      },
-      host: {
-        id: sanitizeEntityId(roomState?.roomMeta?.host?.id),
-        displayName: sanitizeRoomTitle(roomState?.roomMeta?.host?.displayName),
-        avatarUrl: sanitizeUrl(roomState?.roomMeta?.host?.avatarUrl)
       }
     }
   };
@@ -500,6 +569,7 @@ function normalizeAttachment(attachment) {
     canControlBroadcast: attachment.canControlBroadcast === true,
     readOnly: attachment.readOnly !== false ? true : false,
     user: attachment.user && typeof attachment.user === "object" ? attachment.user : null,
+    connectedAt: Number.isFinite(attachment.connectedAt) ? attachment.connectedAt : 0,
     sentAt: Array.isArray(attachment.sentAt) ? attachment.sentAt.filter((value) => typeof value === "number") : []
   };
 }
@@ -542,10 +612,6 @@ function sanitizeIsoTimestamp(value) {
   return new Date(timestamp).toISOString();
 }
 
-function sanitizeEntityId(value) {
-  return String(value ?? "").trim().slice(0, 128);
-}
-
 function sanitizeUrl(value) {
   const nextValue = String(value ?? "").trim();
   if (!nextValue) {
@@ -578,10 +644,7 @@ function areRoomMetaEqual(left, right) {
     String(left?.stream?.relayUrl ?? "") === String(right?.stream?.relayUrl ?? "") &&
     String(left?.stream?.namespace ?? "") === String(right?.stream?.namespace ?? "") &&
     String(left?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) === String(right?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) &&
-    String(left?.stream?.webRtcUrl ?? "") === String(right?.stream?.webRtcUrl ?? "") &&
-    String(left?.host?.id ?? "") === String(right?.host?.id ?? "") &&
-    String(left?.host?.displayName ?? "") === String(right?.host?.displayName ?? "") &&
-    String(left?.host?.avatarUrl ?? "") === String(right?.host?.avatarUrl ?? "")
+    String(left?.stream?.webRtcUrl ?? "") === String(right?.stream?.webRtcUrl ?? "")
   );
 }
 

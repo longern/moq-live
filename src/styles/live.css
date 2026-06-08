@@ -310,6 +310,17 @@
   text-align: center;
 }
 
+.live-page-toast {
+  position: fixed;
+  left: 50%;
+  z-index: var(--z-toast);
+  transform: translateX(-50%);
+}
+
+.live-page-toast-desktop {
+  bottom: calc(112px + env(safe-area-inset-bottom));
+}
+
 .live-desktop-overlay {
   position: absolute;
   inset: 0;
@@ -1007,6 +1018,15 @@
   box-shadow: 0 12px 28px rgba(82, 109, 255, 0.2);
   filter: none;
   cursor: default;
+}
+
+.live-dock-button-primary:disabled:not(.is-starting),
+.live-fab-primary:disabled:not(.is-starting) {
+  background: linear-gradient(180deg, #b9c7ff, #8fa3f2);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(82, 109, 255, 0.14);
+  filter: none;
+  cursor: not-allowed;
 }
 
 .live-dock-button-primary:hover,

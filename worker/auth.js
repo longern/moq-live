@@ -290,7 +290,9 @@ export async function getSessionUser(db, request) {
       users.display_name_changed_at AS display_name_changed_at,
       sessions.expires_at AS session_expires_at,
       users.primary_email AS primary_email,
-      users.avatar_url AS avatar_url
+      users.avatar_url AS avatar_url,
+      users.follower_count AS follower_count,
+      users.following_count AS following_count
     FROM ${TABLES.sessions} AS sessions
     INNER JOIN ${TABLES.users} AS users ON users.id = sessions.user_id
     WHERE sessions.session_token_hash = ?
@@ -836,6 +838,8 @@ function buildUserPayload(row) {
     ),
     email: row.primary_email,
     avatarUrl: row.avatar_url,
+    followerCount: Math.max(0, Number(row.follower_count || 0)),
+    followingCount: Math.max(0, Number(row.following_count || 0)),
   };
 }
 
@@ -849,7 +853,9 @@ async function getUserRowById(db, userId) {
       display_name,
       display_name_changed_at,
       primary_email,
-      avatar_url
+      avatar_url,
+      follower_count,
+      following_count
      FROM ${TABLES.users}
      WHERE id = ?
      LIMIT 1`,

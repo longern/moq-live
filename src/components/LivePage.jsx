@@ -4,7 +4,7 @@ import { useCompactViewport, usePortraitViewport } from "../hooks/useMediaQuery.
 import { useLiveMobileShellMode } from "../hooks/useLiveMobileShellMode.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
-import { FloatingToast } from "./FloatingToast.jsx";
+import { FloatingToastPresence } from "./FloatingToast.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 
 export function LivePage({
@@ -338,9 +338,7 @@ export function LivePage({
     return (
       <>
         <LiveMobilePage {...pageProps} shellMode={mobileShellMode} />
-        {visibleToastMessage ? (
-          <FloatingToast className="live-page-toast live-page-toast-mobile">{visibleToastMessage}</FloatingToast>
-        ) : null}
+        <FloatingToastPresence className="live-page-toast live-page-toast-mobile">{visibleToastMessage}</FloatingToastPresence>
       </>
     );
   }
@@ -348,9 +346,7 @@ export function LivePage({
   return (
     <>
       <LiveDesktopPage {...pageProps} />
-      {visibleToastMessage ? (
-        <FloatingToast className="live-page-toast live-page-toast-desktop">{visibleToastMessage}</FloatingToast>
-      ) : null}
+      <FloatingToastPresence className="live-page-toast live-page-toast-desktop">{visibleToastMessage}</FloatingToastPresence>
     </>
   );
 }

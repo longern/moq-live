@@ -7,9 +7,7 @@ import {
   Minimize,
   MoreHorizontal,
   Pause,
-  PictureInPicture2,
   Play,
-  QrCode,
   Radio,
   Share,
   Users,
@@ -18,11 +16,15 @@ import {
   X
 } from "lucide-react";
 import { ChatPanel } from "./ChatPanel.jsx";
-import { FloatingToast } from "./FloatingToast.jsx";
+import { FloatingToastPresence } from "./FloatingToast.jsx";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { StatusPill } from "./StatusPill.jsx";
-import { SwipeableDrawer } from "./SwipeableDrawer.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
+import {
+  WatchAudienceSheet,
+  WatchHostProfileSheet,
+  WatchMobileMoreSheet,
+} from "./watch/WatchSessionSheets.jsx";
 import { formatAudienceCount } from "../lib/audience.js";
 import {
   isPortraitMedia,
@@ -48,6 +50,8 @@ export function WatchSessionPage({
   hostHandle,
   hostDisplayName,
   hostAvatarUrl,
+  hostFollowerCount = 0,
+  hostFollowingCount = 0,
   hostIcon,
   hostFollowing = false,
   hostFollowBusy = false,
@@ -126,6 +130,8 @@ export function WatchSessionPage({
     portraitViewport,
   });
   const audienceCountText = formatAudienceCount(chatOnlineCount);
+  const hostFollowerCountText = formatAudienceCount(hostFollowerCount);
+  const hostFollowingCountText = formatAudienceCount(hostFollowingCount);
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
   const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
   const imageShareReady = Boolean(shareImageUrl && !shareImageLoading);
@@ -295,7 +301,7 @@ export function WatchSessionPage({
     return (
       <button
         type="button"
-        className={`watch-host-follow-button${hostFollowing ? " is-following" : ""}${className ? ` ${className}` : ""}`}
+        className={`watch-host-follow-button${hostFollowing ? " is-following" : " is-primary"}${className ? ` ${className}` : ""}`}
         onClick={(event) => {
           event.stopPropagation();
           onHostFollowToggle?.();
@@ -1033,103 +1039,35 @@ export function WatchSessionPage({
           />
         </aside>
       </div>
-      <SwipeableDrawer
+      <WatchMobileMoreSheet
         open={moreOpen}
         onClose={closeMoreSheet}
-        ariaLabel="关闭更多操作"
-        className="watch-mobile-more-drawer"
-        panelClassName="watch-mobile-more-panel"
-      >
-        <div className="watch-mobile-more-header">
-          <strong>{roomLabel}</strong>
-          <span>{playerBadge.label}</span>
-        </div>
-        <div className="watch-mobile-more-actions" role="group" aria-label="更多观看操作">
-          <button
-            type="button"
-            className="watch-mobile-more-action"
-            onClick={async () => {
-              await shareWatchLink();
-              closeMoreSheet();
-            }}
-            disabled={!watchLink || !shareSupported}
-            aria-label="分享观看链接"
-          >
-            <span className="watch-mobile-more-action-icon">
-              <Share aria-hidden="true" />
-            </span>
-            <span>分享</span>
-          </button>
-          <button
-            type="button"
-            className="watch-mobile-more-action"
-            onClick={openImageShareModal}
-            disabled={!watchLink}
-            aria-label="图片分享"
-          >
-            <span className="watch-mobile-more-action-icon">
-              <QrCode aria-hidden="true" />
-            </span>
-            <span>图片分享</span>
-          </button>
-          <button
-            type="button"
-            className="watch-mobile-more-action"
-            onClick={async () => {
-              await copyWatchLink();
-              closeMoreSheet();
-            }}
-            disabled={!watchLink}
-            aria-label="复制观看链接"
-          >
-            <span className="watch-mobile-more-action-icon">
-              <Copy aria-hidden="true" />
-            </span>
-            <span>复制链接</span>
-          </button>
-          <button
-            type="button"
-            className="watch-mobile-more-action"
-            onClick={openPictureInPicture}
-            disabled={!(elementPipSupported || videoPipSupported) || !playerSession}
-            aria-label={pictureInPictureActive ? "关闭小窗播放" : "小窗播放"}
-          >
-            <span className="watch-mobile-more-action-icon">
-              <PictureInPicture2 aria-hidden="true" />
-            </span>
-            <span>{pictureInPictureActive ? "关闭小窗" : "小窗播放"}</span>
-          </button>
-        </div>
-      </SwipeableDrawer>
-      <SwipeableDrawer
+        hostAvatarUrl={hostAvatarUrl}
+        hostChipLabel={hostChipLabel}
+        watchLink={watchLink}
+        shareSupported={shareSupported}
+        elementPipSupported={elementPipSupported}
+        videoPipSupported={videoPipSupported}
+        playerSession={playerSession}
+        pictureInPictureActive={pictureInPictureActive}
+        onShareWatchLink={shareWatchLink}
+        onOpenImageShareModal={openImageShareModal}
+        onCopyWatchLink={copyWatchLink}
+        onOpenPictureInPicture={openPictureInPicture}
+      />
+      <WatchHostProfileSheet
         open={hostProfileOpen}
         onClose={closeHostProfile}
-        ariaLabel="关闭主播信息"
-        className="watch-host-profile-drawer"
-        panelClassName="watch-host-profile-panel"
-      >
-        <div className="watch-host-profile-head">
-          <UserAvatar
-            avatarUrl={hostAvatarUrl}
-            displayName={hostChipLabel}
-            className="watch-host-profile-avatar"
-            imgAlt={hostChipLabel || "主播头像"}
-            imgWidth={64}
-            imgHeight={64}
-            monogramClassName="is-monogram"
-            placeholderClassName="is-placeholder"
-            iconClassName="watch-host-profile-avatar-icon"
-          />
-          <div className="watch-host-profile-copy">
-            <strong>{hostDisplayName || hostChipLabel}</strong>
-            <span>{hostHandle || roomLabel}</span>
-          </div>
-        </div>
-        {renderHostFollowButton("watch-host-follow-button-profile")}
-      </SwipeableDrawer>
-      {toastMessage ? (
-        <FloatingToast className="watch-session-toast">{toastMessage}</FloatingToast>
-      ) : null}
+        hostAvatarUrl={hostAvatarUrl}
+        hostChipLabel={hostChipLabel}
+        hostDisplayName={hostDisplayName}
+        hostHandle={hostHandle}
+        roomLabel={roomLabel}
+        hostFollowerCountText={hostFollowerCountText}
+        hostFollowingCountText={hostFollowingCountText}
+        followButton={renderHostFollowButton("watch-host-follow-button-profile")}
+      />
+      <FloatingToastPresence className="watch-session-toast">{toastMessage}</FloatingToastPresence>
       {imageShareMounted ? (
         <div className={`watch-share-image-layer${imageShareClosing ? " is-closing" : ""}`}>
           <button
@@ -1191,43 +1129,12 @@ export function WatchSessionPage({
           </section>
         </div>
       ) : null}
-      <SwipeableDrawer
+      <WatchAudienceSheet
         open={audienceOpen}
         onClose={closeAudienceSheet}
-        ariaLabel="关闭观众列表"
-        className="watch-audience-drawer"
-        panelClassName="watch-audience-panel"
-      >
-        <div className="watch-audience-head">
-          <strong>在线用户</strong>
-          <span>{audienceCountText} 人</span>
-        </div>
-        {loggedInViewers.length > 0 ? (
-          <div className="watch-audience-list">
-            {loggedInViewers.map((viewer) => {
-              const displayName = viewer.displayName || "已登录用户";
-              return (
-                <div className="watch-audience-row" key={viewer.id}>
-                  <UserAvatar
-                    avatarUrl={viewer.avatarUrl}
-                    displayName={displayName}
-                    className="watch-audience-avatar"
-                    imgAlt={`${displayName}头像`}
-                    imgWidth={48}
-                    imgHeight={48}
-                    monogramClassName="is-monogram"
-                    placeholderClassName="is-placeholder"
-                    iconClassName="watch-audience-avatar-icon"
-                  />
-                  <span>{displayName}</span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="watch-audience-empty">暂无在线用户</div>
-        )}
-      </SwipeableDrawer>
+        audienceCountText={audienceCountText}
+        loggedInViewers={loggedInViewers}
+      />
       {shareMenuMounted ? (
         <>
           <button

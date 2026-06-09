@@ -234,15 +234,24 @@
   }
 
   .page.watch-idle-page[data-page="watch"] {
-    overflow: hidden;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .watch-idle-shell {
+    height: auto;
+    min-height: 100%;
     padding: 0;
   }
 
+  .watch-idle-panel {
+    height: auto;
+    min-height: 100%;
+  }
+
   .watch-room-section {
-    padding: 0 8px calc(96px + env(safe-area-inset-bottom));
+    overflow: visible;
+    padding: 8px 8px calc(72px + env(safe-area-inset-bottom));
   }
 
   .watch-room-section.is-empty {
@@ -437,7 +446,7 @@
   }
 
   .watch-layout:has(.watch-stage-frame.is-portrait) {
-    --watch-float-bg-alpha: 0.48;
+    --watch-float-bg-alpha: 0.38;
     --watch-float-bg: rgba(6, 14, 22, var(--watch-float-bg-alpha));
     --watch-float-border: rgba(255, 255, 255, 0.075);
     --watch-float-shadow: rgba(0, 0, 0, 0.16);
@@ -732,15 +741,6 @@
     gap: 12px;
   }
 
-  button.primary,
-  button.secondary,
-  button.success {
-    width: 100%;
-    min-height: 44px;
-    padding: 0 16px;
-    font-weight: 650;
-  }
-
   .watch-idle-form button {
     width: auto;
   }
@@ -936,18 +936,43 @@
 
   .watch-mobile-more-header {
     display: grid;
-    gap: 4px;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
   }
 
   .watch-mobile-more-header strong {
+    min-width: 0;
     font-size: 1rem;
     line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .watch-mobile-more-header span {
-    color: var(--muted);
-    font-size: 0.82rem;
-    line-height: 1.4;
+  .watch-mobile-more-avatar {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .watch-mobile-more-avatar img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
+
+  .watch-mobile-more-avatar-icon {
+    width: 16px;
+    height: 16px;
   }
 
   .watch-layout:has(.watch-stage-frame.is-portrait)

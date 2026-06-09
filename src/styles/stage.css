@@ -183,7 +183,7 @@ publisher-moq {
   display: flex;
   align-items: end;
   justify-content: space-between;
-  padding: 28px 14px 14px;
+  padding: 6px 14px 6px;
   z-index: 2;
   opacity: 0;
   pointer-events: none;
@@ -198,19 +198,21 @@ publisher-moq {
 
 .stage-controls-fade {
   position: absolute;
-  inset: 0 0 0;
+  inset: auto 0 0;
+  height: 100%;
   background: linear-gradient(
     180deg,
     transparent 0%,
-    rgba(4, 11, 17, 0.18) 34%,
-    rgba(4, 11, 17, 0.72) 100%
+    rgba(0, 0, 0, 0.08) 42%,
+    rgba(0, 0, 0, 0.16) 71%,
+    rgba(0, 0, 0, 0.3) 100%
   );
   pointer-events: none;
 }
 
 .stage-controls-right {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 .stage-unmute-prompt {
@@ -260,11 +262,16 @@ publisher-moq {
   width: 36px;
   min-height: 36px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 0;
   border-radius: 999px;
-  background: rgba(3, 8, 14, 0.72);
+  background: transparent;
   color: var(--text);
-  backdrop-filter: blur(10px);
+  box-shadow: none;
+}
+
+.stage-control-button:hover,
+.stage-control-button:focus-visible {
+  color: rgba(255, 255, 255, 0.74);
 }
 
 .stage-control-button svg {

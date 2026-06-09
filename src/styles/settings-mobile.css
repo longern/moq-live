@@ -38,6 +38,14 @@
     box-shadow: none;
   }
 
+  .my-profile-stats {
+    margin: 0 16px;
+  }
+
+  .my-profile-stat {
+    padding: 8px 10px 10px;
+  }
+
   .desktop-settings-sidebar,
   .desktop-settings-content {
     display: none;
@@ -174,6 +182,24 @@
 
   .account-panel-body {
     padding: 0 0 calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .follows-panel-body {
+    padding: 0 0 calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .follow-list-row {
+    padding: 14px 16px;
+  }
+
+  .follow-list-avatar {
+    width: 42px;
+    height: 42px;
+  }
+
+  .pagination-controls,
+  .pagination-terminal {
+    padding-inline: 16px;
   }
 
   .account-edit-panel-body {

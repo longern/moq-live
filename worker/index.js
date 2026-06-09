@@ -69,6 +69,9 @@ export default {
       if (url.pathname === "/api/me/room/cover" && request.method === "DELETE") {
         return await handleMyRoomCoverDelete(env, request);
       }
+      if (url.pathname === "/api/me/follows" && request.method === "GET") {
+        return await handleMyFollows(env, request);
+      }
       if (url.pathname === "/api/rooms" && request.method === "GET") {
         return await handleRooms(env);
       }
@@ -76,7 +79,7 @@ export default {
         return await handleRoomResolve(env, request);
       }
       if (/^\/api\/users\/[^/]+\/follow$/.test(url.pathname) && ["GET", "POST", "DELETE"].includes(request.method)) {
-        return await handleUserFollow(env, request);
+        return await handleUserFollow(env, request, ctx);
       }
       if (url.pathname === "/api/me/profile" && request.method === "POST") {
         return await handleProfileUpdate(env, request);
@@ -325,6 +328,95 @@ async function handleRooms(env) {
   });
 }
 
+function clampFollowsLimit(value) {
+  const parsed = Number.parseInt(value || "", 10);
+  if (!Number.isFinite(parsed)) {
+    return 20;
+  }
+  return Math.min(50, Math.max(1, parsed));
+}
+
+function parseFollowsCursor(value) {
+  const [createdAt = "", userId = ""] = String(value || "").split("|");
+  if (!createdAt || !userId) {
+    return null;
+  }
+  return { createdAt, userId };
+}
+
+function buildFollowsCursor(row, userIdColumn) {
+  const createdAt = String(row.follow_created_at || "");
+  const userId = String(row[userIdColumn] || "");
+  return createdAt && userId ? `${createdAt}|${userId}` : "";
+}
+
+function buildFollowUserPayload(row, request) {
+  return {
+    id: row.user_id || "",
+    handle: row.user_handle || "",
+    displayName: row.user_display_name || "",
+    email: row.user_email || "",
+    avatarUrl: normalizeMediaUrlForRequest(request, row.user_avatar_url || ""),
+    followerCount: Math.max(0, Number(row.user_follower_count || 0)),
+    followingCount: Math.max(0, Number(row.user_following_count || 0)),
+  };
+}
+
+async function handleMyFollows(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const type = url.searchParams.get("type") === "followers" ? "followers" : "following";
+  const limit = clampFollowsLimit(url.searchParams.get("limit"));
+  const cursor = parseFollowsCursor(url.searchParams.get("cursor"));
+  const cursorCreatedAt = cursor?.createdAt || "9999-12-31T23:59:59.999Z";
+  const cursorUserId = cursor?.userId || "";
+  const userIdColumn = type === "followers" ? "follower_user_id" : "followed_user_id";
+  const relationColumn = type === "followers" ? "followed_user_id" : "follower_user_id";
+
+  const result = await db.prepare(
+    `SELECT
+      follows.${userIdColumn} AS follow_user_id,
+      follows.created_at AS follow_created_at,
+      users.id AS user_id,
+      users.handle AS user_handle,
+      users.display_name AS user_display_name,
+      users.primary_email AS user_email,
+      users.avatar_url AS user_avatar_url,
+      users.follower_count AS user_follower_count,
+      users.following_count AS user_following_count
+    FROM moq_user_follows AS follows
+    INNER JOIN moq_users AS users
+      ON users.id = follows.${userIdColumn}
+    WHERE follows.${relationColumn} = ?
+      AND (
+        follows.created_at < ?
+        OR (follows.created_at = ? AND follows.${userIdColumn} > ?)
+      )
+    ORDER BY follows.created_at DESC, follows.${userIdColumn} ASC
+    LIMIT ?`
+  ).bind(session.user.id, cursorCreatedAt, cursorCreatedAt, cursorUserId, limit + 1).all();
+
+  const rows = Array.isArray(result?.results) ? result.results : [];
+  const pageRows = rows.slice(0, limit);
+  const hasMore = rows.length > limit;
+
+  return json({
+    ok: true,
+    type,
+    items: pageRows.map((row) => ({
+      createdAt: row.follow_created_at || "",
+      user: buildFollowUserPayload(row, request),
+    })),
+    nextCursor: hasMore ? buildFollowsCursor(pageRows[pageRows.length - 1], "follow_user_id") : "",
+    hasMore,
+  });
+}
+
 async function handleRoomResolve(env, request) {
   const db = getDb(env);
   const url = new URL(request.url);
@@ -343,7 +435,9 @@ async function handleRoomResolve(env, request) {
       users.handle AS host_handle,
       users.display_name AS host_display_name,
       users.primary_email AS host_email,
-      users.avatar_url AS host_avatar_url
+      users.avatar_url AS host_avatar_url,
+      users.follower_count AS host_follower_count,
+      users.following_count AS host_following_count
     FROM moq_rooms AS rooms
     INNER JOIN moq_users AS users
       ON users.id = rooms.host_user_id
@@ -367,13 +461,68 @@ async function handleRoomResolve(env, request) {
         handle: row.host_handle || "",
         displayName: row.host_display_name || "",
         email: row.host_email || "",
-        avatarUrl: normalizeMediaUrlForRequest(request, row.host_avatar_url || "")
+        avatarUrl: normalizeMediaUrlForRequest(request, row.host_avatar_url || ""),
+        followerCount: Math.max(0, Number(row.host_follower_count || 0)),
+        followingCount: Math.max(0, Number(row.host_following_count || 0))
       }
     }
   });
 }
 
-async function handleUserFollow(env, request) {
+function runAfterResponse(ctx, task) {
+  const guardedTask = Promise.resolve()
+    .then(task)
+    .catch((error) => {
+      console.warn(
+        "background follow count update failed",
+        error instanceof Error ? error.message : String(error),
+      );
+    });
+
+  if (typeof ctx?.waitUntil === "function") {
+    ctx.waitUntil(guardedTask);
+    return;
+  }
+
+  void guardedTask;
+}
+
+async function updateFollowCounts(db, {
+  followerUserId,
+  followedUserId,
+  followerDelta,
+  followingDelta,
+}) {
+  if (followerDelta > 0) {
+    await db.prepare(
+      `UPDATE moq_users
+       SET follower_count = follower_count + 1
+       WHERE id = ?`
+    ).bind(followedUserId).run();
+  } else if (followerDelta < 0) {
+    await db.prepare(
+      `UPDATE moq_users
+       SET follower_count = MAX(0, follower_count - 1)
+       WHERE id = ?`
+    ).bind(followedUserId).run();
+  }
+
+  if (followingDelta > 0) {
+    await db.prepare(
+      `UPDATE moq_users
+       SET following_count = following_count + 1
+       WHERE id = ?`
+    ).bind(followerUserId).run();
+  } else if (followingDelta < 0) {
+    await db.prepare(
+      `UPDATE moq_users
+       SET following_count = MAX(0, following_count - 1)
+       WHERE id = ?`
+    ).bind(followerUserId).run();
+  }
+}
+
+async function handleUserFollow(env, request, ctx) {
   const db = getDb(env);
   const session = await getSessionUser(db, request);
   if (!session?.user?.id) {
@@ -390,11 +539,19 @@ async function handleUserFollow(env, request) {
   }
 
   const targetUser = await db.prepare(
-    `SELECT id FROM moq_users WHERE id = ? LIMIT 1`
+    `SELECT
+       id,
+       follower_count AS follower_count,
+       following_count AS following_count
+     FROM moq_users
+     WHERE id = ?
+     LIMIT 1`
   ).bind(targetUserId).first();
   if (!targetUser?.id) {
     return json({ ok: false, error: "User not found", code: "user_not_found" }, { status: 404 });
   }
+  const targetFollowerCount = Math.max(0, Number(targetUser.follower_count || 0));
+  const targetFollowingCount = Math.max(0, Number(targetUser.following_count || 0));
 
   if (request.method === "GET") {
     const row = await db.prepare(
@@ -403,30 +560,65 @@ async function handleUserFollow(env, request) {
        WHERE follower_user_id = ? AND followed_user_id = ?
        LIMIT 1`
     ).bind(session.user.id, targetUserId).first();
-    return json({ ok: true, following: Boolean(row) });
+    return json({
+      ok: true,
+      following: Boolean(row),
+      followerCount: targetFollowerCount,
+      followingCount: targetFollowingCount
+    });
   }
 
   if (request.method === "POST") {
     const now = new Date().toISOString();
-    await db.prepare(
-      `INSERT INTO moq_user_follows (
+    const result = await db.prepare(
+      `INSERT OR IGNORE INTO moq_user_follows (
         follower_user_id,
         followed_user_id,
         notify_live_started,
         created_at,
         updated_at
-      ) VALUES (?, ?, 1, ?, ?)
-      ON CONFLICT(follower_user_id, followed_user_id)
-      DO UPDATE SET updated_at = excluded.updated_at`
+      ) VALUES (?, ?, 1, ?, ?)`
     ).bind(session.user.id, targetUserId, now, now).run();
-    return json({ ok: true, following: true });
+    const inserted = Number(result?.meta?.changes || 0) > 0;
+    let followerCount = targetFollowerCount;
+    if (inserted) {
+      followerCount += 1;
+      runAfterResponse(ctx, () => updateFollowCounts(db, {
+        followerUserId: session.user.id,
+        followedUserId: targetUserId,
+        followerDelta: 1,
+        followingDelta: 1,
+      }));
+    }
+    return json({
+      ok: true,
+      following: true,
+      followerCount,
+      followingCount: targetFollowingCount
+    });
   }
 
-  await db.prepare(
+  const result = await db.prepare(
     `DELETE FROM moq_user_follows
      WHERE follower_user_id = ? AND followed_user_id = ?`
   ).bind(session.user.id, targetUserId).run();
-  return json({ ok: true, following: false });
+  const deleted = Number(result?.meta?.changes || 0) > 0;
+  let followerCount = targetFollowerCount;
+  if (deleted) {
+    followerCount = Math.max(0, followerCount - 1);
+    runAfterResponse(ctx, () => updateFollowCounts(db, {
+      followerUserId: session.user.id,
+      followedUserId: targetUserId,
+      followerDelta: -1,
+      followingDelta: -1,
+    }));
+  }
+  return json({
+    ok: true,
+    following: false,
+    followerCount,
+    followingCount: targetFollowingCount
+  });
 }
 
 function normalizeMediaUrlForRequest(request, value) {

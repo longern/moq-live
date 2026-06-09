@@ -10,7 +10,21 @@ import {
 import { LoginDrawer } from "./LoginDrawer.jsx";
 import { MobilePanelPresence, useMobilePanelViewport } from "./MobilePanelPresence.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
-import { createAppError, getAppErrorMessage } from "../lib/appErrors.js";
+import { formatAudienceCount } from "../lib/audience.js";
+import { createApiError, createAppError, getAppErrorMessage } from "../lib/appErrors.js";
+
+const FOLLOWS_PAGE_SIZE = 20;
+
+function createEmptyFollowsState() {
+  return {
+    items: [],
+    nextCursor: "",
+    hasMore: false,
+    loading: false,
+    loadingMore: false,
+    error: "",
+  };
+}
 
 function formatHistoryTime(value) {
   const date = new Date(value);
@@ -140,6 +154,216 @@ function SectionBlock({ title, action = null, children }) {
   );
 }
 
+function getFollowsPanelTitle(type) {
+  return type === "followers" ? "粉丝" : "关注";
+}
+
+function PaginationControls({
+  disabled = false,
+  hasMore,
+  loading,
+  onLoadMore,
+  remainingLabel = "没有更多了"
+}) {
+  if (!hasMore && !loading) {
+    return <div className="pagination-terminal">{remainingLabel}</div>;
+  }
+
+  return (
+    <div className="pagination-controls">
+      <button
+        type="button"
+        className="secondary pagination-load-more"
+        disabled={disabled || loading}
+        onClick={onLoadMore}
+      >
+        {loading ? "加载中" : "加载更多"}
+      </button>
+    </div>
+  );
+}
+
+function FollowListItem({
+  item,
+  onOpenUserRoom,
+  onRequestUnfollow,
+  openable,
+  showFollowingAction,
+  unfollowDisabled
+}) {
+  const user = item?.user || {};
+  const primary = user.displayName || user.handle || user.email || "匿名用户";
+  const secondary = user.handle ? `@${user.handle}` : user.email || "";
+  const watchTarget = user.handle || user.id || "";
+
+  return (
+    <li>
+      <div className={`follow-list-row${showFollowingAction ? " has-action" : ""}`}>
+        <button
+          type="button"
+          className="follow-list-open-button"
+          disabled={!openable || !watchTarget}
+          onClick={() => {
+            if (openable && watchTarget) {
+              onOpenUserRoom(watchTarget);
+            }
+          }}
+        >
+          <UserAvatar
+            avatarUrl={user.avatarUrl}
+            displayName={user.displayName}
+            email={user.email}
+            className="follow-list-avatar"
+            imgAlt={primary}
+            monogramClassName="is-monogram"
+            placeholderClassName="is-placeholder"
+          />
+          <div className="follow-list-copy">
+            <strong>{primary}</strong>
+            {secondary ? <span>{secondary}</span> : null}
+          </div>
+        </button>
+        {showFollowingAction ? (
+          <button
+            type="button"
+            className="follow-list-action-button secondary"
+            disabled={unfollowDisabled}
+            onClick={() => {
+              onRequestUnfollow(user);
+            }}
+          >
+            已关注
+          </button>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+function UnfollowConfirmDialog({
+  error,
+  loading,
+  onCancel,
+  onConfirm,
+  user
+}) {
+  const name = user?.displayName || user?.handle || user?.email || "该用户";
+
+  return (
+    <div className="follow-confirm-layer">
+      <button
+        type="button"
+        className="follow-confirm-backdrop"
+        aria-label="关闭取消关注确认框"
+        onClick={onCancel}
+      />
+      <section
+        className="follow-confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="取消关注确认"
+      >
+        <div className="follow-confirm-copy">
+          <strong>取消关注？</strong>
+          <span>{name}</span>
+        </div>
+        {error ? <p className="inline-warning">{error}</p> : null}
+        <div className="follow-confirm-actions">
+          <button type="button" className="secondary" onClick={onCancel} disabled={loading}>
+            取消
+          </button>
+          <button type="button" className="primary" onClick={onConfirm} disabled={loading}>
+            {loading ? "处理中" : "确认"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function FollowsDrawer({
+  error,
+  hasMore,
+  items,
+  loading,
+  loadingMore,
+  onClose,
+  onConfirmUnfollow,
+  onLoadMore,
+  onOpenUserRoom,
+  onRequestUnfollow,
+  onRetry,
+  onCancelUnfollow,
+  pendingUnfollowUser,
+  title,
+  type,
+  unfollowBusy,
+  unfollowError,
+  transitionClassName
+}) {
+  const initialLoading = loading && !items.length;
+  const showFollowingAction = type === "following";
+
+  return (
+    <PanelShell
+      backdropClassName="auth-panel-backdrop"
+      backdropLabel={`关闭${title}列表`}
+      bodyClassName="follows-panel-body"
+      closeLabel="返回"
+      closeButtonClassName="account-panel-close"
+      headClassName="account-panel-head"
+      onClose={onClose}
+      panelClassName="auth-panel auth-panel-follows"
+      panelLabel={`${title}列表`}
+      title={title}
+      transitionClassName={transitionClassName}
+    >
+      {initialLoading ? (
+        <div className="follow-list-state">加载中</div>
+      ) : error ? (
+        <div className="follow-list-state is-error">
+          <span>{error}</span>
+          <button type="button" className="secondary" onClick={onRetry}>
+            重试
+          </button>
+        </div>
+      ) : items.length ? (
+        <>
+          <ul className="follow-list">
+            {items.map((item) => (
+              <FollowListItem
+                key={`${item.user?.id || ""}-${item.createdAt}`}
+                item={item}
+                onOpenUserRoom={onOpenUserRoom}
+                onRequestUnfollow={onRequestUnfollow}
+                openable={showFollowingAction}
+                showFollowingAction={showFollowingAction}
+                unfollowDisabled={unfollowBusy}
+              />
+            ))}
+          </ul>
+          <PaginationControls
+            hasMore={hasMore}
+            loading={loadingMore}
+            onLoadMore={onLoadMore}
+          />
+        </>
+      ) : (
+        <div className="follow-list-state">暂无{title}</div>
+      )}
+      {pendingUnfollowUser ? (
+        <UnfollowConfirmDialog
+          error={unfollowError}
+          loading={unfollowBusy}
+          onCancel={onCancelUnfollow}
+          onConfirm={onConfirmUnfollow}
+          user={pendingUnfollowUser}
+        />
+      ) : null}
+    </PanelShell>
+  );
+}
+
 function PanelShell({
   backdropClassName,
   backdropLabel,
@@ -186,6 +410,10 @@ function PanelShell({
 function ProfileSummaryCard({
   authPending,
   authUser,
+  followerCount,
+  followingCount,
+  onOpenFollowers,
+  onOpenFollowing,
   profileName,
   profileSubtitle,
   onOpenProfilePanel
@@ -208,6 +436,29 @@ function ProfileSummaryCard({
           <ChevronIcon />
         </span>
       </button>
+      {authUser ? (
+        <div className="my-profile-stats" aria-label="关注和粉丝">
+          <button
+            type="button"
+            className="my-profile-stat my-profile-stat-button"
+            onClick={onOpenFollowing}
+            aria-label={`查看关注列表，${formatAudienceCount(followingCount)} 关注`}
+          >
+            <strong>{formatAudienceCount(followingCount)}</strong>
+            <span>关注</span>
+          </button>
+          <hr className="my-profile-stat-divider" aria-hidden="true" />
+          <button
+            type="button"
+            className="my-profile-stat my-profile-stat-button"
+            onClick={onOpenFollowers}
+            aria-label={`查看粉丝列表，${formatAudienceCount(followerCount)} 粉丝`}
+          >
+            <strong>{formatAudienceCount(followerCount)}</strong>
+            <span>粉丝</span>
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -811,9 +1062,11 @@ export function SettingsPage({
   onUpdateHandle,
   onUpdateAvatar,
   onRelayUrlInput,
+  onOpenFollowUserRoom,
   watchHistoryItems,
   onOpenWatchHistoryItem,
   onClearWatchHistory,
+  onRefreshAuth,
   loginPanelRequestKey = 0,
   logText,
   logRef
@@ -832,6 +1085,16 @@ export function SettingsPage({
   const [loginPanelOpen, setLoginPanelOpen] = useState(false);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [mobileEditPanel, setMobileEditPanel] = useState(null);
+  const [followsPanelType, setFollowsPanelType] = useState(null);
+  const [renderedFollowsPanelType, setRenderedFollowsPanelType] = useState(null);
+  const [followsState, setFollowsState] = useState(() => ({
+    following: createEmptyFollowsState(),
+    followers: createEmptyFollowsState(),
+  }));
+  const [pendingUnfollowUser, setPendingUnfollowUser] = useState(null);
+  const [unfollowBusy, setUnfollowBusy] = useState(false);
+  const [unfollowError, setUnfollowError] = useState("");
+  const [profileFollowingAdjustment, setProfileFollowingAdjustment] = useState(0);
   const [desktopSection, setDesktopSection] = useState("account");
   const [avatarError, setAvatarError] = useState("");
   const [avatarStatus, setAvatarStatus] = useState("");
@@ -853,6 +1116,16 @@ export function SettingsPage({
       setDisplayNameSaving(false);
       setDisplayNameEditing(false);
       setMobileEditPanel(null);
+      setFollowsPanelType(null);
+      setRenderedFollowsPanelType(null);
+      setFollowsState({
+        following: createEmptyFollowsState(),
+        followers: createEmptyFollowsState(),
+      });
+      setPendingUnfollowUser(null);
+      setUnfollowBusy(false);
+      setUnfollowError("");
+      setProfileFollowingAdjustment(0);
       setAvatarError("");
       setAvatarStatus("");
       setAvatarSaving(false);
@@ -870,6 +1143,16 @@ export function SettingsPage({
     setDisplayNameStatus("");
     setDisplayNameSaving(false);
     setDisplayNameEditing(false);
+    setFollowsPanelType(null);
+    setRenderedFollowsPanelType(null);
+    setFollowsState({
+      following: createEmptyFollowsState(),
+      followers: createEmptyFollowsState(),
+    });
+    setPendingUnfollowUser(null);
+    setUnfollowBusy(false);
+    setUnfollowError("");
+    setProfileFollowingAdjustment(0);
     setAvatarError("");
     setAvatarStatus("");
     setAvatarSaving(false);
@@ -900,6 +1183,10 @@ export function SettingsPage({
   );
   const profileName = authPending ? "账号加载中" : authUser?.displayName || authUser?.email || "登录";
   const profileSubtitle = authPending ? "正在检查登录状态" : authUser ? (authUser.email || "已登录") : null;
+  const profileFollowerCount = Math.max(0, Number(authUser?.followerCount || 0));
+  const profileFollowingCount = Math.max(0, Number(authUser?.followingCount || 0) + profileFollowingAdjustment);
+  const visibleFollowsPanelType = followsPanelType || renderedFollowsPanelType;
+  const activeFollowsState = visibleFollowsPanelType ? followsState[visibleFollowsPanelType] : createEmptyFollowsState();
   const authApiStatus = authAvailable ? "已连接" : "未连接";
   const historyItems = useMemo(() => (watchHistoryItems ?? []).map((item) => ({
     ...item,
@@ -971,6 +1258,163 @@ export function SettingsPage({
     }
 
     openLoginPanel();
+  }
+
+  async function loadFollows(type, { reset = false } = {}) {
+    if (!authUser?.id || !type) {
+      return;
+    }
+
+    const currentState = followsState[type] ?? createEmptyFollowsState();
+    if (currentState.loading || currentState.loadingMore) {
+      return;
+    }
+    if (!reset && !currentState.hasMore && currentState.items.length) {
+      return;
+    }
+
+    setFollowsState((current) => ({
+      ...current,
+      [type]: {
+        ...(current[type] ?? createEmptyFollowsState()),
+        error: "",
+        loading: reset,
+        loadingMore: !reset,
+      }
+    }));
+
+    try {
+      const cursor = reset ? "" : currentState.nextCursor;
+      const params = new URLSearchParams({
+        type,
+        limit: String(FOLLOWS_PAGE_SIZE),
+      });
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+
+      const response = await fetch(`/api/me/follows?${params.toString()}`, {
+        credentials: "same-origin",
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw createApiError(payload, "follows_list_failed", { status: response.status });
+      }
+
+      setFollowsState((current) => {
+        const previousItems = reset ? [] : (current[type]?.items ?? []);
+        const nextItems = Array.isArray(payload.items) ? payload.items : [];
+        return {
+          ...current,
+          [type]: {
+            items: previousItems.concat(nextItems),
+            nextCursor: payload.nextCursor || "",
+            hasMore: Boolean(payload.hasMore),
+            loading: false,
+            loadingMore: false,
+            error: "",
+          }
+        };
+      });
+    } catch (error) {
+      setFollowsState((current) => ({
+        ...current,
+        [type]: {
+          ...(current[type] ?? createEmptyFollowsState()),
+          loading: false,
+          loadingMore: false,
+          error: getAppErrorMessage(error),
+        }
+      }));
+    }
+  }
+
+  function openFollowsPanel(type) {
+    if (authPending) {
+      return;
+    }
+
+    if (!authUser) {
+      openLoginPanel();
+      return;
+    }
+
+    setFollowsPanelType(type);
+    setRenderedFollowsPanelType(type);
+    const currentState = followsState[type] ?? createEmptyFollowsState();
+    if (!currentState.items.length && !currentState.loading) {
+      void loadFollows(type, { reset: true });
+    }
+  }
+
+  function openFollowUserRoom(target) {
+    const normalizedTarget = String(target || "").trim();
+    if (!normalizedTarget) {
+      return;
+    }
+
+    setFollowsPanelType(null);
+    setPendingUnfollowUser(null);
+    onOpenFollowUserRoom?.(normalizedTarget);
+  }
+
+  function requestUnfollow(user) {
+    if (!user?.id) {
+      return;
+    }
+
+    setPendingUnfollowUser(user);
+    setUnfollowError("");
+  }
+
+  function cancelUnfollow() {
+    if (unfollowBusy) {
+      return;
+    }
+
+    setPendingUnfollowUser(null);
+    setUnfollowError("");
+  }
+
+  async function confirmUnfollow() {
+    const targetUserId = pendingUnfollowUser?.id;
+    if (!targetUserId || unfollowBusy) {
+      return;
+    }
+
+    setUnfollowBusy(true);
+    setUnfollowError("");
+
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(targetUserId)}/follow`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw createApiError(payload, "follow_update_failed", { status: response.status });
+      }
+
+      setFollowsState((current) => {
+        const currentFollowing = current.following ?? createEmptyFollowsState();
+        return {
+          ...current,
+          following: {
+            ...currentFollowing,
+            items: currentFollowing.items.filter((item) => item.user?.id !== targetUserId),
+          }
+        };
+      });
+      setProfileFollowingAdjustment((current) => current - 1);
+      setPendingUnfollowUser(null);
+      void onRefreshAuth?.();
+    } catch (error) {
+      setUnfollowError(getAppErrorMessage(error));
+    } finally {
+      setUnfollowBusy(false);
+    }
   }
 
   function startDisplayNameEditing() {
@@ -1074,8 +1518,16 @@ export function SettingsPage({
                 <ProfileSummaryCard
                   authPending={authPending}
                   authUser={authUser}
+                  followerCount={profileFollowerCount}
+                  followingCount={profileFollowingCount}
                   profileName={profileName}
                   profileSubtitle={profileSubtitle}
+                  onOpenFollowers={() => {
+                    openFollowsPanel("followers");
+                  }}
+                  onOpenFollowing={() => {
+                    openFollowsPanel("following");
+                  }}
                   onOpenProfilePanel={openProfilePanel}
                 />
               </div>
@@ -1312,6 +1764,39 @@ export function SettingsPage({
               transitionClassName={transitionClassName}
             />
           ) : null)}
+        </MobilePanelPresence>
+
+        <MobilePanelPresence open={Boolean(followsPanelType && authUser)}>
+          {({ transitionClassName }) => visibleFollowsPanelType ? (
+            <FollowsDrawer
+              error={activeFollowsState.error}
+              hasMore={activeFollowsState.hasMore}
+              items={activeFollowsState.items}
+              loading={activeFollowsState.loading}
+              loadingMore={activeFollowsState.loadingMore}
+              onClose={() => {
+                setFollowsPanelType(null);
+              }}
+              onLoadMore={() => {
+                void loadFollows(visibleFollowsPanelType);
+              }}
+              onOpenUserRoom={openFollowUserRoom}
+              onRequestUnfollow={requestUnfollow}
+              onRetry={() => {
+                void loadFollows(visibleFollowsPanelType, { reset: true });
+              }}
+              onCancelUnfollow={cancelUnfollow}
+              onConfirmUnfollow={() => {
+                void confirmUnfollow();
+              }}
+              pendingUnfollowUser={pendingUnfollowUser}
+              title={getFollowsPanelTitle(visibleFollowsPanelType)}
+              type={visibleFollowsPanelType}
+              unfollowBusy={unfollowBusy}
+              unfollowError={unfollowError}
+              transitionClassName={transitionClassName}
+            />
+          ) : null}
         </MobilePanelPresence>
 
         <MobilePanelPresence open={loginPanelOpen}>

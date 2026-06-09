@@ -356,11 +356,11 @@
   min-width: 52px;
   min-height: 28px;
   padding: 0 10px;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
-  background: linear-gradient(180deg, var(--primary), var(--primary-strong));
-  color: #fff;
-  box-shadow: 0 10px 24px var(--primary-shadow);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(235, 244, 251, 0.9);
+  box-shadow: none;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 650;
@@ -368,8 +368,15 @@
   white-space: nowrap;
 }
 
-.watch-host-follow-button:hover:not(:disabled),
-.watch-host-follow-button:focus-visible {
+.watch-host-follow-button.is-primary {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--primary), var(--primary-strong));
+  color: #fff;
+  box-shadow: 0 10px 24px var(--primary-shadow);
+}
+
+.watch-host-follow-button.is-primary:hover:not(:disabled),
+.watch-host-follow-button.is-primary:focus-visible {
   background: linear-gradient(180deg, var(--primary-hover), var(--primary-strong));
   box-shadow: 0 12px 28px var(--primary-shadow);
 }
@@ -379,10 +386,10 @@
   outline-offset: 2px;
 }
 
-.watch-host-follow-button.is-following {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(235, 244, 251, 0.9);
+.watch-host-follow-button.is-following:hover:not(:disabled),
+.watch-host-follow-button.is-following:focus-visible,
+.watch-host-follow-button.is-following:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
   box-shadow: none;
 }
 
@@ -486,6 +493,48 @@
   color: rgba(235, 244, 251, 0.66);
   font-size: 0.86rem;
   line-height: 1.3;
+}
+
+.watch-host-profile-stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  margin: 0 2px;
+}
+
+.watch-host-profile-stat {
+  min-width: 0;
+  padding: 4px 12px 6px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.watch-host-profile-stat-divider {
+  width: 1px;
+  height: 36px;
+  margin: 0;
+  border: 0;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.watch-host-profile-stat strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1.12rem;
+  line-height: 1.15;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watch-host-profile-stat span {
+  color: rgba(235, 244, 251, 0.66);
+  font-size: 0.78rem;
+  line-height: 1.2;
 }
 
 .watch-host-follow-button-profile {

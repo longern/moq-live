@@ -1,6 +1,6 @@
 @media (orientation: portrait) {
   body:has(.watch-stage-frame.is-portrait) {
-    --watch-float-bg-alpha: 0.48;
+    --watch-float-bg-alpha: 0.38;
     --watch-float-bg: rgba(6, 14, 22, var(--watch-float-bg-alpha));
     --watch-float-border: rgba(255, 255, 255, 0.075);
     --watch-float-shadow: rgba(0, 0, 0, 0.16);
@@ -482,18 +482,43 @@
 
   body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-header {
     display: grid;
-    gap: 4px;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
   }
 
   body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-header strong {
+    min-width: 0;
     font-size: 1rem;
     line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-header span {
-    color: var(--muted);
-    font-size: 0.82rem;
-    line-height: 1.4;
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-avatar {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-avatar img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
+
+  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-avatar-icon {
+    width: 16px;
+    height: 16px;
   }
 
   body:has(.watch-stage-frame.is-portrait) .watch-portrait-chat-overlay {

@@ -340,6 +340,7 @@ export function App() {
 
   const {
     authState,
+    refreshAuthState,
     startMicrosoftLogin,
     logout,
     updateDisplayName,
@@ -366,6 +367,8 @@ export function App() {
     hostHandle: "",
     hostDisplayName: "",
     hostAvatarUrl: "",
+    hostFollowerCount: 0,
+    hostFollowingCount: 0,
     title: "",
     welcomeMessage: "",
     coverUrl: ""
@@ -373,6 +376,8 @@ export function App() {
   const [watchFollowState, setWatchFollowState] = useState({
     hostUserId: "",
     following: false,
+    followerCount: 0,
+    followingCount: 0,
     loading: false,
     busy: false,
     error: ""
@@ -515,6 +520,14 @@ export function App() {
     ? ""
     : watchRoomResolution.hostUserId || "";
   const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.hostAvatarUrl || "";
+  const watchHostFollowerCount =
+    watchFollowState.hostUserId === watchHostUserId
+      ? watchFollowState.followerCount
+      : watchRoomResolution.hostFollowerCount;
+  const watchHostFollowingCount =
+    watchFollowState.hostUserId === watchHostUserId
+      ? watchFollowState.followingCount
+      : watchRoomResolution.hostFollowingCount;
   const watchRoomCoverUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.coverUrl || "";
   const watchWelcomeMessage = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.welcomeMessage || "";
   const siteIconUrl = "/icons/icon-192.png";
@@ -569,6 +582,14 @@ export function App() {
         : "匿名用户";
   const showWatchPage = page === "watch" || (page === "live" && liveBackdropPage === "watch");
   const showSettingsPage = page === "settings" || (page === "live" && liveBackdropPage === "settings");
+
+  useEffect(() => {
+    if (!showSettingsPage || authState.loading || !authState.user?.id) {
+      return;
+    }
+
+    void refreshAuthState();
+  }, [showSettingsPage, authState.loading, authState.user?.id]);
 
   useEffect(() => {
     if (page === "live") {
@@ -720,6 +741,8 @@ export function App() {
     setWatchFollowState((current) => ({
       hostUserId: targetUserId,
       following: current.hostUserId === targetUserId ? current.following : false,
+      followerCount: current.hostUserId === targetUserId ? current.followerCount : watchRoomResolution.hostFollowerCount,
+      followingCount: current.hostUserId === targetUserId ? current.followingCount : watchRoomResolution.hostFollowingCount,
       loading: false,
       busy: true,
       error: ""
@@ -737,6 +760,8 @@ export function App() {
       setWatchFollowState({
         hostUserId: targetUserId,
         following: Boolean(payload.following),
+        followerCount: Math.max(0, Number(payload.followerCount ?? watchRoomResolution.hostFollowerCount)),
+        followingCount: Math.max(0, Number(payload.followingCount ?? watchRoomResolution.hostFollowingCount)),
         loading: false,
         busy: false,
         error: ""
@@ -746,6 +771,8 @@ export function App() {
       setWatchFollowState((current) => ({
         hostUserId: targetUserId,
         following: current.hostUserId === targetUserId ? current.following : currentlyFollowing,
+        followerCount: current.hostUserId === targetUserId ? current.followerCount : watchRoomResolution.hostFollowerCount,
+        followingCount: current.hostUserId === targetUserId ? current.followingCount : watchRoomResolution.hostFollowingCount,
         loading: false,
         busy: false,
         error: message
@@ -833,6 +860,8 @@ export function App() {
         hostHandle: "",
         hostDisplayName: "",
         hostAvatarUrl: "",
+        hostFollowerCount: 0,
+        hostFollowingCount: 0,
         title: "",
         welcomeMessage: "",
         coverUrl: ""
@@ -851,6 +880,8 @@ export function App() {
         hostHandle: "",
         hostDisplayName: "",
         hostAvatarUrl: "",
+        hostFollowerCount: 0,
+        hostFollowingCount: 0,
         title: "",
         welcomeMessage: "",
         coverUrl: ""
@@ -878,6 +909,8 @@ export function App() {
           hostHandle: payload.room?.host?.handle || watchHandle,
           hostDisplayName: payload.room?.host?.displayName || "",
           hostAvatarUrl: payload.room?.host?.avatarUrl || "",
+          hostFollowerCount: Math.max(0, Number(payload.room?.host?.followerCount || 0)),
+          hostFollowingCount: Math.max(0, Number(payload.room?.host?.followingCount || 0)),
           title: payload.room?.title || "",
           welcomeMessage: payload.room?.welcomeMessage || "",
           coverUrl: payload.room?.coverUrl || ""
@@ -896,6 +929,8 @@ export function App() {
           hostHandle: "",
           hostDisplayName: "",
           hostAvatarUrl: "",
+          hostFollowerCount: 0,
+          hostFollowingCount: 0,
           title: "",
           welcomeMessage: "",
           coverUrl: ""
@@ -922,6 +957,8 @@ export function App() {
       setWatchFollowState({
         hostUserId: targetUserId,
         following: false,
+        followerCount: watchRoomResolution.hostFollowerCount,
+        followingCount: watchRoomResolution.hostFollowingCount,
         loading: false,
         busy: false,
         error: ""
@@ -933,6 +970,8 @@ export function App() {
       setWatchFollowState({
         hostUserId: targetUserId,
         following: false,
+        followerCount: watchRoomResolution.hostFollowerCount,
+        followingCount: watchRoomResolution.hostFollowingCount,
         loading: false,
         busy: false,
         error: ""
@@ -944,6 +983,8 @@ export function App() {
     setWatchFollowState((current) => ({
       hostUserId: targetUserId,
       following: current.hostUserId === targetUserId ? current.following : false,
+      followerCount: current.hostUserId === targetUserId ? current.followerCount : watchRoomResolution.hostFollowerCount,
+      followingCount: current.hostUserId === targetUserId ? current.followingCount : watchRoomResolution.hostFollowingCount,
       loading: true,
       busy: false,
       error: ""
@@ -964,6 +1005,8 @@ export function App() {
         setWatchFollowState({
           hostUserId: targetUserId,
           following: Boolean(payload.following),
+          followerCount: Math.max(0, Number(payload.followerCount ?? watchRoomResolution.hostFollowerCount)),
+          followingCount: Math.max(0, Number(payload.followingCount ?? watchRoomResolution.hostFollowingCount)),
           loading: false,
           busy: false,
           error: ""
@@ -976,6 +1019,8 @@ export function App() {
         setWatchFollowState({
           hostUserId: targetUserId,
           following: false,
+          followerCount: watchRoomResolution.hostFollowerCount,
+          followingCount: watchRoomResolution.hostFollowingCount,
           loading: false,
           busy: false,
           error: message
@@ -989,7 +1034,14 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [authState.loading, authState.user?.id, watchHostUserId, watchJoined]);
+  }, [
+    authState.loading,
+    authState.user?.id,
+    watchHostUserId,
+    watchJoined,
+    watchRoomResolution.hostFollowerCount,
+    watchRoomResolution.hostFollowingCount
+  ]);
 
   useEffect(() => {
     if (page !== "watch" || !watchRouteCommitted || watchingNamespace || !resolvedWatchRoomId) {
@@ -1387,6 +1439,8 @@ export function App() {
             hostHandle={watchRoomResolution.hostHandle}
             hostDisplayName={watchHostDisplayName}
             hostAvatarUrl={watchHostAvatarUrl}
+            hostFollowerCount={watchHostFollowerCount}
+            hostFollowingCount={watchHostFollowingCount}
             hostIcon={watchHostIcon}
             hostFollowing={watchFollowState.hostUserId === watchHostUserId && watchFollowState.following}
             hostFollowBusy={
@@ -1530,11 +1584,15 @@ export function App() {
               autorunRef.current = false;
               setRelayUrlValue(event.currentTarget.value);
             }}
+            onOpenFollowUserRoom={(target) => {
+              beginWatch(target);
+            }}
             watchHistoryItems={watchHistoryItems}
             onOpenWatchHistoryItem={openWatchHistoryItem}
             onClearWatchHistory={() => {
               setWatchHistoryItems(clearWatchHistory());
             }}
+            onRefreshAuth={refreshAuthState}
             loginPanelRequestKey={settingsLoginPanelRequestKey}
             logText={logText}
             logRef={logRef}

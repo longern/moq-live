@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LivePage } from "./LivePage.jsx";
 import { useChatController } from "../hooks/useChatController.js";
+import { useCommentSpeech } from "../hooks/useCommentSpeech.js";
 import { usePublisherController } from "../hooks/usePublisherController.js";
 import { buildWatchLink, generateRoomId } from "../lib/routeState.js";
 import { describePublishState } from "../lib/status.js";
@@ -9,12 +10,134 @@ import { createAppError, getAppErrorMessage } from "../lib/appErrors.js";
 import { normalizeStreamProtocol } from "../lib/streamProtocol.js";
 
 const STREAM_SETTINGS_STORAGE_PREFIX = "moq-live:stream-settings";
+const COMMENT_SPEECH_STORAGE_PREFIX = "moq-live:comment-speech";
+const LOCATION_SHARING_STORAGE_PREFIX = "moq-live:location-sharing";
+const COHOST_RECENTS_STORAGE_PREFIX = "moq-live:cohost-recents";
+const MAX_COHOST_RECENTS = 6;
 
 function getStreamSettingsStorageKey(userId) {
   if (userId) {
     return `${STREAM_SETTINGS_STORAGE_PREFIX}:user:${userId}`;
   }
   return `${STREAM_SETTINGS_STORAGE_PREFIX}:local`;
+}
+
+function getCommentSpeechStorageKey(userId) {
+  if (userId) {
+    return `${COMMENT_SPEECH_STORAGE_PREFIX}:user:${userId}`;
+  }
+  return `${COMMENT_SPEECH_STORAGE_PREFIX}:local`;
+}
+
+function getLocationSharingStorageKey(userId) {
+  if (userId) {
+    return `${LOCATION_SHARING_STORAGE_PREFIX}:user:${userId}`;
+  }
+  return `${LOCATION_SHARING_STORAGE_PREFIX}:local`;
+}
+
+function getCohostRecentsStorageKey(userId) {
+  if (userId) {
+    return `${COHOST_RECENTS_STORAGE_PREFIX}:user:${userId}`;
+  }
+  return `${COHOST_RECENTS_STORAGE_PREFIX}:local`;
+}
+
+function readStoredBoolean(storageKey, fallback = false) {
+  if (typeof window === "undefined" || !storageKey) {
+    return fallback;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(storageKey);
+    if (storedValue === null) {
+      return fallback;
+    }
+    return storedValue === "1";
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredBoolean(storageKey, value) {
+  if (typeof window === "undefined" || !storageKey) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(storageKey, value ? "1" : "0");
+  } catch {
+    // Ignore storage failures; the setting remains active for the current session.
+  }
+}
+
+function readStoredCohostRecents(storageKey) {
+  if (typeof window === "undefined" || !storageKey) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((item) => ({
+        handle: String(item?.handle ?? "").trim(),
+        displayName: String(item?.displayName ?? "").trim(),
+        avatarUrl: String(item?.avatarUrl ?? "").trim(),
+      }))
+      .filter((item) => item.handle)
+      .slice(0, MAX_COHOST_RECENTS);
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredCohostRecents(storageKey, recents) {
+  if (typeof window === "undefined" || !storageKey) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(recents.slice(0, MAX_COHOST_RECENTS)));
+  } catch {
+    // Ignore storage failures; recent cohost shortcuts are not critical.
+  }
+}
+
+function getCohostRequestErrorMessage(error) {
+  if (error?.code === "room_not_found") {
+    return "直播间不存在";
+  }
+  if (error?.code === "room_not_live") {
+    return "直播间未开播";
+  }
+  if (error?.code === "cohost_invites_blocked") {
+    return "对方已屏蔽连线邀请";
+  }
+  if (error?.code === "cohost_self") {
+    return "不能向自己发起连线";
+  }
+  return getAppErrorMessage(error);
+}
+
+function getCurrentPosition() {
+  if (
+    typeof navigator === "undefined"
+    || !navigator.geolocation
+    || typeof navigator.geolocation.getCurrentPosition !== "function"
+  ) {
+    return Promise.reject(new Error("geolocation unavailable"));
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: false,
+      maximumAge: 60_000,
+      timeout: 10_000,
+    });
+  });
 }
 
 function readStoredStreamSettings(storageKey) {
@@ -31,6 +154,7 @@ function readStoredStreamSettings(storageKey) {
     return {
       protocol: typeof parsed?.protocol === "string" ? normalizeStreamProtocol(parsed.protocol) : "",
       qualityId: typeof parsed?.qualityId === "string" ? parsed.qualityId : "",
+      cameraId: typeof parsed?.cameraId === "string" ? parsed.cameraId : "",
       publishUrl: typeof parsed?.publishUrl === "string" ? parsed.publishUrl : "",
       playbackUrl: typeof parsed?.playbackUrl === "string" ? parsed.playbackUrl : "",
     };
@@ -41,7 +165,7 @@ function readStoredStreamSettings(storageKey) {
 
 function writeStoredStreamSettings(
   storageKey,
-  { protocol = "", qualityId = "", publishUrl = "", playbackUrl = "" },
+  { protocol = "", qualityId = "", cameraId = "", publishUrl = "", playbackUrl = "" },
 ) {
   if (typeof window === "undefined" || !storageKey) {
     return;
@@ -50,15 +174,17 @@ function writeStoredStreamSettings(
   try {
     const nextProtocol = protocol ? normalizeStreamProtocol(protocol) : "";
     const nextQualityId = String(qualityId);
+    const nextCameraId = String(cameraId);
     const nextPublishUrl = String(publishUrl);
     const nextPlaybackUrl = String(playbackUrl);
-    if (!nextProtocol && !nextQualityId && !nextPublishUrl && !nextPlaybackUrl) {
+    if (!nextProtocol && !nextQualityId && !nextCameraId && !nextPublishUrl && !nextPlaybackUrl) {
       window.localStorage.removeItem(storageKey);
       return;
     }
     window.localStorage.setItem(storageKey, JSON.stringify({
       protocol: nextProtocol,
       qualityId: nextQualityId,
+      cameraId: nextCameraId,
       publishUrl: nextPublishUrl,
       playbackUrl: nextPlaybackUrl,
     }));
@@ -278,6 +404,46 @@ export function LiveRoute({
     log,
   });
   const streamSettingsStorageKey = getStreamSettingsStorageKey(authState.user?.id);
+  const commentSpeechStorageKey = getCommentSpeechStorageKey(authState.user?.id);
+  const locationSharingStorageKey = getLocationSharingStorageKey(authState.user?.id);
+  const cohostRecentsStorageKey = getCohostRecentsStorageKey(authState.user?.id);
+  const [commentSpeechEnabled, setCommentSpeechEnabled] = useState(() => readStoredBoolean(commentSpeechStorageKey));
+  const commentSpeechSupported =
+    typeof window !== "undefined"
+    && "speechSynthesis" in window
+    && typeof window.SpeechSynthesisUtterance === "function";
+  const [locationSharingEnabled, setLocationSharingEnabled] = useState(() => readStoredBoolean(locationSharingStorageKey));
+  const [locationSharingPending, setLocationSharingPending] = useState(false);
+  const [cohostRecentHosts, setCohostRecentHosts] = useState(() => readStoredCohostRecents(cohostRecentsStorageKey));
+  const locationSharingSupported =
+    typeof navigator !== "undefined"
+    && Boolean(navigator.geolocation)
+    && typeof navigator.geolocation.getCurrentPosition === "function";
+
+  useEffect(() => {
+    setCommentSpeechEnabled(readStoredBoolean(commentSpeechStorageKey));
+  }, [commentSpeechStorageKey]);
+
+  useEffect(() => {
+    setLocationSharingEnabled(readStoredBoolean(locationSharingStorageKey));
+  }, [locationSharingStorageKey]);
+
+  useEffect(() => {
+    setCohostRecentHosts(readStoredCohostRecents(cohostRecentsStorageKey));
+  }, [cohostRecentsStorageKey]);
+
+  useEffect(() => {
+    if (!liveChatEnabled || liveChat.connectionState !== "connected") {
+      setLocationSharingPending(false);
+    }
+  }, [liveChat.connectionState, liveChatEnabled]);
+
+  useCommentSpeech({
+    enabled: liveChatEnabled && commentSpeechEnabled && commentSpeechSupported,
+    messages: liveChat.messages,
+    connectionState: liveChat.connectionState,
+    log,
+  });
 
   useEffect(() => {
     const nextPublishUrl = liveRoomDetails?.webRtcPublishUrl || "";
@@ -323,6 +489,13 @@ export function LiveRoute({
         log(`publish quality restore failed: ${message}`);
       });
     }
+    if (
+      storedSettings.cameraId &&
+      storedSettings.cameraId !== publisher.selectedCameraId &&
+      publisher.cameraOptions.some((option) => option.value === storedSettings.cameraId)
+    ) {
+      publisher.setSelectedCameraId(storedSettings.cameraId);
+    }
     if (storedSettings.publishUrl && storedSettings.publishUrl !== publisher.webRtcPublishUrl) {
       publisher.setWebRtcPublishUrl(storedSettings.publishUrl);
     }
@@ -331,8 +504,10 @@ export function LiveRoute({
     }
   }, [
     log,
+    publisher.cameraOptions,
     publisher.publishQualityId,
     publisher.publishProtocol,
+    publisher.selectedCameraId,
     publisher.webRtcPlaybackUrl,
     publisher.webRtcPublishUrl,
     streamSettingsStorageKey,
@@ -411,6 +586,13 @@ export function LiveRoute({
         if (switched) {
           publisher.setSelectedCameraId(cameraId);
           publisher.setCameraEnabled(true);
+          writeStoredStreamSettings(streamSettingsStorageKey, {
+            protocol: publisher.publishProtocol,
+            qualityId: publisher.publishQualityId,
+            cameraId,
+            publishUrl: publisher.webRtcPublishUrl,
+            playbackUrl: publisher.webRtcPlaybackUrl,
+          });
         }
       } catch (error) {
         const message = getAppErrorMessage(error);
@@ -421,6 +603,13 @@ export function LiveRoute({
 
     publisher.setSelectedCameraId(cameraId);
     publisher.setCameraEnabled(true);
+    writeStoredStreamSettings(streamSettingsStorageKey, {
+      protocol: publisher.publishProtocol,
+      qualityId: publisher.publishQualityId,
+      cameraId,
+      publishUrl: publisher.webRtcPublishUrl,
+      playbackUrl: publisher.webRtcPlaybackUrl,
+    });
   }
 
   function enableVideoMode() {
@@ -478,6 +667,7 @@ export function LiveRoute({
     writeStoredStreamSettings(streamSettingsStorageKey, {
       protocol: publisher.publishProtocol,
       qualityId: publisher.publishQualityId,
+      cameraId: publisher.selectedCameraId,
       publishUrl: nextUrl,
       playbackUrl: publisher.webRtcPlaybackUrl,
     });
@@ -488,6 +678,7 @@ export function LiveRoute({
     writeStoredStreamSettings(streamSettingsStorageKey, {
       protocol: publisher.publishProtocol,
       qualityId: publisher.publishQualityId,
+      cameraId: publisher.selectedCameraId,
       publishUrl: publisher.webRtcPublishUrl,
       playbackUrl: nextUrl,
     });
@@ -497,6 +688,7 @@ export function LiveRoute({
     writeStoredStreamSettings(streamSettingsStorageKey, {
       protocol: publisher.publishProtocol,
       qualityId,
+      cameraId: publisher.selectedCameraId,
       publishUrl: publisher.webRtcPublishUrl,
       playbackUrl: publisher.webRtcPlaybackUrl,
     });
@@ -508,10 +700,145 @@ export function LiveRoute({
     writeStoredStreamSettings(streamSettingsStorageKey, {
       protocol: nextProtocol,
       qualityId: publisher.publishQualityId,
+      cameraId: publisher.selectedCameraId,
       publishUrl: publisher.webRtcPublishUrl,
       playbackUrl: publisher.webRtcPlaybackUrl,
     });
     await publisher.setPublishProtocol(nextProtocol);
+  }
+
+  function changeCommentSpeechEnabled(nextEnabled) {
+    const enabled = Boolean(nextEnabled) && commentSpeechSupported;
+    setCommentSpeechEnabled(enabled);
+    writeStoredBoolean(commentSpeechStorageKey, enabled);
+  }
+
+  async function changeLocationSharingEnabled(nextEnabled) {
+    const enabled = Boolean(nextEnabled);
+    if (!locationSharingSupported) {
+      setLocationSharingEnabled(false);
+      writeStoredBoolean(locationSharingStorageKey, false);
+      return;
+    }
+
+    if (!enabled) {
+      setLocationSharingEnabled(false);
+      writeStoredBoolean(locationSharingStorageKey, false);
+      const sent = liveChat.sendEvent({
+        type: "room.location.updated",
+        location: { enabled: false },
+      });
+      if (!sent) {
+        log("room location disable skipped: chat channel unavailable");
+      }
+      return;
+    }
+
+    setLocationSharingPending(true);
+    try {
+      const position = await getCurrentPosition();
+      const sent = liveChat.sendEvent({
+        type: "room.location.updated",
+        location: {
+          enabled: true,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          updatedAt: new Date(position.timestamp || Date.now()).toISOString(),
+        },
+      });
+      if (!sent) {
+        log("room location update skipped: chat channel unavailable");
+        setLocationSharingEnabled(false);
+        writeStoredBoolean(locationSharingStorageKey, false);
+        return;
+      }
+      setLocationSharingEnabled(true);
+      writeStoredBoolean(locationSharingStorageKey, true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log(`room location update failed: ${message}`);
+      setLocationSharingEnabled(false);
+      writeStoredBoolean(locationSharingStorageKey, false);
+    } finally {
+      setLocationSharingPending(false);
+    }
+  }
+
+  function rememberCohostHost(room) {
+    const host = room?.host;
+    const handle = String(host?.handle || "").trim();
+    if (!handle) {
+      return;
+    }
+
+    const nextHost = {
+      handle,
+      displayName: String(host?.displayName || "").trim(),
+      avatarUrl: String(host?.avatarUrl || "").trim(),
+    };
+    setCohostRecentHosts((current) => {
+      const next = [
+        nextHost,
+        ...current.filter((item) => item.handle !== handle)
+      ].slice(0, MAX_COHOST_RECENTS);
+      writeStoredCohostRecents(cohostRecentsStorageKey, next);
+      return next;
+    });
+  }
+
+  async function requestCohostInvite(handle) {
+    const response = await fetch("/api/cohost/request", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ handle }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const error = createApiError(payload, "cohost_request_failed", { status: response.status });
+      error.message = getCohostRequestErrorMessage(error);
+      throw error;
+    }
+
+    rememberCohostHost(payload.room);
+    return payload;
+  }
+
+  async function respondToCohostInvite(invite, accepted) {
+    if (!invite?.id || !invite.requesterRoomId || !invite.targetRoomId) {
+      return null;
+    }
+
+    const response = await fetch("/api/cohost/respond", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        inviteId: invite.id,
+        requesterRoomId: invite.requesterRoomId,
+        targetRoomId: invite.targetRoomId,
+        accepted,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw createApiError(payload, "cohost_response_failed", { status: response.status });
+    }
+
+    liveChat.dismissCohostInvite(invite.id);
+    if (accepted) {
+      rememberCohostHost({
+        host: invite.requester
+      });
+    }
+    return payload;
   }
 
   async function closeLivePage() {
@@ -644,6 +971,25 @@ export function LiveRoute({
           log(`screen share stop failed: ${message}`);
         });
       }}
+      commentSpeechEnabled={commentSpeechEnabled && commentSpeechSupported}
+      commentSpeechSupported={commentSpeechSupported}
+      onCommentSpeechEnabledChange={changeCommentSpeechEnabled}
+      locationSharingEnabled={locationSharingEnabled && locationSharingSupported}
+      locationSharingSupported={locationSharingSupported}
+      locationSharingPending={locationSharingPending}
+      onLocationSharingEnabledChange={(nextEnabled) => {
+        void changeLocationSharingEnabled(nextEnabled);
+      }}
+      cohostInvitesAllowed={liveChat.cohostInvitesAllowed}
+      cohostInvite={liveChat.cohostInvite}
+      cohostInviteResponse={liveChat.cohostInviteResponse}
+      cohostActive={liveChat.cohostActive}
+      cohostRecentHosts={cohostRecentHosts}
+      onCohostInvitesAllowedChange={(nextAllowed) => {
+        liveChat.setCohostInviteAllowed(nextAllowed);
+      }}
+      onCohostInviteRequest={requestCohostInvite}
+      onCohostInviteRespond={(invite, accepted) => respondToCohostInvite(invite, accepted)}
       chatMessages={liveChat.messages}
       chatDraft={liveChat.draft}
       chatConnectionState={liveChatEnabled ? liveChat.connectionState : "closed"}

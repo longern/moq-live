@@ -5,9 +5,12 @@ import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
 import { formatAudienceCount } from "../../lib/audience.js";
 import {
+  AudioVideoSettingsIcon,
   AudienceIcon,
+  CheckIcon,
   ChatIcon,
   CloseIcon,
+  CohostIcon,
   EndBroadcastIcon,
   FlipCameraIcon,
   MicrophoneIcon,
@@ -18,12 +21,18 @@ import {
 import { LiveMoreMenu } from "./LiveMoreMenu.jsx";
 import { LivePreviewStage } from "./LivePreviewStage.jsx";
 import { LiveQualityMenu } from "./LiveQualityMenu.jsx";
+import { LiveSwitch } from "./LiveSwitch.jsx";
 
 export function LiveMobilePage(props) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
   const [qualityDrawerOpen, setQualityDrawerOpen] = useState(false);
+  const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
+  const [cohostDrawerOpen, setCohostDrawerOpen] = useState(false);
+  const [cohostHandle, setCohostHandle] = useState("");
+  const [cohostBusy, setCohostBusy] = useState(false);
+  const [cohostResponseBusy, setCohostResponseBusy] = useState(false);
   const [cameraNoticeVisible, setCameraNoticeVisible] = useState(false);
   const cameraNoticeTimerRef = useRef(null);
   const {
@@ -32,7 +41,7 @@ export function LiveMobilePage(props) {
     roomAvatarUrl,
     publishBlocked,
     publishBlockedReason,
-    cameraOptions,
+    cameraOptions = [],
     publishQualityOptions = [],
     publishProtocolOptions = [],
     publishQualityId,
@@ -79,8 +88,22 @@ export function LiveMobilePage(props) {
     roomCoverInputRef,
     roomTitle,
     roomWelcomeMessage,
+    commentSpeechEnabled,
+    commentSpeechSupported,
+    locationSharingEnabled,
+    locationSharingSupported,
+    locationSharingPending,
+    cohostInvitesAllowed = true,
+    cohostInvite = null,
+    cohostActive = null,
+    cohostRecentHosts = [],
     onSaveRoomTitle,
     onSaveRoomWelcomeMessage,
+    onCommentSpeechEnabledChange,
+    onLocationSharingEnabledChange,
+    onCohostInvitesAllowedChange,
+    onCohostInviteRequest,
+    onCohostInviteRespond,
     roomInfoBlockedReason,
     onRoomInfoBlocked,
     onPickCover,
@@ -99,6 +122,8 @@ export function LiveMobilePage(props) {
   const showModeSwitch = !publishControlActive;
   const showStartButton = !isPublishing;
   const showCameraControl = !voiceMode;
+  const showMediaSettingsControl = immersiveShell && isPublishing;
+  const showCohostControl = showMediaSettingsControl;
   const audienceCountText = formatAudienceCount(chatOnlineCount);
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
 
@@ -120,10 +145,25 @@ export function LiveMobilePage(props) {
     }
   }, [showLiveHeader]);
 
+  useEffect(() => {
+    if (!showMediaSettingsControl) {
+      setMediaSettingsOpen(false);
+      setCohostDrawerOpen(false);
+    }
+  }, [showMediaSettingsControl]);
+
+  useEffect(() => {
+    if (!cohostDrawerOpen) {
+      setCohostHandle("");
+    }
+  }, [cohostDrawerOpen]);
+
   function openMoreSheet() {
     setChatDrawerOpen(false);
     setAudienceOpen(false);
     setQualityDrawerOpen(false);
+    setMediaSettingsOpen(false);
+    setCohostDrawerOpen(false);
     setMoreOpen(true);
   }
 
@@ -138,6 +178,8 @@ export function LiveMobilePage(props) {
     setMoreOpen(false);
     setAudienceOpen(false);
     setQualityDrawerOpen(false);
+    setMediaSettingsOpen(false);
+    setCohostDrawerOpen(false);
     setChatDrawerOpen(true);
   }
 
@@ -152,6 +194,8 @@ export function LiveMobilePage(props) {
     setMoreOpen(false);
     setChatDrawerOpen(false);
     setQualityDrawerOpen(false);
+    setMediaSettingsOpen(false);
+    setCohostDrawerOpen(false);
     setAudienceOpen(true);
   }
 
@@ -163,11 +207,68 @@ export function LiveMobilePage(props) {
     setMoreOpen(false);
     setChatDrawerOpen(false);
     setAudienceOpen(false);
+    setMediaSettingsOpen(false);
+    setCohostDrawerOpen(false);
     setQualityDrawerOpen(true);
   }
 
   function closeQualitySheet() {
     setQualityDrawerOpen(false);
+  }
+
+  function openMediaSettingsSheet() {
+    setMoreOpen(false);
+    setChatDrawerOpen(false);
+    setAudienceOpen(false);
+    setQualityDrawerOpen(false);
+    setCohostDrawerOpen(false);
+    setMediaSettingsOpen(true);
+  }
+
+  function closeMediaSettingsSheet() {
+    setMediaSettingsOpen(false);
+  }
+
+  function openCohostSheet() {
+    if (!showCohostControl) {
+      return;
+    }
+
+    setMoreOpen(false);
+    setChatDrawerOpen(false);
+    setAudienceOpen(false);
+    setQualityDrawerOpen(false);
+    setMediaSettingsOpen(false);
+    setCohostDrawerOpen(true);
+  }
+
+  function closeCohostSheet() {
+    setCohostDrawerOpen(false);
+  }
+
+  async function submitCohostInvite(nextHandle = cohostHandle) {
+    const handle = nextHandle.trim().replace(/^@+/, "");
+    if (!handle || cohostBusy) {
+      return;
+    }
+
+    setCohostBusy(true);
+    const ok = await onCohostInviteRequest?.(handle);
+    setCohostBusy(false);
+    if (ok) {
+      setCohostHandle("");
+      setCohostDrawerOpen(false);
+    }
+  }
+
+  async function respondToCohostInvite(accepted) {
+    if (!cohostInvite || cohostResponseBusy) {
+      return;
+    }
+
+    setCohostResponseBusy(true);
+    await onCohostInviteRespond?.(cohostInvite, accepted);
+    setCohostResponseBusy(false);
   }
 
   function showCameraUnavailableNotice() {
@@ -331,7 +432,29 @@ export function LiveMobilePage(props) {
             ) : null}
             <div className="live-mobile-actions">
               <div className="live-mobile-utility-row" aria-label="开播辅助操作">
-                {showCameraControl ? (
+                {showMediaSettingsControl ? (
+                  <button
+                    type="button"
+                    className={`live-fab live-fab-icon${mediaSettingsOpen ? " is-active" : ""}`}
+                    onClick={mediaSettingsOpen ? closeMediaSettingsSheet : openMediaSettingsSheet}
+                    aria-label={mediaSettingsOpen ? "关闭音画设置" : "音画设置"}
+                    aria-expanded={mediaSettingsOpen}
+                  >
+                    <AudioVideoSettingsIcon />
+                  </button>
+                ) : null}
+                {showCohostControl ? (
+                  <button
+                    type="button"
+                    className={`live-fab live-fab-icon${cohostDrawerOpen ? " is-active" : ""}${cohostActive ? " is-connected" : ""}`}
+                    onClick={cohostDrawerOpen ? closeCohostSheet : openCohostSheet}
+                    aria-label={cohostDrawerOpen ? "关闭连线" : "连线"}
+                    aria-expanded={cohostDrawerOpen}
+                  >
+                    <CohostIcon />
+                  </button>
+                ) : null}
+                {!showMediaSettingsControl && showCameraControl ? (
                   <button
                     type="button"
                     className={`live-fab live-fab-icon${cameraUnavailable ? " is-unavailable" : ""}`}
@@ -344,14 +467,16 @@ export function LiveMobilePage(props) {
                     <FlipCameraIcon />
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  className={`live-fab live-fab-icon${microphoneEnabled ? "" : " is-muted"}`}
-                  onClick={onToggleMicrophone}
-                  aria-label={microphoneEnabled ? "关闭麦克风" : "打开麦克风"}
-                >
-                  <MicrophoneIcon enabled={microphoneEnabled} />
-                </button>
+                {!showMediaSettingsControl ? (
+                  <button
+                    type="button"
+                    className={`live-fab live-fab-icon${microphoneEnabled ? "" : " is-muted"}`}
+                    onClick={onToggleMicrophone}
+                    aria-label={microphoneEnabled ? "关闭麦克风" : "打开麦克风"}
+                  >
+                    <MicrophoneIcon enabled={microphoneEnabled} />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={`live-fab live-fab-icon${qualityDrawerOpen ? " is-active" : ""}`}
@@ -477,6 +602,118 @@ export function LiveMobilePage(props) {
         ) : null}
 
         <SwipeableDrawer
+          open={mediaSettingsOpen}
+          onClose={closeMediaSettingsSheet}
+          ariaLabel="关闭音画设置"
+          className="live-mobile-drawer"
+          panelClassName="live-mobile-media-panel"
+        >
+          <div className="live-mobile-media-panel-head">
+            <strong>音画设置</strong>
+          </div>
+          <div className="live-mobile-media-toolbar">
+            <div className="live-mobile-media-toolbar-left" role="group" aria-label="快捷音画控制">
+              <button
+                type="button"
+                className={`live-media-icon-button${cameraUnavailable ? " is-unavailable" : ""}`}
+                onClick={handleCameraAction}
+                aria-label={cameraUnavailable
+                  ? "未检测到可用摄像头"
+                  : `翻转摄像头，当前${cameraMode === "rear" ? "后摄" : "前摄"}`}
+                aria-disabled={cameraUnavailable ? "true" : undefined}
+              >
+                <FlipCameraIcon />
+              </button>
+              <button
+                type="button"
+                className={`live-media-icon-button${microphoneEnabled ? "" : " is-muted"}`}
+                onClick={onToggleMicrophone}
+                aria-label={microphoneEnabled ? "关闭麦克风" : "打开麦克风"}
+              >
+                <MicrophoneIcon enabled={microphoneEnabled} />
+              </button>
+            </div>
+          </div>
+        </SwipeableDrawer>
+
+        <SwipeableDrawer
+          open={cohostDrawerOpen}
+          onClose={closeCohostSheet}
+          ariaLabel="关闭连线"
+          className="live-mobile-drawer"
+          panelClassName="live-mobile-cohost-panel"
+        >
+          <div className="live-cohost-head">
+            <strong>连线</strong>
+            <button
+              type="button"
+              className="live-cohost-switch"
+              role="switch"
+              aria-checked={cohostInvitesAllowed}
+              aria-label="允许其他主播邀请连线"
+              onClick={() => onCohostInvitesAllowedChange?.(!cohostInvitesAllowed)}
+            >
+              <span>允许邀请</span>
+              <LiveSwitch checked={cohostInvitesAllowed} />
+            </button>
+          </div>
+          <form
+            className="live-cohost-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitCohostInvite();
+            }}
+          >
+            <input
+              value={cohostHandle}
+              onChange={(event) => setCohostHandle(event.currentTarget.value)}
+              placeholder="输入主播号"
+              autoComplete="off"
+              inputMode="text"
+            />
+            <button type="submit" disabled={!cohostHandle.trim() || cohostBusy}>
+              {cohostBusy ? "发送中" : "申请"}
+            </button>
+          </form>
+          <div className="live-cohost-recent">
+            <div className="live-cohost-recent-head">最近连线</div>
+            {cohostRecentHosts.length > 0 ? (
+              <div className="live-cohost-recent-list">
+                {cohostRecentHosts.map((host) => {
+                  const name = host.displayName || host.handle;
+                  return (
+                    <button
+                      type="button"
+                      className="live-cohost-recent-row"
+                      key={host.handle}
+                      disabled={cohostBusy}
+                      onClick={() => {
+                        void submitCohostInvite(host.handle);
+                      }}
+                    >
+                      <UserAvatar
+                        avatarUrl={host.avatarUrl}
+                        displayName={name}
+                        className="live-cohost-avatar"
+                        imgAlt={`${name}头像`}
+                        imgWidth={38}
+                        imgHeight={38}
+                        monogramClassName="is-monogram"
+                        placeholderClassName="is-placeholder"
+                        iconClassName="live-cohost-avatar-icon"
+                      />
+                      <span>{name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="live-cohost-empty">暂无最近连线</div>
+            )}
+          </div>
+        </SwipeableDrawer>
+
+        <SwipeableDrawer
           open={qualityDrawerOpen}
           onClose={closeQualitySheet}
           ariaLabel="关闭画质设置"
@@ -514,10 +751,17 @@ export function LiveMobilePage(props) {
             roomCoverInputRef={roomCoverInputRef}
             roomTitle={roomTitle}
             roomWelcomeMessage={roomWelcomeMessage}
+            commentSpeechEnabled={commentSpeechEnabled}
+            commentSpeechSupported={commentSpeechSupported}
+            locationSharingEnabled={locationSharingEnabled}
+            locationSharingSupported={locationSharingSupported}
+            locationSharingPending={locationSharingPending}
             onPickCover={onPickCover}
             onOpenCoverPicker={onOpenCoverPicker}
             onSaveRoomTitle={onSaveRoomTitle}
             onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
+            onCommentSpeechEnabledChange={onCommentSpeechEnabledChange}
+            onLocationSharingEnabledChange={onLocationSharingEnabledChange}
             roomInfoBlockedReason={roomInfoBlockedReason}
             onRoomInfoBlocked={onRoomInfoBlocked}
             onShare={onShare}
@@ -526,6 +770,45 @@ export function LiveMobilePage(props) {
             onClose={closeMoreSheet}
           />
         </SwipeableDrawer>
+        {cohostInvite ? (
+          <div className="live-cohost-invite-layer">
+            <section
+              className="live-cohost-invite-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-label="连线邀请"
+            >
+              <div className="live-cohost-invite-copy">
+                <strong>{cohostInvite.requester.displayName || cohostInvite.requester.handle}</strong>
+                <span>申请与你连线</span>
+              </div>
+              <div className="live-cohost-invite-actions">
+                <button
+                  type="button"
+                  className="live-cohost-invite-button reject"
+                  onClick={() => {
+                    void respondToCohostInvite(false);
+                  }}
+                  disabled={cohostResponseBusy}
+                  aria-label="拒绝连线邀请"
+                >
+                  <CloseIcon />
+                </button>
+                <button
+                  type="button"
+                  className="live-cohost-invite-button accept"
+                  onClick={() => {
+                    void respondToCohostInvite(true);
+                  }}
+                  disabled={cohostResponseBusy}
+                  aria-label="接受连线邀请"
+                >
+                  <CheckIcon />
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
       </div>
     </section>
   );

@@ -982,10 +982,10 @@ function AccountDetailsContent({
         {avatarError ? <p className="inline-warning">{avatarError}</p> : null}
         {avatarStatus ? <p className="status">{avatarStatus}</p> : null}
 
-        <div className="my-actions">
+        <div className="my-account-actions">
           <button
             type="button"
-            className="secondary"
+            className="my-plain-danger-button"
             onClick={() => {
               onClose();
               onLogout();

@@ -31,7 +31,7 @@
   }
 }
 
-@media (min-width: 761px) and (max-width: 980px) {
+@media (min-width: 601px) and (max-width: 980px) {
   .page[data-page="watch"][data-joined="true"] {
     overflow: auto;
   }
@@ -137,8 +137,7 @@
   }
 
   .live-layout .stage-column {
-    display: grid;
-    grid-template-rows: minmax(0, 1fr);
+    display: flex;
     align-items: stretch;
     min-height: 0;
     height: 100%;
@@ -206,7 +205,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 600px) {
   .app-container {
     grid-template-rows: minmax(0, 1fr);
     gap: 0;
@@ -331,7 +330,7 @@
   }
 
   .watch-layout .control-column[data-joined="false"] {
-    display: grid;
+    display: flex;
     flex: 1 1 auto;
     padding-top: 20px;
   }
@@ -458,12 +457,9 @@
     min-height: 32px;
     display: inline-flex;
     align-items: center;
-    border: 1px solid var(--watch-float-border);
     border-radius: 999px;
     background: var(--watch-float-bg);
     color: var(--text);
-    backdrop-filter: blur(14px);
-    box-shadow: 0 12px 28px var(--watch-float-shadow);
   }
 
   .watch-mobile-host-chip {
@@ -480,8 +476,9 @@
     width: 24px;
     height: 24px;
     min-width: 24px;
-    display: inline-grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
@@ -736,8 +733,8 @@
   }
 
   .action-row {
-    display: grid;
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
   }
 
@@ -786,9 +783,10 @@
     min-width: 0;
     min-height: 76px;
     padding: 8px 6px;
-    display: grid;
-    justify-items: center;
-    align-content: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 7px;
     border: 0;
     border-radius: 0;
@@ -887,8 +885,9 @@
     width: 48px;
     height: 48px;
     min-width: 48px;
-    display: inline-grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
@@ -953,8 +952,9 @@
   .watch-mobile-more-avatar {
     width: 34px;
     height: 34px;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 999px;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.08);
@@ -1069,14 +1069,15 @@
   }
 
   .chat-panel-watch-overlay .chat-composer-floating {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
     gap: 10px;
     align-items: center;
     padding-right: 0;
   }
 
   .chat-panel-watch-overlay .chat-composer-floating input {
+    flex: 1 1 auto;
+    min-width: 0;
     min-height: 36px;
     height: 36px;
     border: 1px solid var(--watch-float-border);

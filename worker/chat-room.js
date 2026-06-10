@@ -7,10 +7,12 @@ const MAX_ROOM_TITLE_LENGTH = 80;
 const DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE = "Exceeded allowed rows written in Durable Objects free tier.";
 const STREAM_PROTOCOL_MOQ = "moq";
 const STREAM_PROTOCOL_WEBRTC = "webrtc";
+const COHOST_INVITE_TTL_MS = 60_000;
 
 export class ChatRoomDO {
-  constructor(ctx) {
+  constructor(ctx, env) {
     this.ctx = ctx;
+    this.env = env;
     this.recentMessages = [];
     this.roomState = getDefaultRoomState();
     this.ready = this.ctx.blockConcurrencyWhile(async () => {
@@ -30,6 +32,27 @@ export class ChatRoomDO {
       console.warn("Skipped pruning chat messages because Durable Object write quota was exceeded.");
     }
     const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname.endsWith("/state")) {
+      return json({
+        ok: true,
+        stream: this.roomState.stream,
+        roomMeta: this.roomState.roomMeta,
+        cohost: this.roomState.cohost
+      });
+    }
+
+    if (request.method === "POST" && url.pathname.endsWith("/cohost/request")) {
+      return await this.handleCohostInviteRequest(request);
+    }
+
+    if (request.method === "POST" && url.pathname.endsWith("/cohost/response")) {
+      return await this.handleCohostInviteResponse(request);
+    }
+
+    if (request.method === "POST" && url.pathname.endsWith("/cohost/active")) {
+      return await this.handleCohostActiveUpdate(request);
+    }
 
     if (!url.pathname.endsWith("/ws")) {
       return new Response("Not found", { status: 404 });
@@ -73,7 +96,8 @@ export class ChatRoomDO {
       ...this.getPresenceSnapshot(),
       messages: this.recentMessages,
       stream: this.roomState.stream,
-      roomMeta: this.roomState.roomMeta
+      roomMeta: this.roomState.roomMeta,
+      cohost: this.roomState.cohost
     });
     this.broadcastPresence();
 
@@ -117,6 +141,16 @@ export class ChatRoomDO {
 
     if (payload?.type === "room.updated") {
       await this.handleRoomUpdated(ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "room.location.updated") {
+      await this.handleRoomLocationUpdated(ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "cohost.invites.set_allowed") {
+      await this.handleCohostInvitesAllowed(ws, session, payload);
       return;
     }
 
@@ -247,7 +281,7 @@ export class ChatRoomDO {
       if (
         session?.role === "broadcaster" &&
         session.canControlBroadcast &&
-        session.user?.id === userId
+        (!userId || session.user?.id === userId)
       ) {
         return true;
       }
@@ -383,7 +417,12 @@ export class ChatRoomDO {
 
     const nextRoomState = {
       ...this.roomState,
-      stream: nextStream
+      stream: nextStream,
+      cohost: {
+        ...this.roomState.cohost,
+        invitesAllowed: true,
+        active: null
+      }
     };
     const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
     if (!persisted) {
@@ -393,6 +432,14 @@ export class ChatRoomDO {
     this.broadcast({
       type: "stream.started",
       stream: nextStream
+    });
+    this.broadcast({
+      type: "cohost.invites.changed",
+      invitesAllowed: nextRoomState.cohost.invitesAllowed
+    });
+    this.broadcast({
+      type: "cohost.active.changed",
+      active: nextRoomState.cohost.active
     });
   }
 
@@ -406,9 +453,14 @@ export class ChatRoomDO {
       return;
     }
 
+    const previousActive = this.roomState.cohost.active;
     const nextRoomState = {
       ...this.roomState,
-      stream: getDefaultRoomState().stream
+      stream: getDefaultRoomState().stream,
+      cohost: {
+        ...this.roomState.cohost,
+        active: null
+      }
     };
     const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
     if (!persisted) {
@@ -419,6 +471,11 @@ export class ChatRoomDO {
       type: "stream.stopped",
       stream: this.roomState.stream
     });
+    this.broadcast({
+      type: "cohost.active.changed",
+      active: null
+    });
+    await this.clearPeerCohostActive(previousActive);
   }
 
   async handleRoomUpdated(ws, session, payload) {
@@ -453,6 +510,147 @@ export class ChatRoomDO {
       type: "room.updated",
       roomMeta: nextRoomMeta
     });
+  }
+
+  async handleRoomLocationUpdated(ws, session, payload) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
+      this.sendError(ws, "forbidden_room_location_update");
+      return;
+    }
+
+    const nextLocation = normalizeRoomLocation(payload.location);
+    if (areRoomLocationsEqual(this.roomState.location, nextLocation)) {
+      return;
+    }
+
+    const nextRoomState = {
+      ...this.roomState,
+      location: nextLocation
+    };
+    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    if (!persisted) {
+      return;
+    }
+    this.roomState = nextRoomState;
+  }
+
+  async handleCohostInvitesAllowed(ws, session, payload) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
+      this.sendError(ws, "forbidden_cohost_update");
+      return;
+    }
+
+    const nextCohost = {
+      ...this.roomState.cohost,
+      invitesAllowed: payload.invitesAllowed !== false
+    };
+    if (this.roomState.cohost.invitesAllowed === nextCohost.invitesAllowed) {
+      return;
+    }
+
+    const nextRoomState = {
+      ...this.roomState,
+      cohost: nextCohost
+    };
+    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    if (!persisted) {
+      return;
+    }
+    this.roomState = nextRoomState;
+    this.broadcast({
+      type: "cohost.invites.changed",
+      invitesAllowed: nextCohost.invitesAllowed
+    });
+  }
+
+  async handleCohostInviteRequest(request) {
+    const payload = await request.json().catch(() => ({}));
+    const invite = normalizeCohostInvite(payload.invite);
+    if (!invite) {
+      return json({ ok: false, error: "Invalid cohost invite", code: "invalid_cohost_invite" }, { status: 400 });
+    }
+
+    if (!this.roomState.stream.isLive || !this.hasActiveBroadcastController()) {
+      return json({ ok: false, error: "Room is not live", code: "room_not_live" }, { status: 409 });
+    }
+
+    if (this.roomState.cohost.invitesAllowed === false) {
+      return json({ ok: false, error: "Cohost invites are blocked", code: "cohost_invites_blocked" }, { status: 403 });
+    }
+
+    let delivered = 0;
+    for (const socket of this.ctx.getWebSockets()) {
+      const session = normalizeAttachment(socket.deserializeAttachment());
+      if (
+        !session?.isRoomOwner ||
+        session.role !== "broadcaster" ||
+        !session.canControlBroadcast
+      ) {
+        continue;
+      }
+      this.send(socket, {
+        type: "cohost.invite.received",
+        invite
+      });
+      delivered += 1;
+    }
+
+    if (delivered === 0) {
+      return json({ ok: false, error: "Room is not live", code: "room_not_live" }, { status: 409 });
+    }
+
+    return json({ ok: true, delivered });
+  }
+
+  async handleCohostInviteResponse(request) {
+    const payload = await request.json().catch(() => ({}));
+    const response = normalizeCohostInviteResponse(payload.response);
+    if (!response) {
+      return json({ ok: false, error: "Invalid cohost response", code: "invalid_cohost_response" }, { status: 400 });
+    }
+
+    this.broadcast({
+      type: "cohost.invite.responded",
+      response
+    });
+    return json({ ok: true });
+  }
+
+  async handleCohostActiveUpdate(request) {
+    const payload = await request.json().catch(() => ({}));
+    const active = normalizeCohostActive(payload.active);
+    const nextCohost = {
+      ...this.roomState.cohost,
+      active
+    };
+    const nextRoomState = {
+      ...this.roomState,
+      cohost: nextCohost
+    };
+    this.roomState = nextRoomState;
+    await this.ctx.storage.put("roomState", nextRoomState);
+    this.broadcast({
+      type: "cohost.active.changed",
+      active
+    });
+    return json({ ok: true });
+  }
+
+  async clearPeerCohostActive(active) {
+    if (!active?.peerRoomId || !this.env?.CHAT_ROOM) {
+      return;
+    }
+
+    try {
+      const stub = this.env.CHAT_ROOM.get(this.env.CHAT_ROOM.idFromName(active.peerRoomId));
+      await stub.fetch(new Request("https://chat-room.internal/cohost/active", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ active: null })
+      }));
+    } catch (error) {
+      console.warn("Failed to clear peer cohost state", error instanceof Error ? error.message : String(error));
+    }
   }
 
   handleBroadcastControlCheck(ws, session, payload) {
@@ -519,6 +717,15 @@ export class ChatRoomDO {
   }
 }
 
+function json(payload, init = {}) {
+  const headers = new Headers(init.headers || {});
+  headers.set("content-type", "application/json; charset=utf-8");
+  return new Response(JSON.stringify(payload), {
+    ...init,
+    headers
+  });
+}
+
 function getDefaultRoomState() {
   return {
     stream: {
@@ -534,7 +741,9 @@ function getDefaultRoomState() {
         protocol: STREAM_PROTOCOL_MOQ,
         webRtcUrl: ""
       }
-    }
+    },
+    location: getDefaultRoomLocation(),
+    cohost: getDefaultCohostState()
   };
 }
 
@@ -553,7 +762,53 @@ function normalizeRoomState(roomState) {
         protocol: sanitizeStreamProtocol(roomState?.roomMeta?.stream?.protocol),
         webRtcUrl: sanitizeUrl(roomState?.roomMeta?.stream?.webRtcUrl)
       }
-    }
+    },
+    location: normalizeRoomLocation(roomState?.location),
+    cohost: normalizeCohostState(roomState?.cohost)
+  };
+}
+
+function getDefaultCohostState() {
+  return {
+    invitesAllowed: true,
+    active: null
+  };
+}
+
+function normalizeCohostState(cohost) {
+  return {
+    invitesAllowed: cohost?.invitesAllowed === false ? false : true,
+    active: normalizeCohostActive(cohost?.active)
+  };
+}
+
+function getDefaultRoomLocation() {
+  return {
+    enabled: false,
+    latitude: null,
+    longitude: null,
+    accuracy: null,
+    updatedAt: null
+  };
+}
+
+function normalizeRoomLocation(location) {
+  if (!location?.enabled) {
+    return getDefaultRoomLocation();
+  }
+
+  const latitude = sanitizeCoordinate(location.latitude, -90, 90);
+  const longitude = sanitizeCoordinate(location.longitude, -180, 180);
+  if (latitude === null || longitude === null) {
+    return getDefaultRoomLocation();
+  }
+
+  return {
+    enabled: true,
+    latitude,
+    longitude,
+    accuracy: sanitizeAccuracy(location.accuracy),
+    updatedAt: sanitizeIsoTimestamp(location.updatedAt) ?? new Date().toISOString()
   };
 }
 
@@ -576,6 +831,126 @@ function normalizeAttachment(attachment) {
 
 function sanitizeRequestId(value) {
   return String(value ?? "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
+}
+
+function sanitizeInviteId(value) {
+  return String(value ?? "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 96);
+}
+
+function sanitizeHandle(value) {
+  return String(value ?? "").trim().replace(/^@+/, "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 24);
+}
+
+function sanitizeDisplayName(value) {
+  return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, 48);
+}
+
+function normalizeCohostUser(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const handle = sanitizeHandle(value.handle);
+  if (!handle) {
+    return null;
+  }
+
+  return {
+    id: String(value.id ?? "").trim().slice(0, 128),
+    handle,
+    displayName: sanitizeDisplayName(value.displayName),
+    avatarUrl: sanitizeUrl(value.avatarUrl)
+  };
+}
+
+function normalizeCohostStream(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const protocol = sanitizeStreamProtocol(value.protocol);
+  const relayUrl = sanitizeUrl(value.relayUrl);
+  const namespace = sanitizeNamespace(value.namespace);
+  const webRtcUrl = sanitizeUrl(value.webRtcUrl);
+  const moqReady = protocol === STREAM_PROTOCOL_MOQ && relayUrl && namespace;
+  const webRtcReady = protocol === STREAM_PROTOCOL_WEBRTC && webRtcUrl;
+  if (!moqReady && !webRtcReady) {
+    return null;
+  }
+
+  return {
+    relayUrl,
+    namespace,
+    protocol,
+    webRtcUrl
+  };
+}
+
+function normalizeCohostInvite(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = sanitizeInviteId(value.id);
+  const requesterRoomId = sanitizeNamespace(value.requesterRoomId);
+  const targetRoomId = sanitizeNamespace(value.targetRoomId);
+  const requester = normalizeCohostUser(value.requester);
+  const requestedAt = sanitizeIsoTimestamp(value.requestedAt) ?? new Date().toISOString();
+  if (!id || !requesterRoomId || !targetRoomId || !requester) {
+    return null;
+  }
+
+  if (Date.now() - Date.parse(requestedAt) > COHOST_INVITE_TTL_MS) {
+    return null;
+  }
+
+  return {
+    id,
+    requesterRoomId,
+    targetRoomId,
+    requestedAt,
+    requester
+  };
+}
+
+function normalizeCohostInviteResponse(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = sanitizeInviteId(value.id);
+  const target = normalizeCohostUser(value.target);
+  if (!id || !target) {
+    return null;
+  }
+
+  return {
+    id,
+    accepted: Boolean(value.accepted),
+    respondedAt: sanitizeIsoTimestamp(value.respondedAt) ?? new Date().toISOString(),
+    target
+  };
+}
+
+function normalizeCohostActive(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const peerRoomId = sanitizeNamespace(value.peerRoomId);
+  const peer = normalizeCohostUser(value.peer);
+  const stream = normalizeCohostStream(value.stream);
+  if (!peerRoomId || !peer || !stream) {
+    return null;
+  }
+
+  return {
+    id: sanitizeInviteId(value.id) || `cohost-${Date.now().toString(36)}`,
+    peerRoomId,
+    acceptedAt: sanitizeIsoTimestamp(value.acceptedAt) ?? new Date().toISOString(),
+    peer,
+    stream
+  };
 }
 
 function parseUserHeader(headerValue) {
@@ -638,6 +1013,22 @@ function sanitizeStreamProtocol(value) {
   return value === STREAM_PROTOCOL_WEBRTC ? STREAM_PROTOCOL_WEBRTC : STREAM_PROTOCOL_MOQ;
 }
 
+function sanitizeCoordinate(value, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < min || number > max) {
+    return null;
+  }
+  return Math.round(number * 1_000_000) / 1_000_000;
+}
+
+function sanitizeAccuracy(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) {
+    return null;
+  }
+  return Math.round(number);
+}
+
 function areRoomMetaEqual(left, right) {
   return (
     String(left?.title ?? "") === String(right?.title ?? "") &&
@@ -645,6 +1036,16 @@ function areRoomMetaEqual(left, right) {
     String(left?.stream?.namespace ?? "") === String(right?.stream?.namespace ?? "") &&
     String(left?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) === String(right?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) &&
     String(left?.stream?.webRtcUrl ?? "") === String(right?.stream?.webRtcUrl ?? "")
+  );
+}
+
+function areRoomLocationsEqual(left, right) {
+  return (
+    Boolean(left?.enabled) === Boolean(right?.enabled) &&
+    Number(left?.latitude) === Number(right?.latitude) &&
+    Number(left?.longitude) === Number(right?.longitude) &&
+    Number(left?.accuracy) === Number(right?.accuracy) &&
+    String(left?.updatedAt ?? "") === String(right?.updatedAt ?? "")
   );
 }
 

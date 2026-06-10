@@ -125,8 +125,9 @@
   margin-top: 2px;
   border-radius: 999px;
   overflow: hidden;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(
     135deg,
     rgba(16, 196, 182, 0.26),
@@ -186,8 +187,7 @@
 }
 
 .chat-composer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   gap: 10px;
   align-items: center;
 }
@@ -200,7 +200,15 @@
 }
 
 .chat-composer input {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+.chat-composer button,
+.chat-composer-floating button,
+.chat-composer-readonly button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 @media (min-width: 981px) {

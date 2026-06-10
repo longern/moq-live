@@ -4,7 +4,8 @@
 }
 
 .control-block {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
@@ -21,6 +22,56 @@
   top: 64%;
   z-index: var(--z-toast);
   transform: translate(-50%, -50%);
+}
+
+#playerMount.watch-player-mount {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: #050d14;
+}
+
+#playerMount.watch-player-mount.is-cohost {
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 1px;
+}
+
+.watch-player-tile {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #050d14;
+}
+
+.watch-player-tile > video,
+.watch-player-tile > canvas,
+.watch-player-tile > .placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+#playerMount.watch-player-mount.is-cohost .player-webrtc,
+#playerMount.watch-player-mount.is-cohost .player-moq {
+  object-fit: cover;
+}
+
+.watch-player-label {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  max-width: calc(100% - 20px);
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(4, 11, 17, 0.58);
+  color: rgba(245, 249, 252, 0.94);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  backdrop-filter: blur(10px);
 }
 
 .watch-share-image-layer {
@@ -133,9 +184,10 @@
   min-width: 0;
   min-height: 42px;
   padding: 6px 4px;
-  display: grid;
-  justify-items: center;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
   border: 0;
   border-radius: 8px;
@@ -326,7 +378,8 @@
 
 .watch-desktop-room-copy {
   min-width: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 3px;
 }
 
@@ -443,8 +496,9 @@
   width: 64px;
   height: 64px;
   flex: 0 0 64px;
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
@@ -470,7 +524,8 @@
 
 .watch-host-profile-copy {
   min-width: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 5px;
 }
 
@@ -505,8 +560,9 @@
 .watch-host-profile-stat {
   min-width: 0;
   padding: 4px 12px 6px;
-  display: grid;
-  justify-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 4px;
   text-align: center;
 }
@@ -623,7 +679,8 @@
   position: fixed;
   z-index: var(--z-share-panel);
   width: 248px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -690,7 +747,7 @@
   justify-content: flex-end;
 }
 
-@media (min-width: 761px) {
+@media (min-width: 601px) {
   .watch-layout,
   .live-layout {
     --stage-min-height: 360px;
@@ -716,8 +773,9 @@
     max-height: var(--stage-max-height);
     aspect-ratio: var(--stage-aspect-ratio);
     justify-self: center;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: #000;
   }
 
@@ -728,6 +786,7 @@
       calc(var(--stage-max-height) * var(--stage-aspect-width) / var(--stage-aspect-height))
     );
     height: 100%;
+    margin-inline: auto;
     aspect-ratio: var(--stage-aspect-ratio);
   }
 

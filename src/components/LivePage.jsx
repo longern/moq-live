@@ -55,6 +55,21 @@ export function LivePage({
   onShare,
   onStartScreenShare,
   onStopScreenShare,
+  commentSpeechEnabled = false,
+  commentSpeechSupported = false,
+  onCommentSpeechEnabledChange,
+  locationSharingEnabled = false,
+  locationSharingSupported = false,
+  locationSharingPending = false,
+  onLocationSharingEnabledChange,
+  cohostInvitesAllowed = true,
+  cohostInvite = null,
+  cohostInviteResponse = null,
+  cohostActive = null,
+  cohostRecentHosts = [],
+  onCohostInvitesAllowedChange,
+  onCohostInviteRequest,
+  onCohostInviteRespond,
   onStartSynthetic,
   onStopSynthetic,
   chatMessages,
@@ -91,6 +106,7 @@ export function LivePage({
   const [toastMessage, setToastMessage] = useState("");
   const roomCoverInputRef = useRef(null);
   const toastTimerRef = useRef(null);
+  const lastCohostResponseIdRef = useRef("");
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mediaMode = cameraEnabled ? "video" : "voice";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
@@ -139,6 +155,16 @@ export function LivePage({
       toastTimerRef.current = null;
     }, 2200);
   }
+
+  useEffect(() => {
+    if (!cohostInviteResponse?.id || lastCohostResponseIdRef.current === cohostInviteResponse.id) {
+      return;
+    }
+
+    lastCohostResponseIdRef.current = cohostInviteResponse.id;
+    const name = cohostInviteResponse.target?.displayName || cohostInviteResponse.target?.handle || "对方";
+    showToast(cohostInviteResponse.accepted ? `${name}已接受连线` : `${name}已拒绝连线`);
+  }, [cohostInviteResponse?.accepted, cohostInviteResponse?.id, cohostInviteResponse?.target]);
 
   useEffect(() => {
     if (!authUser?.id || hidden) {
@@ -251,6 +277,28 @@ export function LivePage({
     return payload;
   }
 
+  async function handleCohostInviteRequest(handle) {
+    try {
+      await onCohostInviteRequest?.(handle);
+      showToast("连线邀请已发送");
+      return true;
+    } catch (error) {
+      showToast(error?.message || getAppErrorMessage(error));
+      return false;
+    }
+  }
+
+  async function handleCohostInviteRespond(invite, accepted) {
+    try {
+      await onCohostInviteRespond?.(invite, accepted);
+      showToast(accepted ? "已接受连线邀请" : "已拒绝连线邀请");
+      return true;
+    } catch (error) {
+      showToast(getAppErrorMessage(error));
+      return false;
+    }
+  }
+
   const pageProps = {
     hidden,
     roomLabel,
@@ -300,6 +348,20 @@ export function LivePage({
     onShare,
     onStartScreenShare,
     onStopScreenShare,
+    commentSpeechEnabled,
+    commentSpeechSupported,
+    onCommentSpeechEnabledChange,
+    locationSharingEnabled,
+    locationSharingSupported,
+    locationSharingPending,
+    onLocationSharingEnabledChange,
+    cohostInvitesAllowed,
+    cohostInvite,
+    cohostActive,
+    cohostRecentHosts,
+    onCohostInvitesAllowedChange,
+    onCohostInviteRequest: handleCohostInviteRequest,
+    onCohostInviteRespond: handleCohostInviteRespond,
     onStartSynthetic,
     onStopSynthetic,
     chatMessages,

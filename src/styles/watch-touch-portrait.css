@@ -191,12 +191,9 @@
     min-height: 32px;
     display: inline-flex;
     align-items: center;
-    border: 1px solid var(--watch-float-border);
     border-radius: 999px;
     background: var(--watch-float-bg);
     color: var(--text);
-    backdrop-filter: blur(14px);
-    box-shadow: 0 12px 28px var(--watch-float-shadow);
   }
 
   body:has(.watch-stage-frame.is-portrait) .watch-mobile-host-chip {
@@ -214,8 +211,9 @@
     width: 24px;
     height: 24px;
     min-width: 24px;
-    display: inline-grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
@@ -328,9 +326,10 @@
     min-width: 0;
     min-height: 84px;
     padding: 10px 6px;
-    display: grid;
-    justify-items: center;
-    align-content: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 8px;
     border: 0;
     border-radius: 0;
@@ -433,8 +432,9 @@
     width: 48px;
     height: 48px;
     min-width: 48px;
-    display: inline-grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
@@ -499,8 +499,9 @@
   body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-avatar {
     width: 34px;
     height: 34px;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 999px;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.08);
@@ -630,8 +631,7 @@
   body:has(.watch-stage-frame.is-portrait)
     .chat-panel-watch-overlay
     .chat-composer-floating {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
     gap: 10px;
     align-items: center;
     padding-right: 0;
@@ -641,6 +641,8 @@
     .chat-panel-watch-overlay
     .chat-composer-floating
     input {
+    flex: 1 1 auto;
+    min-width: 0;
     min-height: 36px;
     height: 36px;
     border: 1px solid var(--watch-float-border);

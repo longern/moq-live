@@ -54,6 +54,7 @@ export function WatchSessionPage({
   hostFollowingCount = 0,
   hostIcon,
   hostFollowing = false,
+  hostFollowLoading = false,
   hostFollowBusy = false,
   onHostFollowToggle,
   roomCoverUrl,
@@ -80,6 +81,13 @@ export function WatchSessionPage({
   playerStarted = false,
   playerFreezeFrameUrl = "",
   playerRef,
+  cohostActive = null,
+  cohostPlayerSession = null,
+  cohostPlayerStarted = false,
+  cohostPlayerMuted = true,
+  cohostPlayerRef,
+  cohostPlayerStatus = "",
+  cohostPlayerBadge = { state: "idle" },
   authAvailable,
   authLoading,
   authUser,
@@ -139,6 +147,7 @@ export function WatchSessionPage({
   const showInitialPlaybackSpinner = Boolean(
     !playerStarted && playerBadge.state === "warm"
   );
+  const showCohostLayout = Boolean(cohostActive && (cohostPlayerSession || cohostPlayerBadge.state === "warm"));
 
   function clearHideTimer() {
     if (hideTimerRef.current) {
@@ -294,7 +303,7 @@ export function WatchSessionPage({
   }
 
   function renderHostFollowButton(className = "") {
-    if (!showHostFollowButton) {
+    if (!showHostFollowButton || authLoading || hostFollowLoading) {
       return null;
     }
 
@@ -306,7 +315,7 @@ export function WatchSessionPage({
           event.stopPropagation();
           onHostFollowToggle?.();
         }}
-        disabled={authLoading || hostFollowBusy || !authAvailable}
+        disabled={hostFollowBusy || !authAvailable}
         aria-pressed={authUser ? hostFollowing : undefined}
       >
         {hostFollowing ? "已关注" : "关注"}
@@ -826,43 +835,79 @@ export function WatchSessionPage({
             onMouseLeave={handleStagePointerLeave}
             onClick={handleStageClick}
           >
-            <div id="playerMount">
-              {playerSession && testPlayback && WatchTestCanvas ? (
-                <Suspense fallback={null}>
-                  <WatchTestCanvas
-                    playback={testPlayback}
-                    playerRef={playerRef}
-                    playerSession={playerSession}
-                  />
-                </Suspense>
-              ) : playerSession ? (
-                playerSession.protocol === STREAM_PROTOCOL_WEBRTC ? (
-                  <video
-                    ref={playerRef}
-                    className="player-webrtc"
-                    autoPlay
-                    playsInline
-                    muted={playerMuted}
-                    aria-label={`${hostDisplayName || hostChipLabel} 直播画面`}
-                  />
-                ) : (
-                  <canvas
-                    ref={playerRef}
-                    className="player-moq"
-                    width="1280"
-                    height="720"
-                    aria-label={`${playerSession.namespace} 直播画面`}
-                  />
-                )
-              ) : (
-                <div className="placeholder">
-                  {stageLoading ? (
-                    <LoadingSpinner className="stage-loading-spinner" />
+            <div id="playerMount" className={showCohostLayout ? "watch-player-mount is-cohost" : "watch-player-mount"}>
+              <div className="watch-player-tile">
+                {playerSession && testPlayback && WatchTestCanvas ? (
+                  <Suspense fallback={null}>
+                    <WatchTestCanvas
+                      playback={testPlayback}
+                      playerRef={playerRef}
+                      playerSession={playerSession}
+                    />
+                  </Suspense>
+                ) : playerSession ? (
+                  playerSession.protocol === STREAM_PROTOCOL_WEBRTC ? (
+                    <video
+                      ref={playerRef}
+                      className="player-webrtc"
+                      autoPlay
+                      playsInline
+                      muted={playerMuted}
+                      aria-label={`${hostDisplayName || hostChipLabel} 直播画面`}
+                    />
                   ) : (
-                    <p>{stageMessage}</p>
+                    <canvas
+                      ref={playerRef}
+                      className="player-moq"
+                      width="1280"
+                      height="720"
+                      aria-label={`${playerSession.namespace} 直播画面`}
+                    />
+                  )
+                ) : (
+                  <div className="placeholder">
+                    {stageLoading ? (
+                      <LoadingSpinner className="stage-loading-spinner" />
+                    ) : (
+                      <p>{stageMessage}</p>
+                    )}
+                  </div>
+                )}
+                {showCohostLayout ? <span className="watch-player-label">{hostDisplayName || hostChipLabel}</span> : null}
+              </div>
+              {showCohostLayout ? (
+                <div className="watch-player-tile">
+                  {cohostPlayerSession ? (
+                    cohostPlayerSession.protocol === STREAM_PROTOCOL_WEBRTC ? (
+                      <video
+                        ref={cohostPlayerRef}
+                        className="player-webrtc"
+                        autoPlay
+                        playsInline
+                        muted={cohostPlayerMuted}
+                        aria-label={`${cohostActive.peer.displayName || cohostActive.peer.handle} 直播画面`}
+                      />
+                    ) : (
+                      <canvas
+                        ref={cohostPlayerRef}
+                        className="player-moq"
+                        width="1280"
+                        height="720"
+                        aria-label={`${cohostPlayerSession.namespace} 直播画面`}
+                      />
+                    )
+                  ) : (
+                    <div className="placeholder">
+                      {cohostPlayerBadge.state === "warm" ? (
+                        <LoadingSpinner className="stage-loading-spinner" />
+                      ) : (
+                        <p>{cohostPlayerStatus || "连线画面加载中"}</p>
+                      )}
+                    </div>
                   )}
+                  <span className="watch-player-label">{cohostActive.peer.displayName || cohostActive.peer.handle}</span>
                 </div>
-              )}
+              ) : null}
             </div>
             {playerFreezeFrameUrl ? (
               <img

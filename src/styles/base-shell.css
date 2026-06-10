@@ -130,14 +130,16 @@ pre {
 }
 
 .brand {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
 .brand-button {
-  display: grid;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   padding: 0;
   border: 0;
   background: transparent;
@@ -362,7 +364,8 @@ pre {
   right: 0;
   z-index: var(--z-menu);
   min-width: 156px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
   padding: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);

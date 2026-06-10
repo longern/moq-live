@@ -32,7 +32,7 @@ export function useMediaQuery(query) {
 }
 
 export function useCompactViewport() {
-  return useMediaQuery("(max-width: 760px)");
+  return useMediaQuery("(max-width: 600px)");
 }
 
 export function usePortraitViewport() {

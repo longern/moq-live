@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const MOBILE_PANEL_QUERY = "(max-width: 760px)";
+const MOBILE_PANEL_QUERY = "(max-width: 600px)";
 const MOBILE_PANEL_EXIT_MS = 280;
 
 export function useMobilePanelViewport() {

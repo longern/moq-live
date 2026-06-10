@@ -52,6 +52,13 @@ function getDefaultRoomMeta() {
   };
 }
 
+function getDefaultCohostState() {
+  return {
+    invitesAllowed: true,
+    active: null
+  };
+}
+
 function normalizeLoggedInViewers(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -65,6 +72,90 @@ function normalizeLoggedInViewers(value) {
     }))
     .filter((viewer) => viewer.id)
     .slice(0, 100);
+}
+
+function normalizeCohostInvite(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = String(value.id ?? "").trim();
+  const requesterRoomId = String(value.requesterRoomId ?? "").trim();
+  const requesterHandle = String(value.requester?.handle ?? "").trim();
+  if (!id || !requesterRoomId || !requesterHandle) {
+    return null;
+  }
+
+  return {
+    id,
+    requesterRoomId,
+    targetRoomId: String(value.targetRoomId ?? "").trim(),
+    requestedAt: String(value.requestedAt ?? "").trim(),
+    requester: {
+      id: String(value.requester?.id ?? "").trim(),
+      handle: requesterHandle,
+      displayName: String(value.requester?.displayName ?? "").trim(),
+      avatarUrl: String(value.requester?.avatarUrl ?? "").trim()
+    }
+  };
+}
+
+function normalizeCohostInviteResponse(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = String(value.id ?? "").trim();
+  const targetHandle = String(value.target?.handle ?? "").trim();
+  if (!id || !targetHandle) {
+    return null;
+  }
+
+  return {
+    id,
+    accepted: Boolean(value.accepted),
+    respondedAt: String(value.respondedAt ?? "").trim(),
+    target: {
+      id: String(value.target?.id ?? "").trim(),
+      handle: targetHandle,
+      displayName: String(value.target?.displayName ?? "").trim(),
+      avatarUrl: String(value.target?.avatarUrl ?? "").trim()
+    }
+  };
+}
+
+function normalizeCohostActive(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const peerRoomId = String(value.peerRoomId ?? "").trim();
+  const peerHandle = String(value.peer?.handle ?? "").trim();
+  const protocol = normalizeStreamProtocol(value.stream?.protocol);
+  const stream = {
+    relayUrl: String(value.stream?.relayUrl ?? "").trim(),
+    namespace: String(value.stream?.namespace ?? "").trim(),
+    protocol,
+    webRtcUrl: String(value.stream?.webRtcUrl ?? "").trim()
+  };
+  const moqReady = protocol !== "webrtc" && stream.relayUrl && stream.namespace;
+  const webRtcReady = protocol === "webrtc" && stream.webRtcUrl;
+  if (!peerRoomId || !peerHandle || (!moqReady && !webRtcReady)) {
+    return null;
+  }
+
+  return {
+    id: String(value.id ?? "").trim(),
+    peerRoomId,
+    acceptedAt: String(value.acceptedAt ?? "").trim(),
+    peer: {
+      id: String(value.peer?.id ?? "").trim(),
+      handle: peerHandle,
+      displayName: String(value.peer?.displayName ?? "").trim(),
+      avatarUrl: String(value.peer?.avatarUrl ?? "").trim()
+    },
+    stream
+  };
 }
 
 function getReconnectDelayMs(attempt) {
@@ -89,6 +180,10 @@ export function useChatController({
   const [roomMeta, setRoomMeta] = useState(getDefaultRoomMeta);
   const [roomStateReady, setRoomStateReady] = useState(false);
   const [canControlBroadcast, setCanControlBroadcast] = useState(false);
+  const [cohostInvitesAllowed, setCohostInvitesAllowed] = useState(true);
+  const [cohostInvite, setCohostInvite] = useState(null);
+  const [cohostInviteResponse, setCohostInviteResponse] = useState(null);
+  const [cohostActive, setCohostActive] = useState(null);
 
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -169,6 +264,10 @@ export function useChatController({
       setRoomMeta(getDefaultRoomMeta());
       setRoomStateReady(false);
       setCanControlBroadcast(false);
+      setCohostInvitesAllowed(true);
+      setCohostInvite(null);
+      setCohostInviteResponse(null);
+      setCohostActive(null);
       clearBroadcastControlRequests();
       reconnectAttemptRef.current = 0;
       connectionAttemptedAtRef.current = [];
@@ -240,6 +339,12 @@ export function useChatController({
               webRtcUrl: payload.roomMeta?.stream?.webRtcUrl || ""
             }
           });
+          setCohostInvitesAllowed(
+            payload.cohost?.invitesAllowed === false
+              ? false
+              : getDefaultCohostState().invitesAllowed
+          );
+          setCohostActive(normalizeCohostActive(payload.cohost?.active));
           setRoomStateReady(true);
           setChatError("");
           return;
@@ -259,6 +364,32 @@ export function useChatController({
 
         if (payload.type === "broadcast.control.changed") {
           setCanControlBroadcast(Boolean(payload.canControlBroadcast));
+          return;
+        }
+
+        if (payload.type === "cohost.invites.changed") {
+          setCohostInvitesAllowed(payload.invitesAllowed !== false);
+          return;
+        }
+
+        if (payload.type === "cohost.invite.received") {
+          const invite = normalizeCohostInvite(payload.invite);
+          if (invite) {
+            setCohostInvite(invite);
+          }
+          return;
+        }
+
+        if (payload.type === "cohost.invite.responded") {
+          const response = normalizeCohostInviteResponse(payload.response);
+          if (response) {
+            setCohostInviteResponse(response);
+          }
+          return;
+        }
+
+        if (payload.type === "cohost.active.changed") {
+          setCohostActive(normalizeCohostActive(payload.active));
           return;
         }
 
@@ -432,6 +563,26 @@ export function useChatController({
     return true;
   }
 
+  function setCohostInviteAllowed(nextAllowed) {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    socket.send(JSON.stringify({
+      type: "cohost.invites.set_allowed",
+      invitesAllowed: Boolean(nextAllowed)
+    }));
+    setCohostInvitesAllowed(Boolean(nextAllowed));
+    return true;
+  }
+
+  function dismissCohostInvite(inviteId) {
+    setCohostInvite((current) => (
+      !inviteId || current?.id === inviteId ? null : current
+    ));
+  }
+
   return {
     messages,
     draft,
@@ -445,9 +596,15 @@ export function useChatController({
     roomMeta,
     roomStateReady,
     canControlBroadcast,
+    cohostInvitesAllowed,
+    cohostInvite,
+    cohostInviteResponse,
+    cohostActive,
     sendMessage,
     sendEvent,
     requestBroadcastControl,
-    releaseBroadcastControl
+    releaseBroadcastControl,
+    setCohostInviteAllowed,
+    dismissCohostInvite
   };
 }

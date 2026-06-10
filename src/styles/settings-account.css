@@ -1,7 +1,8 @@
 .account-panel-list {
   --account-list-label-width: 72px;
   --account-list-gap: 16px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -65,11 +66,10 @@
 }
 
 .account-list-avatar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   justify-content: flex-end;
-  column-gap: 12px;
+  gap: 12px;
 }
 
 .account-list-avatar .my-profile-avatar {
@@ -78,8 +78,9 @@
 }
 
 .account-list-avatar-editable {
-  display: grid;
-  justify-items: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 10px;
 }
 
@@ -108,7 +109,7 @@
 
 .account-editable-row {
   min-width: 0;
-  display: grid;
+  display: block;
   padding: 16px 20px;
 }
 
@@ -216,45 +217,68 @@
 }
 
 .my-account-form {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
 }
 
 .my-account-form-content {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
   padding: 0 20px;
 }
 
-.my-actions {
-  padding: 16px 18px 18px;
+.my-account-actions {
+  padding: 0;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
 }
 
-.my-actions button {
-  flex: 1 1 180px;
-}
-
-.my-plain-login-button {
+.my-plain-login-button,
+.my-plain-danger-button {
   flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
   min-height: auto;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.my-plain-login-button {
   color: var(--accent-2);
 }
 
-.my-plain-login-button:disabled {
+.my-plain-danger-button {
+  color: var(--danger);
+}
+
+.my-plain-login-button:hover:not(:disabled),
+.my-plain-login-button:focus-visible,
+.my-plain-danger-button:hover:not(:disabled),
+.my-plain-danger-button:focus-visible {
+  transform: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.my-plain-login-button:disabled,
+.my-plain-danger-button:disabled {
   opacity: 0.64;
 }
 
 .my-history-list {
   margin: 0;
   padding: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   list-style: none;
 }
 
@@ -262,9 +286,9 @@
   width: 100%;
   min-width: 0;
   padding: 14px 18px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   border: 0;
   border-radius: 0;
@@ -281,7 +305,8 @@
 
 .my-history-copy {
   min-width: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
@@ -322,14 +347,16 @@
 .my-empty-state {
   min-height: 220px;
   padding: 18px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  align-content: start;
+  align-items: flex-start;
   color: var(--muted);
 }
 
 .my-log-block {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 14px 18px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);

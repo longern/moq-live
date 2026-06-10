@@ -144,10 +144,17 @@ function MorePanel({
   roomCoverInputRef,
   roomTitle,
   roomWelcomeMessage,
+  commentSpeechEnabled,
+  commentSpeechSupported,
+  locationSharingEnabled,
+  locationSharingSupported,
+  locationSharingPending,
   onPickCover,
   onOpenCoverPicker,
   onSaveRoomTitle,
   onSaveRoomWelcomeMessage,
+  onCommentSpeechEnabledChange,
+  onLocationSharingEnabledChange,
   roomInfoBlockedReason,
   onRoomInfoBlocked,
   onShare,
@@ -165,10 +172,17 @@ function MorePanel({
       roomCoverInputRef={roomCoverInputRef}
       roomTitle={roomTitle}
       roomWelcomeMessage={roomWelcomeMessage}
+      commentSpeechEnabled={commentSpeechEnabled}
+      commentSpeechSupported={commentSpeechSupported}
+      locationSharingEnabled={locationSharingEnabled}
+      locationSharingSupported={locationSharingSupported}
+      locationSharingPending={locationSharingPending}
       onPickCover={onPickCover}
       onOpenCoverPicker={onOpenCoverPicker}
       onSaveRoomTitle={onSaveRoomTitle}
       onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
+      onCommentSpeechEnabledChange={onCommentSpeechEnabledChange}
+      onLocationSharingEnabledChange={onLocationSharingEnabledChange}
       roomInfoBlockedReason={roomInfoBlockedReason}
       onRoomInfoBlocked={onRoomInfoBlocked}
       onShare={onShare}
@@ -247,8 +261,15 @@ export function LiveDesktopPage(props) {
     roomCoverInputRef,
     roomTitle,
     roomWelcomeMessage,
+    commentSpeechEnabled,
+    commentSpeechSupported,
+    locationSharingEnabled,
+    locationSharingSupported,
+    locationSharingPending,
     onSaveRoomTitle,
     onSaveRoomWelcomeMessage,
+    onCommentSpeechEnabledChange,
+    onLocationSharingEnabledChange,
     onPickCover,
     onOpenCoverPicker,
     onRequestClose,
@@ -377,10 +398,17 @@ export function LiveDesktopPage(props) {
       roomCoverInputRef={roomCoverInputRef}
       roomTitle={roomTitle}
       roomWelcomeMessage={roomWelcomeMessage}
+      commentSpeechEnabled={commentSpeechEnabled}
+      commentSpeechSupported={commentSpeechSupported}
+      locationSharingEnabled={locationSharingEnabled}
+      locationSharingSupported={locationSharingSupported}
+      locationSharingPending={locationSharingPending}
       onPickCover={onPickCover}
       onOpenCoverPicker={onOpenCoverPicker}
       onSaveRoomTitle={onSaveRoomTitle}
       onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
+      onCommentSpeechEnabledChange={onCommentSpeechEnabledChange}
+      onLocationSharingEnabledChange={onLocationSharingEnabledChange}
       roomInfoBlockedReason={roomInfoBlockedReason}
       onRoomInfoBlocked={onRoomInfoBlocked}
       onShare={onShare}

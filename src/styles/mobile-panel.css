@@ -1,4 +1,4 @@
-@media (max-width: 760px) {
+@media (max-width: 600px) {
   .settings-panel-backdrop.mobile-panel-transition,
   .auth-panel-backdrop.mobile-panel-transition {
     animation: mobile-panel-backdrop-in 220ms ease both;

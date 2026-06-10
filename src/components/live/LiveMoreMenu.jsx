@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { getAppErrorMessage } from "../../lib/appErrors.js";
 import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
+import { LiveSwitch } from "./LiveSwitch.jsx";
 import {
   ChatIcon,
   CoverIcon,
+  LocationIcon,
   MenuChevronIcon,
   ShareIcon,
+  SpeakerIcon,
   TitleIcon,
 } from "./liveIcons.jsx";
 
@@ -30,6 +33,33 @@ function LiveMoreMenuItem({
   );
 }
 
+function LiveMoreMenuSwitchItem({
+  icon,
+  label,
+  checked,
+  onToggle,
+  disabled = false,
+  ariaLabel = label,
+}) {
+  return (
+    <li className="live-menu-list-item">
+      <button
+        type="button"
+        className="live-menu-item live-more-menu-item live-more-menu-switch-item"
+        role="switch"
+        aria-checked={checked}
+        aria-label={ariaLabel}
+        onClick={onToggle}
+        disabled={disabled}
+      >
+        <span className="live-more-menu-icon">{icon}</span>
+        <span className="live-more-menu-label">{label}</span>
+        <LiveSwitch checked={checked} />
+      </button>
+    </li>
+  );
+}
+
 export function LiveMoreMenu({
   roomCoverUrl,
   roomCoverBusy,
@@ -39,10 +69,17 @@ export function LiveMoreMenu({
   roomCoverInputRef,
   roomTitle,
   roomWelcomeMessage,
+  commentSpeechEnabled = false,
+  commentSpeechSupported = false,
+  locationSharingEnabled = false,
+  locationSharingSupported = false,
+  locationSharingPending = false,
   onPickCover,
   onOpenCoverPicker,
   onSaveRoomTitle,
   onSaveRoomWelcomeMessage,
+  onCommentSpeechEnabledChange,
+  onLocationSharingEnabledChange,
   roomInfoBlockedReason = "",
   onRoomInfoBlocked,
   onShare,
@@ -140,6 +177,24 @@ export function LiveMoreMenu({
       ? "欢迎语"
       : "直播标题";
 
+  function handleCommentSpeechToggle() {
+    if (!commentSpeechSupported) {
+      return;
+    }
+    onCommentSpeechEnabledChange?.(!commentSpeechEnabled);
+  }
+
+  function handleLocationSharingToggle() {
+    if (roomInfoBlockedReason) {
+      onRoomInfoBlocked?.();
+      return;
+    }
+    if (!locationSharingSupported || locationSharingPending) {
+      return;
+    }
+    onLocationSharingEnabledChange?.(!locationSharingEnabled);
+  }
+
   return (
     <>
       <input
@@ -175,6 +230,22 @@ export function LiveMoreMenu({
                 icon={<ChatIcon />}
                 label="欢迎语"
                 onClick={() => setActiveEditor("welcome")}
+              />
+              <LiveMoreMenuSwitchItem
+                icon={<SpeakerIcon />}
+                label="朗读评论"
+                checked={commentSpeechEnabled}
+                onToggle={handleCommentSpeechToggle}
+                disabled={!commentSpeechSupported}
+                ariaLabel={commentSpeechSupported ? "朗读评论" : "当前浏览器不支持朗读评论"}
+              />
+              <LiveMoreMenuSwitchItem
+                icon={<LocationIcon />}
+                label="位置信息"
+                checked={locationSharingEnabled}
+                onToggle={handleLocationSharingToggle}
+                disabled={!locationSharingSupported || locationSharingPending}
+                ariaLabel={locationSharingSupported ? "位置信息" : "当前浏览器不支持位置信息"}
               />
             </LiveMenuList>
           </div>

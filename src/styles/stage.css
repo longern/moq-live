@@ -129,8 +129,9 @@ publisher-moq {
 .stage-error {
   width: 100%;
   height: 100%;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 24px;
   text-align: center;
 }
@@ -299,7 +300,8 @@ publisher-moq {
 
 .stage-column,
 .control-column {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   min-width: 0;
 }

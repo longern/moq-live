@@ -1,8 +1,11 @@
 import {
   ChevronRight,
+  Check,
   Circle,
+  Handshake,
   Image,
   Link,
+  MapPin,
   MessageCircle,
   Mic,
   MicOff,
@@ -15,6 +18,8 @@ import {
   SwitchCamera,
   Type,
   Users,
+  Video,
+  Volume2,
   X,
 } from "lucide-react";
 
@@ -29,6 +34,10 @@ export function FlipCameraIcon() {
 
 export function CloseIcon() {
   return <X {...iconProps} />;
+}
+
+export function CheckIcon() {
+  return <Check {...iconProps} />;
 }
 
 export function EndBroadcastIcon() {
@@ -49,6 +58,10 @@ export function ShareIcon() {
 
 export function QualityIcon() {
   return <SlidersHorizontal {...iconProps} />;
+}
+
+export function AudioVideoSettingsIcon() {
+  return <Video {...iconProps} />;
 }
 
 export function CoverIcon() {
@@ -75,8 +88,20 @@ export function ChatIcon() {
   return <MessageCircle {...iconProps} />;
 }
 
+export function CohostIcon() {
+  return <Handshake {...iconProps} />;
+}
+
 export function AudienceIcon() {
   return <Users {...iconProps} />;
+}
+
+export function SpeakerIcon() {
+  return <Volume2 {...iconProps} />;
+}
+
+export function LocationIcon() {
+  return <MapPin {...iconProps} />;
 }
 
 export function MoreIcon() {

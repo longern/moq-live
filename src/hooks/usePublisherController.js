@@ -995,7 +995,7 @@ export function usePublisherController({
   }
 
   function shouldUsePortraitSyntheticPreview() {
-    if (!window.matchMedia("(max-width: 760px)").matches) {
+    if (!window.matchMedia("(max-width: 600px)").matches) {
       return false;
     }
 

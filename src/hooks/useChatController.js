@@ -605,6 +605,19 @@ export function useChatController({
     return true;
   }
 
+  function clearCohostActive() {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    socket.send(JSON.stringify({
+      type: "cohost.active.clear"
+    }));
+    setCohostActive(null);
+    return true;
+  }
+
   function dismissCohostInvite(inviteId) {
     setCohostInvite((current) => (
       !inviteId || current?.id === inviteId ? null : current
@@ -634,6 +647,7 @@ export function useChatController({
     requestBroadcastControl,
     releaseBroadcastControl,
     setCohostInviteAllowed,
+    clearCohostActive,
     dismissCohostInvite
   };
 }

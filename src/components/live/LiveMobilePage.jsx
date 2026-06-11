@@ -19,6 +19,7 @@ import {
   ShareIcon
 } from "./liveIcons.jsx";
 import { LiveMoreMenu } from "./LiveMoreMenu.jsx";
+import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
 import { LivePreviewStage } from "./LivePreviewStage.jsx";
 import { LiveQualityMenu } from "./LiveQualityMenu.jsx";
 import { LiveSwitch } from "./LiveSwitch.jsx";
@@ -90,6 +91,7 @@ export function LiveMobilePage(props) {
     roomWelcomeMessage,
     commentSpeechEnabled,
     commentSpeechSupported,
+    liveNotificationEnabled,
     locationSharingEnabled,
     locationSharingSupported,
     locationSharingPending,
@@ -100,8 +102,10 @@ export function LiveMobilePage(props) {
     onSaveRoomTitle,
     onSaveRoomWelcomeMessage,
     onCommentSpeechEnabledChange,
+    onLiveNotificationEnabledChange,
     onLocationSharingEnabledChange,
     onCohostInvitesAllowedChange,
+    onCohostDisconnect,
     onCohostInviteRequest,
     onCohostInviteRespond,
     roomInfoBlockedReason,
@@ -269,6 +273,11 @@ export function LiveMobilePage(props) {
     setCohostResponseBusy(true);
     await onCohostInviteRespond?.(cohostInvite, accepted);
     setCohostResponseBusy(false);
+  }
+
+  function disconnectCohost() {
+    onCohostDisconnect?.();
+    setCohostDrawerOpen(false);
   }
 
   function showCameraUnavailableNotice() {
@@ -645,18 +654,37 @@ export function LiveMobilePage(props) {
         >
           <div className="live-cohost-head">
             <strong>连线</strong>
-            <button
-              type="button"
-              className="live-cohost-switch"
-              role="switch"
-              aria-checked={cohostInvitesAllowed}
-              aria-label="允许其他主播邀请连线"
-              onClick={() => onCohostInvitesAllowedChange?.(!cohostInvitesAllowed)}
-            >
-              <span>允许邀请</span>
-              <LiveSwitch checked={cohostInvitesAllowed} />
-            </button>
           </div>
+          <LiveMenuList className="live-cohost-menu" ariaLabel="连线设置">
+            {cohostActive ? (
+              <LiveMenuItem
+                className="live-more-menu-item live-cohost-menu-item live-cohost-disconnect-item"
+                aria-label="断开连线"
+                onClick={disconnectCohost}
+              >
+                <span className="live-more-menu-icon">
+                  <CloseIcon />
+                </span>
+                <span className="live-more-menu-label">断开连线</span>
+              </LiveMenuItem>
+            ) : null}
+            <li className="live-menu-list-item">
+              <button
+                type="button"
+                className="live-menu-item live-more-menu-item live-more-menu-switch-item live-cohost-menu-item"
+                role="switch"
+                aria-checked={cohostInvitesAllowed}
+                aria-label="允许其他主播邀请连线"
+                onClick={() => onCohostInvitesAllowedChange?.(!cohostInvitesAllowed)}
+              >
+                <span className="live-more-menu-icon">
+                  <CohostIcon />
+                </span>
+                <span className="live-more-menu-label">允许邀请</span>
+                <LiveSwitch checked={cohostInvitesAllowed} />
+              </button>
+            </li>
+          </LiveMenuList>
           <form
             className="live-cohost-form"
             onSubmit={(event) => {
@@ -672,7 +700,7 @@ export function LiveMobilePage(props) {
               inputMode="text"
             />
             <button type="submit" disabled={!cohostHandle.trim() || cohostBusy}>
-              {cohostBusy ? "发送中" : "申请"}
+              申请
             </button>
           </form>
           <div className="live-cohost-recent">
@@ -753,6 +781,7 @@ export function LiveMobilePage(props) {
             roomWelcomeMessage={roomWelcomeMessage}
             commentSpeechEnabled={commentSpeechEnabled}
             commentSpeechSupported={commentSpeechSupported}
+            liveNotificationEnabled={liveNotificationEnabled}
             locationSharingEnabled={locationSharingEnabled}
             locationSharingSupported={locationSharingSupported}
             locationSharingPending={locationSharingPending}
@@ -761,6 +790,7 @@ export function LiveMobilePage(props) {
             onSaveRoomTitle={onSaveRoomTitle}
             onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
             onCommentSpeechEnabledChange={onCommentSpeechEnabledChange}
+            onLiveNotificationEnabledChange={onLiveNotificationEnabledChange}
             onLocationSharingEnabledChange={onLocationSharingEnabledChange}
             roomInfoBlockedReason={roomInfoBlockedReason}
             onRoomInfoBlocked={onRoomInfoBlocked}

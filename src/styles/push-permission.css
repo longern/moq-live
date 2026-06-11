@@ -1,0 +1,92 @@
+.push-permission-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.push-permission-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 8, 14, 0.58);
+}
+
+.push-permission-dialog {
+  position: relative;
+  width: min(360px, 100%);
+  padding: 18px;
+  border: 1px solid rgba(226, 238, 248, 0.14);
+  border-radius: 8px;
+  background: rgba(10, 20, 30, 0.98);
+  color: var(--text);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+}
+
+.push-permission-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: rgba(235, 244, 251, 0.74);
+}
+
+.push-permission-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.push-permission-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 34px;
+}
+
+.push-permission-copy strong {
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.push-permission-copy span,
+.push-permission-check,
+.push-permission-error {
+  color: rgba(235, 244, 251, 0.68);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.push-permission-check {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.push-permission-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.push-permission-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+}
+
+.push-permission-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

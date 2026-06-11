@@ -7,6 +7,7 @@ import {
   CoverIcon,
   LocationIcon,
   MenuChevronIcon,
+  NotificationIcon,
   ShareIcon,
   SpeakerIcon,
   TitleIcon,
@@ -71,6 +72,7 @@ export function LiveMoreMenu({
   roomWelcomeMessage,
   commentSpeechEnabled = false,
   commentSpeechSupported = false,
+  liveNotificationEnabled = true,
   locationSharingEnabled = false,
   locationSharingSupported = false,
   locationSharingPending = false,
@@ -79,6 +81,7 @@ export function LiveMoreMenu({
   onSaveRoomTitle,
   onSaveRoomWelcomeMessage,
   onCommentSpeechEnabledChange,
+  onLiveNotificationEnabledChange,
   onLocationSharingEnabledChange,
   roomInfoBlockedReason = "",
   onRoomInfoBlocked,
@@ -184,6 +187,10 @@ export function LiveMoreMenu({
     onCommentSpeechEnabledChange?.(!commentSpeechEnabled);
   }
 
+  function handleLiveNotificationToggle() {
+    onLiveNotificationEnabledChange?.(!liveNotificationEnabled);
+  }
+
   function handleLocationSharingToggle() {
     if (roomInfoBlockedReason) {
       onRoomInfoBlocked?.();
@@ -238,6 +245,13 @@ export function LiveMoreMenu({
                 onToggle={handleCommentSpeechToggle}
                 disabled={!commentSpeechSupported}
                 ariaLabel={commentSpeechSupported ? "朗读评论" : "当前浏览器不支持朗读评论"}
+              />
+              <LiveMoreMenuSwitchItem
+                icon={<NotificationIcon />}
+                label="开播通知"
+                checked={liveNotificationEnabled}
+                onToggle={handleLiveNotificationToggle}
+                ariaLabel="开播通知"
               />
               <LiveMoreMenuSwitchItem
                 icon={<LocationIcon />}

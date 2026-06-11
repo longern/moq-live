@@ -1,6 +1,7 @@
 import {
   ChevronRight,
   Check,
+  Bell,
   Circle,
   Handshake,
   Image,
@@ -98,6 +99,10 @@ export function AudienceIcon() {
 
 export function SpeakerIcon() {
   return <Volume2 {...iconProps} />;
+}
+
+export function NotificationIcon() {
+  return <Bell {...iconProps} />;
 }
 
 export function LocationIcon() {

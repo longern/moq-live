@@ -98,13 +98,12 @@ export function WatchMobileMoreSheet({
   );
 }
 
-export function WatchHostProfileSheet({
-  open,
-  onClose,
+export function WatchHostProfileContent({
   hostAvatarUrl,
   hostChipLabel,
   hostDisplayName,
-  hostLocationText = "位置未知",
+  hostBio = "",
+  hostProfileInfoItems = ["位置未知"],
   hostLocationClickable = false,
   hostLocationPending = false,
   onHostLocationClick,
@@ -114,14 +113,13 @@ export function WatchHostProfileSheet({
   hostFollowingCountText,
   followButton,
 }) {
+  const profileInfoItems = Array.isArray(hostProfileInfoItems) && hostProfileInfoItems.length > 0
+    ? hostProfileInfoItems
+    : ["位置未知"];
+  const normalizedHostBio = String(hostBio || "").trim();
+
   return (
-    <SwipeableDrawer
-      open={open}
-      onClose={onClose}
-      ariaLabel="关闭主播信息"
-      className="watch-host-profile-drawer"
-      panelClassName="watch-host-profile-panel"
-    >
+    <>
       <div className="watch-host-profile-head">
         <UserAvatar
           avatarUrl={hostAvatarUrl}
@@ -146,7 +144,11 @@ export function WatchHostProfileSheet({
         disabled={!hostLocationClickable}
         aria-busy={hostLocationPending ? "true" : "false"}
       >
-        {hostLocationText || "位置未知"}
+        {profileInfoItems.map((item, index) => (
+          <span className="watch-host-profile-info-chip" key={`${item}:${index}`}>
+            {item}
+          </span>
+        ))}
       </button>
       <div className="watch-host-profile-stats" aria-label="主播关注和粉丝">
         <div className="watch-host-profile-stat">
@@ -159,7 +161,28 @@ export function WatchHostProfileSheet({
           <span>粉丝</span>
         </div>
       </div>
+      <p className={`watch-host-profile-bio${normalizedHostBio ? "" : " is-placeholder"}`}>
+        {normalizedHostBio || "暂无个人简介"}
+      </p>
       {followButton}
+    </>
+  );
+}
+
+export function WatchHostProfileSheet({
+  open,
+  onClose,
+  ...profileProps
+}) {
+  return (
+    <SwipeableDrawer
+      open={open}
+      onClose={onClose}
+      ariaLabel="关闭主播信息"
+      className="watch-host-profile-drawer"
+      panelClassName="watch-host-profile-panel"
+    >
+      <WatchHostProfileContent {...profileProps} />
     </SwipeableDrawer>
   );
 }

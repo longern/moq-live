@@ -340,23 +340,30 @@
     border-bottom: 0;
   }
 
-  .watch-stage-frame.is-portrait {
+  .watch-stage-frame.is-immersive-stage {
     width: 100%;
     height: auto;
     flex: 1 1 auto;
     min-height: 0;
+  }
+
+  .watch-stage-frame.is-portrait {
     aspect-ratio: 9 / 16;
   }
 
+  #playerMount.watch-player-mount.is-cohost {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .watch-layout
-    .stage-column:has(.watch-stage-frame.is-portrait)
+    .stage-column:has(.watch-stage-frame.is-immersive-stage)
     .watch-stage-frame {
     width: 100%;
     height: 100%;
     flex: 1 1 auto;
   }
 
-  .watch-layout .stage-column:has(.watch-stage-frame.is-portrait) {
+  .watch-layout .stage-column:has(.watch-stage-frame.is-immersive-stage) {
     flex: 1 1 auto;
     height: 100%;
   }
@@ -444,7 +451,7 @@
     max-width: min(72vw, 260px);
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait) {
+  .watch-layout:has(.watch-stage-frame.is-immersive-stage) {
     --watch-float-bg-alpha: 0.38;
     --watch-float-bg: rgba(6, 14, 22, var(--watch-float-bg-alpha));
     --watch-float-border: rgba(255, 255, 255, 0.075);
@@ -594,7 +601,7 @@
     display: none;
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait) .info-strip-mobile {
+  .watch-layout:has(.watch-stage-frame.is-immersive-stage) .info-strip-mobile {
     display: none;
   }
 
@@ -697,7 +704,12 @@
     font-size: 0.84rem;
   }
 
-  label {
+  .stack > label,
+  .live-desktop-panel > label,
+  .live-panel-field,
+  .live-more-title-field,
+  .my-field,
+  .account-edit-field {
     gap: 8px;
     color: #c8d7e5;
     font-size: 0.82rem;
@@ -727,7 +739,7 @@
   }
 
   .page[data-page="watch"][data-immersive="true"]
-    .watch-layout:has(.watch-stage-frame.is-portrait)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
     .control-column[data-joined="true"] {
     display: none;
   }
@@ -975,7 +987,7 @@
     height: 16px;
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
+  .watch-layout:has(.watch-stage-frame.is-immersive-stage)
     .watch-portrait-chat-overlay {
     position: absolute;
     inset: auto 0 0;
@@ -991,7 +1003,7 @@
     transition: opacity 160ms ease;
   }
 
-  .watch-layout:has(.watch-stage-frame.is-portrait)
+  .watch-layout:has(.watch-stage-frame.is-immersive-stage)
     .watch-portrait-chat-overlay.is-hidden {
     opacity: 0;
     pointer-events: none;

@@ -146,6 +146,7 @@ function MorePanel({
   roomWelcomeMessage,
   commentSpeechEnabled,
   commentSpeechSupported,
+  liveNotificationEnabled,
   locationSharingEnabled,
   locationSharingSupported,
   locationSharingPending,
@@ -154,6 +155,7 @@ function MorePanel({
   onSaveRoomTitle,
   onSaveRoomWelcomeMessage,
   onCommentSpeechEnabledChange,
+  onLiveNotificationEnabledChange,
   onLocationSharingEnabledChange,
   roomInfoBlockedReason,
   onRoomInfoBlocked,
@@ -174,6 +176,7 @@ function MorePanel({
       roomWelcomeMessage={roomWelcomeMessage}
       commentSpeechEnabled={commentSpeechEnabled}
       commentSpeechSupported={commentSpeechSupported}
+      liveNotificationEnabled={liveNotificationEnabled}
       locationSharingEnabled={locationSharingEnabled}
       locationSharingSupported={locationSharingSupported}
       locationSharingPending={locationSharingPending}
@@ -182,6 +185,7 @@ function MorePanel({
       onSaveRoomTitle={onSaveRoomTitle}
       onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
       onCommentSpeechEnabledChange={onCommentSpeechEnabledChange}
+      onLiveNotificationEnabledChange={onLiveNotificationEnabledChange}
       onLocationSharingEnabledChange={onLocationSharingEnabledChange}
       roomInfoBlockedReason={roomInfoBlockedReason}
       onRoomInfoBlocked={onRoomInfoBlocked}
@@ -263,12 +267,14 @@ export function LiveDesktopPage(props) {
     roomWelcomeMessage,
     commentSpeechEnabled,
     commentSpeechSupported,
+    liveNotificationEnabled,
     locationSharingEnabled,
     locationSharingSupported,
     locationSharingPending,
     onSaveRoomTitle,
     onSaveRoomWelcomeMessage,
     onCommentSpeechEnabledChange,
+    onLiveNotificationEnabledChange,
     onLocationSharingEnabledChange,
     onPickCover,
     onOpenCoverPicker,
@@ -400,6 +406,7 @@ export function LiveDesktopPage(props) {
       roomWelcomeMessage={roomWelcomeMessage}
       commentSpeechEnabled={commentSpeechEnabled}
       commentSpeechSupported={commentSpeechSupported}
+      liveNotificationEnabled={liveNotificationEnabled}
       locationSharingEnabled={locationSharingEnabled}
       locationSharingSupported={locationSharingSupported}
       locationSharingPending={locationSharingPending}
@@ -408,6 +415,7 @@ export function LiveDesktopPage(props) {
       onSaveRoomTitle={onSaveRoomTitle}
       onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
       onCommentSpeechEnabledChange={onCommentSpeechEnabledChange}
+      onLiveNotificationEnabledChange={onLiveNotificationEnabledChange}
       onLocationSharingEnabledChange={onLocationSharingEnabledChange}
       roomInfoBlockedReason={roomInfoBlockedReason}
       onRoomInfoBlocked={onRoomInfoBlocked}

@@ -1,9 +1,10 @@
+import react from "@vitejs/plugin-react";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const moqNetAdapterModulePath = "/node_modules/@moq/net/ietf/adapter.js";
@@ -265,6 +266,17 @@ export default defineConfig(({ mode }) => {
     plugins: [
       injectSiteTitle(siteTitle),
       createWebManifestPlugin(env, siteTitle),
+      VitePWA({
+        injectRegister: false,
+        manifest: false,
+        strategies: "injectManifest",
+        srcDir: "src",
+        filename: "moq-push-sw.js",
+        injectManifest: {
+          injectionPoint: undefined,
+          rollupFormat: "iife",
+        },
+      }),
       patchMoqNetPublishDoneDetails(),
       react(),
     ],

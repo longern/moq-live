@@ -375,6 +375,12 @@
   pointer-events: auto;
 }
 
+.live-desktop-panel > label,
+.live-panel-field {
+  display: flex;
+  flex-direction: column;
+}
+
 .live-desktop-panel.is-microphone-panel {
   gap: 14px;
   width: min(100%, 386px);

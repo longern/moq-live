@@ -1,19 +1,13 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
-  ChevronLeft,
-  Copy,
-  Download,
   Maximize,
   Minimize,
-  MoreHorizontal,
   Pause,
   Play,
   Radio,
   Share,
-  Users,
   Volume2,
   VolumeX,
-  X
 } from "lucide-react";
 import { ChatPanel } from "./ChatPanel.jsx";
 import { FloatingToastPresence } from "./FloatingToast.jsx";
@@ -22,9 +16,16 @@ import { StatusPill } from "./StatusPill.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 import {
   WatchAudienceSheet,
+  WatchHostProfileContent,
   WatchHostProfileSheet,
   WatchMobileMoreSheet,
 } from "./watch/WatchSessionSheets.jsx";
+import { WatchHostProfileActions } from "./watch/WatchHostProfileActions.jsx";
+import { WatchMobileHud } from "./watch/WatchMobileHud.jsx";
+import {
+  WatchDesktopSharePanel,
+  WatchImageShareDialog,
+} from "./watch/WatchSharePanels.jsx";
 import { formatAudienceCount } from "../lib/audience.js";
 import {
   isPortraitMedia,
@@ -32,6 +33,13 @@ import {
 } from "../lib/mediaLayout.js";
 import { buildWatchShareImage } from "../lib/shareImage.js";
 import { STREAM_PROTOCOL_WEBRTC } from "../lib/streamProtocol.js";
+import {
+  buildHostLocationLabel,
+  buildHostProfileInfoItems,
+  getViewerPosition,
+  getWatchPlayerTileClassName,
+  getWatchStageLayout,
+} from "../lib/watchSession.js";
 import { getWatchStageView } from "../lib/watchStageView.js";
 import { usePortraitViewport } from "../hooks/useMediaQuery.js";
 
@@ -40,30 +48,6 @@ const WatchTestCanvas = import.meta.env.DEV
   : null;
 
 const IMAGE_SHARE_EXIT_MS = 180;
-
-function getViewerPosition() {
-  if (
-    typeof navigator === "undefined"
-    || !navigator.geolocation
-    || typeof navigator.geolocation.getCurrentPosition !== "function"
-  ) {
-    return Promise.reject(new Error("geolocation unavailable"));
-  }
-
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: false,
-      maximumAge: 60_000,
-      timeout: 10_000,
-    });
-  });
-}
-
-function buildLocationLabel(province, distanceText) {
-  const normalizedProvince = province === "未知" ? "" : province;
-  const nextProvince = normalizedProvince || "位置未知";
-  return distanceText ? `${nextProvince} · 距你 ${distanceText}` : nextProvince;
-}
 
 export function WatchSessionPage({
   hidden,
@@ -75,8 +59,12 @@ export function WatchSessionPage({
   hostHandle,
   hostDisplayName,
   hostAvatarUrl,
+  hostGender = "",
+  hostBirthDate = "",
+  hostBio = "",
   hostLocationProvince = "位置未知",
   hostLocationAvailable = false,
+  hostDistanceAvailable = hostLocationAvailable,
   hostLocationUpdatedAt = "",
   hostFollowerCount = 0,
   hostFollowingCount = 0,
@@ -84,7 +72,10 @@ export function WatchSessionPage({
   hostFollowing = false,
   hostFollowLoading = false,
   hostFollowBusy = false,
+  hostNotifyLiveStarted = false,
+  hostNotifyBusy = false,
   onHostFollowToggle,
+  onHostNotifyLiveToggle,
   roomCoverUrl,
   siteIconUrl,
   watchLink,
@@ -100,6 +91,7 @@ export function WatchSessionPage({
   playerMuted,
   showTapToUnmute,
   playerOrientation,
+  cohostPlayerOrientation,
   onStop,
   onTogglePlayback,
   onToggleMute,
@@ -177,13 +169,34 @@ export function WatchSessionPage({
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
   const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
   const imageShareReady = Boolean(shareImageUrl && !shareImageLoading);
-  const hostLocationText = buildLocationLabel(hostLocationProvince, hostDistanceText);
+  const hostProfileInfoItems = buildHostProfileInfoItems({
+    gender: hostGender,
+    birthDate: hostBirthDate,
+    province: hostLocationProvince,
+    distanceText: hostDistanceText,
+  });
   const hostLocationClickable = Boolean(
-    viewerLocationPermission !== "granted"
+    hostDistanceAvailable
+    && hostLocationAvailable
+    && viewerLocationPermission !== "granted"
     && viewerLocationPermission !== "checking"
   );
   const showHostFollowButton = Boolean(hostUserId && authUser?.id !== hostUserId);
   const showCohostLayout = Boolean(cohostActive && (cohostPlayerSession || cohostPlayerBadge.state === "warm"));
+  const immersiveShell = immersivePortrait || (portraitViewport && showCohostLayout);
+  const stageLayout = getWatchStageLayout({
+    cohost: showCohostLayout,
+    portrait: portraitMedia,
+  });
+  const immersiveStage = stageLayout === "single-portrait" || stageLayout === "cohost";
+  const stageClassName = [
+    "stage-frame",
+    "watch-stage-frame",
+    controlsVisible ? "controls-visible" : "",
+    immersiveStage ? "is-immersive-stage" : "",
+    stageLayout === "single-portrait" ? "is-portrait" : "",
+    stageLayout === "cohost" ? "is-cohost-stage" : "",
+  ].filter(Boolean).join(" ");
   const stageView = getWatchStageView({
     playerSession,
     playerStarted,
@@ -251,7 +264,7 @@ export function WatchSessionPage({
     setHostDistanceText("");
     setHostDistancePending(false);
     setViewerLocationPermission("checking");
-  }, [chatRoom, hostLocationAvailable, hostLocationUpdatedAt]);
+  }, [chatRoom, hostDistanceAvailable, hostLocationAvailable, hostLocationUpdatedAt]);
 
   useEffect(() => {
     if (!hostProfileOpen) {
@@ -283,7 +296,7 @@ export function WatchSessionPage({
         return;
       }
 
-      if (!hostLocationAvailable || !chatRoom) {
+      if (!hostDistanceAvailable || !hostLocationAvailable || !chatRoom) {
         return;
       }
 
@@ -303,7 +316,7 @@ export function WatchSessionPage({
     return () => {
       cancelled = true;
     };
-  }, [chatRoom, hostLocationAvailable, hostLocationUpdatedAt, hostProfileOpen]);
+  }, [chatRoom, hostDistanceAvailable, hostLocationAvailable, hostLocationUpdatedAt, hostProfileOpen]);
 
   function showToast(message) {
     if (toastTimerRef.current) {
@@ -320,6 +333,12 @@ export function WatchSessionPage({
     if (!hostLocationAvailable || !chatRoom) {
       if (userInitiated) {
         showToast("主播位置未知");
+      }
+      return false;
+    }
+    if (!hostDistanceAvailable) {
+      if (userInitiated) {
+        showToast("主播未开播，暂不可查看距离");
       }
       return false;
     }
@@ -344,10 +363,10 @@ export function WatchSessionPage({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.ok === false) {
-        if (payload.code === "location_unavailable") {
+        if (payload.code === "location_unavailable" || payload.code === "distance_unavailable") {
           setHostDistanceText("");
           if (userInitiated) {
-            showToast("主播位置未知");
+            showToast(payload.code === "distance_unavailable" ? "主播未开播，暂不可查看距离" : "主播位置未知");
           }
           return false;
         }
@@ -388,7 +407,7 @@ export function WatchSessionPage({
       return;
     }
 
-    if (immersivePortrait) {
+    if (immersiveShell) {
       hideControls();
       setImmersiveControlsHidden(false);
       return;
@@ -405,7 +424,7 @@ export function WatchSessionPage({
     return () => {
       clearHideTimer();
     };
-  }, [immersivePortrait, playerSession, playerBadge.state]);
+  }, [immersiveShell, playerSession, playerBadge.state]);
 
   function revealControls() {
     if (!playerSession || playerBadge.state === "error") {
@@ -434,7 +453,7 @@ export function WatchSessionPage({
     if (!touchModeRef.current || !playerSession || playerBadge.state === "error") {
       return;
     }
-    if (immersivePortrait) {
+    if (immersiveShell) {
       clearHideTimer();
       setImmersiveControlsHidden((current) => !current);
       return;
@@ -481,6 +500,20 @@ export function WatchSessionPage({
       >
         {hostFollowing ? "已关注" : "关注"}
       </button>
+    );
+  }
+
+  function renderHostProfileActions() {
+    return (
+      <WatchHostProfileActions
+        authAvailable={authAvailable}
+        followButton={renderHostFollowButton("watch-host-follow-button-profile")}
+        followBusy={hostFollowBusy}
+        following={hostFollowing}
+        notifyBusy={hostNotifyBusy}
+        notifyLiveStarted={hostNotifyLiveStarted}
+        onNotifyLiveToggle={onHostNotifyLiveToggle}
+      />
     );
   }
 
@@ -906,75 +939,24 @@ export function WatchSessionPage({
   }, [shareMenuMounted]);
 
   function renderMobileHud(className = "", persistent = false) {
-    const visible = immersivePortrait
+    const visible = immersiveShell
       ? !immersiveControlsHidden || playerBadge.state === "error"
       : persistent || controlsVisible || playerBadge.state === "error";
 
     return (
-      <div className={`stage-mobile-hud${visible ? " is-visible" : ""}${className ? ` ${className}` : ""}`}>
-        <div className="stage-mobile-hud-left">
-          <button
-            type="button"
-            className="stage-mobile-leave"
-            onClick={(event) => {
-              event.stopPropagation();
-              onStop();
-            }}
-            aria-label="离开直播间"
-          >
-            <ChevronLeft aria-hidden="true" />
-          </button>
-          <div className="watch-mobile-host-chip">
-            <button
-              type="button"
-              className="watch-mobile-host-chip-main"
-              onClick={openHostProfile}
-              aria-label={`查看${hostChipLabel}资料`}
-              aria-haspopup="dialog"
-              aria-expanded={hostProfileOpen ? "true" : "false"}
-            >
-              <UserAvatar
-                avatarUrl={hostAvatarUrl}
-                displayName={hostChipLabel}
-                className="watch-mobile-host-avatar"
-                imgAlt={hostChipLabel || "主播头像"}
-                imgWidth={24}
-                imgHeight={24}
-                monogramClassName="is-monogram"
-                placeholderClassName="is-placeholder"
-                iconClassName="watch-mobile-host-avatar-icon"
-              />
-              <span className="watch-mobile-host-name">{hostChipLabel}</span>
-            </button>
-            {renderHostFollowButton("watch-host-follow-button-mobile")}
-          </div>
-        </div>
-        <div className="stage-mobile-hud-actions">
-          <button
-            type="button"
-            className="watch-mobile-audience-chip"
-            onClick={(event) => {
-              event.stopPropagation();
-              openAudienceSheet();
-            }}
-            aria-label={`${audienceCountText}人在线，查看已登录观众`}
-          >
-            <Users aria-hidden="true" />
-            <span>{audienceCountText}</span>
-          </button>
-          <button
-            type="button"
-            className="stage-mobile-more"
-            onClick={(event) => {
-              event.stopPropagation();
-              openMoreSheet();
-            }}
-            aria-label="更多操作"
-          >
-            <MoreHorizontal aria-hidden="true" />
-          </button>
-        </div>
-      </div>
+      <WatchMobileHud
+        audienceCountText={audienceCountText}
+        className={className}
+        followButton={renderHostFollowButton("watch-host-follow-button-mobile")}
+        hostAvatarUrl={hostAvatarUrl}
+        hostChipLabel={hostChipLabel}
+        hostProfileOpen={hostProfileOpen}
+        onOpenAudienceSheet={openAudienceSheet}
+        onOpenHostProfile={openHostProfile}
+        onOpenMoreSheet={openMoreSheet}
+        onStop={onStop}
+        visible={visible}
+      />
     );
   }
 
@@ -983,95 +965,102 @@ export function WatchSessionPage({
       className="page page-immersive"
       data-page="watch"
       data-joined="true"
-      data-immersive={immersivePortrait ? "true" : "false"}
+      data-immersive={immersiveShell ? "true" : "false"}
       hidden={hidden}
     >
       <div className="page-grid watch-layout">
         <section className="stage-column">
-          {!immersivePortrait ? renderMobileHud("stage-mobile-hud-top", true) : null}
+          {!immersiveShell ? renderMobileHud("stage-mobile-hud-top", true) : null}
           <div
             ref={stageRef}
-            className={`stage-frame watch-stage-frame${controlsVisible ? " controls-visible" : ""}${portraitMedia ? " is-portrait" : ""}`}
+            className={stageClassName}
             onMouseMove={handleStagePointerMove}
             onMouseLeave={handleStagePointerLeave}
             onClick={handleStageClick}
           >
             <div id="playerMount" className={showCohostLayout ? "watch-player-mount is-cohost" : "watch-player-mount"}>
-              <div className={`watch-player-tile${stageView.showInitialPlaybackSpinner ? " is-loading-first-frame" : ""}`}>
-                {playerSession && testPlayback && WatchTestCanvas ? (
-                  <Suspense fallback={null}>
-                    <WatchTestCanvas
-                      playback={testPlayback}
-                      playerRef={playerRef}
-                      playerSession={playerSession}
-                    />
-                  </Suspense>
-                ) : playerSession ? (
-                  playerSession.protocol === STREAM_PROTOCOL_WEBRTC ? (
-                    <video
-                      ref={playerRef}
-                      className="player-webrtc"
-                      autoPlay
-                      playsInline
-                      muted={playerMuted}
-                      aria-label={`${hostDisplayName || hostChipLabel} 直播画面`}
-                    />
-                  ) : (
-                    <canvas
-                      ref={playerRef}
-                      className="player-moq"
-                      width="1280"
-                      height="720"
-                      aria-label={`${playerSession.namespace} 直播画面`}
-                    />
-                  )
-                ) : (
-                  <div className="placeholder">
-                    {stageView.placeholderLoading ? (
-                      <LoadingSpinner className="stage-loading-spinner" />
-                    ) : stageView.placeholderMessage ? (
-                      <p>{stageView.placeholderMessage}</p>
-                    ) : null}
-                  </div>
-                )}
-                {stageView.showInitialPlaybackSpinner ? (
-                  <div className="placeholder stage-first-frame-loading" aria-hidden="true">
-                    <LoadingSpinner className="stage-loading-spinner" />
-                  </div>
-                ) : null}
-                {showCohostLayout ? <span className="watch-player-label">{hostDisplayName || hostChipLabel}</span> : null}
-              </div>
-              {showCohostLayout ? (
-                <div className="watch-player-tile">
-                  {cohostPlayerSession ? (
-                    cohostPlayerSession.protocol === STREAM_PROTOCOL_WEBRTC ? (
+              <div className={getWatchPlayerTileClassName({
+                loading: stageView.showInitialPlaybackSpinner,
+                orientation: playerOrientation,
+              })}>
+                <div className="watch-player-media">
+                  {playerSession && testPlayback && WatchTestCanvas ? (
+                    <Suspense fallback={null}>
+                      <WatchTestCanvas
+                        playback={testPlayback}
+                        playerRef={playerRef}
+                        playerSession={playerSession}
+                      />
+                    </Suspense>
+                  ) : playerSession ? (
+                    playerSession.protocol === STREAM_PROTOCOL_WEBRTC ? (
                       <video
-                        ref={cohostPlayerRef}
+                        ref={playerRef}
                         className="player-webrtc"
                         autoPlay
                         playsInline
-                        muted={cohostPlayerMuted}
-                        aria-label={`${cohostActive.peer.displayName || cohostActive.peer.handle} 直播画面`}
+                        muted={playerMuted}
+                        aria-label={`${hostDisplayName || hostChipLabel} 直播画面`}
                       />
                     ) : (
                       <canvas
-                        ref={cohostPlayerRef}
+                        ref={playerRef}
                         className="player-moq"
                         width="1280"
                         height="720"
-                        aria-label={`${cohostPlayerSession.namespace} 直播画面`}
+                        aria-label={`${playerSession.namespace} 直播画面`}
                       />
                     )
                   ) : (
                     <div className="placeholder">
-                      {cohostPlayerBadge.state === "warm" ? (
+                      {stageView.placeholderLoading ? (
                         <LoadingSpinner className="stage-loading-spinner" />
-                      ) : (
-                        <p>{cohostPlayerStatus || "连线画面加载中"}</p>
-                      )}
+                      ) : stageView.placeholderMessage ? (
+                        <p>{stageView.placeholderMessage}</p>
+                      ) : null}
                     </div>
                   )}
-                  <span className="watch-player-label">{cohostActive.peer.displayName || cohostActive.peer.handle}</span>
+                  {stageView.showInitialPlaybackSpinner ? (
+                    <div className="placeholder stage-first-frame-loading" aria-hidden="true">
+                      <LoadingSpinner className="stage-loading-spinner" />
+                    </div>
+                  ) : null}
+                  {showCohostLayout ? <span className="watch-player-label">{hostDisplayName || hostChipLabel}</span> : null}
+                </div>
+              </div>
+              {showCohostLayout ? (
+                <div className={getWatchPlayerTileClassName({ orientation: cohostPlayerOrientation })}>
+                  <div className="watch-player-media">
+                    {cohostPlayerSession ? (
+                      cohostPlayerSession.protocol === STREAM_PROTOCOL_WEBRTC ? (
+                        <video
+                          ref={cohostPlayerRef}
+                          className="player-webrtc"
+                          autoPlay
+                          playsInline
+                          muted={cohostPlayerMuted}
+                          aria-label={`${cohostActive.peer.displayName || cohostActive.peer.handle} 直播画面`}
+                        />
+                      ) : (
+                        <canvas
+                          ref={cohostPlayerRef}
+                          className="player-moq"
+                          width="1280"
+                          height="720"
+                          aria-label={`${cohostPlayerSession.namespace} 直播画面`}
+                        />
+                      )
+                    ) : (
+                      <div className="placeholder">
+                        {cohostPlayerBadge.state === "warm" ? (
+                          <LoadingSpinner className="stage-loading-spinner" />
+                        ) : (
+                          <p>{cohostPlayerStatus || "连线画面加载中"}</p>
+                        )}
+                      </div>
+                    )}
+                    <span className="watch-player-label">{cohostActive.peer.displayName || cohostActive.peer.handle}</span>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1095,7 +1084,7 @@ export function WatchSessionPage({
                 onClick={(event) => {
                   event.stopPropagation();
                   onDismissTapToUnmute();
-                  if (!immersivePortrait) {
+                  if (!immersiveShell) {
                     revealControls();
                   }
                 }}
@@ -1103,8 +1092,8 @@ export function WatchSessionPage({
                 点按以取消静音
               </button>
             ) : null}
-            {immersivePortrait ? renderMobileHud("stage-mobile-hud-overlay", true) : null}
-            {immersivePortrait ? (
+            {immersiveShell ? renderMobileHud("stage-mobile-hud-overlay", true) : null}
+            {immersiveShell ? (
               <div
                 className={`watch-portrait-chat-overlay${immersiveControlsHidden ? " is-hidden" : ""}`}
                 onClick={(event) => {
@@ -1131,7 +1120,7 @@ export function WatchSessionPage({
                 />
               </div>
             ) : null}
-            {stageView.showPlaybackControls && !immersivePortrait ? (
+            {stageView.showPlaybackControls && !immersiveShell ? (
               <div className={`stage-controls${controlsVisible ? " is-visible" : ""}`}>
                 <div className="stage-controls-fade" />
                 <button
@@ -1183,15 +1172,43 @@ export function WatchSessionPage({
                     <Radio className="watch-desktop-room-avatar-icon" />
                   </span>
                 ) : (
-                  <UserAvatar
-                    avatarUrl={hostAvatarUrl}
-                    displayName={hostDisplayName}
-                    className="watch-desktop-room-avatar"
-                    imgAlt={hostDisplayName || "主播头像"}
-                    monogramClassName="is-monogram"
-                    placeholderClassName="is-placeholder"
-                    iconClassName="watch-desktop-room-avatar-icon"
-                  />
+                  <div
+                    className="watch-desktop-host-profile-trigger"
+                    role="group"
+                    tabIndex={0}
+                    aria-label="查看主播信息"
+                  >
+                    <UserAvatar
+                      avatarUrl={hostAvatarUrl}
+                      displayName={hostDisplayName}
+                      className="watch-desktop-room-avatar"
+                      imgAlt={hostDisplayName || "主播头像"}
+                      monogramClassName="is-monogram"
+                      placeholderClassName="is-placeholder"
+                      iconClassName="watch-desktop-room-avatar-icon"
+                    />
+                    <div
+                      className="watch-desktop-host-profile-popover"
+                      role="dialog"
+                      aria-label="主播信息"
+                    >
+                      <WatchHostProfileContent
+                        hostAvatarUrl={hostAvatarUrl}
+                        hostChipLabel={hostChipLabel}
+                        hostDisplayName={hostDisplayName}
+                        hostBio={hostBio}
+                        hostProfileInfoItems={hostProfileInfoItems}
+                        hostLocationClickable={hostLocationClickable}
+                        hostLocationPending={hostDistancePending}
+                        onHostLocationClick={handleHostLocationClick}
+                        hostHandle={hostHandle}
+                        roomLabel={roomLabel}
+                        hostFollowerCountText={hostFollowerCountText}
+                        hostFollowingCountText={hostFollowingCountText}
+                        followButton={renderHostProfileActions()}
+                      />
+                    </div>
+                  </div>
                 )}
 	                <div className="watch-desktop-room-copy">
 	                  <strong data-room-label>{roomTitle || roomLabel}</strong>
@@ -1218,7 +1235,7 @@ export function WatchSessionPage({
           </div>
         </section>
 
-        <aside className={`control-column${!immersivePortrait ? " watch-control-column-landscape" : ""}`} data-joined="true">
+        <aside className={`control-column${!immersiveShell ? " watch-control-column-landscape" : ""}`} data-joined="true">
           <div className="info-strip info-strip-mobile">
             <div className="info-item">
               <strong data-room-label>{roomLabel}</strong>
@@ -1267,7 +1284,8 @@ export function WatchSessionPage({
         hostAvatarUrl={hostAvatarUrl}
         hostChipLabel={hostChipLabel}
         hostDisplayName={hostDisplayName}
-        hostLocationText={hostLocationText}
+        hostBio={hostBio}
+        hostProfileInfoItems={hostProfileInfoItems}
         hostLocationClickable={hostLocationClickable}
         hostLocationPending={hostDistancePending}
         onHostLocationClick={handleHostLocationClick}
@@ -1275,69 +1293,22 @@ export function WatchSessionPage({
         roomLabel={roomLabel}
         hostFollowerCountText={hostFollowerCountText}
         hostFollowingCountText={hostFollowingCountText}
-        followButton={renderHostFollowButton("watch-host-follow-button-profile")}
+        followButton={renderHostProfileActions()}
       />
       <FloatingToastPresence className="watch-session-toast">{toastMessage}</FloatingToastPresence>
       {imageShareMounted ? (
-        <div className={`watch-share-image-layer${imageShareClosing ? " is-closing" : ""}`}>
-          <button
-            type="button"
-            className="watch-share-image-backdrop"
-            aria-label="关闭图片分享"
-            onClick={closeImageShareModal}
-          />
-          <section
-            className="watch-share-image-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="图片分享"
-          >
-            <div className="watch-share-image-head">
-              <h3>图片分享</h3>
-              <button
-                type="button"
-                className="watch-share-image-close"
-                aria-label="关闭图片分享"
-                onClick={closeImageShareModal}
-              >
-                <X aria-hidden="true" />
-              </button>
-            </div>
-            <div className="watch-share-image-preview">
-              {shareImageLoading ? (
-                <LoadingSpinner className="watch-share-image-spinner" />
-              ) : shareImageUrl ? (
-                <img src={shareImageUrl} alt={`${roomLabel}直播间二维码分享图`} />
-              ) : null}
-            </div>
-            <div className="watch-share-image-actions">
-              <button
-                type="button"
-                onClick={shareWatchImage}
-                disabled={!imageShareReady || !shareSupported}
-              >
-                <Share aria-hidden="true" />
-                <span>分享</span>
-              </button>
-              <button
-                type="button"
-                onClick={copyWatchImage}
-                disabled={!imageShareReady}
-              >
-                <Copy aria-hidden="true" />
-                <span>复制图片</span>
-              </button>
-              <button
-                type="button"
-                onClick={saveWatchImage}
-                disabled={!imageShareReady}
-              >
-                <Download aria-hidden="true" />
-                <span>保存图片</span>
-              </button>
-            </div>
-          </section>
-        </div>
+        <WatchImageShareDialog
+          imageShareClosing={imageShareClosing}
+          imageShareReady={imageShareReady}
+          onClose={closeImageShareModal}
+          onCopyImage={copyWatchImage}
+          onSaveImage={saveWatchImage}
+          onShareImage={shareWatchImage}
+          roomLabel={roomLabel}
+          shareImageLoading={shareImageLoading}
+          shareImageUrl={shareImageUrl}
+          shareSupported={shareSupported}
+        />
       ) : null}
       <WatchAudienceSheet
         open={audienceOpen}
@@ -1345,46 +1316,17 @@ export function WatchSessionPage({
         audienceCountText={audienceCountText}
         loggedInViewers={loggedInViewers}
       />
-      {shareMenuMounted ? (
-        <>
-          <button
-            type="button"
-            className="watch-desktop-share-backdrop"
-            aria-label="关闭分享面板"
-            onClick={closeShareMenu}
-          />
-          <section
-            className={`watch-desktop-share-panel${shareMenuVisible ? " is-open" : ""}`}
-            style={{
-              left: `${shareMenuPosition.left}px`,
-              top: `${shareMenuPosition.top}px`
-            }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="分享到"
-          >
-            <div className="watch-desktop-share-title">分享到</div>
-            <button
-              type="button"
-              className="watch-desktop-share-action"
-              onClick={copyWatchLink}
-              disabled={!watchLink}
-            >
-              <Copy aria-hidden="true" />
-              <span>复制链接</span>
-            </button>
-            <button
-              type="button"
-              className="watch-desktop-share-action"
-              onClick={shareWatchLink}
-              disabled={!watchLink || !shareSupported}
-            >
-              <Share aria-hidden="true" />
-              <span>分享</span>
-            </button>
-          </section>
-        </>
-      ) : null}
+      <WatchDesktopSharePanel
+        left={shareMenuPosition.left}
+        onClose={closeShareMenu}
+        onCopyLink={copyWatchLink}
+        onShareLink={shareWatchLink}
+        open={shareMenuMounted}
+        shareSupported={shareSupported}
+        top={shareMenuPosition.top}
+        visible={shareMenuVisible}
+        watchLink={watchLink}
+      />
     </section>
   );
 }

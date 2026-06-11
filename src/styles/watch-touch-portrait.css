@@ -1,36 +1,36 @@
 @media (orientation: portrait) {
-  body:has(.watch-stage-frame.is-portrait) {
+  body:has(.watch-stage-frame.is-immersive-stage) {
     --watch-float-bg-alpha: 0.38;
     --watch-float-bg: rgba(6, 14, 22, var(--watch-float-bg-alpha));
     --watch-float-border: rgba(255, 255, 255, 0.075);
     --watch-float-shadow: rgba(0, 0, 0, 0.16);
   }
 
-  body:has(.watch-stage-frame.is-portrait) .app-container-watch-joined {
+  body:has(.watch-stage-frame.is-immersive-stage) .app-container-watch-joined {
     grid-template-rows: minmax(0, 1fr);
     gap: 0;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .app-container-watch-joined
     .topbar {
     display: none;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .page[data-page="watch"][data-joined="true"] {
     height: 100svh;
     overflow: hidden;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .page[data-page="watch"]
     .page-grid {
     min-height: 0;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
-    .watch-layout:has(.watch-stage-frame.is-portrait) {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage) {
     width: 100%;
     height: 100%;
     min-height: 0;
@@ -41,8 +41,8 @@
     overflow: hidden;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
-    .watch-layout:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
     .stage-column {
     position: relative;
     width: 100%;
@@ -57,9 +57,9 @@
     background: #050d14;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
-    .watch-layout:has(.watch-stage-frame.is-portrait)
-    .watch-stage-frame.is-portrait {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
+    .watch-stage-frame.is-immersive-stage {
     width: 100%;
     height: 100%;
     min-height: 0;
@@ -70,9 +70,15 @@
     border-bottom: 0;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
-    .watch-layout:has(.watch-stage-frame.is-portrait)
-    .watch-stage-frame.is-portrait
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
+    .watch-stage-frame.is-cohost-stage {
+    aspect-ratio: auto;
+  }
+
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
+    .watch-stage-frame.is-immersive-stage
     #playerMount {
     width: 100%;
     height: 100%;
@@ -80,9 +86,9 @@
     aspect-ratio: auto;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
-    .watch-layout:has(.watch-stage-frame.is-portrait)
-    .watch-stage-frame.is-portrait
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
+    .watch-stage-frame.is-immersive-stage:not(.is-cohost-stage)
     .player-moq {
     width: 100%;
     height: 100%;
@@ -91,26 +97,56 @@
     object-fit: cover;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
-    .watch-layout:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
+    #playerMount.watch-player-mount.is-cohost {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
+    .watch-stage-frame.is-cohost-stage
+    .watch-player-media {
+    max-width: none;
+    max-height: none;
+  }
+
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
+    .watch-stage-frame.is-cohost-stage
+    .player-moq,
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
+    .watch-stage-frame.is-cohost-stage
+    .player-webrtc {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: contain;
+    background: #000;
+  }
+
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
     .control-column[data-joined="true"] {
     display: none;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
-    .watch-layout:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
     .info-strip-mobile {
     display: none;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
-    .watch-layout:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-layout:has(.watch-stage-frame.is-immersive-stage)
     .stage-column
     > .info-strip:not(.info-strip-mobile) {
     display: none;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-hud {
     z-index: 3;
     display: flex;
     justify-content: space-between;
@@ -121,19 +157,19 @@
     transition: opacity 160ms ease;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud-overlay {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-hud-overlay {
     position: absolute;
     top: 12px;
     left: 12px;
     right: 12px;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud.is-visible {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-hud.is-visible {
     opacity: 1;
     pointer-events: auto;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud-left {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-hud-left {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -141,7 +177,7 @@
     flex: 1 1 auto;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-leave {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-leave {
     width: 28px;
     min-width: 28px;
     min-height: 28px;
@@ -156,7 +192,7 @@
     box-shadow: none;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-leave svg {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-leave svg {
     width: 20px;
     height: 20px;
     stroke: currentColor;
@@ -166,13 +202,13 @@
     stroke-linejoin: round;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-meta {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-meta {
     display: flex;
     align-items: center;
     gap: 10px;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-meta strong {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-meta strong {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -181,12 +217,12 @@
     color: var(--text);
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-meta-left {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-meta-left {
     max-width: min(72vw, 260px);
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-host-chip,
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-audience-chip {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-host-chip,
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-audience-chip {
     min-width: 0;
     min-height: 32px;
     display: inline-flex;
@@ -196,18 +232,18 @@
     color: var(--text);
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-host-chip {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-host-chip {
     max-width: min(58vw, 260px);
-    padding: 4px 12px 4px 5px;
+    padding: 4px 5px;
     gap: 8px;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .watch-mobile-host-chip:has(.watch-host-follow-button) {
     max-width: min(72vw, 340px);
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-host-avatar {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-host-avatar {
     width: 24px;
     height: 24px;
     min-width: 24px;
@@ -222,14 +258,17 @@
     font-weight: 600;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-host-avatar img {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-mobile-host-avatar
+    img {
     width: 100%;
     height: 100%;
     display: block;
     object-fit: cover;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-host-avatar-icon {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-mobile-host-avatar-icon {
     width: 15px;
     height: 15px;
     stroke: currentColor;
@@ -237,7 +276,7 @@
     stroke-width: 1.9;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-host-name {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-host-name {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
@@ -248,21 +287,22 @@
     line-height: 1.2;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-host-follow-button-mobile {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-host-follow-button-mobile {
     min-width: 44px;
     min-height: 24px;
     padding: 0 8px;
     font-size: 0.72rem;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-hud-actions {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-hud-actions {
     display: flex;
     align-items: center;
     gap: 8px;
     flex: 0 0 auto;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-audience-chip {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-audience-chip {
     flex: 0 0 auto;
     gap: 5px;
     padding: 0 10px;
@@ -274,7 +314,9 @@
     cursor: pointer;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-audience-chip svg {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-mobile-audience-chip
+    svg {
     width: 15px;
     height: 15px;
     stroke: currentColor;
@@ -282,7 +324,7 @@
     stroke-width: 2;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-more {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-more {
     width: 28px;
     min-width: 28px;
     min-height: 28px;
@@ -297,13 +339,13 @@
     box-shadow: none;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-mobile-more svg {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-mobile-more svg {
     width: 16px;
     height: 16px;
     fill: currentColor;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .stage-unmute-prompt {
+  body:has(.watch-stage-frame.is-immersive-stage) .stage-unmute-prompt {
     bottom: 72px;
     z-index: 8;
     width: fit-content;
@@ -311,18 +353,18 @@
     pointer-events: auto;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-panel {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-more-panel {
     gap: 12px;
     padding: 16px;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-actions {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-more-actions {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-action {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-more-action {
     min-width: 0;
     min-height: 84px;
     padding: 10px 6px;
@@ -342,27 +384,29 @@
     text-align: center;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .watch-mobile-more-action:hover:not(:disabled),
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .watch-mobile-more-action:focus-visible {
     background: transparent;
     box-shadow: none;
     transform: none;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .watch-mobile-more-action:focus-visible {
     outline: 2px solid var(--primary-ring);
     outline-offset: 2px;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-action:disabled {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-mobile-more-action:disabled {
     cursor: default;
     opacity: 0.42;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-action-icon {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-mobile-more-action-icon {
     width: 46px;
     height: 46px;
     display: inline-flex;
@@ -370,13 +414,15 @@
     justify-content: center;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-action-icon svg {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-mobile-more-action-icon
+    svg {
     width: 21px;
     height: 21px;
     stroke-width: 1.9;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-panel {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-panel {
     --watch-audience-row-height: 60px;
     --watch-audience-row-gap: 8px;
     --watch-audience-list-min-height: calc(
@@ -387,7 +433,7 @@
     padding: 16px 0;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-head {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -395,19 +441,19 @@
     padding-inline: 16px;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-head strong {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-head strong {
     font-size: 1rem;
     font-weight: 600;
     line-height: 1.2;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-head span {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-head span {
     color: var(--muted);
     font-size: 0.82rem;
     line-height: 1.4;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-list {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-list {
     min-height: var(--watch-audience-list-min-height);
     max-height: var(--watch-audience-list-max-height);
     display: flex;
@@ -418,7 +464,7 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-row {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-row {
     min-height: var(--watch-audience-row-height);
     box-sizing: border-box;
     display: flex;
@@ -428,7 +474,7 @@
     color: var(--text);
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-avatar {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-avatar {
     width: 48px;
     height: 48px;
     min-width: 48px;
@@ -443,14 +489,14 @@
     font-weight: 600;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-avatar img {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-avatar img {
     width: 100%;
     height: 100%;
     display: block;
     object-fit: cover;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-avatar-icon {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-avatar-icon {
     width: 20px;
     height: 20px;
     stroke: currentColor;
@@ -458,7 +504,7 @@
     stroke-width: 1.9;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-row > span {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-row > span {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -467,7 +513,7 @@
     line-height: 1.3;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-audience-empty {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-audience-empty {
     min-height: var(--watch-audience-list-min-height);
     box-sizing: border-box;
     display: flex;
@@ -480,14 +526,16 @@
     text-align: center;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-header {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-more-header {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 10px;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-header strong {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-mobile-more-header
+    strong {
     min-width: 0;
     font-size: 1rem;
     line-height: 1.2;
@@ -496,7 +544,7 @@
     white-space: nowrap;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-avatar {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-mobile-more-avatar {
     width: 34px;
     height: 34px;
     display: flex;
@@ -510,19 +558,22 @@
     font-weight: 700;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-avatar img {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-mobile-more-avatar
+    img {
     width: 100%;
     height: 100%;
     display: block;
     object-fit: cover;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-mobile-more-avatar-icon {
+  body:has(.watch-stage-frame.is-immersive-stage)
+    .watch-mobile-more-avatar-icon {
     width: 16px;
     height: 16px;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .watch-portrait-chat-overlay {
+  body:has(.watch-stage-frame.is-immersive-stage) .watch-portrait-chat-overlay {
     position: absolute;
     inset: auto 0 0;
     z-index: 3;
@@ -537,20 +588,20 @@
     transition: opacity 160ms ease;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .watch-portrait-chat-overlay.is-hidden {
     opacity: 0;
     pointer-events: none;
   }
 
-  body:has(.watch-stage-frame.is-portrait) .chat-panel-watch-overlay {
+  body:has(.watch-stage-frame.is-immersive-stage) .chat-panel-watch-overlay {
     position: relative;
     z-index: 1;
     width: 100%;
     background: transparent;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-message-list {
     --watch-chat-list-max-height: min(34vh, 260px);
@@ -586,7 +637,7 @@
     );
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-message-list::-webkit-scrollbar {
     display: none;
@@ -594,7 +645,7 @@
     height: 0;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-message-card {
     max-width: min(84%, 320px);
@@ -607,13 +658,13 @@
     box-shadow: none;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-message-card-system-no-avatar {
     max-width: min(84%, 320px);
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-message-body
     p {
@@ -621,14 +672,14 @@
     line-height: 1.42;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-message-body
     .chat-message-author {
     font-size: 0.9rem;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-composer-floating {
     display: flex;
@@ -637,7 +688,7 @@
     padding-right: 0;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-composer-floating
     input {
@@ -651,7 +702,7 @@
     padding: 0 14px;
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-composer-floating
     button {
@@ -664,7 +715,7 @@
     box-shadow: 0 12px 24px var(--primary-shadow);
   }
 
-  body:has(.watch-stage-frame.is-portrait)
+  body:has(.watch-stage-frame.is-immersive-stage)
     .chat-panel-watch-overlay
     .chat-floating-warning {
     margin: 0 0 2px;

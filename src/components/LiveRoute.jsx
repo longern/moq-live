@@ -6,12 +6,13 @@ import { usePublisherController } from "../hooks/usePublisherController.js";
 import { buildWatchLink, generateRoomId } from "../lib/routeState.js";
 import { describePublishState } from "../lib/status.js";
 import { getPublishBlockReason, isPublishBlocked } from "../lib/roomPolicy.js";
-import { createAppError, getAppErrorMessage } from "../lib/appErrors.js";
+import { createApiError, createAppError, getAppErrorMessage } from "../lib/appErrors.js";
 import { normalizeStreamProtocol } from "../lib/streamProtocol.js";
 
 const STREAM_SETTINGS_STORAGE_PREFIX = "moq-live:stream-settings";
 const COMMENT_SPEECH_STORAGE_PREFIX = "moq-live:comment-speech";
 const LOCATION_SHARING_STORAGE_PREFIX = "moq-live:location-sharing";
+const LIVE_NOTIFICATION_STORAGE_PREFIX = "moq-live:live-start-notifications";
 const COHOST_RECENTS_STORAGE_PREFIX = "moq-live:cohost-recents";
 const MAX_COHOST_RECENTS = 6;
 
@@ -36,6 +37,17 @@ function getLocationSharingStorageKey(userId) {
   return `${LOCATION_SHARING_STORAGE_PREFIX}:local`;
 }
 
+function getLocalLocationSharingStorageKey() {
+  return getLocationSharingStorageKey("");
+}
+
+function getLiveNotificationStorageKey(userId) {
+  if (userId) {
+    return `${LIVE_NOTIFICATION_STORAGE_PREFIX}:user:${userId}`;
+  }
+  return `${LIVE_NOTIFICATION_STORAGE_PREFIX}:local`;
+}
+
 function getCohostRecentsStorageKey(userId) {
   if (userId) {
     return `${COHOST_RECENTS_STORAGE_PREFIX}:user:${userId}`;
@@ -56,6 +68,18 @@ function readStoredBoolean(storageKey, fallback = false) {
     return storedValue === "1";
   } catch {
     return fallback;
+  }
+}
+
+function hasStoredBoolean(storageKey) {
+  if (typeof window === "undefined" || !storageKey) {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(storageKey) !== null;
+  } catch {
+    return false;
   }
 }
 
@@ -406,6 +430,7 @@ export function LiveRoute({
   const streamSettingsStorageKey = getStreamSettingsStorageKey(authState.user?.id);
   const commentSpeechStorageKey = getCommentSpeechStorageKey(authState.user?.id);
   const locationSharingStorageKey = getLocationSharingStorageKey(authState.user?.id);
+  const liveNotificationStorageKey = getLiveNotificationStorageKey(authState.user?.id);
   const cohostRecentsStorageKey = getCohostRecentsStorageKey(authState.user?.id);
   const [commentSpeechEnabled, setCommentSpeechEnabled] = useState(() => readStoredBoolean(commentSpeechStorageKey));
   const commentSpeechSupported =
@@ -414,9 +439,11 @@ export function LiveRoute({
     && typeof window.SpeechSynthesisUtterance === "function";
   const [locationSharingEnabled, setLocationSharingEnabled] = useState(() => readStoredBoolean(locationSharingStorageKey));
   const [locationSharingPending, setLocationSharingPending] = useState(false);
+  const [liveNotificationEnabled, setLiveNotificationEnabled] = useState(() => readStoredBoolean(liveNotificationStorageKey, true));
   const [cohostRecentHosts, setCohostRecentHosts] = useState(() => readStoredCohostRecents(cohostRecentsStorageKey));
   const locationUploadRequestRef = useRef(0);
   const liveLocationUploadKeyRef = useRef("");
+  const liveNotificationSentKeyRef = useRef("");
   const locationSharingSupported =
     typeof navigator !== "undefined"
     && Boolean(navigator.geolocation)
@@ -427,8 +454,23 @@ export function LiveRoute({
   }, [commentSpeechStorageKey]);
 
   useEffect(() => {
+    if (
+      authState.user?.id
+      && !hasStoredBoolean(locationSharingStorageKey)
+      && hasStoredBoolean(getLocalLocationSharingStorageKey())
+    ) {
+      const localValue = readStoredBoolean(getLocalLocationSharingStorageKey());
+      writeStoredBoolean(locationSharingStorageKey, localValue);
+      setLocationSharingEnabled(localValue);
+      return;
+    }
+
     setLocationSharingEnabled(readStoredBoolean(locationSharingStorageKey));
-  }, [locationSharingStorageKey]);
+  }, [authState.user?.id, locationSharingStorageKey]);
+
+  useEffect(() => {
+    setLiveNotificationEnabled(readStoredBoolean(liveNotificationStorageKey, true));
+  }, [liveNotificationStorageKey]);
 
   useEffect(() => {
     setCohostRecentHosts(readStoredCohostRecents(cohostRecentsStorageKey));
@@ -560,6 +602,7 @@ export function LiveRoute({
   useEffect(() => {
     if (!liveStreamActive || !liveRoom) {
       liveLocationUploadKeyRef.current = "";
+      liveNotificationSentKeyRef.current = "";
     }
   }, [liveRoom, liveStreamActive]);
 
@@ -581,7 +624,7 @@ export function LiveRoute({
     }
 
     liveLocationUploadKeyRef.current = uploadKey;
-    void uploadCurrentRoomLocation({ uploadKey, disableOnFailure: true });
+    void uploadCurrentRoomLocation({ uploadKey });
   }, [
     liveChat.canControlBroadcast,
     liveChat.streamState.isLive,
@@ -590,6 +633,46 @@ export function LiveRoute({
     liveStreamActive,
     locationSharingEnabled,
     locationSharingSupported,
+  ]);
+
+  useEffect(() => {
+    const liveKey = getLiveLocationUploadKey();
+    if (
+      !liveNotificationEnabled
+      || !liveStreamActive
+      || !liveChat.streamState.isLive
+      || !liveChat.canControlBroadcast
+      || !liveChatRoomId
+      || !liveKey
+    ) {
+      return;
+    }
+    if (liveNotificationSentKeyRef.current === liveKey) {
+      return;
+    }
+
+    liveNotificationSentKeyRef.current = liveKey;
+    void fetch(`/api/rooms/${encodeURIComponent(liveChatRoomId)}/live-notifications`, {
+      method: "POST",
+      credentials: "same-origin"
+    }).then(async (response) => {
+      if (response.ok) {
+        return;
+      }
+      const payload = await response.json().catch(() => ({}));
+      log(`live notification failed: ${payload.code || response.status}`);
+    }).catch((error) => {
+      log(`live notification failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }, [
+    liveChat.canControlBroadcast,
+    liveChat.streamState.isLive,
+    liveChat.streamState.startedAt,
+    liveChatRoomId,
+    liveNotificationEnabled,
+    liveRoom,
+    liveStreamActive,
+    log,
   ]);
 
   async function shareLiveRoom() {
@@ -750,6 +833,12 @@ export function LiveRoute({
     writeStoredBoolean(commentSpeechStorageKey, enabled);
   }
 
+  function changeLiveNotificationEnabled(nextEnabled) {
+    const enabled = Boolean(nextEnabled);
+    setLiveNotificationEnabled(enabled);
+    writeStoredBoolean(liveNotificationStorageKey, enabled);
+  }
+
   function getLiveLocationUploadKey() {
     if (!liveRoom || !liveChat.streamState.isLive) {
       return "";
@@ -768,7 +857,7 @@ export function LiveRoute({
     return sent;
   }
 
-  async function uploadCurrentRoomLocation({ uploadKey = "", disableOnFailure = false } = {}) {
+  async function uploadCurrentRoomLocation({ uploadKey = "" } = {}) {
     if (!locationSharingSupported) {
       return false;
     }
@@ -794,10 +883,6 @@ export function LiveRoute({
       });
       if (!sent) {
         log("room location update skipped: chat channel unavailable");
-        if (disableOnFailure) {
-          setLocationSharingEnabled(false);
-          writeStoredBoolean(locationSharingStorageKey, false);
-        }
         return false;
       }
 
@@ -808,10 +893,6 @@ export function LiveRoute({
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       log(`room location update failed: ${message}`);
-      if (disableOnFailure) {
-        setLocationSharingEnabled(false);
-        writeStoredBoolean(locationSharingStorageKey, false);
-      }
       return false;
     } finally {
       if (locationUploadRequestRef.current === requestId) {
@@ -843,7 +924,7 @@ export function LiveRoute({
     const uploadKey = getLiveLocationUploadKey();
     if (liveStreamActive && liveChat.streamState.isLive && uploadKey) {
       liveLocationUploadKeyRef.current = uploadKey;
-      await uploadCurrentRoomLocation({ uploadKey, disableOnFailure: true });
+      await uploadCurrentRoomLocation({ uploadKey });
     }
   }
 
@@ -1056,6 +1137,8 @@ export function LiveRoute({
       commentSpeechEnabled={commentSpeechEnabled && commentSpeechSupported}
       commentSpeechSupported={commentSpeechSupported}
       onCommentSpeechEnabledChange={changeCommentSpeechEnabled}
+      liveNotificationEnabled={liveNotificationEnabled}
+      onLiveNotificationEnabledChange={changeLiveNotificationEnabled}
       locationSharingEnabled={locationSharingEnabled && locationSharingSupported}
       locationSharingSupported={locationSharingSupported}
       locationSharingPending={locationSharingPending}
@@ -1069,6 +1152,9 @@ export function LiveRoute({
       cohostRecentHosts={cohostRecentHosts}
       onCohostInvitesAllowedChange={(nextAllowed) => {
         liveChat.setCohostInviteAllowed(nextAllowed);
+      }}
+      onCohostDisconnect={() => {
+        liveChat.clearCohostActive();
       }}
       onCohostInviteRequest={requestCohostInvite}
       onCohostInviteRespond={(invite, accepted) => respondToCohostInvite(invite, accepted)}

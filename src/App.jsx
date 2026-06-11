@@ -20,6 +20,11 @@ import { describePlayerState, RETAINED_PLAYER_LAYOUT_STATES } from "./lib/status
 import { getWatchTestChannel } from "./lib/watchTestChannels.js";
 import { createApiError, getAppErrorMessage } from "./lib/appErrors.js";
 import {
+  setPushPermissionReminderDismissed,
+  shouldPromptForPushPermission,
+  subscribeCurrentUserToWebPush,
+} from "./lib/webPush.js";
+import {
   DEFAULT_STREAM_PROTOCOL,
   STREAM_PROTOCOL_MOQ,
   STREAM_PROTOCOL_WEBRTC,
@@ -368,6 +373,11 @@ export function App() {
     hostHandle: "",
     hostDisplayName: "",
     hostAvatarUrl: "",
+    hostGender: "",
+    hostBirthDate: "",
+    hostBio: "",
+    lastLocationProvince: "",
+    lastLocationUpdatedAt: "",
     hostFollowerCount: 0,
     hostFollowingCount: 0,
     title: "",
@@ -377,14 +387,20 @@ export function App() {
   const [watchFollowState, setWatchFollowState] = useState({
     hostUserId: "",
     following: false,
+    notifyLiveStarted: false,
     followerCount: 0,
     followingCount: 0,
     loading: false,
     busy: false,
+    notifyBusy: false,
     error: ""
   });
   const [watchStreamEnded, setWatchStreamEnded] = useState(false);
   const [topbarWatchRoom, setTopbarWatchRoom] = useState("");
+  const [pushPromptOpen, setPushPromptOpen] = useState(false);
+  const [pushPromptDismissChecked, setPushPromptDismissChecked] = useState(false);
+  const [pushPromptBusy, setPushPromptBusy] = useState(false);
+  const [pushPromptError, setPushPromptError] = useState("");
 
   const watchPlaybackRelayUrlRef = useRef("");
   const watchPlaybackNamespaceRef = useRef("");
@@ -551,9 +567,25 @@ export function App() {
   const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.hostAvatarUrl || "";
   const watchHostLocationProvince = watchingNamespace || watchingTestChannel
     ? "位置未知"
-    : chat.roomLocation.province || "位置未知";
-  const watchHostLocationAvailable = !watchingNamespace && !watchingTestChannel && chat.roomLocation.hasLocation === true;
-  const watchHostLocationUpdatedAt = watchingNamespace || watchingTestChannel ? "" : chat.roomLocation.updatedAt || "";
+    : chat.streamState.isLive
+      ? chat.roomLocation.province || watchRoomResolution.lastLocationProvince || "位置未知"
+      : watchRoomResolution.lastLocationProvince || "位置未知";
+  const watchHostLocationAvailable = !watchingNamespace
+    && !watchingTestChannel
+    && (
+      chat.streamState.isLive
+        ? chat.roomLocation.hasLocation === true || Boolean(watchRoomResolution.lastLocationProvince)
+        : Boolean(watchRoomResolution.lastLocationProvince)
+    );
+  const watchHostDistanceAvailable = !watchingNamespace
+    && !watchingTestChannel
+    && chat.streamState.isLive
+    && chat.roomLocation.hasLocation === true;
+  const watchHostLocationUpdatedAt = watchingNamespace || watchingTestChannel
+    ? ""
+    : chat.streamState.isLive
+      ? chat.roomLocation.updatedAt || ""
+      : watchRoomResolution.lastLocationUpdatedAt || "";
   const watchHostFollowerCount =
     watchFollowState.hostUserId === watchHostUserId
       ? watchFollowState.followerCount
@@ -775,10 +807,12 @@ export function App() {
     setWatchFollowState((current) => ({
       hostUserId: targetUserId,
       following: current.hostUserId === targetUserId ? current.following : false,
+      notifyLiveStarted: current.hostUserId === targetUserId ? current.notifyLiveStarted : false,
       followerCount: current.hostUserId === targetUserId ? current.followerCount : watchRoomResolution.hostFollowerCount,
       followingCount: current.hostUserId === targetUserId ? current.followingCount : watchRoomResolution.hostFollowingCount,
       loading: false,
       busy: true,
+      notifyBusy: false,
       error: ""
     }));
 
@@ -794,24 +828,135 @@ export function App() {
       setWatchFollowState({
         hostUserId: targetUserId,
         following: Boolean(payload.following),
+        notifyLiveStarted: Boolean(payload.following && payload.notifyLiveStarted),
         followerCount: Math.max(0, Number(payload.followerCount ?? watchRoomResolution.hostFollowerCount)),
         followingCount: Math.max(0, Number(payload.followingCount ?? watchRoomResolution.hostFollowingCount)),
         loading: false,
         busy: false,
+        notifyBusy: false,
         error: ""
       });
+      if (!currentlyFollowing && payload.following && shouldPromptForPushPermission()) {
+        setPushPromptDismissChecked(false);
+        setPushPromptError("");
+        setPushPromptOpen(true);
+      }
     } catch (error) {
       const message = getAppErrorMessage(error);
       setWatchFollowState((current) => ({
         hostUserId: targetUserId,
         following: current.hostUserId === targetUserId ? current.following : currentlyFollowing,
+        notifyLiveStarted: current.hostUserId === targetUserId ? current.notifyLiveStarted : false,
         followerCount: current.hostUserId === targetUserId ? current.followerCount : watchRoomResolution.hostFollowerCount,
         followingCount: current.hostUserId === targetUserId ? current.followingCount : watchRoomResolution.hostFollowingCount,
         loading: false,
         busy: false,
+        notifyBusy: false,
         error: message
       }));
       log(`follow update failed: ${message}`);
+    }
+  }
+
+  async function toggleWatchLiveNotification() {
+    const targetUserId = watchHostUserId;
+    if (
+      !targetUserId ||
+      authState.user?.id === targetUserId ||
+      watchFollowState.hostUserId !== targetUserId ||
+      !watchFollowState.following ||
+      watchFollowState.notifyBusy
+    ) {
+      return;
+    }
+
+    if (!authState.user?.id) {
+      setLoginPromptOpen(true);
+      return;
+    }
+
+    const nextNotifyLiveStarted = !watchFollowState.notifyLiveStarted;
+    setWatchFollowState((current) => ({
+      hostUserId: targetUserId,
+      following: current.hostUserId === targetUserId ? current.following : false,
+      notifyLiveStarted: current.hostUserId === targetUserId ? current.notifyLiveStarted : false,
+      followerCount: current.hostUserId === targetUserId ? current.followerCount : watchRoomResolution.hostFollowerCount,
+      followingCount: current.hostUserId === targetUserId ? current.followingCount : watchRoomResolution.hostFollowingCount,
+      loading: false,
+      busy: false,
+      notifyBusy: true,
+      error: ""
+    }));
+
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(targetUserId)}/follow`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ notifyLiveStarted: nextNotifyLiveStarted })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw createApiError(payload, "follow_update_failed", { status: response.status });
+      }
+      setWatchFollowState({
+        hostUserId: targetUserId,
+        following: Boolean(payload.following),
+        notifyLiveStarted: Boolean(payload.following && payload.notifyLiveStarted),
+        followerCount: Math.max(0, Number(payload.followerCount ?? watchRoomResolution.hostFollowerCount)),
+        followingCount: Math.max(0, Number(payload.followingCount ?? watchRoomResolution.hostFollowingCount)),
+        loading: false,
+        busy: false,
+        notifyBusy: false,
+        error: ""
+      });
+      if (nextNotifyLiveStarted && payload.following && payload.notifyLiveStarted && shouldPromptForPushPermission()) {
+        setPushPromptDismissChecked(false);
+        setPushPromptError("");
+        setPushPromptOpen(true);
+      }
+    } catch (error) {
+      const message = getAppErrorMessage(error);
+      setWatchFollowState((current) => ({
+        hostUserId: targetUserId,
+        following: current.hostUserId === targetUserId ? current.following : true,
+        notifyLiveStarted: current.hostUserId === targetUserId ? current.notifyLiveStarted : !nextNotifyLiveStarted,
+        followerCount: current.hostUserId === targetUserId ? current.followerCount : watchRoomResolution.hostFollowerCount,
+        followingCount: current.hostUserId === targetUserId ? current.followingCount : watchRoomResolution.hostFollowingCount,
+        loading: false,
+        busy: false,
+        notifyBusy: false,
+        error: message
+      }));
+      log(`live notification preference update failed: ${message}`);
+    }
+  }
+
+  function closePushPrompt() {
+    if (pushPromptDismissChecked) {
+      setPushPermissionReminderDismissed(true);
+    }
+    setPushPromptOpen(false);
+    setPushPromptError("");
+    setPushPromptBusy(false);
+  }
+
+  async function enablePushNotifications() {
+    setPushPromptBusy(true);
+    setPushPromptError("");
+    try {
+      const subscribed = await subscribeCurrentUserToWebPush();
+      if (pushPromptDismissChecked || subscribed) {
+        setPushPermissionReminderDismissed(true);
+      }
+      setPushPromptOpen(false);
+    } catch (error) {
+      setPushPromptError("通知开启失败，请稍后再试");
+      log(`push subscription failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setPushPromptBusy(false);
     }
   }
 
@@ -894,6 +1039,11 @@ export function App() {
         hostHandle: "",
         hostDisplayName: "",
         hostAvatarUrl: "",
+        hostGender: "",
+        hostBirthDate: "",
+        hostBio: "",
+        lastLocationProvince: "",
+        lastLocationUpdatedAt: "",
         hostFollowerCount: 0,
         hostFollowingCount: 0,
         title: "",
@@ -906,19 +1056,33 @@ export function App() {
     let cancelled = false;
 
     async function resolveWatchRoom() {
-      setWatchRoomResolution({
-        loading: true,
-        error: "",
-        roomId: "",
-        hostUserId: "",
-        hostHandle: "",
-        hostDisplayName: "",
-        hostAvatarUrl: "",
-        hostFollowerCount: 0,
-        hostFollowingCount: 0,
-        title: "",
-        welcomeMessage: "",
-        coverUrl: ""
+      setWatchRoomResolution((current) => {
+        if (current.hostHandle === watchHandle && current.roomId) {
+          return {
+            ...current,
+            loading: false,
+            error: "",
+          };
+        }
+        return {
+          loading: true,
+          error: "",
+          roomId: "",
+          hostUserId: "",
+          hostHandle: "",
+          hostDisplayName: "",
+          hostAvatarUrl: "",
+          hostGender: "",
+          hostBirthDate: "",
+          hostBio: "",
+          lastLocationProvince: "",
+          lastLocationUpdatedAt: "",
+          hostFollowerCount: 0,
+          hostFollowingCount: 0,
+          title: "",
+          welcomeMessage: "",
+          coverUrl: ""
+        };
       });
 
       try {
@@ -943,6 +1107,11 @@ export function App() {
           hostHandle: payload.room?.host?.handle || watchHandle,
           hostDisplayName: payload.room?.host?.displayName || "",
           hostAvatarUrl: payload.room?.host?.avatarUrl || "",
+          hostGender: payload.room?.host?.gender || "",
+          hostBirthDate: payload.room?.host?.birthDate || "",
+          hostBio: payload.room?.host?.bio || "",
+          lastLocationProvince: payload.room?.lastLocationProvince || "",
+          lastLocationUpdatedAt: payload.room?.lastLocationUpdatedAt || "",
           hostFollowerCount: Math.max(0, Number(payload.room?.host?.followerCount || 0)),
           hostFollowingCount: Math.max(0, Number(payload.room?.host?.followingCount || 0)),
           title: payload.room?.title || "",
@@ -963,6 +1132,11 @@ export function App() {
           hostHandle: "",
           hostDisplayName: "",
           hostAvatarUrl: "",
+          hostGender: "",
+          hostBirthDate: "",
+          hostBio: "",
+          lastLocationProvince: "",
+          lastLocationUpdatedAt: "",
           hostFollowerCount: 0,
           hostFollowingCount: 0,
           title: "",
@@ -978,7 +1152,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [page, watchHandle, watchRouteCommitted, watchingNamespace, watchingTestChannel]);
+  }, [chat.streamState.isLive, page, watchHandle, watchRouteCommitted, watchingNamespace, watchingTestChannel]);
 
   useEffect(() => {
     if (authState.loading) {
@@ -991,10 +1165,12 @@ export function App() {
       setWatchFollowState({
         hostUserId: targetUserId,
         following: false,
+        notifyLiveStarted: false,
         followerCount: watchRoomResolution.hostFollowerCount,
         followingCount: watchRoomResolution.hostFollowingCount,
         loading: false,
         busy: false,
+        notifyBusy: false,
         error: ""
       });
       return;
@@ -1004,10 +1180,12 @@ export function App() {
       setWatchFollowState({
         hostUserId: targetUserId,
         following: false,
+        notifyLiveStarted: false,
         followerCount: watchRoomResolution.hostFollowerCount,
         followingCount: watchRoomResolution.hostFollowingCount,
         loading: false,
         busy: false,
+        notifyBusy: false,
         error: ""
       });
       return;
@@ -1017,10 +1195,12 @@ export function App() {
     setWatchFollowState((current) => ({
       hostUserId: targetUserId,
       following: current.hostUserId === targetUserId ? current.following : false,
+      notifyLiveStarted: current.hostUserId === targetUserId ? current.notifyLiveStarted : false,
       followerCount: current.hostUserId === targetUserId ? current.followerCount : watchRoomResolution.hostFollowerCount,
       followingCount: current.hostUserId === targetUserId ? current.followingCount : watchRoomResolution.hostFollowingCount,
       loading: true,
       busy: false,
+      notifyBusy: false,
       error: ""
     }));
 
@@ -1039,10 +1219,12 @@ export function App() {
         setWatchFollowState({
           hostUserId: targetUserId,
           following: Boolean(payload.following),
+          notifyLiveStarted: Boolean(payload.following && payload.notifyLiveStarted),
           followerCount: Math.max(0, Number(payload.followerCount ?? watchRoomResolution.hostFollowerCount)),
           followingCount: Math.max(0, Number(payload.followingCount ?? watchRoomResolution.hostFollowingCount)),
           loading: false,
           busy: false,
+          notifyBusy: false,
           error: ""
         });
       } catch (error) {
@@ -1053,10 +1235,12 @@ export function App() {
         setWatchFollowState({
           hostUserId: targetUserId,
           following: false,
+          notifyLiveStarted: false,
           followerCount: watchRoomResolution.hostFollowerCount,
           followingCount: watchRoomResolution.hostFollowingCount,
           loading: false,
           busy: false,
+          notifyBusy: false,
           error: message
         });
         log(`follow status failed: ${message}`);
@@ -1544,8 +1728,12 @@ export function App() {
             hostHandle={watchRoomResolution.hostHandle}
             hostDisplayName={watchHostDisplayName}
             hostAvatarUrl={watchHostAvatarUrl}
+            hostGender={watchRoomResolution.hostGender}
+            hostBirthDate={watchRoomResolution.hostBirthDate}
+            hostBio={watchRoomResolution.hostBio}
             hostLocationProvince={watchHostLocationProvince}
             hostLocationAvailable={watchHostLocationAvailable}
+            hostDistanceAvailable={watchHostDistanceAvailable}
             hostLocationUpdatedAt={watchHostLocationUpdatedAt}
             hostFollowerCount={watchHostFollowerCount}
             hostFollowingCount={watchHostFollowingCount}
@@ -1562,7 +1750,16 @@ export function App() {
               watchFollowState.hostUserId === watchHostUserId &&
               watchFollowState.busy
             }
+            hostNotifyLiveStarted={
+              watchFollowState.hostUserId === watchHostUserId &&
+              watchFollowState.notifyLiveStarted
+            }
+            hostNotifyBusy={
+              watchFollowState.hostUserId === watchHostUserId &&
+              watchFollowState.notifyBusy
+            }
             onHostFollowToggle={toggleWatchFollow}
+            onHostNotifyLiveToggle={toggleWatchLiveNotification}
             roomCoverUrl={watchRoomCoverUrl}
             siteIconUrl={siteIconUrl}
             watchLink={watchPageLink}
@@ -1578,6 +1775,7 @@ export function App() {
             playerMuted={watchingTestChannel ? true : player.playerMuted}
             showTapToUnmute={watchingTestChannel ? false : player.showTapToUnmute}
             playerOrientation={effectivePlayerOrientation}
+            cohostPlayerOrientation={cohostPlayer.playerOrientation}
             room={watchRoom}
             onRoomInput={(event) => {
               setWatchRoomValue(event.currentTarget.value);
@@ -1731,6 +1929,49 @@ export function App() {
           onPreloadLive={preloadLiveRoute}
         />
       )}
+      {pushPromptOpen ? (
+        <div className="push-permission-layer" role="presentation">
+          <button
+            type="button"
+            className="push-permission-backdrop"
+            aria-label="关闭通知权限提示"
+            onClick={closePushPrompt}
+          />
+          <div className="push-permission-dialog" role="dialog" aria-modal="true" aria-labelledby="push-permission-title">
+            <button
+              type="button"
+              className="push-permission-close"
+              aria-label="关闭通知权限提示"
+              onClick={closePushPrompt}
+            >
+              <X aria-hidden="true" />
+            </button>
+            <div className="push-permission-copy">
+              <strong id="push-permission-title">开启开播通知</strong>
+              <span>接收开播通知，不错过每一个精彩瞬间。</span>
+            </div>
+            <label className="push-permission-check">
+              <input
+                type="checkbox"
+                checked={pushPromptDismissChecked}
+                onChange={(event) => {
+                  setPushPromptDismissChecked(event.currentTarget.checked);
+                }}
+              />
+              <span>不再提醒</span>
+            </label>
+            {pushPromptError ? <p className="push-permission-error">{pushPromptError}</p> : null}
+            <div className="push-permission-actions">
+              <button type="button" className="secondary" onClick={closePushPrompt}>
+                稍后
+              </button>
+              <button type="button" className="primary" onClick={enablePushNotifications} disabled={pushPromptBusy}>
+                {pushPromptBusy ? "开启中" : "开启通知"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <MobilePanelPresence open={loginPromptOpen}>
         {({ transitionClassName }) => (
           <LoginDrawer

@@ -120,7 +120,6 @@ export function ChatPanel({
               email={message.user?.email}
               className="chat-avatar"
               imgAlt={message.user?.displayName || "用户头像"}
-              initialsLength={2}
               placeholderClassName="is-placeholder"
             />
             <div className="chat-message-body">

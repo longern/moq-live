@@ -669,8 +669,6 @@
   min-height: 32px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 .live-cohost-head strong {
@@ -679,33 +677,21 @@
   font-weight: 700;
 }
 
-.live-cohost-switch {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  min-height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: rgba(225, 236, 246, 0.9);
-  box-shadow: none;
-  font-size: 0.88rem;
-  line-height: 1;
-  white-space: nowrap;
+.live-cohost-menu {
+  border-radius: 14px;
 }
 
-.live-cohost-switch:hover,
-.live-cohost-switch:focus-visible {
-  background: transparent;
-  transform: none;
+.live-cohost-menu-item {
+  min-height: 52px;
 }
 
-.live-cohost-switch:focus-visible {
-  outline: 2px solid var(--primary-ring);
-  outline-offset: 3px;
+.live-cohost-menu-item .live-more-menu-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.live-cohost-disconnect-item {
+  color: #ffc8bd;
 }
 
 .live-cohost-form {
@@ -718,11 +704,12 @@
   min-width: 0;
   height: 42px;
   padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 0;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.07);
   color: var(--text);
   font: inherit;
+  box-shadow: none;
 }
 
 .live-cohost-form button {

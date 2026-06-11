@@ -162,6 +162,11 @@ export class ChatRoomDO {
       return;
     }
 
+    if (payload?.type === "cohost.active.clear") {
+      await this.handleCohostActiveClear(ws, session);
+      return;
+    }
+
     if (payload?.type === "broadcast.control.check") {
       this.handleBroadcastControlCheck(ws, session, payload);
       return;
@@ -438,6 +443,7 @@ export class ChatRoomDO {
       return;
     }
     this.roomState = nextRoomState;
+    await this.writeRoomLastStartedAt(session.room, nextStream.startedAt);
     this.broadcast({
       type: "stream.started",
       stream: nextStream
@@ -467,6 +473,7 @@ export class ChatRoomDO {
     }
 
     const previousActive = this.roomState.cohost.active;
+    const previousLocation = this.roomState.location;
     const nextRoomState = {
       ...this.roomState,
       stream: getDefaultRoomState().stream,
@@ -481,6 +488,7 @@ export class ChatRoomDO {
       return;
     }
     this.roomState = nextRoomState;
+    await this.writeRoomLastLocation(session.room, previousLocation);
     this.broadcast({
       type: "stream.stopped",
       stream: this.roomState.stream
@@ -562,16 +570,59 @@ export class ChatRoomDO {
       return;
     }
     this.roomState = nextRoomState;
+    await this.writeRoomLastLocation(session.room, nextLocation);
     this.broadcast({
       type: "room.location.updated",
       location: getPublicRoomLocation(nextLocation)
     });
   }
 
+  async writeRoomLastLocation(roomId, location) {
+    if (!roomId || !this.env?.APP_DB) {
+      return;
+    }
+
+    const normalized = normalizeRoomLocation(location);
+    const province = normalized.enabled ? sanitizeLocationProvince(normalized.province) : "";
+    const updatedAt = normalized.enabled && province
+      ? sanitizeIsoTimestamp(normalized.provinceResolvedAt) || sanitizeIsoTimestamp(normalized.updatedAt) || new Date().toISOString()
+      : null;
+
+    try {
+      await this.env.APP_DB.prepare(
+        `UPDATE moq_rooms
+         SET last_location_province = ?, last_location_updated_at = ?
+         WHERE id = ?`
+      ).bind(province || null, updatedAt, roomId).run();
+    } catch (error) {
+      console.warn("Failed to persist room last location", error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async writeRoomLastStartedAt(roomId, startedAt) {
+    if (!roomId || !this.env?.APP_DB) {
+      return;
+    }
+
+    const normalizedStartedAt = sanitizeIsoTimestamp(startedAt) || new Date().toISOString();
+    try {
+      await this.env.APP_DB.prepare(
+        `UPDATE moq_rooms
+         SET last_started_at = ?
+         WHERE id = ?`
+      ).bind(normalizedStartedAt, roomId).run();
+    } catch (error) {
+      console.warn("Failed to persist room live start", error instanceof Error ? error.message : String(error));
+    }
+  }
+
   async handleLocationDistance(request) {
     const hostLocation = normalizeRoomLocation(this.roomState.location);
     if (!hostLocation.enabled) {
       return json({ ok: false, error: "Location unavailable", code: "location_unavailable" }, { status: 404 });
+    }
+    if (!this.roomState.stream.isLive) {
+      return json({ ok: false, error: "Distance unavailable", code: "distance_unavailable" }, { status: 409 });
     }
 
     const payload = await request.json().catch(() => null);
@@ -623,6 +674,37 @@ export class ChatRoomDO {
       type: "cohost.invites.changed",
       invitesAllowed: nextCohost.invitesAllowed
     });
+  }
+
+  async handleCohostActiveClear(ws, session) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
+      this.sendError(ws, "forbidden_cohost_update");
+      return;
+    }
+
+    const previousActive = this.roomState.cohost.active;
+    if (!previousActive) {
+      return;
+    }
+
+    const nextRoomState = {
+      ...this.roomState,
+      cohost: {
+        ...this.roomState.cohost,
+        active: null
+      }
+    };
+    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    if (!persisted) {
+      return;
+    }
+
+    this.roomState = nextRoomState;
+    this.broadcast({
+      type: "cohost.active.changed",
+      active: null
+    });
+    await this.clearPeerCohostActive(previousActive);
   }
 
   async handleCohostInviteRequest(request) {

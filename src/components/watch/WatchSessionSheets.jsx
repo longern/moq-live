@@ -104,6 +104,10 @@ export function WatchHostProfileSheet({
   hostAvatarUrl,
   hostChipLabel,
   hostDisplayName,
+  hostLocationText = "位置未知",
+  hostLocationClickable = false,
+  hostLocationPending = false,
+  onHostLocationClick,
   hostHandle,
   roomLabel,
   hostFollowerCountText,
@@ -135,6 +139,15 @@ export function WatchHostProfileSheet({
           <span>{hostHandle || roomLabel}</span>
         </div>
       </div>
+      <button
+        type="button"
+        className="watch-host-profile-location"
+        onClick={onHostLocationClick}
+        disabled={!hostLocationClickable}
+        aria-busy={hostLocationPending ? "true" : "false"}
+      >
+        {hostLocationText || "位置未知"}
+      </button>
       <div className="watch-host-profile-stats" aria-label="主播关注和粉丝">
         <div className="watch-host-profile-stat">
           <strong>{hostFollowingCountText}</strong>

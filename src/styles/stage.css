@@ -163,6 +163,11 @@ publisher-moq {
   background: rgba(4, 11, 17, 0.82);
 }
 
+.stage-status-overlay {
+  color: rgba(235, 244, 251, 0.82);
+  background: rgba(4, 11, 17, 0.68);
+}
+
 .stage-error p {
   max-width: 420px;
   line-height: 1.55;

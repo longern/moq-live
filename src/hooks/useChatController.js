@@ -52,10 +52,30 @@ function getDefaultRoomMeta() {
   };
 }
 
+function getDefaultRoomLocation() {
+  return {
+    hasLocation: false,
+    province: "",
+    updatedAt: null
+  };
+}
+
 function getDefaultCohostState() {
   return {
     invitesAllowed: true,
     active: null
+  };
+}
+
+function normalizeRoomLocation(value) {
+  if (!value || typeof value !== "object") {
+    return getDefaultRoomLocation();
+  }
+
+  return {
+    hasLocation: value.hasLocation === true,
+    province: String(value.province ?? "").trim(),
+    updatedAt: String(value.updatedAt ?? "").trim() || null
   };
 }
 
@@ -178,6 +198,7 @@ export function useChatController({
   const [chatError, setChatError] = useState("");
   const [streamState, setStreamState] = useState(getDefaultStreamState);
   const [roomMeta, setRoomMeta] = useState(getDefaultRoomMeta);
+  const [roomLocation, setRoomLocation] = useState(getDefaultRoomLocation);
   const [roomStateReady, setRoomStateReady] = useState(false);
   const [canControlBroadcast, setCanControlBroadcast] = useState(false);
   const [cohostInvitesAllowed, setCohostInvitesAllowed] = useState(true);
@@ -262,6 +283,7 @@ export function useChatController({
       setChatError("");
       setStreamState(getDefaultStreamState());
       setRoomMeta(getDefaultRoomMeta());
+      setRoomLocation(getDefaultRoomLocation());
       setRoomStateReady(false);
       setCanControlBroadcast(false);
       setCohostInvitesAllowed(true);
@@ -339,6 +361,7 @@ export function useChatController({
               webRtcUrl: payload.roomMeta?.stream?.webRtcUrl || ""
             }
           });
+          setRoomLocation(normalizeRoomLocation(payload.location));
           setCohostInvitesAllowed(
             payload.cohost?.invitesAllowed === false
               ? false
@@ -428,6 +451,11 @@ export function useChatController({
               webRtcUrl: payload.roomMeta?.stream?.webRtcUrl || ""
             }
           });
+          return;
+        }
+
+        if (payload.type === "room.location.updated") {
+          setRoomLocation(normalizeRoomLocation(payload.location));
           return;
         }
 
@@ -594,6 +622,7 @@ export function useChatController({
     chatError,
     streamState,
     roomMeta,
+    roomLocation,
     roomStateReady,
     canControlBroadcast,
     cohostInvitesAllowed,

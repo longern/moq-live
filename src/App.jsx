@@ -500,7 +500,7 @@ export function App() {
               ? (resolvedWatchPlaybackReady ? "" : "加载中")
               : watchStreamEnded
                 ? "直播已结束"
-                : "直播暂未开始";
+                : "尚未开播";
 
   watchPlaybackRelayUrlRef.current = resolvedWatchRelayUrl;
   watchPlaybackNamespaceRef.current = resolvedWatchNamespace;
@@ -549,6 +549,11 @@ export function App() {
     ? ""
     : watchRoomResolution.hostUserId || "";
   const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.hostAvatarUrl || "";
+  const watchHostLocationProvince = watchingNamespace || watchingTestChannel
+    ? "位置未知"
+    : chat.roomLocation.province || "位置未知";
+  const watchHostLocationAvailable = !watchingNamespace && !watchingTestChannel && chat.roomLocation.hasLocation === true;
+  const watchHostLocationUpdatedAt = watchingNamespace || watchingTestChannel ? "" : chat.roomLocation.updatedAt || "";
   const watchHostFollowerCount =
     watchFollowState.hostUserId === watchHostUserId
       ? watchFollowState.followerCount
@@ -1539,6 +1544,9 @@ export function App() {
             hostHandle={watchRoomResolution.hostHandle}
             hostDisplayName={watchHostDisplayName}
             hostAvatarUrl={watchHostAvatarUrl}
+            hostLocationProvince={watchHostLocationProvince}
+            hostLocationAvailable={watchHostLocationAvailable}
+            hostLocationUpdatedAt={watchHostLocationUpdatedAt}
             hostFollowerCount={watchHostFollowerCount}
             hostFollowingCount={watchHostFollowingCount}
             hostIcon={watchHostIcon}
@@ -1562,7 +1570,8 @@ export function App() {
             stageMessage={watchStageMessage}
             chatRoom={watchChatRoom}
             chatRoomLabel={watchChatRoomLabel}
-            playerStatus={effectivePlayerStatus}
+            playerStatusMessage={effectivePlayerStatus}
+            playerStatusKind={effectivePlayerStatusKind}
             playerBadge={playerBadge}
             fullscreenActive={player.fullscreenActive}
             playerPaused={watchingTestChannel ? false : player.playerPaused}

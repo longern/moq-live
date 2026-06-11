@@ -108,6 +108,9 @@ export default {
       if (request.method === "GET" && /^\/api\/chat\/[^/]+\/ws$/.test(url.pathname)) {
         return await handleChatWebSocket(env, request);
       }
+      if (request.method === "POST" && /^\/api\/chat\/[^/]+\/location\/distance$/.test(url.pathname)) {
+        return await handleChatLocationDistance(env, request);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const status = Number.isInteger(error?.status) ? error.status : 500;
@@ -615,6 +618,29 @@ async function handleCohostRespond(env, request) {
   }
 
   return json({ ok: true, accepted });
+}
+
+async function handleChatLocationDistance(env, request) {
+  const roomId = decodeURIComponent(new URL(request.url).pathname.split("/")[3] || "");
+  if (!roomId) {
+    return json({ ok: false, error: "Room not found", code: "room_not_found" }, { status: 404 });
+  }
+
+  const payload = await request.json().catch(() => ({}));
+  const response = await postToChatRoom(env, roomId, "/location/distance", payload);
+  if (!response.ok) {
+    return json({
+      ok: false,
+      error: response.error || "Location distance failed",
+      code: response.code || "location_distance_failed"
+    }, { status: response.status || 500 });
+  }
+
+  return json({
+    ok: true,
+    distanceMeters: response.distanceMeters,
+    distanceText: response.distanceText || ""
+  });
 }
 
 function sanitizeCohostHandle(value) {

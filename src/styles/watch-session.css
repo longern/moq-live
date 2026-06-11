@@ -29,6 +29,9 @@
   inset: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
   background: #050d14;
 }
 
@@ -41,8 +44,21 @@
   position: relative;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
-  background: #050d14;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    radial-gradient(
+      circle at 18% 18%,
+      rgba(255, 114, 64, 0.32),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at 84% 18%,
+      rgba(16, 196, 182, 0.22),
+      transparent 30%
+    ),
+    #040b11;
 }
 
 .watch-player-tile > video,
@@ -50,6 +66,15 @@
 .watch-player-tile > .placeholder {
   width: 100%;
   height: 100%;
+}
+
+.watch-player-tile > .placeholder {
+  background: transparent;
+}
+
+.watch-player-tile.is-loading-first-frame > .player-webrtc,
+.watch-player-tile.is-loading-first-frame > .player-moq {
+  opacity: 0;
 }
 
 #playerMount.watch-player-mount.is-cohost .player-webrtc,
@@ -520,6 +545,35 @@
   stroke: currentColor;
   fill: none;
   stroke-width: 1.8;
+}
+
+.watch-host-profile-location {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(235, 244, 251, 0.58);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watch-host-profile-location:not(:disabled) {
+  cursor: pointer;
+}
+
+.watch-host-profile-location:not(:disabled):hover,
+.watch-host-profile-location:not(:disabled):focus-visible {
+  color: rgba(235, 244, 251, 0.82);
+}
+
+.watch-host-profile-location:disabled {
+  cursor: default;
 }
 
 .watch-host-profile-copy {

@@ -113,7 +113,7 @@ export function usePlayerSession({
   log,
   audioPlaybackSupported,
 }) {
-  const [playerStatus, setPlayerStatus] = useState("等待开始。");
+  const [playerStatus, setPlayerStatus] = useState("");
   const [playerStatusKind, setPlayerStatusKind] = useState("idle");
   const [fullscreenActive, setFullscreenActive] = useState(false);
   const [playerPaused, setPlayerPaused] = useState(false);
@@ -424,7 +424,7 @@ export function usePlayerSession({
       const token = ++playbackTokenRef.current;
       await stopPlayer({
         token,
-        finalStatus: "等待开始。",
+        finalStatus: "",
         finalKind: "idle",
         logMessage: "reset player before restart",
       });
@@ -1161,7 +1161,7 @@ export function usePlayerSession({
       } else if (broadcastStatus === "loading") {
         updatePlayerStatus("connecting", "正在加载 catalog。");
       } else if (broadcastStatus === "offline") {
-        updatePlayerStatus("offair", "直播暂未开始。");
+        updatePlayerStatus("offair", "");
         logRef.current?.("未开播：catalog unavailable");
       }
     };

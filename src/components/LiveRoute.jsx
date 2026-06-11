@@ -415,6 +415,8 @@ export function LiveRoute({
   const [locationSharingEnabled, setLocationSharingEnabled] = useState(() => readStoredBoolean(locationSharingStorageKey));
   const [locationSharingPending, setLocationSharingPending] = useState(false);
   const [cohostRecentHosts, setCohostRecentHosts] = useState(() => readStoredCohostRecents(cohostRecentsStorageKey));
+  const locationUploadRequestRef = useRef(0);
+  const liveLocationUploadKeyRef = useRef("");
   const locationSharingSupported =
     typeof navigator !== "undefined"
     && Boolean(navigator.geolocation)
@@ -554,6 +556,41 @@ export function LiveRoute({
     publishProtocol,
     webRtcUrl,
   });
+
+  useEffect(() => {
+    if (!liveStreamActive || !liveRoom) {
+      liveLocationUploadKeyRef.current = "";
+    }
+  }, [liveRoom, liveStreamActive]);
+
+  useEffect(() => {
+    const uploadKey = getLiveLocationUploadKey();
+    if (
+      !locationSharingEnabled
+      || !locationSharingSupported
+      || !liveStreamActive
+      || !liveChat.streamState.isLive
+      || !liveChat.canControlBroadcast
+      || !uploadKey
+    ) {
+      return;
+    }
+
+    if (liveLocationUploadKeyRef.current === uploadKey) {
+      return;
+    }
+
+    liveLocationUploadKeyRef.current = uploadKey;
+    void uploadCurrentRoomLocation({ uploadKey, disableOnFailure: true });
+  }, [
+    liveChat.canControlBroadcast,
+    liveChat.streamState.isLive,
+    liveChat.streamState.startedAt,
+    liveRoom,
+    liveStreamActive,
+    locationSharingEnabled,
+    locationSharingSupported,
+  ]);
 
   async function shareLiveRoom() {
     if (!liveWatchLink) {
@@ -713,30 +750,38 @@ export function LiveRoute({
     writeStoredBoolean(commentSpeechStorageKey, enabled);
   }
 
-  async function changeLocationSharingEnabled(nextEnabled) {
-    const enabled = Boolean(nextEnabled);
+  function getLiveLocationUploadKey() {
+    if (!liveRoom || !liveChat.streamState.isLive) {
+      return "";
+    }
+    return `${liveRoom}:${liveChat.streamState.startedAt || "live"}`;
+  }
+
+  function sendRoomLocationDisabled() {
+    const sent = liveChat.sendEvent({
+      type: "room.location.updated",
+      location: { enabled: false },
+    });
+    if (!sent) {
+      log("room location disable skipped: chat channel unavailable");
+    }
+    return sent;
+  }
+
+  async function uploadCurrentRoomLocation({ uploadKey = "", disableOnFailure = false } = {}) {
     if (!locationSharingSupported) {
-      setLocationSharingEnabled(false);
-      writeStoredBoolean(locationSharingStorageKey, false);
-      return;
+      return false;
     }
 
-    if (!enabled) {
-      setLocationSharingEnabled(false);
-      writeStoredBoolean(locationSharingStorageKey, false);
-      const sent = liveChat.sendEvent({
-        type: "room.location.updated",
-        location: { enabled: false },
-      });
-      if (!sent) {
-        log("room location disable skipped: chat channel unavailable");
-      }
-      return;
-    }
-
+    const requestId = locationUploadRequestRef.current + 1;
+    locationUploadRequestRef.current = requestId;
     setLocationSharingPending(true);
     try {
       const position = await getCurrentPosition();
+      if (locationUploadRequestRef.current !== requestId) {
+        return false;
+      }
+
       const sent = liveChat.sendEvent({
         type: "room.location.updated",
         location: {
@@ -749,19 +794,56 @@ export function LiveRoute({
       });
       if (!sent) {
         log("room location update skipped: chat channel unavailable");
-        setLocationSharingEnabled(false);
-        writeStoredBoolean(locationSharingStorageKey, false);
-        return;
+        if (disableOnFailure) {
+          setLocationSharingEnabled(false);
+          writeStoredBoolean(locationSharingStorageKey, false);
+        }
+        return false;
       }
-      setLocationSharingEnabled(true);
-      writeStoredBoolean(locationSharingStorageKey, true);
+
+      if (uploadKey) {
+        liveLocationUploadKeyRef.current = uploadKey;
+      }
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       log(`room location update failed: ${message}`);
+      if (disableOnFailure) {
+        setLocationSharingEnabled(false);
+        writeStoredBoolean(locationSharingStorageKey, false);
+      }
+      return false;
+    } finally {
+      if (locationUploadRequestRef.current === requestId) {
+        setLocationSharingPending(false);
+      }
+    }
+  }
+
+  async function changeLocationSharingEnabled(nextEnabled) {
+    const enabled = Boolean(nextEnabled);
+    if (!locationSharingSupported) {
       setLocationSharingEnabled(false);
       writeStoredBoolean(locationSharingStorageKey, false);
-    } finally {
+      return;
+    }
+
+    if (!enabled) {
+      locationUploadRequestRef.current += 1;
+      liveLocationUploadKeyRef.current = "";
       setLocationSharingPending(false);
+      setLocationSharingEnabled(false);
+      writeStoredBoolean(locationSharingStorageKey, false);
+      sendRoomLocationDisabled();
+      return;
+    }
+
+    setLocationSharingEnabled(true);
+    writeStoredBoolean(locationSharingStorageKey, true);
+    const uploadKey = getLiveLocationUploadKey();
+    if (liveStreamActive && liveChat.streamState.isLive && uploadKey) {
+      liveLocationUploadKeyRef.current = uploadKey;
+      await uploadCurrentRoomLocation({ uploadKey, disableOnFailure: true });
     }
   }
 

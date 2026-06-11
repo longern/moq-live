@@ -8,6 +8,8 @@ const DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE = "Exceeded allowed rows writ
 const STREAM_PROTOCOL_MOQ = "moq";
 const STREAM_PROTOCOL_WEBRTC = "webrtc";
 const COHOST_INVITE_TTL_MS = 60_000;
+const BIG_DATA_CLOUD_REVERSE_GEOCODE_URL = "https://api-bdc.net/data/reverse-geocode-client";
+const BIG_DATA_CLOUD_TIMEOUT_MS = 3_000;
 
 export class ChatRoomDO {
   constructor(ctx, env) {
@@ -38,6 +40,7 @@ export class ChatRoomDO {
         ok: true,
         stream: this.roomState.stream,
         roomMeta: this.roomState.roomMeta,
+        location: getPublicRoomLocation(this.roomState.location),
         cohost: this.roomState.cohost
       });
     }
@@ -52,6 +55,10 @@ export class ChatRoomDO {
 
     if (request.method === "POST" && url.pathname.endsWith("/cohost/active")) {
       return await this.handleCohostActiveUpdate(request);
+    }
+
+    if (request.method === "POST" && url.pathname.endsWith("/location/distance")) {
+      return await this.handleLocationDistance(request);
     }
 
     if (!url.pathname.endsWith("/ws")) {
@@ -97,6 +104,7 @@ export class ChatRoomDO {
       messages: this.recentMessages,
       stream: this.roomState.stream,
       roomMeta: this.roomState.roomMeta,
+      location: getPublicRoomLocation(this.roomState.location),
       cohost: this.roomState.cohost
     });
     this.broadcastPresence();
@@ -418,6 +426,7 @@ export class ChatRoomDO {
     const nextRoomState = {
       ...this.roomState,
       stream: nextStream,
+      location: getDefaultRoomLocation(),
       cohost: {
         ...this.roomState.cohost,
         invitesAllowed: true,
@@ -432,6 +441,10 @@ export class ChatRoomDO {
     this.broadcast({
       type: "stream.started",
       stream: nextStream
+    });
+    this.broadcast({
+      type: "room.location.updated",
+      location: getPublicRoomLocation(nextRoomState.location)
     });
     this.broadcast({
       type: "cohost.invites.changed",
@@ -457,6 +470,7 @@ export class ChatRoomDO {
     const nextRoomState = {
       ...this.roomState,
       stream: getDefaultRoomState().stream,
+      location: getDefaultRoomLocation(),
       cohost: {
         ...this.roomState.cohost,
         active: null
@@ -470,6 +484,10 @@ export class ChatRoomDO {
     this.broadcast({
       type: "stream.stopped",
       stream: this.roomState.stream
+    });
+    this.broadcast({
+      type: "room.location.updated",
+      location: getPublicRoomLocation(this.roomState.location)
     });
     this.broadcast({
       type: "cohost.active.changed",
@@ -518,7 +536,19 @@ export class ChatRoomDO {
       return;
     }
 
-    const nextLocation = normalizeRoomLocation(payload.location);
+    let nextLocation = normalizeRoomLocationInput(payload.location);
+    if (nextLocation.enabled) {
+      nextLocation = applyStoredRoomLocationResolution(nextLocation, this.roomState.location);
+      if (this.roomState.stream.isLive && !nextLocation.geocodingAttempted) {
+        const resolvedAt = new Date().toISOString();
+        nextLocation = {
+          ...nextLocation,
+          province: await reverseGeocodeProvince(nextLocation.latitude, nextLocation.longitude),
+          provinceResolvedAt: resolvedAt,
+          geocodingAttempted: true
+        };
+      }
+    }
     if (areRoomLocationsEqual(this.roomState.location, nextLocation)) {
       return;
     }
@@ -532,6 +562,38 @@ export class ChatRoomDO {
       return;
     }
     this.roomState = nextRoomState;
+    this.broadcast({
+      type: "room.location.updated",
+      location: getPublicRoomLocation(nextLocation)
+    });
+  }
+
+  async handleLocationDistance(request) {
+    const hostLocation = normalizeRoomLocation(this.roomState.location);
+    if (!hostLocation.enabled) {
+      return json({ ok: false, error: "Location unavailable", code: "location_unavailable" }, { status: 404 });
+    }
+
+    const payload = await request.json().catch(() => null);
+    const viewerLatitude = sanitizeCoordinate(payload?.latitude, -90, 90);
+    const viewerLongitude = sanitizeCoordinate(payload?.longitude, -180, 180);
+    if (viewerLatitude === null || viewerLongitude === null) {
+      return json({ ok: false, error: "Invalid location", code: "invalid_location" }, { status: 400 });
+    }
+
+    const distanceMeters = calculateDistanceMeters({
+      latitude: hostLocation.latitude,
+      longitude: hostLocation.longitude
+    }, {
+      latitude: viewerLatitude,
+      longitude: viewerLongitude
+    });
+
+    return json({
+      ok: true,
+      distanceMeters,
+      distanceText: formatDistanceText(distanceMeters)
+    });
   }
 
   async handleCohostInvitesAllowed(ws, session, payload) {
@@ -788,7 +850,10 @@ function getDefaultRoomLocation() {
     latitude: null,
     longitude: null,
     accuracy: null,
-    updatedAt: null
+    updatedAt: null,
+    province: "",
+    provinceResolvedAt: null,
+    geocodingAttempted: false
   };
 }
 
@@ -808,7 +873,44 @@ function normalizeRoomLocation(location) {
     latitude,
     longitude,
     accuracy: sanitizeAccuracy(location.accuracy),
-    updatedAt: sanitizeIsoTimestamp(location.updatedAt) ?? new Date().toISOString()
+    updatedAt: sanitizeIsoTimestamp(location.updatedAt) ?? new Date().toISOString(),
+    province: sanitizeLocationProvince(location.province),
+    provinceResolvedAt: sanitizeIsoTimestamp(location.provinceResolvedAt),
+    geocodingAttempted: location.geocodingAttempted === true
+  };
+}
+
+function normalizeRoomLocationInput(location) {
+  const normalized = normalizeRoomLocation(location);
+  return normalized.enabled
+    ? {
+        ...normalized,
+        province: "",
+        provinceResolvedAt: null,
+        geocodingAttempted: false
+      }
+    : normalized;
+}
+
+function applyStoredRoomLocationResolution(nextLocation, currentLocation) {
+  if (!nextLocation.enabled || !currentLocation?.enabled || currentLocation.geocodingAttempted !== true) {
+    return nextLocation;
+  }
+
+  return {
+    ...nextLocation,
+    province: sanitizeLocationProvince(currentLocation.province),
+    provinceResolvedAt: sanitizeIsoTimestamp(currentLocation.provinceResolvedAt),
+    geocodingAttempted: true
+  };
+}
+
+function getPublicRoomLocation(location) {
+  const normalized = normalizeRoomLocation(location);
+  return {
+    hasLocation: normalized.enabled,
+    province: normalized.enabled ? normalized.province : "",
+    updatedAt: normalized.enabled ? normalized.updatedAt : null
   };
 }
 
@@ -1029,6 +1131,84 @@ function sanitizeAccuracy(value) {
   return Math.round(number);
 }
 
+function sanitizeLocationProvince(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
+}
+
+function calculateDistanceMeters(left, right) {
+  const earthRadiusMeters = 6_371_000;
+  const leftLatitude = toRadians(left.latitude);
+  const rightLatitude = toRadians(right.latitude);
+  const deltaLatitude = toRadians(right.latitude - left.latitude);
+  const deltaLongitude = toRadians(right.longitude - left.longitude);
+  const sinLatitude = Math.sin(deltaLatitude / 2);
+  const sinLongitude = Math.sin(deltaLongitude / 2);
+  const rawValue = sinLatitude * sinLatitude
+    + Math.cos(leftLatitude) * Math.cos(rightLatitude) * sinLongitude * sinLongitude;
+  const value = Math.min(1, Math.max(0, rawValue));
+  return Math.max(0, Math.round(earthRadiusMeters * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))));
+}
+
+function toRadians(value) {
+  return value * Math.PI / 180;
+}
+
+function formatDistanceText(distanceMeters) {
+  if (!Number.isFinite(distanceMeters)) {
+    return "";
+  }
+
+  if (distanceMeters < 100) {
+    return "<100 m";
+  }
+
+  if (distanceMeters < 1_000) {
+    return `${Math.round(distanceMeters / 10) * 10} m`;
+  }
+
+  if (distanceMeters < 100_000) {
+    const kilometers = distanceMeters / 1_000;
+    return `${kilometers < 10 ? kilometers.toFixed(1) : Math.round(kilometers)} km`;
+  }
+
+  return `${Math.round(distanceMeters / 1_000)} km`;
+}
+
+async function reverseGeocodeProvince(latitude, longitude) {
+  const url = new URL(BIG_DATA_CLOUD_REVERSE_GEOCODE_URL);
+  url.searchParams.set("latitude", String(latitude));
+  url.searchParams.set("longitude", String(longitude));
+  url.searchParams.set("localityLanguage", "zh");
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, BIG_DATA_CLOUD_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: { accept: "application/json" },
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      return "";
+    }
+
+    const payload = await response.json().catch(() => null);
+    return sanitizeLocationProvince(
+      payload?.principalSubdivision
+        || payload?.locality
+        || payload?.countryName
+        || ""
+    );
+  } catch (error) {
+    console.warn("BigDataCloud reverse geocode failed", error instanceof Error ? error.message : String(error));
+    return "";
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function areRoomMetaEqual(left, right) {
   return (
     String(left?.title ?? "") === String(right?.title ?? "") &&
@@ -1045,7 +1225,10 @@ function areRoomLocationsEqual(left, right) {
     Number(left?.latitude) === Number(right?.latitude) &&
     Number(left?.longitude) === Number(right?.longitude) &&
     Number(left?.accuracy) === Number(right?.accuracy) &&
-    String(left?.updatedAt ?? "") === String(right?.updatedAt ?? "")
+    String(left?.updatedAt ?? "") === String(right?.updatedAt ?? "") &&
+    String(left?.province ?? "") === String(right?.province ?? "") &&
+    String(left?.provinceResolvedAt ?? "") === String(right?.provinceResolvedAt ?? "") &&
+    Boolean(left?.geocodingAttempted) === Boolean(right?.geocodingAttempted)
   );
 }
 

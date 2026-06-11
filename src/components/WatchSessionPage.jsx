@@ -32,6 +32,7 @@ import {
 } from "../lib/mediaLayout.js";
 import { buildWatchShareImage } from "../lib/shareImage.js";
 import { STREAM_PROTOCOL_WEBRTC } from "../lib/streamProtocol.js";
+import { getWatchStageView } from "../lib/watchStageView.js";
 import { usePortraitViewport } from "../hooks/useMediaQuery.js";
 
 const WatchTestCanvas = import.meta.env.DEV
@@ -39,6 +40,30 @@ const WatchTestCanvas = import.meta.env.DEV
   : null;
 
 const IMAGE_SHARE_EXIT_MS = 180;
+
+function getViewerPosition() {
+  if (
+    typeof navigator === "undefined"
+    || !navigator.geolocation
+    || typeof navigator.geolocation.getCurrentPosition !== "function"
+  ) {
+    return Promise.reject(new Error("geolocation unavailable"));
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: false,
+      maximumAge: 60_000,
+      timeout: 10_000,
+    });
+  });
+}
+
+function buildLocationLabel(province, distanceText) {
+  const normalizedProvince = province === "未知" ? "" : province;
+  const nextProvince = normalizedProvince || "位置未知";
+  return distanceText ? `${nextProvince} · 距你 ${distanceText}` : nextProvince;
+}
 
 export function WatchSessionPage({
   hidden,
@@ -50,6 +75,9 @@ export function WatchSessionPage({
   hostHandle,
   hostDisplayName,
   hostAvatarUrl,
+  hostLocationProvince = "位置未知",
+  hostLocationAvailable = false,
+  hostLocationUpdatedAt = "",
   hostFollowerCount = 0,
   hostFollowingCount = 0,
   hostIcon,
@@ -64,7 +92,8 @@ export function WatchSessionPage({
   stageMessage,
   chatRoom,
   chatRoomLabel,
-  playerStatus,
+  playerStatusMessage,
+  playerStatusKind = "idle",
   playerBadge,
   fullscreenActive,
   playerPaused,
@@ -116,6 +145,9 @@ export function WatchSessionPage({
   const [imageShareClosing, setImageShareClosing] = useState(false);
   const [shareImageUrl, setShareImageUrl] = useState("");
   const [shareImageLoading, setShareImageLoading] = useState(false);
+  const [hostDistanceText, setHostDistanceText] = useState("");
+  const [hostDistancePending, setHostDistancePending] = useState(false);
+  const [viewerLocationPermission, setViewerLocationPermission] = useState("checking");
   const [shareMenuMounted, setShareMenuMounted] = useState(false);
   const [shareMenuVisible, setShareMenuVisible] = useState(false);
   const [shareMenuPosition, setShareMenuPosition] = useState({ left: 0, top: 0 });
@@ -130,6 +162,8 @@ export function WatchSessionPage({
   const pipVideoRef = useRef(null);
   const pipVideoStreamRef = useRef(null);
   const toastTimerRef = useRef(null);
+  const hostDistanceRequestRef = useRef(0);
+  const hostDistanceAutoKeyRef = useRef("");
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const portraitViewport = usePortraitViewport();
   const portraitMedia = isPortraitMedia(playerOrientation);
@@ -143,11 +177,22 @@ export function WatchSessionPage({
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
   const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
   const imageShareReady = Boolean(shareImageUrl && !shareImageLoading);
-  const showHostFollowButton = Boolean(hostUserId && authUser?.id !== hostUserId);
-  const showInitialPlaybackSpinner = Boolean(
-    !playerStarted && playerBadge.state === "warm"
+  const hostLocationText = buildLocationLabel(hostLocationProvince, hostDistanceText);
+  const hostLocationClickable = Boolean(
+    viewerLocationPermission !== "granted"
+    && viewerLocationPermission !== "checking"
   );
+  const showHostFollowButton = Boolean(hostUserId && authUser?.id !== hostUserId);
   const showCohostLayout = Boolean(cohostActive && (cohostPlayerSession || cohostPlayerBadge.state === "warm"));
+  const stageView = getWatchStageView({
+    playerSession,
+    playerStarted,
+    playerStatusMessage,
+    playerStatusKind,
+    playerBadgeState: playerBadge.state,
+    stageLoading,
+    stageMessage,
+  });
 
   function clearHideTimer() {
     if (hideTimerRef.current) {
@@ -200,6 +245,66 @@ export function WatchSessionPage({
     restoreVideoPictureInPicture();
   }, []);
 
+  useEffect(() => {
+    hostDistanceRequestRef.current += 1;
+    hostDistanceAutoKeyRef.current = "";
+    setHostDistanceText("");
+    setHostDistancePending(false);
+    setViewerLocationPermission("checking");
+  }, [chatRoom, hostLocationAvailable, hostLocationUpdatedAt]);
+
+  useEffect(() => {
+    if (!hostProfileOpen) {
+      return undefined;
+    }
+
+    if (
+      typeof navigator === "undefined"
+      || !navigator.permissions
+      || typeof navigator.permissions.query !== "function"
+    ) {
+      setViewerLocationPermission("prompt");
+      return undefined;
+    }
+
+    let cancelled = false;
+    void navigator.permissions.query({ name: "geolocation" }).then((permissionStatus) => {
+      if (cancelled) {
+        return;
+      }
+
+      const syncPermission = () => {
+        setViewerLocationPermission(permissionStatus.state);
+      };
+      syncPermission();
+      permissionStatus.onchange = syncPermission;
+
+      if (permissionStatus.state !== "granted") {
+        return;
+      }
+
+      if (!hostLocationAvailable || !chatRoom) {
+        return;
+      }
+
+      const locationKey = `${chatRoom}:${hostLocationUpdatedAt || "location"}`;
+      if (hostDistanceAutoKeyRef.current === locationKey) {
+        return;
+      }
+
+      hostDistanceAutoKeyRef.current = locationKey;
+      void requestHostDistance({ userInitiated: false });
+    }).catch(() => {
+      if (!cancelled) {
+        setViewerLocationPermission("prompt");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chatRoom, hostLocationAvailable, hostLocationUpdatedAt, hostProfileOpen]);
+
   function showToast(message) {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
@@ -209,6 +314,62 @@ export function WatchSessionPage({
       setToastMessage("");
       toastTimerRef.current = null;
     }, 1600);
+  }
+
+  async function requestHostDistance({ userInitiated = false } = {}) {
+    if (!hostLocationAvailable || !chatRoom) {
+      if (userInitiated) {
+        showToast("主播位置未知");
+      }
+      return false;
+    }
+
+    const requestId = hostDistanceRequestRef.current + 1;
+    hostDistanceRequestRef.current = requestId;
+    setHostDistancePending(true);
+    try {
+      const position = await getViewerPosition();
+      if (hostDistanceRequestRef.current !== requestId) {
+        return false;
+      }
+
+      const response = await fetch(`/api/chat/${encodeURIComponent(chatRoom)}/location/distance`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) {
+        if (payload.code === "location_unavailable") {
+          setHostDistanceText("");
+          if (userInitiated) {
+            showToast("主播位置未知");
+          }
+          return false;
+        }
+        throw new Error(payload.error || payload.code || "location distance failed");
+      }
+
+      setHostDistanceText(String(payload.distanceText || "").trim());
+      return true;
+    } catch (error) {
+      if (userInitiated) {
+        showToast("无法获取你的位置");
+      }
+      return false;
+    } finally {
+      if (hostDistanceRequestRef.current === requestId) {
+        setHostDistancePending(false);
+      }
+    }
+  }
+
+  async function handleHostLocationClick() {
+    await requestHostDistance({ userInitiated: true });
   }
 
   async function writeClipboardText(text) {
@@ -836,7 +997,7 @@ export function WatchSessionPage({
             onClick={handleStageClick}
           >
             <div id="playerMount" className={showCohostLayout ? "watch-player-mount is-cohost" : "watch-player-mount"}>
-              <div className="watch-player-tile">
+              <div className={`watch-player-tile${stageView.showInitialPlaybackSpinner ? " is-loading-first-frame" : ""}`}>
                 {playerSession && testPlayback && WatchTestCanvas ? (
                   <Suspense fallback={null}>
                     <WatchTestCanvas
@@ -866,13 +1027,18 @@ export function WatchSessionPage({
                   )
                 ) : (
                   <div className="placeholder">
-                    {stageLoading ? (
+                    {stageView.placeholderLoading ? (
                       <LoadingSpinner className="stage-loading-spinner" />
-                    ) : (
-                      <p>{stageMessage}</p>
-                    )}
+                    ) : stageView.placeholderMessage ? (
+                      <p>{stageView.placeholderMessage}</p>
+                    ) : null}
                   </div>
                 )}
+                {stageView.showInitialPlaybackSpinner ? (
+                  <div className="placeholder stage-first-frame-loading" aria-hidden="true">
+                    <LoadingSpinner className="stage-loading-spinner" />
+                  </div>
+                ) : null}
                 {showCohostLayout ? <span className="watch-player-label">{hostDisplayName || hostChipLabel}</span> : null}
               </div>
               {showCohostLayout ? (
@@ -917,14 +1083,9 @@ export function WatchSessionPage({
                 aria-hidden="true"
               />
             ) : null}
-            {showInitialPlaybackSpinner ? (
-              <div className="placeholder stage-first-frame-loading" aria-hidden="true">
-                <LoadingSpinner className="stage-loading-spinner" />
-              </div>
-            ) : null}
-            {playerBadge.state === "error" ? (
-              <div className="stage-error">
-                <p>{playerStatus}</p>
+            {stageView.statusOverlayKind ? (
+              <div className={`stage-error${stageView.statusOverlayKind === "status" ? " stage-status-overlay" : ""}`}>
+                <p>{stageView.statusOverlayMessage}</p>
               </div>
             ) : null}
             {showTapToUnmute && playerSession && playerBadge.state !== "error" ? (
@@ -970,7 +1131,7 @@ export function WatchSessionPage({
                 />
               </div>
             ) : null}
-            {playerBadge.state !== "error" && !immersivePortrait ? (
+            {stageView.showPlaybackControls && !immersivePortrait ? (
               <div className={`stage-controls${controlsVisible ? " is-visible" : ""}`}>
                 <div className="stage-controls-fade" />
                 <button
@@ -1106,6 +1267,10 @@ export function WatchSessionPage({
         hostAvatarUrl={hostAvatarUrl}
         hostChipLabel={hostChipLabel}
         hostDisplayName={hostDisplayName}
+        hostLocationText={hostLocationText}
+        hostLocationClickable={hostLocationClickable}
+        hostLocationPending={hostDistancePending}
+        onHostLocationClick={handleHostLocationClick}
         hostHandle={hostHandle}
         roomLabel={roomLabel}
         hostFollowerCountText={hostFollowerCountText}

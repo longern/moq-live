@@ -162,6 +162,8 @@ function MorePanel({
   onShare,
   shareSupported,
   watchLink,
+  mutedUsers,
+  onUnmuteUser,
   onClose,
 }) {
   return (
@@ -192,6 +194,8 @@ function MorePanel({
       onShare={onShare}
       shareSupported={shareSupported}
       watchLink={watchLink}
+      mutedUsers={mutedUsers}
+      onUnmuteUser={onUnmuteUser}
       onClose={onClose}
     />
   );
@@ -281,6 +285,7 @@ export function LiveDesktopPage({
     error: chatError,
     recovering: chatRecovering = false,
     canRetractMessages = false,
+    mutedUsers = [],
   } = chat;
   const {
     available: authAvailable,
@@ -303,7 +308,9 @@ export function LiveDesktopPage({
     onStopScreenShare,
     onChatDraftChange,
     onChatSend,
+    onChatMessageMute,
     onChatMessageRetract,
+    onChatUserUnmute,
     onChatRequireLogin,
     onSaveRoomTitle,
     onSaveRoomWelcomeMessage,
@@ -456,6 +463,8 @@ export function LiveDesktopPage({
       onShare={onShare}
       shareSupported={shareSupported}
       watchLink={watchLink}
+      mutedUsers={mutedUsers}
+      onUnmuteUser={onChatUserUnmute}
       onClose={() => setOpenPanel("")}
     />
   ) : null;
@@ -647,6 +656,7 @@ export function LiveDesktopPage({
             chatError={chatError}
             chatRecovering={chatRecovering}
             canRetractMessages={canRetractMessages}
+            onMuteMessage={onChatMessageMute}
             onRetractMessage={onChatMessageRetract}
             title="评论"
             showWelcome={false}

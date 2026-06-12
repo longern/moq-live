@@ -944,6 +944,113 @@
   line-height: 1;
 }
 
+.live-more-management {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.live-more-management-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.live-more-management-title {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.live-more-muted-list {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.live-more-muted-row {
+  min-height: 62px;
+  padding: 9px 10px 9px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.live-more-muted-row:last-child {
+  border-bottom: 0;
+}
+
+.live-more-muted-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.live-more-muted-copy strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-more-muted-copy span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-more-muted-action {
+  min-height: 34px;
+  padding: 0 12px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(235, 244, 251, 0.94);
+  box-shadow: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.live-more-muted-action:hover,
+.live-more-muted-action:focus-visible {
+  background: rgba(255, 255, 255, 0.13);
+  transform: none;
+}
+
+.live-more-muted-action:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.live-more-muted-action:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.live-more-management-empty {
+  margin: 0;
+  padding: 18px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
 .live-switch {
   position: relative;
   width: 40px;

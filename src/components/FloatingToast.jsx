@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 const TOAST_EXIT_MS = 200;
+const TOAST_VISIBLE_MS = 1800;
+const ToastContext = createContext(null);
 
 export function FloatingToast({ children, className = "", closing = false }) {
   return (
@@ -47,5 +49,67 @@ export function FloatingToastPresence({ children, className = "", exitMs = TOAST
     <FloatingToast className={className} closing={closing}>
       {renderedChildren}
     </FloatingToast>
+  );
+}
+
+export function ToastProvider({ children }) {
+  const [toastMessage, setToastMessage] = useState("");
+  const toastTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+  }, []);
+
+  const value = useMemo(() => ({
+    showToast(message, options = {}) {
+      const text = String(message || "");
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+      setToastMessage(text);
+      if (!text) {
+        return;
+      }
+      const durationMs = Number(options.durationMs) > 0 ? Number(options.durationMs) : TOAST_VISIBLE_MS;
+      toastTimerRef.current = window.setTimeout(() => {
+        setToastMessage("");
+        toastTimerRef.current = null;
+      }, durationMs);
+    },
+    clearToast() {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+      setToastMessage("");
+    },
+    toastMessage
+  }), [toastMessage]);
+
+  return (
+    <ToastContext.Provider value={value}>
+      {children}
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error("useToast must be used within ToastProvider");
+  }
+  return context;
+}
+
+export function ToastViewport({ className = "", message = "" }) {
+  const { toastMessage } = useToast();
+  return (
+    <FloatingToastPresence className={className}>
+      {message || toastMessage}
+    </FloatingToastPresence>
   );
 }

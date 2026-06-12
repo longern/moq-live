@@ -119,6 +119,7 @@ export function LiveMobilePage({
     error: chatError,
     recovering: chatRecovering = false,
     canRetractMessages = false,
+    mutedUsers = [],
   } = chat;
   const {
     available: authAvailable,
@@ -140,7 +141,9 @@ export function LiveMobilePage({
     onOpenScreenshotShare,
     onChatDraftChange,
     onChatSend,
+    onChatMessageMute,
     onChatMessageRetract,
+    onChatUserUnmute,
     onChatRequireLogin,
     onSaveRoomTitle,
     onSaveRoomWelcomeMessage,
@@ -161,7 +164,8 @@ export function LiveMobilePage({
   const publishControlActive = isPublishing || isStarting;
   const immersiveShell = shellMode === "immersive";
   const voiceMode = mediaMode === "voice";
-  const hasInlineChatComposer = false;
+  const splitChatPanel = !voiceMode && !immersiveShell;
+  const hasInlineChatComposer = splitChatPanel;
   const showChatDrawerEntry = !hasInlineChatComposer;
   const showPassiveChatPreview = showChatDrawerEntry;
   const showLiveHeader = isPublishing;
@@ -503,6 +507,7 @@ export function LiveMobilePage({
                   chatError={chatError}
                   chatRecovering={chatRecovering}
                   canRetractMessages={canRetractMessages}
+                  onMuteMessage={onChatMessageMute}
                   onRetractMessage={onChatMessageRetract}
                   variant="floating"
                   className="chat-panel-live-mobile"
@@ -615,6 +620,30 @@ export function LiveMobilePage({
           </div>
         </div>
 
+        {splitChatPanel ? (
+          <ChatPanel
+            authAvailable={authAvailable}
+            authLoading={authLoading}
+            authUser={authUser}
+            messages={chatMessages}
+            draft={chatDraft}
+            onDraftChange={onChatDraftChange}
+            onSend={onChatSend}
+            onRequireLogin={onChatRequireLogin}
+            connectionState={chatConnectionState}
+            onlineCount={chatOnlineCount}
+            readOnly={chatReadOnly}
+            chatError={chatError}
+            chatRecovering={chatRecovering}
+            canRetractMessages={canRetractMessages}
+            onMuteMessage={onChatMessageMute}
+            onRetractMessage={onChatMessageRetract}
+            title="评论"
+            showWelcome={false}
+            className="chat-panel-live-split"
+          />
+        ) : null}
+
         {showChatDrawerEntry ? (
           <SwipeableDrawer
             open={chatDrawerOpen}
@@ -638,6 +667,7 @@ export function LiveMobilePage({
               chatError={chatError}
               chatRecovering={chatRecovering}
               canRetractMessages={canRetractMessages}
+              onMuteMessage={onChatMessageMute}
               onRetractMessage={onChatMessageRetract}
               title="评论"
               showWelcome={false}
@@ -893,6 +923,8 @@ export function LiveMobilePage({
             onShare={onShare}
             shareSupported={shareSupported}
             watchLink={watchLink}
+            mutedUsers={mutedUsers}
+            onUnmuteUser={onChatUserUnmute}
             onClose={closeMoreSheet}
           />
         </SwipeableDrawer>

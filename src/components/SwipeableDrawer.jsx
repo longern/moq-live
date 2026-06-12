@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const DRAWER_EXIT_MS = 220;
 
@@ -8,6 +9,8 @@ export function SwipeableDrawer({
   ariaLabel = "关闭面板",
   className = "",
   panelClassName = "",
+  portal = false,
+  viewport = false,
   children,
 }) {
   const [mounted, setMounted] = useState(open);
@@ -165,18 +168,24 @@ export function SwipeableDrawer({
     "swipeable-drawer",
     visible ? "is-open" : "",
     dragging ? "is-dragging" : "",
+    viewport ? "is-viewport" : "",
     className,
   ].filter(Boolean).join(" ");
   const drawerPanelClassName = [
     "swipeable-drawer-panel",
     panelClassName,
   ].filter(Boolean).join(" ");
+  const backdropClassName = [
+    "swipeable-drawer-backdrop",
+    visible ? "is-open" : "",
+    viewport ? "is-viewport" : "",
+  ].filter(Boolean).join(" ");
 
-  return (
+  const drawer = (
     <>
       <button
         type="button"
-        className={`swipeable-drawer-backdrop${visible ? " is-open" : ""}`}
+        className={backdropClassName}
         aria-label={ariaLabel}
         onClick={onClose}
       />
@@ -197,4 +206,10 @@ export function SwipeableDrawer({
       </div>
     </>
   );
+
+  if (portal && typeof document !== "undefined") {
+    return createPortal(drawer, document.body);
+  }
+
+  return drawer;
 }

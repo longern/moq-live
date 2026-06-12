@@ -179,6 +179,30 @@ function normalizeCohostActive(value) {
   };
 }
 
+function normalizeChatMute(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const userId = String(value.userId ?? "").trim();
+  if (!userId) {
+    return null;
+  }
+  return {
+    userId,
+    displayName: String(value.displayName ?? "").trim(),
+    expiresAt: String(value.expiresAt ?? "").trim() || null,
+    untilStreamEnds: value.untilStreamEnds === true
+  };
+}
+
+function normalizeModerationState(value) {
+  return {
+    mutedUsers: Array.isArray(value?.mutedUsers)
+      ? value.mutedUsers.map(normalizeChatMute).filter(Boolean)
+      : []
+  };
+}
+
 function getReconnectDelayMs(attempt) {
   return RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
 }
@@ -206,6 +230,8 @@ export function useChatController({
   const [cohostInvite, setCohostInvite] = useState(null);
   const [cohostInviteResponse, setCohostInviteResponse] = useState(null);
   const [cohostActive, setCohostActive] = useState(null);
+  const [mutedUsers, setMutedUsers] = useState([]);
+  const [chatModerationEvent, setChatModerationEvent] = useState(null);
   const [recoveringFromPageLifecycle, setRecoveringFromPageLifecycle] = useState(false);
 
   const socketRef = useRef(null);
@@ -307,6 +333,7 @@ export function useChatController({
       setCohostInvite(null);
       setCohostInviteResponse(null);
       setCohostActive(null);
+      setMutedUsers([]);
       updatePageLifecycleRecovery(false);
       clearBroadcastControlRequests();
       reconnectAttemptRef.current = 0;
@@ -386,8 +413,15 @@ export function useChatController({
               : getDefaultCohostState().invitesAllowed
           );
           setCohostActive(normalizeCohostActive(payload.cohost?.active));
+          setMutedUsers(normalizeModerationState(payload.moderation).mutedUsers);
+          const chatMute = normalizeChatMute(payload.chatMute);
+          if (chatMute && role !== "broadcaster") {
+            setChatError(getChatErrorMessage({ code: "chat_muted", details: chatMute }));
+          }
           setRoomStateReady(true);
-          setChatError("");
+          if (!chatMute || role === "broadcaster") {
+            setChatError("");
+          }
           updatePageLifecycleRecovery(false);
           return;
         }
@@ -406,6 +440,7 @@ export function useChatController({
 
         if (payload.type === "broadcast.control.changed") {
           setCanControlBroadcast(Boolean(payload.canControlBroadcast));
+          setMutedUsers(normalizeModerationState(payload.moderation).mutedUsers);
           return;
         }
 
@@ -442,6 +477,38 @@ export function useChatController({
 
         if (payload.type === "message.retracted" && payload.messageId) {
           setMessages((current) => current.filter((message) => message.id !== payload.messageId));
+          return;
+        }
+
+        if (payload.type === "message.muted") {
+          const mute = normalizeChatMute(payload.mute);
+          if (mute) {
+            setMutedUsers(normalizeModerationState(payload.moderation).mutedUsers);
+            setChatModerationEvent({
+              id: String(payload.id || `mute-${Date.now()}`),
+              type: "message.muted",
+              mute
+            });
+            if (role !== "broadcaster") {
+              setChatError(getChatErrorMessage({ code: "chat_muted", details: mute }));
+            }
+          }
+          return;
+        }
+
+        if (payload.type === "message.unmuted") {
+          const userId = String(payload.userId || "").trim();
+          const mute = normalizeChatMute(payload.mute);
+          setMutedUsers(normalizeModerationState(payload.moderation).mutedUsers);
+          setChatModerationEvent({
+            id: String(payload.id || `unmute-${Date.now()}`),
+            type: "message.unmuted",
+            userId,
+            mute
+          });
+          if (role !== "broadcaster") {
+            setChatError("");
+          }
           return;
         }
 
@@ -651,6 +718,35 @@ export function useChatController({
     return true;
   }
 
+  function muteMessage(messageId, options = {}) {
+    const normalizedMessageId = String(messageId || "").trim();
+    if (!normalizedMessageId || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    socketRef.current.send(JSON.stringify({
+      type: "message.mute",
+      messageId: normalizedMessageId,
+      durationMs: Number(options.durationMs) || 0,
+      untilStreamEnds: options.untilStreamEnds === true,
+      retractMessage: options.retractMessage === true
+    }));
+    return true;
+  }
+
+  function unmuteUser(userId) {
+    const normalizedUserId = String(userId || "").trim();
+    if (!normalizedUserId || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    socketRef.current.send(JSON.stringify({
+      type: "message.unmute",
+      userId: normalizedUserId
+    }));
+    return true;
+  }
+
   function requestBroadcastControl() {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -742,10 +838,14 @@ export function useChatController({
     cohostInvite,
     cohostInviteResponse,
     cohostActive,
+    mutedUsers,
+    chatModerationEvent,
     recoveringFromPageLifecycle,
     sendMessage,
     sendEvent,
     retractMessage,
+    muteMessage,
+    unmuteUser,
     requestBroadcastControl,
     releaseBroadcastControl,
     setCohostInviteAllowed,

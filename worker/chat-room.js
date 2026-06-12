@@ -3,6 +3,7 @@ const MAX_RECENT_MESSAGES = 80;
 const MESSAGE_TTL_MS = 24 * 60 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 5_000;
 const RATE_LIMIT_MAX_MESSAGES = 4;
+const MAX_CHAT_MUTE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_ROOM_TITLE_LENGTH = 80;
 const DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE = "Exceeded allowed rows written in Durable Objects free tier.";
 const STREAM_PROTOCOL_MOQ = "moq";
@@ -105,7 +106,16 @@ export class ChatRoomDO {
       stream: this.roomState.stream,
       roomMeta: this.roomState.roomMeta,
       location: getPublicRoomLocation(this.roomState.location),
-      cohost: this.roomState.cohost
+      cohost: this.roomState.cohost,
+      moderation: getPublicModerationState(
+        this.roomState.moderation,
+        Date.now(),
+        this.roomState.stream.isLive,
+        canControlBroadcast
+      ),
+      chatMute: getPublicChatMute(
+        getActiveChatMute(this.roomState.moderation, user?.id, Date.now(), this.roomState.stream.isLive)
+      )
     });
     this.broadcastPresence();
 
@@ -139,6 +149,16 @@ export class ChatRoomDO {
 
     if (payload?.type === "message.retract") {
       await this.handleMessageRetract(ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "message.mute") {
+      await this.handleMessageMute(ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "message.unmute") {
+      await this.handleMessageUnmute(ws, session, payload);
       return;
     }
 
@@ -244,7 +264,13 @@ export class ChatRoomDO {
         entry.socket.serializeAttachment(nextSession);
         this.send(entry.socket, {
           type: "broadcast.control.changed",
-          canControlBroadcast
+          canControlBroadcast,
+          moderation: getPublicModerationState(
+            this.roomState.moderation,
+            Date.now(),
+            this.roomState.stream.isLive,
+            canControlBroadcast
+          )
         });
       }
     }
@@ -363,6 +389,20 @@ export class ChatRoomDO {
       return;
     }
 
+    const activeMute = getActiveChatMute(
+      this.roomState.moderation,
+      session.user.id,
+      Date.now(),
+      this.roomState.stream.isLive
+    );
+    if (activeMute) {
+      this.sendError(ws, "chat_muted", {
+        expiresAt: activeMute.expiresAt,
+        untilStreamEnds: activeMute.untilStreamEnds
+      });
+      return;
+    }
+
     const text = sanitizeMessage(payload.text);
     if (!text) {
       this.sendError(ws, "empty_message");
@@ -447,6 +487,148 @@ export class ChatRoomDO {
     });
   }
 
+  async handleMessageMute(ws, session, payload) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
+      this.sendError(ws, "forbidden_message_mute");
+      return;
+    }
+
+    const messageId = typeof payload.messageId === "string" ? payload.messageId.trim() : "";
+    if (!messageId) {
+      this.sendError(ws, "message_missing");
+      return;
+    }
+
+    const targetMessage = this.recentMessages.find((message) => message.id === messageId);
+    if (!targetMessage) {
+      this.sendError(ws, "message_missing");
+      return;
+    }
+
+    const targetUserId = String(targetMessage.user?.id || "").trim();
+    if (!targetUserId || targetUserId === session.user?.id) {
+      this.sendError(ws, "invalid_message_mute_target");
+      return;
+    }
+
+    const untilStreamEnds = payload.untilStreamEnds === true;
+    const durationMs = untilStreamEnds ? null : sanitizeMuteDurationMs(payload.durationMs);
+    if (!untilStreamEnds && durationMs === null) {
+      this.sendError(ws, "invalid_mute_duration");
+      return;
+    }
+
+    const now = Date.now();
+    const mutedAt = new Date(now).toISOString();
+    const mute = {
+      userId: targetUserId,
+      displayName: sanitizeMuteDisplayName(
+        targetMessage.user?.displayName || targetMessage.user?.email || "用户"
+      ),
+      mutedAt,
+      expiresAt: untilStreamEnds ? null : new Date(now + durationMs).toISOString(),
+      untilStreamEnds
+    };
+    const currentModeration = normalizeModerationState(this.roomState.moderation, now, this.roomState.stream.isLive);
+    const nextModeration = {
+      ...currentModeration,
+      mutedUsers: currentModeration.mutedUsers
+        .filter((entry) => entry.userId !== targetUserId)
+        .concat(mute)
+    };
+    const nextRoomState = {
+      ...this.roomState,
+      moderation: nextModeration
+    };
+    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    if (!persisted) {
+      return;
+    }
+    this.roomState = nextRoomState;
+
+    if (payload.retractMessage === true) {
+      const nextMessages = this.recentMessages.filter((message) => message.id !== messageId);
+      if (nextMessages.length !== this.recentMessages.length) {
+        const messagesPersisted = await this.persistStorageOrNotify(ws, "recentMessages", nextMessages);
+        if (!messagesPersisted) {
+          return;
+        }
+        this.recentMessages = nextMessages;
+        this.broadcast({
+          type: "message.retracted",
+          messageId
+        });
+      }
+    }
+
+    this.sendModerationEvent({
+      type: "message.muted",
+      id: `mute-${Date.now().toString(36)}-${crypto.randomUUID()}`,
+      mute: getPublicChatMute(mute),
+      moderation: getPublicModerationState(this.roomState.moderation, Date.now(), this.roomState.stream.isLive, true)
+    });
+  }
+
+  async handleMessageUnmute(ws, session, payload) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
+      this.sendError(ws, "forbidden_message_mute");
+      return;
+    }
+
+    const targetUserId = String(payload.userId || "").trim();
+    if (!targetUserId) {
+      this.sendError(ws, "invalid_message_mute_target");
+      return;
+    }
+
+    const currentModeration = normalizeModerationState(this.roomState.moderation, Date.now(), this.roomState.stream.isLive);
+    const removedMute = currentModeration.mutedUsers.find((entry) => entry.userId === targetUserId) || null;
+    const nextMutedUsers = currentModeration.mutedUsers.filter((entry) => entry.userId !== targetUserId);
+    if (nextMutedUsers.length === currentModeration.mutedUsers.length) {
+      return;
+    }
+
+    const nextRoomState = {
+      ...this.roomState,
+      moderation: {
+        ...currentModeration,
+        mutedUsers: nextMutedUsers
+      }
+    };
+    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    if (!persisted) {
+      return;
+    }
+    this.roomState = nextRoomState;
+
+    this.sendModerationEvent({
+      type: "message.unmuted",
+      id: `unmute-${Date.now().toString(36)}-${crypto.randomUUID()}`,
+      userId: targetUserId,
+      mute: getPublicChatMute(removedMute),
+      moderation: getPublicModerationState(this.roomState.moderation, Date.now(), this.roomState.stream.isLive, true)
+    });
+  }
+
+  sendModerationEvent(payload) {
+    const targetUserId = String(payload?.mute?.userId || payload?.userId || "");
+    for (const socket of this.ctx.getWebSockets()) {
+      const session = normalizeAttachment(socket.deserializeAttachment());
+      const isController = session?.isRoomOwner && session.role === "broadcaster" && session.canControlBroadcast;
+      const isTarget = targetUserId && session?.user?.id === targetUserId;
+      if (!isController && !isTarget) {
+        continue;
+      }
+      if (isController) {
+        this.send(socket, payload);
+      } else {
+        const targetPayload = { ...payload };
+        delete targetPayload.moderation;
+        this.send(socket, targetPayload);
+      }
+    }
+  }
+
   async handleStreamStarted(ws, session, payload) {
     if (!session.isRoomOwner || !session.canControlBroadcast) {
       this.sendError(ws, "forbidden_stream_update");
@@ -515,7 +697,8 @@ export class ChatRoomDO {
       cohost: {
         ...this.roomState.cohost,
         active: null
-      }
+      },
+      moderation: clearStreamScopedMutes(this.roomState.moderation)
     };
     const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
     if (!persisted) {
@@ -921,7 +1104,8 @@ function getDefaultRoomState() {
       }
     },
     location: getDefaultRoomLocation(),
-    cohost: getDefaultCohostState()
+    cohost: getDefaultCohostState(),
+    moderation: getDefaultModerationState()
   };
 }
 
@@ -942,7 +1126,109 @@ function normalizeRoomState(roomState) {
       }
     },
     location: normalizeRoomLocation(roomState?.location),
-    cohost: normalizeCohostState(roomState?.cohost)
+    cohost: normalizeCohostState(roomState?.cohost),
+    moderation: normalizeModerationState(
+      roomState?.moderation,
+      Date.now(),
+      Boolean(roomState?.stream?.isLive)
+    )
+  };
+}
+
+function getDefaultModerationState() {
+  return {
+    mutedUsers: []
+  };
+}
+
+function normalizeModerationState(moderation, now = Date.now(), streamLive = false) {
+  const mutedUsers = Array.isArray(moderation?.mutedUsers)
+    ? moderation.mutedUsers
+      .map((entry) => normalizeChatMute(entry))
+      .filter((entry) => entry && isChatMuteActive(entry, now, streamLive))
+    : [];
+
+  return {
+    mutedUsers
+  };
+}
+
+function normalizeChatMute(entry) {
+  const userId = String(entry?.userId || "").trim();
+  if (!userId) {
+    return null;
+  }
+
+  const untilStreamEnds = entry?.untilStreamEnds === true;
+  const expiresAt = untilStreamEnds ? null : sanitizeIsoTimestamp(entry?.expiresAt);
+  if (!untilStreamEnds && !expiresAt) {
+    return null;
+  }
+
+  return {
+    userId,
+    displayName: sanitizeMuteDisplayName(entry?.displayName),
+    mutedAt: sanitizeIsoTimestamp(entry?.mutedAt) || new Date().toISOString(),
+    expiresAt,
+    untilStreamEnds
+  };
+}
+
+function getActiveChatMute(moderation, userId, now = Date.now(), streamLive = false) {
+  const normalizedUserId = String(userId || "").trim();
+  if (!normalizedUserId) {
+    return null;
+  }
+  const state = normalizeModerationState(moderation, now, streamLive);
+  return state.mutedUsers.find((entry) => entry.userId === normalizedUserId) || null;
+}
+
+function isChatMuteActive(mute, now = Date.now(), streamLive = false) {
+  if (!mute) {
+    return false;
+  }
+  if (mute.untilStreamEnds) {
+    return streamLive;
+  }
+  const expiresAt = Date.parse(mute.expiresAt);
+  return Number.isFinite(expiresAt) && expiresAt > now;
+}
+
+function getPublicChatMute(mute) {
+  if (!mute) {
+    return null;
+  }
+  return {
+    userId: mute.userId,
+    displayName: mute.displayName,
+    expiresAt: mute.expiresAt,
+    untilStreamEnds: mute.untilStreamEnds
+  };
+}
+
+function getPublicModerationState(moderation, now = Date.now(), streamLive = false, canView = false) {
+  if (!canView) {
+    return {
+      mutedUsers: []
+    };
+  }
+  const state = normalizeModerationState(moderation, now, streamLive);
+  return {
+    mutedUsers: state.mutedUsers
+      .map((entry) => getPublicChatMute(entry))
+      .filter(Boolean)
+      .sort((left, right) => {
+        const leftTime = left.untilStreamEnds ? Number.MAX_SAFE_INTEGER : Date.parse(left.expiresAt);
+        const rightTime = right.untilStreamEnds ? Number.MAX_SAFE_INTEGER : Date.parse(right.expiresAt);
+        return leftTime - rightTime || left.displayName.localeCompare(right.displayName, "zh-Hans-CN");
+      })
+  };
+}
+
+function clearStreamScopedMutes(moderation) {
+  const state = normalizeModerationState(moderation, Date.now(), true);
+  return {
+    mutedUsers: state.mutedUsers.filter((entry) => !entry.untilStreamEnds)
   };
 }
 
@@ -1249,6 +1535,22 @@ function sanitizeAccuracy(value) {
 
 function sanitizeLocationProvince(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
+}
+
+function sanitizeMuteDisplayName(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || "用户";
+}
+
+function sanitizeMuteDurationMs(value) {
+  const durationMs = Number(value);
+  if (!Number.isFinite(durationMs)) {
+    return null;
+  }
+  const normalized = Math.round(durationMs);
+  if (normalized < 60_000 || normalized > MAX_CHAT_MUTE_DURATION_MS) {
+    return null;
+  }
+  return normalized;
 }
 
 function calculateDistanceMeters(left, right) {

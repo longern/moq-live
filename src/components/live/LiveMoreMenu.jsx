@@ -3,6 +3,7 @@ import { getAppErrorMessage } from "../../lib/appErrors.js";
 import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
 import { LiveSwitch } from "./LiveSwitch.jsx";
 import {
+  AudienceIcon,
   ChatIcon,
   CoverIcon,
   LocationIcon,
@@ -61,6 +62,33 @@ function LiveMoreMenuSwitchItem({
   );
 }
 
+function padDatePart(value) {
+  return String(value).padStart(2, "0");
+}
+
+function formatMuteExpiresAt(value) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return "未知";
+  }
+  const date = new Date(timestamp);
+  return [
+    date.getFullYear(),
+    "-",
+    padDatePart(date.getMonth() + 1),
+    "-",
+    padDatePart(date.getDate()),
+    " ",
+    padDatePart(date.getHours()),
+    ":",
+    padDatePart(date.getMinutes()),
+  ].join("");
+}
+
+function getMuteExpiresLabel(mute) {
+  return mute?.untilStreamEnds ? "本场直播结束" : formatMuteExpiresAt(mute?.expiresAt);
+}
+
 export function LiveMoreMenu({
   roomCoverUrl,
   roomCoverBusy,
@@ -88,6 +116,8 @@ export function LiveMoreMenu({
   onShare,
   shareSupported,
   watchLink,
+  mutedUsers = [],
+  onUnmuteUser,
   onClose,
 }) {
   const [activeEditor, setActiveEditor] = useState("");
@@ -102,6 +132,7 @@ export function LiveMoreMenu({
   const coverBusy = roomCoverBusy || roomCoverLoading;
   const titleUnchanged = titleDraft.trim().replace(/\s+/g, " ") === (roomTitle || "").trim().replace(/\s+/g, " ");
   const welcomeUnchanged = welcomeDraft.trim().replace(/\s+/g, " ") === (roomWelcomeMessage || "").trim().replace(/\s+/g, " ");
+  const visibleMutedUsers = Array.isArray(mutedUsers) ? mutedUsers : [];
 
   useEffect(() => {
     setTitleDraft(roomTitle || "");
@@ -178,7 +209,9 @@ export function LiveMoreMenu({
     ? "直播封面"
     : activeEditor === "welcome"
       ? "欢迎语"
-      : "直播标题";
+      : activeEditor === "management"
+        ? "房间管理"
+        : "直播标题";
 
   function handleCommentSpeechToggle() {
     if (!commentSpeechSupported) {
@@ -237,6 +270,11 @@ export function LiveMoreMenu({
                 icon={<ChatIcon />}
                 label="欢迎语"
                 onClick={() => setActiveEditor("welcome")}
+              />
+              <LiveMoreMenuItem
+                icon={<AudienceIcon />}
+                label="房间管理"
+                onClick={() => setActiveEditor("management")}
               />
               <LiveMoreMenuSwitchItem
                 icon={<SpeakerIcon />}
@@ -305,6 +343,34 @@ export function LiveMoreMenu({
                 <p className="live-cover-note">建议固定为 1280×720，支持 JPG、PNG、WebP、AVIF，文件不超过 5MB。</p>
                 {roomCoverError ? <p className="inline-warning">{roomCoverError}</p> : null}
                 {roomCoverStatus ? <p className="status">{roomCoverStatus}</p> : null}
+              </div>
+            ) : activeEditor === "management" ? (
+              <div className="live-more-management">
+                <div className="live-more-management-section">
+                  <div className="live-more-management-title">禁言用户</div>
+                  {visibleMutedUsers.length ? (
+                    <ul className="live-more-muted-list" aria-label="被禁言的用户">
+                      {visibleMutedUsers.map((mute) => (
+                        <li key={mute.userId} className="live-more-muted-row">
+                          <span className="live-more-muted-copy">
+                            <strong>{mute.displayName || "用户"}</strong>
+                            <span>到期 {getMuteExpiresLabel(mute)}</span>
+                          </span>
+                          <button
+                            type="button"
+                            className="live-more-muted-action"
+                            onClick={() => onUnmuteUser?.(mute.userId)}
+                            disabled={!onUnmuteUser}
+                          >
+                            解除
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="live-more-management-empty">暂无被禁言用户</p>
+                  )}
+                </div>
               </div>
             ) : activeEditor === "welcome" ? (
               <form className="live-more-title-form" onSubmit={handleWelcomeSubmit}>

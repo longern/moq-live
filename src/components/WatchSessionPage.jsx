@@ -11,7 +11,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import { ChatPanel } from "./ChatPanel.jsx";
-import { FloatingToastPresence } from "./FloatingToast.jsx";
+import { ToastViewport, useToast } from "./FloatingToast.jsx";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { StatusPill } from "./StatusPill.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
@@ -155,7 +155,6 @@ export function WatchSessionPage({
   const [elementPipSupported, setElementPipSupported] = useState(false);
   const [videoPipSupported, setVideoPipSupported] = useState(false);
   const [pictureInPictureActive, setPictureInPictureActive] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
   const [imageShareMounted, setImageShareMounted] = useState(false);
   const [imageShareClosing, setImageShareClosing] = useState(false);
   const [shareImageUrl, setShareImageUrl] = useState("");
@@ -176,9 +175,9 @@ export function WatchSessionPage({
   const pipPlaceholderRef = useRef(null);
   const pipVideoRef = useRef(null);
   const pipVideoStreamRef = useRef(null);
-  const toastTimerRef = useRef(null);
   const hostDistanceRequestRef = useRef(0);
   const hostDistanceAutoKeyRef = useRef("");
+  const { showToast } = useToast();
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const portraitViewport = usePortraitViewport();
   const portraitMedia = isPortraitMedia(playerOrientation);
@@ -265,9 +264,6 @@ export function WatchSessionPage({
   }, []);
 
   useEffect(() => () => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
     if (shareCloseTimerRef.current) {
       clearTimeout(shareCloseTimerRef.current);
     }
@@ -340,17 +336,6 @@ export function WatchSessionPage({
       cancelled = true;
     };
   }, [chatRoom, hostDistanceAvailable, hostLocationAvailable, hostLocationUpdatedAt, hostProfileOpen]);
-
-  function showToast(message) {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    setToastMessage(message);
-    toastTimerRef.current = window.setTimeout(() => {
-      setToastMessage("");
-      toastTimerRef.current = null;
-    }, 1600);
-  }
 
   async function requestHostDistance({ userInitiated = false } = {}) {
     if (!hostLocationAvailable || !chatRoom) {
@@ -1349,7 +1334,7 @@ export function WatchSessionPage({
         hostFollowingCountText={hostFollowingCountText}
         followButton={renderHostProfileActions()}
       />
-      <FloatingToastPresence className="watch-session-toast">{toastMessage}</FloatingToastPresence>
+      {hidden ? null : <ToastViewport className="watch-session-toast" />}
       {imageShareMounted ? (
         <WatchImageShareDialog
           imageShareClosing={imageShareClosing}

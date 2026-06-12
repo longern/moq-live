@@ -4,7 +4,7 @@ import { useCompactViewport, usePortraitViewport } from "../hooks/useMediaQuery.
 import { useLiveMobileShellMode } from "../hooks/useLiveMobileShellMode.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
-import { FloatingToastPresence } from "./FloatingToast.jsx";
+import { ToastViewport, useToast } from "./FloatingToast.jsx";
 import { WatchImageShareDialog } from "./watch/WatchSharePanels.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 import { buildLiveScreenshotShareImage, buildWatchShareImage } from "../lib/shareImage.js";
@@ -92,6 +92,8 @@ export function LivePage({
     error: chatError,
     recovering: chatRecovering = false,
     canRetractMessages = false,
+    mutedUsers: chatMutedUsers = [],
+    moderationEvent: chatModerationEvent = null,
   } = chat;
   const {
     available: authAvailable,
@@ -125,7 +127,9 @@ export function LivePage({
     onStopSynthetic,
     onChatDraftChange,
     onChatSend,
+    onChatMessageMute,
     onChatMessageRetract,
+    onChatUserUnmute,
     onChatRequireLogin,
     onRoomDetailsChange,
     onRequestClose,
@@ -145,30 +149,26 @@ export function LivePage({
   const [roomCoverBusy, setRoomCoverBusy] = useState(false);
   const [roomCoverError, setRoomCoverError] = useState("");
   const [roomCoverStatus, setRoomCoverStatus] = useState("");
-  const [toastMessage, setToastMessage] = useState("");
   const [shareImageUrl, setShareImageUrl] = useState("");
   const [shareImageLoading, setShareImageLoading] = useState(false);
   const [shareImageKind, setShareImageKind] = useState("poster");
   const [imageShareMounted, setImageShareMounted] = useState(false);
   const [imageShareClosing, setImageShareClosing] = useState(false);
   const roomCoverInputRef = useRef(null);
-  const toastTimerRef = useRef(null);
   const imageShareCloseTimerRef = useRef(null);
   const shareImageRequestIdRef = useRef(0);
   const lastCohostResponseIdRef = useRef("");
+  const { clearToast, showToast } = useToast();
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mediaMode = cameraEnabled ? "video" : "voice";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
   const useMobileShell = compactViewport || portraitViewport;
   const mobileShellMode = useLiveMobileShellMode({
     cameraEnabled,
-    isPublishing,
-    isStarting,
     portraitViewport,
     previewActive,
     previewHasVideo,
     previewOrientation,
-    previewPending,
     previewSourceType,
   });
 
@@ -177,37 +177,11 @@ export function LivePage({
   }
 
   useEffect(() => () => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
     if (imageShareCloseTimerRef.current) {
       clearTimeout(imageShareCloseTimerRef.current);
       imageShareCloseTimerRef.current = null;
     }
   }, []);
-
-  function showToast(message) {
-    if (!message) {
-      return;
-    }
-    if (message === roomInfoBlockedReason) {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = null;
-      }
-      setToastMessage("");
-      return;
-    }
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    setToastMessage(message);
-    toastTimerRef.current = window.setTimeout(() => {
-      setToastMessage("");
-      toastTimerRef.current = null;
-    }, 2200);
-  }
 
   async function writeClipboardText(text) {
     try {
@@ -438,6 +412,21 @@ export function LivePage({
   }, [cohostInviteResponse?.accepted, cohostInviteResponse?.id, cohostInviteResponse?.target]);
 
   useEffect(() => {
+    if (!chatModerationEvent?.id) {
+      return;
+    }
+    if (chatModerationEvent.type === "message.muted") {
+      const name = chatModerationEvent.mute?.displayName || "用户";
+      showToast(`已禁言 ${name}`);
+      return;
+    }
+    if (chatModerationEvent.type === "message.unmuted") {
+      const name = chatModerationEvent.mute?.displayName || "用户";
+      showToast(`已解除 ${name} 的禁言`);
+    }
+  }, [chatModerationEvent?.id, chatModerationEvent?.mute?.displayName, chatModerationEvent?.type]);
+
+  useEffect(() => {
     if (!authUser?.id || hidden) {
       setRoomCoverUrl("");
       setRoomCoverLoading(false);
@@ -651,6 +640,7 @@ export function LivePage({
       error: chatError,
       recovering: chatRecovering,
       canRetractMessages,
+      mutedUsers: chatMutedUsers,
     },
     auth: {
       available: authAvailable,
@@ -687,7 +677,9 @@ export function LivePage({
       onStopSynthetic,
       onChatDraftChange,
       onChatSend,
+      onChatMessageMute,
       onChatMessageRetract,
+      onChatUserUnmute,
       onChatRequireLogin,
       onRequestClose: requestClose,
       onSelectLiveMode,
@@ -695,16 +687,15 @@ export function LivePage({
       onOpenCoverPicker: openRoomCoverPicker,
       onSaveRoomTitle: handleRoomTitleSave,
       onSaveRoomWelcomeMessage: handleRoomWelcomeMessageSave,
-      onRoomInfoBlocked: () => showToast(roomInfoBlockedReason),
+      onRoomInfoBlocked: clearToast,
     },
   };
-  const visibleToastMessage = roomInfoBlockedReason || toastMessage;
 
   if (useMobileShell) {
     return (
       <>
         <LiveMobilePage {...pageProps} view={{ ...pageProps.view, shellMode: mobileShellMode }} />
-        <FloatingToastPresence className="live-page-toast live-page-toast-mobile">{visibleToastMessage}</FloatingToastPresence>
+        {hidden ? null : <ToastViewport className="live-page-toast live-page-toast-mobile" message={roomInfoBlockedReason} />}
         {imageShareMounted ? (
           <WatchImageShareDialog
             imageShareClosing={imageShareClosing}
@@ -728,7 +719,7 @@ export function LivePage({
   return (
     <>
       <LiveDesktopPage {...pageProps} />
-      <FloatingToastPresence className="live-page-toast live-page-toast-desktop">{visibleToastMessage}</FloatingToastPresence>
+      {hidden ? null : <ToastViewport className="live-page-toast live-page-toast-desktop" message={roomInfoBlockedReason} />}
       {imageShareMounted ? (
         <WatchImageShareDialog
           imageShareClosing={imageShareClosing}

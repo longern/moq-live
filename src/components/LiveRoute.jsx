@@ -1093,6 +1093,8 @@ export function LiveRoute({
         error: liveChatEnabled ? liveChat.chatError : "",
         recovering: liveChatEnabled ? liveChat.recoveringFromPageLifecycle : false,
         canRetractMessages: liveChatEnabled && liveChat.canControlBroadcast,
+        mutedUsers: liveChatEnabled && liveChat.canControlBroadcast ? liveChat.mutedUsers : [],
+        moderationEvent: liveChat.chatModerationEvent,
       }}
       auth={{
         available: authState.available,
@@ -1200,8 +1202,14 @@ export function LiveRoute({
         onChatSend: () => {
           liveChat.sendMessage();
         },
+        onChatMessageMute: (messageId, options) => {
+          liveChat.muteMessage(messageId, options);
+        },
         onChatMessageRetract: (messageId) => {
           liveChat.retractMessage(messageId);
+        },
+        onChatUserUnmute: (userId) => {
+          liveChat.unmuteUser(userId);
         },
         onChatRequireLogin: onRequireLogin,
         onRoomDetailsChange: setLiveRoomDetails,

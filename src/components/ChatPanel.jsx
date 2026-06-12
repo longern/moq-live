@@ -1,11 +1,20 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { Copy, RotateCcw } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Ban, Copy, RotateCcw, X } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
+import { SwipeableDrawer } from "./SwipeableDrawer.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
+import { useToast } from "./FloatingToast.jsx";
 
 const CHAT_MESSAGE_MENU_MARGIN = 8;
 const CHAT_MESSAGE_MENU_TOUCH_GAP = 10;
 const CHAT_MESSAGE_MENU_EXIT_MS = 120;
+const CHAT_MUTE_OPTIONS = [
+  { id: "10m", label: "10 分钟", durationMs: 10 * 60_000 },
+  { id: "1h", label: "1 小时", durationMs: 60 * 60_000 },
+  { id: "24h", label: "24 小时", durationMs: 24 * 60 * 60_000 },
+  { id: "7d", label: "7 天", durationMs: 7 * 24 * 60 * 60_000 },
+];
 
 function getConnectionLabel(state) {
   if (state === "connected") {
@@ -90,13 +99,64 @@ function getMeasuredContextMenuPosition(anchorLeft, anchorTop, menuNode, placeme
   };
 }
 
+function ChatMessageMutePanel({
+  message,
+  muteRetractMessage,
+  onCancel,
+  onMute,
+  onMuteRetractMessageChange,
+}) {
+  const targetName = message?.user?.displayName || message?.user?.email || "该用户";
+  const messageText = String(message?.text || "").trim() || "这条评论";
+
+  return (
+    <div className="chat-message-mute-panel" role="none">
+      <div className="chat-message-mute-target">
+        <span className="chat-message-author chat-message-mute-target-name">{targetName}</span>
+        <p>{messageText}</p>
+      </div>
+      <div className="chat-message-mute-title">禁言时长</div>
+      <ul className="chat-message-mute-options" aria-label="选择禁言时间">
+        {CHAT_MUTE_OPTIONS.map((option) => (
+          <li key={option.id} className="chat-message-mute-option-item">
+            <button
+              type="button"
+              className="chat-message-mute-option"
+              onClick={() => onMute(option)}
+            >
+              <span>{option.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <label className="chat-message-mute-retract">
+        <input
+          type="checkbox"
+          checked={muteRetractMessage}
+          onChange={(event) => onMuteRetractMessageChange(event.currentTarget.checked)}
+        />
+        <span>同时撤回这条评论</span>
+      </label>
+      <button
+        type="button"
+        className="chat-message-mute-cancel"
+        onClick={onCancel}
+      >
+        取消
+      </button>
+    </div>
+  );
+}
+
 function ChatMessageContextMenu({
+  canMute,
   canRetract,
   closing,
   left,
   menuRef,
   onClose,
   onCopy,
+  onOpenMute,
   onRetract,
   open,
   positioned,
@@ -148,9 +208,79 @@ function ChatMessageContextMenu({
             <span>撤回</span>
           </button>
         ) : null}
+        {canMute ? (
+          <button
+            type="button"
+            className="chat-message-context-action"
+            role="menuitem"
+            onClick={onOpenMute}
+          >
+            <span className="chat-message-context-icon">
+              <Ban aria-hidden="true" />
+            </span>
+            <span>禁言</span>
+          </button>
+        ) : null}
       </div>
     </>
   );
+}
+
+function ChatMessageMuteDialog({
+  message,
+  muteRetractMessage,
+  onClose,
+  onMute,
+  onMuteRetractMessageChange,
+  open,
+}) {
+  if (!open) {
+    return null;
+  }
+
+  const dialog = (
+    <div className="chat-message-mute-dialog-layer">
+      <button
+        type="button"
+        className="chat-message-mute-dialog-backdrop"
+        aria-label="关闭禁言对话框"
+        onClick={onClose}
+      />
+      <section
+        className="chat-message-mute-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="禁言用户"
+      >
+        <header className="chat-message-mute-dialog-header">
+          <div className="chat-message-mute-dialog-copy">
+            <strong>禁言用户</strong>
+          </div>
+          <button
+            type="button"
+            className="chat-message-mute-dialog-close"
+            aria-label="关闭禁言对话框"
+            onClick={onClose}
+          >
+            <X aria-hidden="true" />
+          </button>
+        </header>
+        <ChatMessageMutePanel
+          message={message}
+          muteRetractMessage={muteRetractMessage}
+          onCancel={onClose}
+          onMute={onMute}
+          onMuteRetractMessageChange={onMuteRetractMessageChange}
+        />
+      </section>
+    </div>
+  );
+
+  if (typeof document === "undefined") {
+    return dialog;
+  }
+
+  return createPortal(dialog, document.body);
 }
 
 export function ChatPanel({
@@ -176,8 +306,10 @@ export function ChatPanel({
   showComposer = true,
   showWelcome = true,
   onRetractMessage,
+  onMuteMessage,
 }) {
   const composerInputId = useId();
+  const { showToast } = useToast();
   const listRef = useRef(null);
   const contextMenuRef = useRef(null);
   const contextMenuCloseTimerRef = useRef(null);
@@ -198,6 +330,15 @@ export function ChatPanel({
     top: 0,
     message: null,
   });
+  const [muteDrawer, setMuteDrawer] = useState({
+    open: false,
+    message: null,
+  });
+  const [muteDialog, setMuteDialog] = useState({
+    open: false,
+    message: null,
+  });
+  const [muteRetractMessage, setMuteRetractMessage] = useState(true);
 
   function clearContextMenuCloseTimer() {
     if (contextMenuCloseTimerRef.current) {
@@ -237,6 +378,23 @@ export function ChatPanel({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [contextMenu.open]);
+
+  useEffect(() => {
+    if (!muteDialog.open) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        closeMuteDialog();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [muteDialog.open]);
 
   useLayoutEffect(() => {
     if (!contextMenu.open || contextMenu.closing || !contextMenuRef.current) {
@@ -319,6 +477,7 @@ export function ChatPanel({
       top: event.clientY,
       message,
     });
+    setMuteRetractMessage(true);
   }
 
   function closeMessageMenu() {
@@ -346,24 +505,43 @@ export function ChatPanel({
     }, CHAT_MESSAGE_MENU_EXIT_MS);
   }
 
+  function closeMessageMenuImmediately() {
+    clearContextMenuCloseTimer();
+    setContextMenu((current) => ({
+      ...current,
+      open: false,
+      closing: false,
+      positioned: false,
+      message: null,
+    }));
+  }
+
   async function copyContextMessage() {
     const text = String(contextMenu.message?.text || "");
     if (!text) {
+      showToast("复制失败");
       closeMessageMenu();
       return;
     }
 
+    let copied = false;
     try {
-      await navigator.clipboard?.writeText(text);
+      if (typeof navigator.clipboard?.writeText === "function") {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } else {
+        throw new Error("clipboard unavailable");
+      }
     } catch {
       const textarea = document.createElement("textarea");
       textarea.value = text;
       textarea.style.cssText = "position:fixed;left:-9999px;top:-9999px;";
       document.body.appendChild(textarea);
       textarea.select();
-      document.execCommand("copy");
+      copied = document.execCommand("copy");
       textarea.remove();
     } finally {
+      showToast(copied ? "复制成功" : "复制失败");
       closeMessageMenu();
     }
   }
@@ -374,6 +552,54 @@ export function ChatPanel({
       onRetractMessage?.(messageId);
     }
     closeMessageMenu();
+  }
+
+  function openMutePanel() {
+    if (isCoarsePointer()) {
+      setMuteDrawer({
+        open: true,
+        message: contextMenu.message,
+      });
+      closeMessageMenuImmediately();
+      return;
+    }
+
+    setMuteDialog({
+      open: true,
+      message: contextMenu.message,
+    });
+    closeMessageMenuImmediately();
+  }
+
+  function muteContextMessage(option) {
+    const messageId = (
+      muteDrawer.open
+        ? muteDrawer.message
+        : muteDialog.open
+          ? muteDialog.message
+          : contextMenu.message
+    )?.id;
+    if (messageId) {
+      onMuteMessage?.(messageId, {
+        durationMs: option.durationMs,
+        untilStreamEnds: option.untilStreamEnds === true,
+        retractMessage: muteRetractMessage
+      });
+    }
+    setMuteDrawer({ open: false, message: null });
+    setMuteDialog({ open: false, message: null });
+    closeMessageMenu();
+  }
+
+  function closeMuteDrawer() {
+    setMuteDrawer((current) => ({
+      ...current,
+      open: false,
+    }));
+  }
+
+  function closeMuteDialog() {
+    setMuteDialog({ open: false, message: null });
   }
 
   const composerState = getComposerState({
@@ -460,17 +686,49 @@ export function ChatPanel({
         ) : null}
       </div>
       <ChatMessageContextMenu
+        canMute={Boolean(
+          canRetractMessages
+          && contextMenu.message?.user?.id
+          && contextMenu.message?.user?.id !== authUser?.id
+          && onMuteMessage
+        )}
         canRetract={canRetractMessages}
         closing={contextMenu.closing}
         left={contextMenu.left}
         menuRef={contextMenuRef}
         onClose={closeMessageMenu}
         onCopy={copyContextMessage}
+        onOpenMute={openMutePanel}
         onRetract={retractContextMessage}
         open={contextMenu.open}
         positioned={contextMenu.positioned}
         top={contextMenu.top}
       />
+      <ChatMessageMuteDialog
+        open={muteDialog.open}
+        message={muteDialog.message}
+        muteRetractMessage={muteRetractMessage}
+        onClose={closeMuteDialog}
+        onMute={muteContextMessage}
+        onMuteRetractMessageChange={setMuteRetractMessage}
+      />
+      <SwipeableDrawer
+        open={muteDrawer.open}
+        onClose={closeMuteDrawer}
+        ariaLabel="关闭禁言面板"
+        className="chat-message-mute-drawer"
+        panelClassName="chat-message-mute-drawer-panel"
+        portal
+        viewport
+      >
+        <ChatMessageMutePanel
+          message={muteDrawer.message}
+          muteRetractMessage={muteRetractMessage}
+          onCancel={closeMuteDrawer}
+          onMute={muteContextMessage}
+          onMuteRetractMessageChange={setMuteRetractMessage}
+        />
+      </SwipeableDrawer>
 
       {chatError && !chatRecovering ? (
         <p className={`inline-warning${floating ? " chat-floating-warning" : ""}`}>{chatError}</p>

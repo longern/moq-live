@@ -9,6 +9,7 @@
   inset: 0;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior-y: none;
 }
 
 .live-mobile-page[data-shell="compact"] {
@@ -351,7 +352,7 @@
 .live-mobile-page[data-shell="immersive"]
   .chat-panel-live-mobile
   .chat-message-list {
-  padding: 0 72px 8px 0;
+  padding: 0 0 8px;
 }
 
 .live-mobile-page[data-shell="immersive"]
@@ -364,9 +365,7 @@
     0deg,
     #000 0,
     #000
-      calc(
-        var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)
-      ),
+      calc(var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)),
     rgba(0, 0, 0, 0.42) calc(var(--live-chat-list-max-height) - 12px),
     transparent var(--live-chat-list-max-height)
   );
@@ -374,9 +373,7 @@
     0deg,
     #000 0,
     #000
-      calc(
-        var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)
-      ),
+      calc(var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)),
     rgba(0, 0, 0, 0.42) calc(var(--live-chat-list-max-height) - 12px),
     transparent var(--live-chat-list-max-height)
   );
@@ -386,23 +383,6 @@
   display: none;
   width: 0;
   height: 0;
-}
-
-.chat-panel-live-mobile .chat-message-hit-area {
-  max-width: min(84%, 320px);
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 4px;
-  padding: 3px 6px;
-  border: 0;
-  border-radius: 16px;
-  background: var(--watch-float-bg);
-  box-shadow: none;
-}
-
-.live-mobile-page[data-shell="immersive"]
-  .chat-panel-live-mobile
-  .chat-message-hit-area {
-  grid-template-columns: 18px minmax(0, 1fr);
 }
 
 .chat-panel-live-mobile .chat-avatar {

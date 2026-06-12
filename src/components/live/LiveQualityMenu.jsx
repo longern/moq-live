@@ -1,22 +1,27 @@
 import { useState } from "react";
-import { STREAM_PROTOCOL_WEBRTC } from "../../lib/streamProtocol.js";
+import { STREAM_PROTOCOL_MOQ, STREAM_PROTOCOL_WEBRTC } from "../../lib/streamProtocol.js";
 import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
 import { MenuChevronIcon } from "./liveIcons.jsx";
+
+const MOQ_RELAY_ENDPOINT_PLACEHOLDER = "draft-14.cloudflare.mediaoverquic.com";
 
 export function LiveQualityMenu({
   publishQualityOptions = [],
   publishQualityId,
   publishProtocolOptions = [],
   publishProtocol,
+  relayUrl = "",
   webRtcPublishUrl = "",
   webRtcPlaybackUrl = "",
   onPublishQualityChange,
   onPublishProtocolChange,
+  onRelayUrlChange,
   onWebRtcPublishUrlChange,
   onWebRtcPlaybackUrlChange,
   onAfterSelect,
 }) {
   const [protocolEditorOpen, setProtocolEditorOpen] = useState(false);
+  const showMoqRelayUrl = publishProtocol === STREAM_PROTOCOL_MOQ;
   const showWebRtcUrls = publishProtocol === STREAM_PROTOCOL_WEBRTC;
 
   function handleQualitySelect(optionId) {
@@ -102,6 +107,23 @@ export function LiveQualityMenu({
               </LiveMenuItem>
             ))}
           </LiveMenuList>
+          {showMoqRelayUrl ? (
+            <div className="live-quality-url-fields">
+              <label className="live-more-title-field live-quality-url-field">
+                <span>中继端点</span>
+                <input
+                  type="url"
+                  value={relayUrl}
+                  placeholder={MOQ_RELAY_ENDPOINT_PLACEHOLDER}
+                  onChange={(event) => onRelayUrlChange?.(event.currentTarget.value)}
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+              </label>
+            </div>
+          ) : null}
           {showWebRtcUrls ? (
             <div className="live-quality-url-fields">
               <label className="live-more-title-field live-quality-url-field">

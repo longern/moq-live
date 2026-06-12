@@ -7,7 +7,7 @@ import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
 import { FloatingToastPresence } from "./FloatingToast.jsx";
 import { WatchImageShareDialog } from "./watch/WatchSharePanels.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
-import { buildWatchShareImage } from "../lib/shareImage.js";
+import { buildLiveScreenshotShareImage, buildWatchShareImage } from "../lib/shareImage.js";
 
 const IMAGE_SHARE_EXIT_MS = 180;
 
@@ -53,6 +53,7 @@ export function LivePage({
     selectedMicrophoneId,
     publishQualityId,
     publishProtocol,
+    relayUrl,
     webRtcPublishUrl,
     webRtcPlaybackUrl,
     cameraEnabled,
@@ -102,6 +103,7 @@ export function LivePage({
     onMicrophoneChange,
     onPublishQualityChange,
     onPublishProtocolChange,
+    onRelayUrlChange,
     onWebRtcPublishUrlChange,
     onWebRtcPlaybackUrlChange,
     onCycleCamera,
@@ -146,11 +148,13 @@ export function LivePage({
   const [toastMessage, setToastMessage] = useState("");
   const [shareImageUrl, setShareImageUrl] = useState("");
   const [shareImageLoading, setShareImageLoading] = useState(false);
+  const [shareImageKind, setShareImageKind] = useState("poster");
   const [imageShareMounted, setImageShareMounted] = useState(false);
   const [imageShareClosing, setImageShareClosing] = useState(false);
   const roomCoverInputRef = useRef(null);
   const toastTimerRef = useRef(null);
   const imageShareCloseTimerRef = useRef(null);
+  const shareImageRequestIdRef = useRef(0);
   const lastCohostResponseIdRef = useRef("");
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mediaMode = cameraEnabled ? "video" : "voice";
@@ -251,7 +255,8 @@ export function LivePage({
     const name = (roomDetails?.title || roomLabel || "直播间")
       .replace(/[\\/:*?"<>|]+/g, "")
       .trim();
-    return `${name || "直播间"}分享图.png`;
+    const suffix = shareImageKind === "screenshot" ? "截屏分享图" : "分享图";
+    return `${name || "直播间"}${suffix}.png`;
   }
 
   async function shareLiveImage() {
@@ -320,6 +325,7 @@ export function LivePage({
   }
 
   function closeImageShareModal() {
+    shareImageRequestIdRef.current += 1;
     if (imageShareCloseTimerRef.current) {
       clearTimeout(imageShareCloseTimerRef.current);
     }
@@ -342,8 +348,11 @@ export function LivePage({
     }
     setImageShareMounted(true);
     setImageShareClosing(false);
+    setShareImageKind("poster");
     setShareImageUrl("");
     setShareImageLoading(true);
+    const requestId = shareImageRequestIdRef.current + 1;
+    shareImageRequestIdRef.current = requestId;
 
     try {
       const imageUrl = await buildWatchShareImage({
@@ -356,13 +365,65 @@ export function LivePage({
         siteIconUrl,
         siteTitle,
       });
+      if (shareImageRequestIdRef.current !== requestId) {
+        return;
+      }
       setShareImageUrl(imageUrl);
     } catch (error) {
+      if (shareImageRequestIdRef.current !== requestId) {
+        return;
+      }
       console.error("live room share image failed", error);
       setImageShareMounted(false);
       showToast("生成失败");
     } finally {
-      setShareImageLoading(false);
+      if (shareImageRequestIdRef.current === requestId) {
+        setShareImageLoading(false);
+      }
+    }
+  }
+
+  async function openScreenshotShareModal() {
+    if (!watchLink) {
+      return;
+    }
+
+    if (imageShareCloseTimerRef.current) {
+      clearTimeout(imageShareCloseTimerRef.current);
+      imageShareCloseTimerRef.current = null;
+    }
+    setImageShareMounted(true);
+    setImageShareClosing(false);
+    setShareImageKind("screenshot");
+    setShareImageUrl("");
+    setShareImageLoading(true);
+    const requestId = shareImageRequestIdRef.current + 1;
+    shareImageRequestIdRef.current = requestId;
+
+    try {
+      const imageUrl = await buildLiveScreenshotShareImage({
+        watchLink,
+        videoElement: previewVideoRef?.current,
+        hostAvatarUrl: roomAvatarUrl,
+        siteIconUrl,
+        siteTitle,
+        mirrorPreview,
+      });
+      if (shareImageRequestIdRef.current !== requestId) {
+        return;
+      }
+      setShareImageUrl(imageUrl);
+    } catch (error) {
+      if (shareImageRequestIdRef.current !== requestId) {
+        return;
+      }
+      console.error("live room screenshot share image failed", error);
+      setImageShareMounted(false);
+      showToast("生成失败");
+    } finally {
+      if (shareImageRequestIdRef.current === requestId) {
+        setShareImageLoading(false);
+      }
     }
   }
 
@@ -550,6 +611,7 @@ export function LivePage({
       selectedMicrophoneId,
       publishQualityId,
       publishProtocol,
+      relayUrl,
       webRtcPublishUrl,
       webRtcPlaybackUrl,
       cameraEnabled,
@@ -600,6 +662,7 @@ export function LivePage({
       onMicrophoneChange,
       onPublishQualityChange,
       onPublishProtocolChange,
+      onRelayUrlChange,
       onWebRtcPublishUrlChange,
       onWebRtcPlaybackUrlChange,
       onCycleCamera,
@@ -610,6 +673,7 @@ export function LivePage({
       onShare: shareLiveLink,
       onCopyShareLink: copyLiveLink,
       onOpenImageShare: openImageShareModal,
+      onOpenScreenshotShare: openScreenshotShareModal,
       onStartScreenShare,
       onStopScreenShare,
       onCommentSpeechEnabledChange,
@@ -645,11 +709,13 @@ export function LivePage({
           <WatchImageShareDialog
             imageShareClosing={imageShareClosing}
             imageShareReady={Boolean(shareImageUrl && !shareImageLoading)}
+            imageShareTitle={shareImageKind === "screenshot" ? "截屏分享" : "图片分享"}
             onClose={closeImageShareModal}
             onCopyImage={copyLiveImage}
             onSaveImage={saveLiveImage}
             onShareImage={shareLiveImage}
             roomLabel={roomLabel}
+            shareImageAlt={shareImageKind === "screenshot" ? `${roomLabel}直播间截屏分享图` : undefined}
             shareImageLoading={shareImageLoading}
             shareImageUrl={shareImageUrl}
             shareSupported={shareSupported}
@@ -667,11 +733,13 @@ export function LivePage({
         <WatchImageShareDialog
           imageShareClosing={imageShareClosing}
           imageShareReady={Boolean(shareImageUrl && !shareImageLoading)}
+          imageShareTitle={shareImageKind === "screenshot" ? "截屏分享" : "图片分享"}
           onClose={closeImageShareModal}
           onCopyImage={copyLiveImage}
           onSaveImage={saveLiveImage}
           onShareImage={shareLiveImage}
           roomLabel={roomLabel}
+          shareImageAlt={shareImageKind === "screenshot" ? `${roomLabel}直播间截屏分享图` : undefined}
           shareImageLoading={shareImageLoading}
           shareImageUrl={shareImageUrl}
           shareSupported={shareSupported}

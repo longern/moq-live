@@ -4,6 +4,7 @@ import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 
 const CHAT_MESSAGE_MENU_MARGIN = 8;
+const CHAT_MESSAGE_MENU_TOUCH_GAP = 10;
 const CHAT_MESSAGE_MENU_EXIT_MS = 120;
 
 function getConnectionLabel(state) {
@@ -66,7 +67,7 @@ function isCoarsePointer() {
     && window.matchMedia("(pointer: coarse)").matches;
 }
 
-function getMeasuredContextMenuPosition(anchorLeft, anchorTop, menuNode) {
+function getMeasuredContextMenuPosition(anchorLeft, anchorTop, menuNode, placement) {
   const rect = menuNode.getBoundingClientRect();
   const maxLeft = Math.max(
     CHAT_MESSAGE_MENU_MARGIN,
@@ -76,10 +77,16 @@ function getMeasuredContextMenuPosition(anchorLeft, anchorTop, menuNode) {
     CHAT_MESSAGE_MENU_MARGIN,
     window.innerHeight - rect.height - CHAT_MESSAGE_MENU_MARGIN
   );
+  const preferredLeft = placement === "above-point"
+    ? anchorLeft - rect.width / 2
+    : anchorLeft;
+  const preferredTop = placement === "above-point"
+    ? anchorTop - rect.height - CHAT_MESSAGE_MENU_TOUCH_GAP
+    : anchorTop;
 
   return {
-    left: Math.max(CHAT_MESSAGE_MENU_MARGIN, Math.min(anchorLeft, maxLeft)),
-    top: Math.max(CHAT_MESSAGE_MENU_MARGIN, Math.min(anchorTop, maxTop)),
+    left: Math.max(CHAT_MESSAGE_MENU_MARGIN, Math.min(preferredLeft, maxLeft)),
+    top: Math.max(CHAT_MESSAGE_MENU_MARGIN, Math.min(preferredTop, maxTop)),
   };
 }
 
@@ -174,12 +181,19 @@ export function ChatPanel({
   const listRef = useRef(null);
   const contextMenuRef = useRef(null);
   const contextMenuCloseTimerRef = useRef(null);
+  const lastPointerRef = useRef({
+    clientX: 0,
+    clientY: 0,
+    pointerType: "",
+    time: 0,
+  });
   const [contextMenu, setContextMenu] = useState({
     open: false,
     closing: false,
     positioned: false,
     anchorLeft: 0,
     anchorTop: 0,
+    placement: "at-point",
     left: 0,
     top: 0,
     message: null,
@@ -232,7 +246,8 @@ export function ChatPanel({
     const position = getMeasuredContextMenuPosition(
       contextMenu.anchorLeft,
       contextMenu.anchorTop,
-      contextMenuRef.current
+      contextMenuRef.current,
+      contextMenu.placement
     );
 
     setContextMenu((current) => {
@@ -259,15 +274,39 @@ export function ChatPanel({
     contextMenu.anchorTop,
     contextMenu.closing,
     contextMenu.open,
+    contextMenu.placement,
   ]);
 
   useEffect(() => () => {
     clearContextMenuCloseTimer();
   }, []);
 
-  function openMessageMenu(event, message) {
+  function rememberMessagePointer(event) {
+    lastPointerRef.current = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pointerType: event.pointerType || "",
+      time: performance.now(),
+    };
+  }
+
+  function isRecentTouchPointer(event) {
+    const pointer = lastPointerRef.current;
+    if (pointer.pointerType !== "touch" && pointer.pointerType !== "pen") {
+      return false;
+    }
+    if (performance.now() - pointer.time > 900) {
+      return false;
+    }
+    return Math.abs(pointer.clientX - event.clientX) <= 24
+      && Math.abs(pointer.clientY - event.clientY) <= 24;
+  }
+
+  function openMessageMenu(event, message, { placement } = {}) {
     event.preventDefault();
     event.stopPropagation();
+    const resolvedPlacement = placement
+      || (isRecentTouchPointer(event) ? "above-point" : "at-point");
     clearContextMenuCloseTimer();
     setContextMenu({
       open: true,
@@ -275,6 +314,7 @@ export function ChatPanel({
       positioned: false,
       anchorLeft: event.clientX,
       anchorTop: event.clientY,
+      placement: resolvedPlacement,
       left: event.clientX,
       top: event.clientY,
       message,
@@ -380,10 +420,11 @@ export function ChatPanel({
           >
             <div
               className="chat-message-hit-area"
+              onPointerDown={rememberMessagePointer}
               onContextMenu={(event) => openMessageMenu(event, message)}
               onClick={(event) => {
                 if (isCoarsePointer()) {
-                  openMessageMenu(event, message);
+                  openMessageMenu(event, message, { placement: "above-point" });
                 }
               }}
             >

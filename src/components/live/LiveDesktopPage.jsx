@@ -248,6 +248,7 @@ export function LiveDesktopPage({
     selectedMicrophoneId,
     publishQualityId,
     publishProtocol,
+    relayUrl,
     webRtcPublishUrl,
     webRtcPlaybackUrl,
     cameraEnabled,
@@ -291,6 +292,7 @@ export function LiveDesktopPage({
     onMicrophoneChange,
     onPublishQualityChange,
     onPublishProtocolChange,
+    onRelayUrlChange,
     onWebRtcPublishUrlChange,
     onWebRtcPlaybackUrlChange,
     onCycleCamera,
@@ -410,10 +412,12 @@ export function LiveDesktopPage({
       publishQualityId={publishQualityId}
       publishProtocolOptions={publishProtocolOptions}
       publishProtocol={publishProtocol}
+      relayUrl={relayUrl}
       webRtcPublishUrl={webRtcPublishUrl}
       webRtcPlaybackUrl={webRtcPlaybackUrl}
       onPublishQualityChange={onPublishQualityChange}
       onPublishProtocolChange={onPublishProtocolChange}
+      onRelayUrlChange={onRelayUrlChange}
       onWebRtcPublishUrlChange={onWebRtcPublishUrlChange}
       onWebRtcPlaybackUrlChange={onWebRtcPlaybackUrlChange}
     />

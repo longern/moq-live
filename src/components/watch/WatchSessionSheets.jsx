@@ -107,6 +107,7 @@ export function WatchHostProfileContent({
   hostLocationClickable = false,
   hostLocationPending = false,
   onHostLocationClick,
+  onHostHandleCopy,
   hostHandle,
   roomLabel,
   hostFollowerCountText,
@@ -117,6 +118,7 @@ export function WatchHostProfileContent({
     ? hostProfileInfoItems
     : ["位置未知"];
   const normalizedHostBio = String(hostBio || "").trim();
+  const hostHandleText = hostHandle || roomLabel;
 
   return (
     <>
@@ -134,7 +136,19 @@ export function WatchHostProfileContent({
         />
         <div className="watch-host-profile-copy">
           <strong>{hostDisplayName || hostChipLabel}</strong>
-          <span>{hostHandle || roomLabel}</span>
+          {hostHandleText ? (
+            <button
+              type="button"
+              className="watch-host-profile-handle"
+              onClick={(event) => {
+                event.stopPropagation();
+                onHostHandleCopy?.(hostHandleText);
+              }}
+              aria-label={`复制主播号 ${hostHandleText}`}
+            >
+              {hostHandleText}
+            </button>
+          ) : null}
         </div>
       </div>
       <button

@@ -233,24 +233,10 @@ function AdvancedSettingsContent({
   authApiStatus,
   buildLabel,
   logRef,
-  logText,
-  onRelayUrlInput,
-  relayHost,
-  relayUrl
+  logText
 }) {
   return (
     <>
-      <SectionBlock title="连接">
-        <label className="my-field">
-          <span>Relay Endpoint</span>
-          <input id="url" value={relayUrl} onInput={onRelayUrlInput} />
-        </label>
-        <div className="my-info-row">
-          <strong>当前 Host</strong>
-          <span data-relay-host>{relayHost}</span>
-        </div>
-      </SectionBlock>
-
       <SectionBlock title="诊断">
         <div className="my-info-row">
           <strong>Auth API</strong>
@@ -275,9 +261,6 @@ function SettingsDrawer({
   logRef,
   logText,
   onClose,
-  onRelayUrlInput,
-  relayHost,
-  relayUrl,
   transitionClassName
 }) {
   return (
@@ -299,9 +282,6 @@ function SettingsDrawer({
         buildLabel={buildLabel}
         logRef={logRef}
         logText={logText}
-        onRelayUrlInput={onRelayUrlInput}
-        relayHost={relayHost}
-        relayUrl={relayUrl}
       />
     </SettingsPanelShell>
   );
@@ -358,8 +338,6 @@ function DesktopSettingsSidebar({
 
 export function SettingsPage({
   hidden,
-  relayUrl,
-  relayHost,
   buildLabel,
   authAvailable,
   authLoading,
@@ -369,7 +347,6 @@ export function SettingsPage({
   onUpdateDisplayName,
   onUpdateHandle,
   onUpdateAvatar,
-  onRelayUrlInput,
   onOpenFollowUserRoom,
   watchHistoryItems,
   onOpenWatchHistoryItem,
@@ -916,9 +893,6 @@ export function SettingsPage({
                     buildLabel={buildLabel}
                     logRef={logRef}
                     logText={logText}
-                    onRelayUrlInput={onRelayUrlInput}
-                    relayHost={relayHost}
-                    relayUrl={relayUrl}
                   />
                 ) : null}
               </div>
@@ -944,9 +918,6 @@ export function SettingsPage({
               onClose={() => {
                 setSettingsPanelOpen(false);
               }}
-              onRelayUrlInput={onRelayUrlInput}
-              relayHost={relayHost}
-              relayUrl={relayUrl}
               transitionClassName={transitionClassName}
             />
           )}

@@ -3,6 +3,7 @@ import {
   Maximize,
   Minimize,
   Pause,
+  PictureInPicture2,
   Play,
   Radio,
   Share,
@@ -502,6 +503,20 @@ export function WatchSessionPage({
 
   function closeHostProfile() {
     setHostProfileOpen(false);
+  }
+
+  async function copyHostHandle(handleValue) {
+    const normalizedHandle = String(handleValue || "").trim();
+    if (!normalizedHandle) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(normalizedHandle);
+      showToast("主播号复制成功");
+    } catch {
+      showToast("复制失败");
+    }
   }
 
   function renderHostFollowButton(className = "") {
@@ -1176,6 +1191,19 @@ export function WatchSessionPage({
                     className="stage-control-button"
                     onClick={(event) => {
                       event.stopPropagation();
+                      void openPictureInPicture();
+                      revealControls();
+                    }}
+                    disabled={!(elementPipSupported || videoPipSupported) || !playerSession}
+                    aria-label={pictureInPictureActive ? "关闭小窗播放" : "小窗播放"}
+                  >
+                    <PictureInPicture2 aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="stage-control-button"
+                    onClick={(event) => {
+                      event.stopPropagation();
                       onFullscreen();
                       revealControls();
                     }}
@@ -1224,6 +1252,7 @@ export function WatchSessionPage({
                         hostLocationClickable={hostLocationClickable}
                         hostLocationPending={hostDistancePending}
                         onHostLocationClick={handleHostLocationClick}
+                        onHostHandleCopy={copyHostHandle}
                         hostHandle={hostHandle}
                         roomLabel={roomLabel}
                         hostFollowerCountText={hostFollowerCountText}
@@ -1313,6 +1342,7 @@ export function WatchSessionPage({
         hostLocationClickable={hostLocationClickable}
         hostLocationPending={hostDistancePending}
         onHostLocationClick={handleHostLocationClick}
+        onHostHandleCopy={copyHostHandle}
         hostHandle={hostHandle}
         roomLabel={roomLabel}
         hostFollowerCountText={hostFollowerCountText}

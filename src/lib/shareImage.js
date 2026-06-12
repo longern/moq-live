@@ -22,6 +22,7 @@ const SHARE_QR_IMAGE_X = 260;
 const SHARE_QR_IMAGE_SIZE = 440;
 const SHARE_HINT_Y_MAX = 1120;
 const SHARE_BRAND_Y = 1240;
+const LIVE_SCREENSHOT_DELAY_MS = 2_000;
 
 function loadImage(src, { crossOrigin = "" } = {}) {
   return new Promise((resolve, reject) => {
@@ -127,6 +128,14 @@ function drawCircleImage(ctx, image, centerX, centerY, size) {
   ctx.restore();
 }
 
+function drawRoundedImage(ctx, image, x, y, width, height, radius) {
+  ctx.save();
+  drawRoundRect(ctx, x, y, width, height, radius);
+  ctx.clip();
+  drawImageCover(ctx, image, x, y, width, height);
+  ctx.restore();
+}
+
 function drawImageCover(ctx, image, x, y, width, height) {
   const targetRatio = width / height;
   const imageRatio = image.naturalWidth / image.naturalHeight;
@@ -158,29 +167,81 @@ function drawCoverBanner(ctx, image, { x, y, width, height, radius = 0 }) {
   ctx.restore();
 }
 
-function drawSiteBrand(ctx, { siteTitle, siteIcon, centerX = SHARE_IMAGE_WIDTH / 2, x, y = 178 }) {
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function truncateText(ctx, text, maxWidth) {
+  if (!maxWidth || ctx.measureText(text).width <= maxWidth) {
+    return text;
+  }
+
+  const chars = Array.from(text);
+  let nextText = "";
+
+  for (const char of chars) {
+    const candidate = `${nextText}${char}`;
+    if (ctx.measureText(`${candidate}...`).width > maxWidth) {
+      break;
+    }
+    nextText = candidate;
+  }
+
+  return nextText ? `${nextText}...` : "";
+}
+
+function drawSiteBrand(ctx, {
+  siteTitle,
+  siteIcon,
+  centerX = SHARE_IMAGE_WIDTH / 2,
+  x,
+  y = 178,
+  font = "500 32px system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+  color = "#5f6f7f",
+  iconSize = 32,
+  iconGap = 10,
+  iconRadius = 8,
+  iconPadding = 5,
+  maxWidth = 0,
+}) {
   const title = siteTitle || "MoQ Live";
   ctx.save();
-  ctx.font = "500 32px system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
-  ctx.fillStyle = "#5f6f7f";
+  ctx.font = font;
+  ctx.fillStyle = color;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
 
-  const textWidth = ctx.measureText(title).width;
-  const iconSize = siteIcon ? 32 : 0;
-  const gap = siteIcon ? 10 : 0;
-  const startX = typeof x === "number" ? x : centerX - (iconSize + gap + textWidth) / 2;
+  const actualIconSize = siteIcon ? iconSize : 0;
+  const actualGap = siteIcon ? iconGap : 0;
+  const maxTextWidth = maxWidth
+    ? Math.max(0, maxWidth - actualIconSize - actualGap)
+    : 0;
+  const displayTitle = truncateText(ctx, title, maxTextWidth);
+  const textWidth = ctx.measureText(displayTitle).width;
+  const startX = typeof x === "number"
+    ? x
+    : centerX - (actualIconSize + actualGap + textWidth) / 2;
 
   if (siteIcon) {
+    const iconX = startX;
+    const iconY = y - actualIconSize / 2;
     ctx.fillStyle = "rgba(255, 255, 255, 0.76)";
-    ctx.beginPath();
-    ctx.arc(startX + iconSize / 2, y, iconSize / 2 + 5, 0, Math.PI * 2);
+    drawRoundRect(
+      ctx,
+      iconX - iconPadding,
+      iconY - iconPadding,
+      actualIconSize + iconPadding * 2,
+      actualIconSize + iconPadding * 2,
+      iconRadius + iconPadding
+    );
     ctx.fill();
-    drawCircleImage(ctx, siteIcon, startX + iconSize / 2, y, iconSize);
-    ctx.fillStyle = "#5f6f7f";
+    drawRoundedImage(ctx, siteIcon, iconX, iconY, actualIconSize, actualIconSize, iconRadius);
+    ctx.fillStyle = color;
   }
 
-  ctx.fillText(title, startX + iconSize + gap, y + 1);
+  ctx.fillText(displayTitle, startX + actualIconSize + actualGap, y + 1);
   ctx.restore();
 }
 
@@ -344,6 +405,138 @@ export async function buildWatchShareImage({
   });
 
   drawSiteBrand(ctx, { siteTitle, siteIcon, y: SHARE_BRAND_Y });
+
+  return canvas.toDataURL("image/png");
+}
+
+export async function buildLiveScreenshotShareImage({
+  watchLink,
+  videoElement,
+  hostAvatarUrl,
+  siteIconUrl,
+  siteTitle,
+  mirrorPreview = false,
+  delayMs = LIVE_SCREENSHOT_DELAY_MS,
+}) {
+  if (!watchLink || !videoElement) {
+    throw new Error("live_screenshot_unavailable");
+  }
+
+  await wait(delayMs);
+
+  const sourceWidth = videoElement.videoWidth;
+  const sourceHeight = videoElement.videoHeight;
+
+  if (!sourceWidth || !sourceHeight || videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    throw new Error("live_screenshot_video_not_ready");
+  }
+
+  const qrDataUrl = await QRCode.toDataURL(watchLink, {
+    errorCorrectionLevel: "H",
+    margin: 1,
+    width: 320,
+    color: {
+      dark: "#111827",
+      light: "#ffffff",
+    },
+  });
+  const [qrImage, hostAvatar, siteIcon] = await Promise.all([
+    loadImage(qrDataUrl),
+    loadOptionalImage(hostAvatarUrl),
+    loadOptionalImage(siteIconUrl),
+  ]);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = sourceWidth;
+  canvas.height = sourceHeight;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#050d14";
+  ctx.fillRect(0, 0, sourceWidth, sourceHeight);
+
+  ctx.save();
+  if (mirrorPreview) {
+    ctx.translate(sourceWidth, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(videoElement, 0, 0, sourceWidth, sourceHeight);
+  ctx.restore();
+
+  const shortSide = Math.min(sourceWidth, sourceHeight);
+  const qrSize = Math.max(96, Math.min(168, Math.round(shortSide * 0.18)));
+  const qrPadding = Math.max(8, Math.round(qrSize * 0.08));
+  const brandFontSize = Math.max(12, Math.min(16, Math.round(shortSide * 0.022)));
+  const brandIconSize = Math.max(14, Math.min(20, Math.round(shortSide * 0.026)));
+  const brandLineHeight = Math.max(18, brandIconSize + 4);
+  const scanFontSize = brandFontSize;
+  const scanLineHeight = Math.ceil(scanFontSize * 1.25);
+  const qrToBrandGap = Math.max(6, Math.round(qrSize * 0.06));
+  const brandToScanGap = Math.max(3, Math.round(qrSize * 0.03));
+  const cardWidth = Math.min(sourceWidth - qrPadding * 2, qrSize + qrPadding * 2);
+  const cardHeight = qrPadding
+    + qrSize
+    + qrToBrandGap
+    + brandLineHeight
+    + brandToScanGap
+    + scanLineHeight
+    + qrPadding;
+  const cardRadius = Math.max(10, Math.round(cardWidth * 0.12));
+  const edgeInset = Math.max(16, Math.round(shortSide * 0.035));
+  const cardX = sourceWidth - cardWidth - edgeInset;
+  const cardY = sourceHeight - cardHeight - edgeInset;
+  const qrX = cardX + (cardWidth - qrSize) / 2;
+  const qrY = cardY + qrPadding;
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.28)";
+  ctx.shadowBlur = Math.round(cardWidth * 0.14);
+  ctx.shadowOffsetY = Math.round(cardWidth * 0.04);
+  ctx.fillStyle = "#ffffff";
+  drawRoundRect(ctx, cardX, cardY, cardWidth, cardHeight, cardRadius);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+
+  if (hostAvatar) {
+    const avatarSize = Math.max(28, Math.round(qrSize * 0.24));
+    const avatarCenterX = qrX + qrSize / 2;
+    const avatarCenterY = qrY + qrSize / 2;
+    ctx.save();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(avatarCenterX, avatarCenterY, avatarSize / 2 + Math.max(4, Math.round(avatarSize * 0.12)), 0, Math.PI * 2);
+    ctx.fill();
+    drawCircleImage(ctx, hostAvatar, avatarCenterX, avatarCenterY, avatarSize);
+    ctx.restore();
+  }
+
+  const brandCenterY = qrY + qrSize + qrToBrandGap + brandLineHeight / 2;
+  drawSiteBrand(ctx, {
+    siteTitle,
+    siteIcon,
+    centerX: cardX + cardWidth / 2,
+    y: brandCenterY,
+    font: `600 ${brandFontSize}px system-ui, -apple-system, BlinkMacSystemFont, sans-serif`,
+    color: "#344054",
+    iconSize: brandIconSize,
+    iconGap: Math.max(4, Math.round(brandIconSize * 0.32)),
+    iconRadius: Math.max(3, Math.round(brandIconSize * 0.22)),
+    iconPadding: Math.max(2, Math.round(brandIconSize * 0.12)),
+    maxWidth: cardWidth - qrPadding * 2,
+  });
+
+  ctx.save();
+  ctx.fillStyle = "#667085";
+  ctx.font = `500 ${scanFontSize}px system-ui, -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(
+    "扫码看直播",
+    cardX + cardWidth / 2,
+    brandCenterY + brandLineHeight / 2 + brandToScanGap + scanFontSize
+  );
+  ctx.restore();
 
   return canvas.toDataURL("image/png");
 }

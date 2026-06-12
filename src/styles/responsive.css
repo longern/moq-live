@@ -521,7 +521,6 @@
   }
 
   .watch-host-follow-button-mobile {
-    min-width: 44px;
     min-height: 24px;
     padding: 0 8px;
     font-size: 0.72rem;
@@ -796,10 +795,6 @@
     gap: 10px;
   }
 
-  .live-share-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .watch-mobile-more-action {
     min-width: 0;
     min-height: 76px;
@@ -1032,7 +1027,7 @@
     align-items: stretch;
     min-height: 0;
     max-height: var(--watch-chat-list-max-height);
-    padding: 0 72px 8px 0;
+    padding: 0 0 8px;
     overflow: auto;
     background: transparent;
     -ms-overflow-style: none;
@@ -1063,21 +1058,6 @@
     display: none;
     width: 0;
     height: 0;
-  }
-
-  .chat-panel-watch-overlay .chat-message-hit-area {
-    max-width: min(84%, 320px);
-    grid-template-columns: 18px minmax(0, 1fr);
-    gap: 4px;
-    padding: 3px 6px;
-    border: 0;
-    border-radius: 16px;
-    background: var(--watch-float-bg);
-    box-shadow: none;
-  }
-
-  .chat-panel-watch-overlay .chat-message-card-system-no-avatar {
-    max-width: min(84%, 320px);
   }
 
   .chat-panel-watch-overlay .chat-message-body p {

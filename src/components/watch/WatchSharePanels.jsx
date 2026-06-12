@@ -4,15 +4,20 @@ import { LoadingSpinner } from "../LoadingSpinner.jsx";
 export function WatchImageShareDialog({
   imageShareClosing = false,
   imageShareReady = false,
+  imageShareTitle = "图片分享",
   onClose,
   onCopyImage,
   onSaveImage,
   onShareImage,
   roomLabel,
+  shareImageAlt = "",
   shareImageLoading = false,
   shareImageUrl = "",
   shareSupported = false,
 }) {
+  const dialogTitle = imageShareTitle || "图片分享";
+  const imageAlt = shareImageAlt || `${roomLabel}直播间二维码分享图`;
+
   return (
     <div className={`watch-share-image-layer${imageShareClosing ? " is-closing" : ""}`}>
       <button
@@ -25,10 +30,10 @@ export function WatchImageShareDialog({
         className="watch-share-image-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="图片分享"
+        aria-label={dialogTitle}
       >
         <div className="watch-share-image-head">
-          <h3>图片分享</h3>
+          <h3>{dialogTitle}</h3>
           <button
             type="button"
             className="watch-share-image-close"
@@ -42,7 +47,7 @@ export function WatchImageShareDialog({
           {shareImageLoading ? (
             <LoadingSpinner className="watch-share-image-spinner" />
           ) : shareImageUrl ? (
-            <img src={shareImageUrl} alt={`${roomLabel}直播间二维码分享图`} />
+            <img src={shareImageUrl} alt={imageAlt} />
           ) : null}
         </div>
         <div className="watch-share-image-actions">

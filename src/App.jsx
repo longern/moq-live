@@ -1590,6 +1590,9 @@ export function App() {
             }}
             aria-label={`返回${siteTitle}收看页`}
           >
+            {siteIconUrl ? (
+              <img className="brand-icon" src={siteIconUrl} alt="" aria-hidden="true" />
+            ) : null}
             <span className="brand-title">{siteTitle}</span>
           </a>
 
@@ -1874,6 +1877,7 @@ export function App() {
                     liveRoomDetails={liveRoomDetails}
                     setLiveRoomDetails={setLiveRoomDetails}
                     setLiveRoomValue={setLiveRoomValue}
+                    setRelayUrlValue={setRelayUrlValue}
                     selectPageWithGuard={selectPageWithGuard}
                     authState={authState}
                     log={log}
@@ -1895,8 +1899,6 @@ export function App() {
 
           <SettingsPage
             hidden={!showSettingsPage}
-            relayUrl={relayUrl}
-            relayHost={relayHost}
             buildLabel={buildLabel}
             authAvailable={authState.available}
             authLoading={authState.loading}
@@ -1908,10 +1910,6 @@ export function App() {
             onUpdateDisplayName={(displayName) => updateDisplayName(displayName)}
             onUpdateHandle={(handle) => updateHandle(handle)}
             onUpdateAvatar={(file) => updateAvatar(file)}
-            onRelayUrlInput={(event) => {
-              autorunRef.current = false;
-              setRelayUrlValue(event.currentTarget.value);
-            }}
             onOpenFollowUserRoom={(target) => {
               beginWatch(target);
             }}

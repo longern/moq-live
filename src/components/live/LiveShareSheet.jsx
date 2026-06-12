@@ -1,4 +1,4 @@
-import { Copy, QrCode, Share } from "lucide-react";
+import { Camera, Copy, QrCode, Share } from "lucide-react";
 import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
 
 export function LiveShareSheet({
@@ -6,7 +6,9 @@ export function LiveShareSheet({
   onClose,
   onCopyLink,
   onOpenImageShare,
+  onOpenScreenshotShare,
   onShareLink,
+  screenshotShareAvailable = false,
   shareSupported = false,
   watchLink = "",
 }) {
@@ -45,6 +47,18 @@ export function LiveShareSheet({
             <QrCode aria-hidden="true" />
           </span>
           <span>图片分享</span>
+        </button>
+        <button
+          type="button"
+          className="watch-mobile-more-action"
+          onClick={onOpenScreenshotShare}
+          disabled={!watchLink || !screenshotShareAvailable}
+          aria-label="截屏分享"
+        >
+          <span className="watch-mobile-more-action-icon">
+            <Camera aria-hidden="true" />
+          </span>
+          <span>截屏分享</span>
         </button>
         <button
           type="button"

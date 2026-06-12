@@ -386,6 +386,7 @@ export function LiveRoute({
   liveRoomDetails,
   setLiveRoomDetails,
   setLiveRoomValue,
+  setRelayUrlValue,
   selectPageWithGuard,
   authState,
   log,
@@ -806,6 +807,10 @@ export function LiveRoute({
     });
   }
 
+  function changeRelayUrl(nextUrl) {
+    setRelayUrlValue?.(nextUrl);
+  }
+
   async function changePublishQuality(qualityId) {
     writeStoredStreamSettings(streamSettingsStorageKey, {
       protocol: publisher.publishProtocol,
@@ -1049,6 +1054,7 @@ export function LiveRoute({
         selectedMicrophoneId: publisher.selectedMicrophoneId,
         publishQualityId: publisher.publishQualityId,
         publishProtocol: publisher.publishProtocol,
+        relayUrl,
         webRtcPublishUrl: publisher.webRtcPublishUrl,
         webRtcPlaybackUrl: publisher.webRtcPlaybackUrl,
         cameraEnabled: publisher.cameraEnabled,
@@ -1113,6 +1119,7 @@ export function LiveRoute({
             log(`publish protocol switch failed: ${message}`);
           });
         },
+        onRelayUrlChange: changeRelayUrl,
         onWebRtcPublishUrlChange: changeWebRtcPublishUrl,
         onWebRtcPlaybackUrlChange: changeWebRtcPlaybackUrl,
         onCycleCamera: cycleCameraMode,

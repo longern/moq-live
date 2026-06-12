@@ -82,6 +82,7 @@ export function LiveMobilePage({
     publishProtocolOptions = [],
     publishQualityId,
     publishProtocol,
+    relayUrl,
     webRtcPublishUrl,
     webRtcPlaybackUrl,
     cameraEnabled,
@@ -129,12 +130,14 @@ export function LiveMobilePage({
     onToggleMicrophone,
     onPublishQualityChange,
     onPublishProtocolChange,
+    onRelayUrlChange,
     onWebRtcPublishUrlChange,
     onWebRtcPlaybackUrlChange,
     onTogglePublish,
     onShare,
     onCopyShareLink,
     onOpenImageShare,
+    onOpenScreenshotShare,
     onChatDraftChange,
     onChatSend,
     onChatMessageRetract,
@@ -826,10 +829,12 @@ export function LiveMobilePage({
             publishQualityId={publishQualityId}
             publishProtocolOptions={publishProtocolOptions}
             publishProtocol={publishProtocol}
+            relayUrl={relayUrl}
             webRtcPublishUrl={webRtcPublishUrl}
             webRtcPlaybackUrl={webRtcPlaybackUrl}
             onPublishQualityChange={onPublishQualityChange}
             onPublishProtocolChange={onPublishProtocolChange}
+            onRelayUrlChange={onRelayUrlChange}
             onWebRtcPublishUrlChange={onWebRtcPublishUrlChange}
             onWebRtcPlaybackUrlChange={onWebRtcPlaybackUrlChange}
             onAfterSelect={closeQualitySheet}
@@ -844,7 +849,12 @@ export function LiveMobilePage({
             closeShareSheet();
             onOpenImageShare?.();
           }}
+          onOpenScreenshotShare={() => {
+            closeShareSheet();
+            onOpenScreenshotShare?.();
+          }}
           onShareLink={onShare}
+          screenshotShareAvailable={mediaMode === "video" && previewActive && previewHasVideo}
           shareSupported={shareSupported}
           watchLink={watchLink}
         />

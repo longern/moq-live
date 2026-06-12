@@ -55,75 +55,97 @@ export function WatchSessionPage({
   roomTitle,
   welcomeMessage,
   siteTitle,
-  hostUserId,
-  hostHandle,
-  hostDisplayName,
-  hostAvatarUrl,
-  hostGender = "",
-  hostBirthDate = "",
-  hostBio = "",
-  hostLocationProvince = "位置未知",
-  hostLocationAvailable = false,
-  hostDistanceAvailable = hostLocationAvailable,
-  hostLocationUpdatedAt = "",
-  hostFollowerCount = 0,
-  hostFollowingCount = 0,
-  hostIcon,
-  hostFollowing = false,
-  hostFollowLoading = false,
-  hostFollowBusy = false,
-  hostNotifyLiveStarted = false,
-  hostNotifyBusy = false,
-  onHostFollowToggle,
-  onHostNotifyLiveToggle,
-  roomCoverUrl,
-  siteIconUrl,
-  watchLink,
-  stageLoading,
-  stageMessage,
-  chatRoom,
-  chatRoomLabel,
-  playerStatusMessage,
-  playerStatusKind = "idle",
-  playerBadge,
-  fullscreenActive,
-  playerPaused,
-  playerMuted,
-  showTapToUnmute,
-  playerOrientation,
-  cohostPlayerOrientation,
-  onStop,
-  onTogglePlayback,
-  onToggleMute,
-  onDismissTapToUnmute,
-  onFullscreen,
-  stageRef,
-  playerSession,
-  playerStarted = false,
-  playerFreezeFrameUrl = "",
-  playerRef,
-  cohostActive = null,
-  cohostPlayerSession = null,
-  cohostPlayerStarted = false,
-  cohostPlayerMuted = true,
-  cohostPlayerRef,
-  cohostPlayerStatus = "",
-  cohostPlayerBadge = { state: "idle" },
-  authAvailable,
-  authLoading,
-  authUser,
-  chatMessages,
-  chatDraft,
-  chatConnectionState,
-  chatOnlineCount,
-  chatLoggedInViewers = [],
-  chatReadOnly,
-  chatError,
-  testPlayback,
-  onChatDraftChange,
-  onChatSend,
-  onChatRequireLogin
+  host = {},
+  media = {},
+  player = {},
+  cohost = {},
+  auth = {},
+  chat = {},
+  actions = {},
+  testPlayback
 }) {
+  const {
+    userId: hostUserId,
+    handle: hostHandle,
+    displayName: hostDisplayName,
+    avatarUrl: hostAvatarUrl,
+    gender: hostGender = "",
+    birthDate: hostBirthDate = "",
+    bio: hostBio = "",
+    locationProvince: hostLocationProvince = "位置未知",
+    locationAvailable: hostLocationAvailable = false,
+    distanceAvailable: hostDistanceAvailable = hostLocationAvailable,
+    locationUpdatedAt: hostLocationUpdatedAt = "",
+    followerCount: hostFollowerCount = 0,
+    followingCount: hostFollowingCount = 0,
+    icon: hostIcon,
+    following: hostFollowing = false,
+    followLoading: hostFollowLoading = false,
+    followBusy: hostFollowBusy = false,
+    notifyLiveStarted: hostNotifyLiveStarted = false,
+    notifyBusy: hostNotifyBusy = false,
+  } = host;
+  const {
+    roomCoverUrl,
+    siteIconUrl,
+    watchLink,
+    stageLoading,
+    stageMessage,
+  } = media;
+  const {
+    statusMessage: playerStatusMessage,
+    statusKind: playerStatusKind = "idle",
+    badge: playerBadge,
+    fullscreenActive,
+    paused: playerPaused,
+    muted: playerMuted,
+    showTapToUnmute,
+    orientation: playerOrientation,
+    stageRef,
+    session: playerSession,
+    started: playerStarted = false,
+    freezeFrameUrl: playerFreezeFrameUrl = "",
+    ref: playerRef,
+  } = player;
+  const {
+    active: cohostActive = null,
+    session: cohostPlayerSession = null,
+    started: cohostPlayerStarted = false,
+    muted: cohostPlayerMuted = true,
+    ref: cohostPlayerRef,
+    status: cohostPlayerStatus = "",
+    badge: cohostPlayerBadge = { state: "idle" },
+    orientation: cohostPlayerOrientation,
+  } = cohost;
+  const {
+    available: authAvailable,
+    loading: authLoading,
+    user: authUser,
+  } = auth;
+  const {
+    room: chatRoom,
+    roomLabel: chatRoomLabel,
+    messages: chatMessages,
+    draft: chatDraft,
+    connectionState: chatConnectionState,
+    onlineCount: chatOnlineCount,
+    loggedInViewers: chatLoggedInViewers = [],
+    readOnly: chatReadOnly,
+    error: chatError,
+    recovering: chatRecovering = false,
+  } = chat;
+  const {
+    onStop,
+    onTogglePlayback,
+    onToggleMute,
+    onDismissTapToUnmute,
+    onFullscreen,
+    onHostFollowToggle,
+    onHostNotifyLiveToggle,
+    onChatDraftChange,
+    onChatSend,
+    onChatRequireLogin,
+  } = actions;
   const [controlsVisible, setControlsVisible] = useState(false);
   const [immersiveControlsHidden, setImmersiveControlsHidden] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -1115,6 +1137,7 @@ export function WatchSessionPage({
                   onlineCount={chatOnlineCount}
                   readOnly={chatReadOnly}
                   chatError={chatError}
+                  chatRecovering={chatRecovering}
                   variant="floating"
                   className="chat-panel-watch-overlay"
                 />
@@ -1259,6 +1282,7 @@ export function WatchSessionPage({
             onlineCount={chatOnlineCount}
             readOnly={chatReadOnly}
             chatError={chatError}
+            chatRecovering={chatRecovering}
           />
         </aside>
       </div>

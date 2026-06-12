@@ -785,10 +785,19 @@
     padding: 16px;
   }
 
+  .live-mobile-share-panel {
+    gap: 12px;
+    padding: 16px;
+  }
+
   .watch-mobile-more-actions {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  .live-share-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .watch-mobile-more-action {
@@ -1020,7 +1029,7 @@
     --watch-chat-list-max-height: min(34vh, 260px);
     --watch-chat-list-fade-size: 30px;
     flex: 0 1 auto;
-    align-items: flex-start;
+    align-items: stretch;
     min-height: 0;
     max-height: var(--watch-chat-list-max-height);
     padding: 0 72px 8px 0;
@@ -1056,7 +1065,7 @@
     height: 0;
   }
 
-  .chat-panel-watch-overlay .chat-message-card {
+  .chat-panel-watch-overlay .chat-message-hit-area {
     max-width: min(84%, 320px);
     grid-template-columns: 18px minmax(0, 1fr);
     gap: 4px;
@@ -1092,7 +1101,7 @@
     min-width: 0;
     min-height: 36px;
     height: 36px;
-    border: 1px solid var(--watch-float-border);
+    border: 0;
     border-radius: 999px;
     background: var(--watch-float-bg);
     padding: 0 14px;

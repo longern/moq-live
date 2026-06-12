@@ -392,6 +392,8 @@ export function LiveRoute({
   onRequireLogin,
   onReturnHome,
   syntheticSessionRef,
+  siteIconUrl = "",
+  siteTitle = "",
   onRouteReady,
 }) {
   useEffect(() => {
@@ -1015,167 +1017,188 @@ export function LiveRoute({
 
   return (
     <LivePage
-      hidden={hidden}
-      room={liveRoom}
-      roomDetails={liveRoomDetails}
-      roomLabel={liveRoomLabel}
-      roomAvatarUrl={liveRoomAvatarUrl}
-      shareTarget={liveShareTarget}
-      watchLink={liveWatchLink}
-      publishBlocked={publishBlocked}
-      publishBlockedReason={publishBlockedReason}
-      roomInfoBlockedReason={
-        publishControlBlocked
+      view={{ hidden }}
+      room={{
+        details: liveRoomDetails,
+        label: liveRoomLabel,
+        avatarUrl: liveRoomAvatarUrl,
+        infoBlockedReason: publishControlBlocked
           ? getAppErrorMessage({ code: "broadcast_control_read_only" })
-          : ""
-      }
-      publishStatus={publisher.publishStatus}
-      publishBadge={publishBadge}
-      cameraOptions={publisher.cameraOptions}
-      microphoneOptions={publisher.microphoneOptions}
-      publishQualityOptions={publisher.publishQualityOptions}
-      publishProtocolOptions={publisher.publishProtocolOptions}
-      selectedCameraId={publisher.selectedCameraId}
-      selectedMicrophoneId={publisher.selectedMicrophoneId}
-      publishQualityId={publisher.publishQualityId}
-      publishProtocol={publisher.publishProtocol}
-      webRtcPublishUrl={publisher.webRtcPublishUrl}
-      webRtcPlaybackUrl={publisher.webRtcPlaybackUrl}
-      cameraEnabled={publisher.cameraEnabled}
-      microphoneEnabled={publisher.microphoneEnabled}
-      cameraMode={cameraMode}
-      isPublishing={publisher.publisherIsPublishing}
-      isStarting={publisher.publisherIsStarting}
-      previewActive={publisher.previewActive}
-      previewHasVideo={publisher.previewHasVideo}
-      previewPending={publisher.previewPending}
-      syntheticPublishing={publisher.syntheticPublishing}
-      previewVideoRef={publisher.previewVideoRef}
-      onCameraChange={(event) => {
-        void changeCamera(event.currentTarget.value);
+          : "",
+        siteIconUrl,
+        siteTitle,
       }}
-      onMicrophoneChange={(event) => {
-        publisher.setSelectedMicrophoneId(event.currentTarget.value);
-        publisher.setMicrophoneEnabled(true);
+      share={{
+        target: liveShareTarget,
+        watchLink: liveWatchLink,
       }}
-      onPublishQualityChange={(qualityId) => {
-        void changePublishQuality(qualityId).catch((error) => {
-          const message = getAppErrorMessage(error);
-          log(`publish quality switch failed: ${message}`);
-        });
+      publish={{
+        blocked: publishBlocked,
+        blockedReason: publishBlockedReason,
+        badge: publishBadge,
+        isPublishing: publisher.publisherIsPublishing,
+        isStarting: publisher.publisherIsStarting,
+        syntheticPublishing: publisher.syntheticPublishing,
       }}
-      onPublishProtocolChange={(protocol) => {
-        void changePublishProtocol(protocol).catch((error) => {
-          const message = getAppErrorMessage(error);
-          log(`publish protocol switch failed: ${message}`);
-        });
+      media={{
+        cameraOptions: publisher.cameraOptions,
+        microphoneOptions: publisher.microphoneOptions,
+        publishQualityOptions: publisher.publishQualityOptions,
+        publishProtocolOptions: publisher.publishProtocolOptions,
+        selectedCameraId: publisher.selectedCameraId,
+        selectedMicrophoneId: publisher.selectedMicrophoneId,
+        publishQualityId: publisher.publishQualityId,
+        publishProtocol: publisher.publishProtocol,
+        webRtcPublishUrl: publisher.webRtcPublishUrl,
+        webRtcPlaybackUrl: publisher.webRtcPlaybackUrl,
+        cameraEnabled: publisher.cameraEnabled,
+        microphoneEnabled: publisher.microphoneEnabled,
+        cameraMode,
+        previewActive: publisher.previewActive,
+        previewHasVideo: publisher.previewHasVideo,
+        previewPending: publisher.previewPending,
+        previewSourceType: publisher.previewSourceType,
+        screenShareSupported: publisher.screenShareSupported,
+        screenShareActive: publisher.screenShareActive,
+        previewVideoRef: publisher.previewVideoRef,
       }}
-      onWebRtcPublishUrlChange={changeWebRtcPublishUrl}
-      onWebRtcPlaybackUrlChange={changeWebRtcPlaybackUrl}
-      onCycleCamera={cycleCameraMode}
-      onToggleMicrophone={() => {
-        publisher.setMicrophoneEnabled(!publisher.microphoneEnabled);
+      settings={{
+        commentSpeechEnabled: commentSpeechEnabled && commentSpeechSupported,
+        commentSpeechSupported,
+        liveNotificationEnabled,
+        locationSharingEnabled: locationSharingEnabled && locationSharingSupported,
+        locationSharingSupported,
+        locationSharingPending,
       }}
-      onTogglePublish={() => {
-        if (publisher.publisherIsPublishing || publisher.publisherIsStarting) {
+      cohost={{
+        invitesAllowed: liveChat.cohostInvitesAllowed,
+        invite: liveChat.cohostInvite,
+        inviteResponse: liveChat.cohostInviteResponse,
+        active: liveChat.cohostActive,
+        recentHosts: cohostRecentHosts,
+      }}
+      chat={{
+        messages: liveChat.messages,
+        draft: liveChat.draft,
+        connectionState: liveChatEnabled ? liveChat.connectionState : "closed",
+        onlineCount: liveChat.onlineCount,
+        loggedInViewers: liveChat.loggedInViewers,
+        readOnly: liveChat.readOnly,
+        error: liveChatEnabled ? liveChat.chatError : "",
+        recovering: liveChatEnabled ? liveChat.recoveringFromPageLifecycle : false,
+        canRetractMessages: liveChatEnabled && liveChat.canControlBroadcast,
+      }}
+      auth={{
+        available: authState.available,
+        loading: authState.loading,
+        user: authState.user,
+      }}
+      actions={{
+        onCameraChange: (event) => {
+          void changeCamera(event.currentTarget.value);
+        },
+        onMicrophoneChange: (event) => {
+          publisher.setSelectedMicrophoneId(event.currentTarget.value);
+          publisher.setMicrophoneEnabled(true);
+        },
+        onPublishQualityChange: (qualityId) => {
+          void changePublishQuality(qualityId).catch((error) => {
+            const message = getAppErrorMessage(error);
+            log(`publish quality switch failed: ${message}`);
+          });
+        },
+        onPublishProtocolChange: (protocol) => {
+          void changePublishProtocol(protocol).catch((error) => {
+            const message = getAppErrorMessage(error);
+            log(`publish protocol switch failed: ${message}`);
+          });
+        },
+        onWebRtcPublishUrlChange: changeWebRtcPublishUrl,
+        onWebRtcPlaybackUrlChange: changeWebRtcPlaybackUrl,
+        onCycleCamera: cycleCameraMode,
+        onToggleMicrophone: () => {
+          publisher.setMicrophoneEnabled(!publisher.microphoneEnabled);
+        },
+        onTogglePublish: () => {
+          if (publisher.publisherIsPublishing || publisher.publisherIsStarting) {
+            void publisher.stopCameraPublish();
+            return;
+          }
+          void publisher.startCameraPublish().catch((error) => {
+            const message = getAppErrorMessage(error);
+            log(`camera publish failed: ${message}`);
+          });
+        },
+        onStartPublish: () => {
+          void publisher.startCameraPublish().catch((error) => {
+            const message = getAppErrorMessage(error);
+            log(`camera publish failed: ${message}`);
+          });
+        },
+        onStopPublish: () => {
           void publisher.stopCameraPublish();
-          return;
-        }
-        void publisher.startCameraPublish().catch((error) => {
-          const message = getAppErrorMessage(error);
-          log(`camera publish failed: ${message}`);
-        });
+        },
+        onShare: () => {
+          void shareLiveRoom().catch((error) => {
+            log(`share failed: ${getAppErrorMessage(error)}`);
+          });
+        },
+        onStartSynthetic: () => {
+          selectPageWithGuard("live");
+          void publisher.startSyntheticPublish().catch((error) => {
+            const message = getAppErrorMessage(error);
+            log(`synthetic publish failed: ${message}`);
+          });
+        },
+        onStopSynthetic: () => {
+          selectPageWithGuard("live");
+          void publisher.stopSyntheticPublish();
+        },
+        onRequestClose: () => {
+          void closeLivePage().catch((error) => {
+            log(`live close cleanup failed: ${getAppErrorMessage(error)}`);
+            liveChat.releaseBroadcastControl();
+            onReturnHome?.();
+          });
+        },
+        onSelectLiveMode: selectLiveMode,
+        onStartScreenShare: () => {
+          void publisher.startScreenShare().catch((error) => {
+            const message = getAppErrorMessage(error);
+            log(`screen share failed: ${message}`);
+          });
+        },
+        onStopScreenShare: () => {
+          void publisher.stopScreenShare().catch((error) => {
+            const message = getAppErrorMessage(error);
+            log(`screen share stop failed: ${message}`);
+          });
+        },
+        onCommentSpeechEnabledChange: changeCommentSpeechEnabled,
+        onLiveNotificationEnabledChange: changeLiveNotificationEnabled,
+        onLocationSharingEnabledChange: (nextEnabled) => {
+          void changeLocationSharingEnabled(nextEnabled);
+        },
+        onCohostInvitesAllowedChange: (nextAllowed) => {
+          liveChat.setCohostInviteAllowed(nextAllowed);
+        },
+        onCohostDisconnect: () => {
+          liveChat.clearCohostActive();
+        },
+        onCohostInviteRequest: requestCohostInvite,
+        onCohostInviteRespond: (invite, accepted) => respondToCohostInvite(invite, accepted),
+        onChatDraftChange: (event) => {
+          liveChat.setDraft(event.currentTarget.value);
+        },
+        onChatSend: () => {
+          liveChat.sendMessage();
+        },
+        onChatMessageRetract: (messageId) => {
+          liveChat.retractMessage(messageId);
+        },
+        onChatRequireLogin: onRequireLogin,
+        onRoomDetailsChange: setLiveRoomDetails,
       }}
-      onStartPublish={() => {
-        void publisher.startCameraPublish().catch((error) => {
-          const message = getAppErrorMessage(error);
-          log(`camera publish failed: ${message}`);
-        });
-      }}
-      onStopPublish={() => {
-        void publisher.stopCameraPublish();
-      }}
-      onShare={() => {
-        void shareLiveRoom().catch((error) => {
-          log(`share failed: ${getAppErrorMessage(error)}`);
-        });
-      }}
-      onStartSynthetic={() => {
-        selectPageWithGuard("live");
-        void publisher.startSyntheticPublish().catch((error) => {
-          const message = getAppErrorMessage(error);
-          log(`synthetic publish failed: ${message}`);
-        });
-      }}
-      onStopSynthetic={() => {
-        selectPageWithGuard("live");
-        void publisher.stopSyntheticPublish();
-      }}
-      onRequestClose={() => {
-        void closeLivePage().catch((error) => {
-          log(`live close cleanup failed: ${getAppErrorMessage(error)}`);
-          liveChat.releaseBroadcastControl();
-          onReturnHome?.();
-        });
-      }}
-      onSelectLiveMode={selectLiveMode}
-      screenShareSupported={publisher.screenShareSupported}
-      screenShareActive={publisher.screenShareActive}
-      previewSourceType={publisher.previewSourceType}
-      onStartScreenShare={() => {
-        void publisher.startScreenShare().catch((error) => {
-          const message = getAppErrorMessage(error);
-          log(`screen share failed: ${message}`);
-        });
-      }}
-      onStopScreenShare={() => {
-        void publisher.stopScreenShare().catch((error) => {
-          const message = getAppErrorMessage(error);
-          log(`screen share stop failed: ${message}`);
-        });
-      }}
-      commentSpeechEnabled={commentSpeechEnabled && commentSpeechSupported}
-      commentSpeechSupported={commentSpeechSupported}
-      onCommentSpeechEnabledChange={changeCommentSpeechEnabled}
-      liveNotificationEnabled={liveNotificationEnabled}
-      onLiveNotificationEnabledChange={changeLiveNotificationEnabled}
-      locationSharingEnabled={locationSharingEnabled && locationSharingSupported}
-      locationSharingSupported={locationSharingSupported}
-      locationSharingPending={locationSharingPending}
-      onLocationSharingEnabledChange={(nextEnabled) => {
-        void changeLocationSharingEnabled(nextEnabled);
-      }}
-      cohostInvitesAllowed={liveChat.cohostInvitesAllowed}
-      cohostInvite={liveChat.cohostInvite}
-      cohostInviteResponse={liveChat.cohostInviteResponse}
-      cohostActive={liveChat.cohostActive}
-      cohostRecentHosts={cohostRecentHosts}
-      onCohostInvitesAllowedChange={(nextAllowed) => {
-        liveChat.setCohostInviteAllowed(nextAllowed);
-      }}
-      onCohostDisconnect={() => {
-        liveChat.clearCohostActive();
-      }}
-      onCohostInviteRequest={requestCohostInvite}
-      onCohostInviteRespond={(invite, accepted) => respondToCohostInvite(invite, accepted)}
-      chatMessages={liveChat.messages}
-      chatDraft={liveChat.draft}
-      chatConnectionState={liveChatEnabled ? liveChat.connectionState : "closed"}
-      chatOnlineCount={liveChat.onlineCount}
-      chatLoggedInViewers={liveChat.loggedInViewers}
-      chatReadOnly={liveChat.readOnly}
-      chatError={liveChatEnabled ? liveChat.chatError : ""}
-      authAvailable={authState.available}
-      authLoading={authState.loading}
-      authUser={authState.user}
-      onChatDraftChange={(event) => {
-        liveChat.setDraft(event.currentTarget.value);
-      }}
-      onChatSend={() => {
-        liveChat.sendMessage();
-      }}
-      onChatRequireLogin={onRequireLogin}
-      onRoomDetailsChange={setLiveRoomDetails}
     />
   );
 }

@@ -1724,58 +1724,6 @@ export function App() {
             roomLabel={watchRoomLabel}
             roomTitle={watchRoomTitle}
             welcomeMessage={watchWelcomeMessage}
-            hostUserId={watchHostUserId}
-            hostHandle={watchRoomResolution.hostHandle}
-            hostDisplayName={watchHostDisplayName}
-            hostAvatarUrl={watchHostAvatarUrl}
-            hostGender={watchRoomResolution.hostGender}
-            hostBirthDate={watchRoomResolution.hostBirthDate}
-            hostBio={watchRoomResolution.hostBio}
-            hostLocationProvince={watchHostLocationProvince}
-            hostLocationAvailable={watchHostLocationAvailable}
-            hostDistanceAvailable={watchHostDistanceAvailable}
-            hostLocationUpdatedAt={watchHostLocationUpdatedAt}
-            hostFollowerCount={watchHostFollowerCount}
-            hostFollowingCount={watchHostFollowingCount}
-            hostIcon={watchHostIcon}
-            hostFollowing={watchFollowState.hostUserId === watchHostUserId && watchFollowState.following}
-            hostFollowLoading={
-              authState.loading ||
-              (
-                watchFollowState.hostUserId === watchHostUserId &&
-                watchFollowState.loading
-              )
-            }
-            hostFollowBusy={
-              watchFollowState.hostUserId === watchHostUserId &&
-              watchFollowState.busy
-            }
-            hostNotifyLiveStarted={
-              watchFollowState.hostUserId === watchHostUserId &&
-              watchFollowState.notifyLiveStarted
-            }
-            hostNotifyBusy={
-              watchFollowState.hostUserId === watchHostUserId &&
-              watchFollowState.notifyBusy
-            }
-            onHostFollowToggle={toggleWatchFollow}
-            onHostNotifyLiveToggle={toggleWatchLiveNotification}
-            roomCoverUrl={watchRoomCoverUrl}
-            siteIconUrl={siteIconUrl}
-            watchLink={watchPageLink}
-            stageLoading={watchStageLoading}
-            stageMessage={watchStageMessage}
-            chatRoom={watchChatRoom}
-            chatRoomLabel={watchChatRoomLabel}
-            playerStatusMessage={effectivePlayerStatus}
-            playerStatusKind={effectivePlayerStatusKind}
-            playerBadge={playerBadge}
-            fullscreenActive={player.fullscreenActive}
-            playerPaused={watchingTestChannel ? false : player.playerPaused}
-            playerMuted={watchingTestChannel ? true : player.playerMuted}
-            showTapToUnmute={watchingTestChannel ? false : player.showTapToUnmute}
-            playerOrientation={effectivePlayerOrientation}
-            cohostPlayerOrientation={cohostPlayer.playerOrientation}
             room={watchRoom}
             onRoomInput={(event) => {
               setWatchRoomValue(event.currentTarget.value);
@@ -1786,65 +1734,121 @@ export function App() {
             onOpenRoom={(nextRoom) => {
               beginWatch(nextRoom);
             }}
-            onStop={() => {
-              autorunRef.current = false;
-              setWatchRouteCommitted(false);
-              setWatchRoomValue("");
-              selectPageWithGuard("watch", { updateAutorun: false });
-              void player.stopPlayer();
-              void cohostPlayer.stopPlayer();
+            host={{
+              userId: watchHostUserId,
+              handle: watchRoomResolution.hostHandle,
+              displayName: watchHostDisplayName,
+              avatarUrl: watchHostAvatarUrl,
+              gender: watchRoomResolution.hostGender,
+              birthDate: watchRoomResolution.hostBirthDate,
+              bio: watchRoomResolution.hostBio,
+              locationProvince: watchHostLocationProvince,
+              locationAvailable: watchHostLocationAvailable,
+              distanceAvailable: watchHostDistanceAvailable,
+              locationUpdatedAt: watchHostLocationUpdatedAt,
+              followerCount: watchHostFollowerCount,
+              followingCount: watchHostFollowingCount,
+              icon: watchHostIcon,
+              following: watchFollowState.hostUserId === watchHostUserId && watchFollowState.following,
+              followLoading: authState.loading ||
+                (
+                  watchFollowState.hostUserId === watchHostUserId &&
+                  watchFollowState.loading
+                ),
+              followBusy: watchFollowState.hostUserId === watchHostUserId && watchFollowState.busy,
+              notifyLiveStarted: watchFollowState.hostUserId === watchHostUserId && watchFollowState.notifyLiveStarted,
+              notifyBusy: watchFollowState.hostUserId === watchHostUserId && watchFollowState.notifyBusy,
             }}
-            onTogglePlayback={() => {
-              void player.togglePlayerPlayback().catch((error) => {
-                log(`toggle playback failed: ${error instanceof Error ? error.message : String(error)}`);
-              });
+            media={{
+              roomCoverUrl: watchRoomCoverUrl,
+              siteIconUrl,
+              watchLink: watchPageLink,
+              stageLoading: watchStageLoading,
+              stageMessage: watchStageMessage,
             }}
-            onToggleMute={() => {
-              void player.togglePlayerMute().catch((error) => {
-                log(`toggle mute failed: ${error instanceof Error ? error.message : String(error)}`);
-              });
+            player={{
+              statusMessage: effectivePlayerStatus,
+              statusKind: effectivePlayerStatusKind,
+              badge: playerBadge,
+              fullscreenActive: player.fullscreenActive,
+              paused: watchingTestChannel ? false : player.playerPaused,
+              muted: watchingTestChannel ? true : player.playerMuted,
+              showTapToUnmute: watchingTestChannel ? false : player.showTapToUnmute,
+              orientation: effectivePlayerOrientation,
+              stageRef: player.watchStageRef,
+              session: effectivePlayerSession,
+              started: effectivePlayerStarted,
+              freezeFrameUrl: effectivePlayerFreezeFrameUrl,
+              ref: player.playerRef,
             }}
-            onDismissTapToUnmute={() => {
-              void player.dismissTapToUnmute().catch((error) => {
-                log(`tap to unmute failed: ${error instanceof Error ? error.message : String(error)}`);
-              });
+            cohost={{
+              active: cohostActive,
+              session: cohostPlayer.playerSession,
+              started: cohostPlayer.playerStarted,
+              muted: cohostPlayer.playerMuted,
+              ref: cohostPlayer.playerRef,
+              status: cohostPlayer.playerStatus,
+              badge: describePlayerState(cohostPlayer.playerStatusKind),
+              orientation: cohostPlayer.playerOrientation,
             }}
-            onFullscreen={() => {
-              void player.fullscreenPlayer().catch((error) => {
-                log(`fullscreen failed: ${error instanceof Error ? error.message : String(error)}`);
-              });
-            }}
-            stageRef={player.watchStageRef}
-            playerSession={effectivePlayerSession}
-            playerStarted={effectivePlayerStarted}
-            playerFreezeFrameUrl={effectivePlayerFreezeFrameUrl}
-            playerRef={player.playerRef}
-            cohostActive={cohostActive}
-            cohostPlayerSession={cohostPlayer.playerSession}
-            cohostPlayerStarted={cohostPlayer.playerStarted}
-            cohostPlayerMuted={cohostPlayer.playerMuted}
-            cohostPlayerRef={cohostPlayer.playerRef}
-            cohostPlayerStatus={cohostPlayer.playerStatus}
-            cohostPlayerBadge={describePlayerState(cohostPlayer.playerStatusKind)}
             testPlayback={watchTestChannel}
-            authAvailable={authState.available}
-            authLoading={authState.loading}
-            authUser={authState.user}
-            chatMessages={chat.messages}
-            chatDraft={chat.draft}
-            chatConnectionState={chat.connectionState}
-            chatOnlineCount={chat.onlineCount}
-            chatLoggedInViewers={chat.loggedInViewers}
-            chatReadOnly={chat.readOnly}
-            chatError={chat.chatError}
-            onChatDraftChange={(event) => {
-              chat.setDraft(event.currentTarget.value);
+            auth={{
+              available: authState.available,
+              loading: authState.loading,
+              user: authState.user,
             }}
-            onChatSend={() => {
-              chat.sendMessage();
+            chat={{
+              room: watchChatRoom,
+              roomLabel: watchChatRoomLabel,
+              messages: chat.messages,
+              draft: chat.draft,
+              connectionState: chat.connectionState,
+              onlineCount: chat.onlineCount,
+              loggedInViewers: chat.loggedInViewers,
+              readOnly: chat.readOnly,
+              error: chat.chatError,
+              recovering: chat.recoveringFromPageLifecycle,
             }}
-            onChatRequireLogin={() => {
-              setLoginPromptOpen(true);
+            actions={{
+              onStop: () => {
+                autorunRef.current = false;
+                setWatchRouteCommitted(false);
+                setWatchRoomValue("");
+                selectPageWithGuard("watch", { updateAutorun: false });
+                void player.stopPlayer();
+                void cohostPlayer.stopPlayer();
+              },
+              onTogglePlayback: () => {
+                void player.togglePlayerPlayback().catch((error) => {
+                  log(`toggle playback failed: ${error instanceof Error ? error.message : String(error)}`);
+                });
+              },
+              onToggleMute: () => {
+                void player.togglePlayerMute().catch((error) => {
+                  log(`toggle mute failed: ${error instanceof Error ? error.message : String(error)}`);
+                });
+              },
+              onDismissTapToUnmute: () => {
+                void player.dismissTapToUnmute().catch((error) => {
+                  log(`tap to unmute failed: ${error instanceof Error ? error.message : String(error)}`);
+                });
+              },
+              onFullscreen: () => {
+                void player.fullscreenPlayer().catch((error) => {
+                  log(`fullscreen failed: ${error instanceof Error ? error.message : String(error)}`);
+                });
+              },
+              onHostFollowToggle: toggleWatchFollow,
+              onHostNotifyLiveToggle: toggleWatchLiveNotification,
+              onChatDraftChange: (event) => {
+                chat.setDraft(event.currentTarget.value);
+              },
+              onChatSend: () => {
+                chat.sendMessage();
+              },
+              onChatRequireLogin: () => {
+                setLoginPromptOpen(true);
+              },
             }}
           />
 
@@ -1873,6 +1877,8 @@ export function App() {
                     selectPageWithGuard={selectPageWithGuard}
                     authState={authState}
                     log={log}
+                    siteIconUrl={siteIconUrl}
+                    siteTitle={siteTitle}
                     onRequireLogin={() => {
                       setLoginPromptOpen(true);
                     }}

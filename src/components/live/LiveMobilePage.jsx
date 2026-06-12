@@ -22,12 +22,25 @@ import { LiveMoreMenu } from "./LiveMoreMenu.jsx";
 import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
 import { LivePreviewStage } from "./LivePreviewStage.jsx";
 import { LiveQualityMenu } from "./LiveQualityMenu.jsx";
+import { LiveShareSheet } from "./LiveShareSheet.jsx";
 import { LiveSwitch } from "./LiveSwitch.jsx";
 
-export function LiveMobilePage(props) {
+export function LiveMobilePage({
+  view = {},
+  room = {},
+  share = {},
+  publish = {},
+  media = {},
+  settings = {},
+  cohost = {},
+  chat = {},
+  auth = {},
+  actions = {},
+}) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [qualityDrawerOpen, setQualityDrawerOpen] = useState(false);
   const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
   const [cohostDrawerOpen, setCohostDrawerOpen] = useState(false);
@@ -38,10 +51,32 @@ export function LiveMobilePage(props) {
   const cameraNoticeTimerRef = useRef(null);
   const {
     hidden,
-    roomLabel,
-    roomAvatarUrl,
-    publishBlocked,
-    publishBlockedReason,
+    shellMode = "compact",
+    shareSupported,
+  } = view;
+  const {
+    label: roomLabel,
+    avatarUrl: roomAvatarUrl,
+    coverUrl: roomCoverUrl,
+    coverLoading: roomCoverLoading,
+    coverBusy: roomCoverBusy,
+    coverError: roomCoverError,
+    coverStatus: roomCoverStatus,
+    coverInputRef: roomCoverInputRef,
+    title: roomTitle,
+    welcomeMessage: roomWelcomeMessage,
+    infoBlockedReason: roomInfoBlockedReason,
+  } = room;
+  const {
+    watchLink,
+  } = share;
+  const {
+    blocked: publishBlocked,
+    blockedReason: publishBlockedReason,
+    isPublishing,
+    isStarting = false,
+  } = publish;
+  const {
     cameraOptions = [],
     publishQualityOptions = [],
     publishProtocolOptions = [],
@@ -49,15 +84,47 @@ export function LiveMobilePage(props) {
     publishProtocol,
     webRtcPublishUrl,
     webRtcPlaybackUrl,
+    cameraEnabled,
     cameraMode,
+    mediaMode,
     microphoneEnabled,
-    isPublishing,
-    isStarting = false,
     previewVideoRef,
     previewActive,
     previewHasVideo,
     previewPending,
     mirrorPreview,
+  } = media;
+  const {
+    commentSpeechEnabled,
+    commentSpeechSupported,
+    liveNotificationEnabled,
+    locationSharingEnabled,
+    locationSharingSupported,
+    locationSharingPending,
+  } = settings;
+  const {
+    invitesAllowed: cohostInvitesAllowed = true,
+    invite: cohostInvite = null,
+    active: cohostActive = null,
+    recentHosts: cohostRecentHosts = [],
+  } = cohost;
+  const {
+    messages: chatMessages,
+    draft: chatDraft,
+    connectionState: chatConnectionState,
+    onlineCount: chatOnlineCount,
+    loggedInViewers: chatLoggedInViewers = [],
+    readOnly: chatReadOnly,
+    error: chatError,
+    recovering: chatRecovering = false,
+    canRetractMessages = false,
+  } = chat;
+  const {
+    available: authAvailable,
+    loading: authLoading,
+    user: authUser,
+  } = auth;
+  const {
     onCycleCamera,
     onToggleMicrophone,
     onPublishQualityChange,
@@ -66,39 +133,12 @@ export function LiveMobilePage(props) {
     onWebRtcPlaybackUrlChange,
     onTogglePublish,
     onShare,
-    shareSupported,
-    watchLink,
-    chatMessages,
-    chatDraft,
-    chatConnectionState,
-    chatOnlineCount,
-    chatLoggedInViewers = [],
-    chatReadOnly,
-    chatError,
-    authAvailable,
-    authLoading,
-    authUser,
+    onCopyShareLink,
+    onOpenImageShare,
     onChatDraftChange,
     onChatSend,
+    onChatMessageRetract,
     onChatRequireLogin,
-    roomCoverUrl,
-    roomCoverLoading,
-    roomCoverBusy,
-    roomCoverError,
-    roomCoverStatus,
-    roomCoverInputRef,
-    roomTitle,
-    roomWelcomeMessage,
-    commentSpeechEnabled,
-    commentSpeechSupported,
-    liveNotificationEnabled,
-    locationSharingEnabled,
-    locationSharingSupported,
-    locationSharingPending,
-    cohostInvitesAllowed = true,
-    cohostInvite = null,
-    cohostActive = null,
-    cohostRecentHosts = [],
     onSaveRoomTitle,
     onSaveRoomWelcomeMessage,
     onCommentSpeechEnabledChange,
@@ -108,14 +148,13 @@ export function LiveMobilePage(props) {
     onCohostDisconnect,
     onCohostInviteRequest,
     onCohostInviteRespond,
-    roomInfoBlockedReason,
     onRoomInfoBlocked,
     onPickCover,
     onOpenCoverPicker,
-    shellMode = "compact"
-  } = props;
+    onRequestClose,
+    onSelectLiveMode,
+  } = actions;
   const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
-  const mediaMode = props.mediaMode;
   const publishControlActive = isPublishing || isStarting;
   const immersiveShell = shellMode === "immersive";
   const voiceMode = mediaMode === "voice";
@@ -165,6 +204,7 @@ export function LiveMobilePage(props) {
   function openMoreSheet() {
     setChatDrawerOpen(false);
     setAudienceOpen(false);
+    setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
     setCohostDrawerOpen(false);
@@ -181,6 +221,7 @@ export function LiveMobilePage(props) {
     }
     setMoreOpen(false);
     setAudienceOpen(false);
+    setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
     setCohostDrawerOpen(false);
@@ -197,6 +238,7 @@ export function LiveMobilePage(props) {
     }
     setMoreOpen(false);
     setChatDrawerOpen(false);
+    setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
     setCohostDrawerOpen(false);
@@ -207,10 +249,25 @@ export function LiveMobilePage(props) {
     setAudienceOpen(false);
   }
 
+  function openShareSheet() {
+    setMoreOpen(false);
+    setChatDrawerOpen(false);
+    setAudienceOpen(false);
+    setQualityDrawerOpen(false);
+    setMediaSettingsOpen(false);
+    setCohostDrawerOpen(false);
+    setShareOpen(true);
+  }
+
+  function closeShareSheet() {
+    setShareOpen(false);
+  }
+
   function openQualitySheet() {
     setMoreOpen(false);
     setChatDrawerOpen(false);
     setAudienceOpen(false);
+    setShareOpen(false);
     setMediaSettingsOpen(false);
     setCohostDrawerOpen(false);
     setQualityDrawerOpen(true);
@@ -224,6 +281,7 @@ export function LiveMobilePage(props) {
     setMoreOpen(false);
     setChatDrawerOpen(false);
     setAudienceOpen(false);
+    setShareOpen(false);
     setQualityDrawerOpen(false);
     setCohostDrawerOpen(false);
     setMediaSettingsOpen(true);
@@ -241,6 +299,7 @@ export function LiveMobilePage(props) {
     setMoreOpen(false);
     setChatDrawerOpen(false);
     setAudienceOpen(false);
+    setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
     setCohostDrawerOpen(true);
@@ -318,7 +377,7 @@ export function LiveMobilePage(props) {
             <button
               type="button"
               className={`live-page-close${publishControlActive ? " is-live-control" : ""}`}
-              onClick={publishControlActive ? onTogglePublish : props.onRequestClose}
+              onClick={publishControlActive ? onTogglePublish : onRequestClose}
               aria-label={publishControlActive ? (isStarting ? "取消开播" : "结束直播") : "退出开播页"}
             >
               {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
@@ -358,7 +417,7 @@ export function LiveMobilePage(props) {
                 <button
                   type="button"
                   className={mediaMode === "video" ? "is-active" : ""}
-                  onClick={() => props.onSelectLiveMode?.("video")}
+                  onClick={() => onSelectLiveMode?.("video")}
                   aria-pressed={mediaMode === "video"}
                 >
                   视频
@@ -366,7 +425,7 @@ export function LiveMobilePage(props) {
                 <button
                   type="button"
                   className={mediaMode === "voice" ? "is-active" : ""}
-                  onClick={() => props.onSelectLiveMode?.("voice")}
+                  onClick={() => onSelectLiveMode?.("voice")}
                   aria-pressed={mediaMode === "voice"}
                 >
                   语音
@@ -392,9 +451,17 @@ export function LiveMobilePage(props) {
             <button
               type="button"
               className="live-mobile-head-share"
-              onClick={onShare}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (shareOpen) {
+                  closeShareSheet();
+                  return;
+                }
+                openShareSheet();
+              }}
               aria-label="分享直播间"
-              disabled={!shareSupported || !watchLink}
+              aria-expanded={shareOpen}
+              disabled={!watchLink}
             >
               <ShareIcon />
             </button>
@@ -431,6 +498,9 @@ export function LiveMobilePage(props) {
                   onlineCount={chatOnlineCount}
                   readOnly={chatReadOnly}
                   chatError={chatError}
+                  chatRecovering={chatRecovering}
+                  canRetractMessages={canRetractMessages}
+                  onRetractMessage={onChatMessageRetract}
                   variant="floating"
                   className="chat-panel-live-mobile"
                   title="评论"
@@ -532,7 +602,7 @@ export function LiveMobilePage(props) {
                   type="button"
                   className={`live-fab live-fab-primary${isStarting ? " is-starting" : ""}`}
                   onClick={onTogglePublish}
-                  disabled={isStarting || publishBlocked || (!props.cameraEnabled && !microphoneEnabled)}
+                  disabled={isStarting || publishBlocked || (!cameraEnabled && !microphoneEnabled)}
                   aria-label={isStarting ? "正在开始直播" : "开始直播"}
                 >
                   开始直播
@@ -563,6 +633,9 @@ export function LiveMobilePage(props) {
               onlineCount={chatOnlineCount}
               readOnly={chatReadOnly}
               chatError={chatError}
+              chatRecovering={chatRecovering}
+              canRetractMessages={canRetractMessages}
+              onRetractMessage={onChatMessageRetract}
               title="评论"
               showWelcome={false}
               className="chat-panel-live-drawer"
@@ -762,6 +835,19 @@ export function LiveMobilePage(props) {
             onAfterSelect={closeQualitySheet}
           />
         </SwipeableDrawer>
+
+        <LiveShareSheet
+          open={shareOpen}
+          onClose={closeShareSheet}
+          onCopyLink={onCopyShareLink}
+          onOpenImageShare={() => {
+            closeShareSheet();
+            onOpenImageShare?.();
+          }}
+          onShareLink={onShare}
+          shareSupported={shareSupported}
+          watchLink={watchLink}
+        />
 
         <SwipeableDrawer
           open={moreOpen}

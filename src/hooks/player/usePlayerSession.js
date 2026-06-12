@@ -26,6 +26,8 @@ const AUDIO_RECOVERY_WINDOW_MS = 5 * 60 * 1000;
 const AUDIO_RECOVERY_STABLE_RESET_MS = 2 * 60 * 1000;
 const AUDIO_RECOVERY_MAX_ATTEMPTS = 12;
 const WHEP_UI_WATCHDOG_TIMEOUT_MS = 25_000;
+const WHEP_PAGE_RESTORE_CHECK_DELAY_MS = 700;
+const WHEP_PAGE_RESTORE_RESTART_COOLDOWN_MS = 5_000;
 
 export function getAppleOsUpgradeMessage(navigatorLike = globalThis.navigator) {
   if (!navigatorLike || typeof navigatorLike !== "object") {
@@ -139,6 +141,11 @@ export function usePlayerSession({
   const audioRecoveryAttemptsRef = useRef([]);
   const audioRecoveryInFlightRef = useRef(false);
   const audioRecoveryTimerRef = useRef(null);
+  const whepPageRestoreTimerRef = useRef(null);
+  const whepPageRestoreRestartedAtRef = useRef(0);
+  const playerPausedRef = useRef(playerPaused);
+  const playerStartedRef = useRef(playerStarted);
+  const playerStatusKindRef = useRef(playerStatusKind);
   const audioRecoveryStableRef = useRef({
     sessionKey: "",
     bytesReceived: 0,
@@ -148,6 +155,9 @@ export function usePlayerSession({
 
   logRef.current = log;
   playerSessionStateRef.current = playerSession;
+  playerPausedRef.current = playerPaused;
+  playerStartedRef.current = playerStarted;
+  playerStatusKindRef.current = playerStatusKind;
 
   function updatePlayerStatus(kind, message) {
     setPlayerStatusKind(kind);
@@ -289,6 +299,10 @@ export function usePlayerSession({
     if (audioRecoveryTimerRef.current) {
       clearTimeout(audioRecoveryTimerRef.current);
       audioRecoveryTimerRef.current = null;
+    }
+    if (whepPageRestoreTimerRef.current) {
+      clearTimeout(whepPageRestoreTimerRef.current);
+      whepPageRestoreTimerRef.current = null;
     }
     audioRecoveryInFlightRef.current = false;
 
@@ -567,6 +581,88 @@ export function usePlayerSession({
     });
   }
 
+  function shouldRestartWhepAfterPageRestore() {
+    const currentSession = playerSessionStateRef.current;
+    if (!currentSession || currentSession.protocol !== STREAM_PROTOCOL_WEBRTC) {
+      return { restart: false, reason: "no-whep-session" };
+    }
+    if (playerPausedRef.current || playerStatusKindRef.current === "paused") {
+      return { restart: false, reason: "user-paused" };
+    }
+
+    const ctx = sessionRef.current;
+    if (!ctx || ctx.protocol !== STREAM_PROTOCOL_WEBRTC) {
+      return { restart: true, reason: "missing-whep-context" };
+    }
+    if (ctx.failed) {
+      return { restart: true, reason: `failed phase=${ctx.phase || "unknown"}` };
+    }
+
+    const peerConnection = ctx.connection?.peerConnection;
+    const connectionState = peerConnection?.connectionState || "";
+    const iceConnectionState = peerConnection?.iceConnectionState || "";
+    if (["closed", "failed", "disconnected"].includes(connectionState)) {
+      return { restart: true, reason: `pc=${connectionState}` };
+    }
+    if (["closed", "failed", "disconnected"].includes(iceConnectionState)) {
+      return { restart: true, reason: `ice=${iceConnectionState}` };
+    }
+
+    const playerEl = playerRef.current;
+    if (!playerEl) {
+      return { restart: true, reason: "missing-video-element" };
+    }
+    if (playerEl.ended) {
+      return { restart: true, reason: "video-ended" };
+    }
+    if (playerStartedRef.current && playerEl.paused) {
+      return { restart: true, reason: "video-paused-after-background" };
+    }
+    if (playerStartedRef.current && playerEl.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      return { restart: true, reason: `readyState=${playerEl.readyState}` };
+    }
+
+    return { restart: false, reason: "whep-session-healthy" };
+  }
+
+  function scheduleWhepPageRestoreCheck(source) {
+    const currentSession = playerSessionStateRef.current;
+    if (!currentSession || currentSession.protocol !== STREAM_PROTOCOL_WEBRTC) {
+      return;
+    }
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return;
+    }
+    if (whepPageRestoreTimerRef.current) {
+      clearTimeout(whepPageRestoreTimerRef.current);
+    }
+
+    whepPageRestoreTimerRef.current = window.setTimeout(() => {
+      whepPageRestoreTimerRef.current = null;
+      const { restart, reason } = shouldRestartWhepAfterPageRestore();
+      if (!restart) {
+        logRef.current?.(`[Player] WHEP page restore healthy source=${source} reason=${reason}`);
+        return;
+      }
+
+      const now = Date.now();
+      if (now - whepPageRestoreRestartedAtRef.current < WHEP_PAGE_RESTORE_RESTART_COOLDOWN_MS) {
+        logRef.current?.(`[Player] WHEP page restore restart skipped by cooldown source=${source} reason=${reason}`);
+        return;
+      }
+
+      whepPageRestoreRestartedAtRef.current = now;
+      setPlayerStarted(false);
+      setPlayerPaused(false);
+      setPlayerFreezeFrameUrl("");
+      updatePlayerStatus("connecting", "正在恢复播放。");
+      logRef.current?.(`[Player] WHEP page restore restarting source=${source} reason=${reason}`);
+      void startPlayer({
+        initialMuted: desiredPlayerMutedRef.current,
+      });
+    }, WHEP_PAGE_RESTORE_CHECK_DELAY_MS);
+  }
+
   async function applyDesiredPlayerMute({ logFailure = true } = {}) {
     const playerEl = playerRef.current;
     if (!playerEl) {
@@ -825,6 +921,41 @@ export function usePlayerSession({
       applyDesiredPlayerMute,
       setPlayerMute,
     });
+  }, [playerSession]);
+
+  useEffect(() => {
+    if (!playerSession || playerSession.protocol !== STREAM_PROTOCOL_WEBRTC) {
+      return undefined;
+    }
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return undefined;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        scheduleWhepPageRestoreCheck("visibilitychange");
+      }
+    };
+    const handlePageShow = () => {
+      scheduleWhepPageRestoreCheck("pageshow");
+    };
+    const handleFocus = () => {
+      scheduleWhepPageRestoreCheck("focus");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("focus", handleFocus);
+      if (whepPageRestoreTimerRef.current) {
+        clearTimeout(whepPageRestoreTimerRef.current);
+        whepPageRestoreTimerRef.current = null;
+      }
+    };
   }, [playerSession]);
 
   useEffect(() => {

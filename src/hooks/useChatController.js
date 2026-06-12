@@ -18,6 +18,7 @@ const MAX_RECONNECT_ATTEMPTS = RECONNECT_DELAYS_MS.length;
 const CONNECTION_WINDOW_MS = 5 * 60_000;
 const MAX_CONNECTIONS_PER_WINDOW = 20;
 const BROADCAST_CONTROL_CHECK_TIMEOUT_MS = 4_000;
+const PAGE_RESTORE_SILENT_RECONNECT_WINDOW_MS = 4_000;
 
 function upsertMessages(currentMessages, incomingMessages) {
   const deduped = new Map(currentMessages.map((message) => [message.id, message]));
@@ -205,6 +206,7 @@ export function useChatController({
   const [cohostInvite, setCohostInvite] = useState(null);
   const [cohostInviteResponse, setCohostInviteResponse] = useState(null);
   const [cohostActive, setCohostActive] = useState(null);
+  const [recoveringFromPageLifecycle, setRecoveringFromPageLifecycle] = useState(false);
 
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -213,6 +215,9 @@ export function useChatController({
   const connectionAttemptedAtRef = useRef([]);
   const broadcastControlRequestsRef = useRef(new Map());
   const intentionalCloseRef = useRef(false);
+  const pageHiddenRef = useRef(typeof document !== "undefined" ? document.hidden : false);
+  const lastPageVisibleAtRef = useRef(pageHiddenRef.current ? 0 : Date.now());
+  const recoveringFromPageLifecycleRef = useRef(false);
   const logRef = useRef(log);
 
   logRef.current = log;
@@ -266,6 +271,18 @@ export function useChatController({
     return true;
   }
 
+  function isLikelyPageLifecycleDisconnect() {
+    const now = Date.now();
+    return pageHiddenRef.current
+      || (lastPageVisibleAtRef.current > 0
+        && now - lastPageVisibleAtRef.current <= PAGE_RESTORE_SILENT_RECONNECT_WINDOW_MS);
+  }
+
+  function updatePageLifecycleRecovery(nextRecovering) {
+    recoveringFromPageLifecycleRef.current = Boolean(nextRecovering);
+    setRecoveringFromPageLifecycle(Boolean(nextRecovering));
+  }
+
   useEffect(() => {
     clearReconnectTimers();
 
@@ -290,6 +307,7 @@ export function useChatController({
       setCohostInvite(null);
       setCohostInviteResponse(null);
       setCohostActive(null);
+      updatePageLifecycleRecovery(false);
       clearBroadcastControlRequests();
       reconnectAttemptRef.current = 0;
       connectionAttemptedAtRef.current = [];
@@ -318,7 +336,7 @@ export function useChatController({
       socketUrl.searchParams.set("role", role);
       const reconnecting = reconnectAttemptRef.current > 0;
       setConnectionState(reconnecting ? "reconnecting" : "connecting");
-      setChatError(reconnecting
+      setChatError(reconnecting && !recoveringFromPageLifecycleRef.current
         ? getChatErrorMessage({ code: "socket_retrying" })
         : "");
 
@@ -370,6 +388,7 @@ export function useChatController({
           setCohostActive(normalizeCohostActive(payload.cohost?.active));
           setRoomStateReady(true);
           setChatError("");
+          updatePageLifecycleRecovery(false);
           return;
         }
 
@@ -418,6 +437,11 @@ export function useChatController({
 
         if (payload.type === "message.created" && payload.message) {
           setMessages((current) => upsertMessages(current, [payload.message]));
+          return;
+        }
+
+        if (payload.type === "message.retracted" && payload.messageId) {
+          setMessages((current) => current.filter((message) => message.id !== payload.messageId));
           return;
         }
 
@@ -471,7 +495,7 @@ export function useChatController({
         }
       });
 
-      socket.addEventListener("close", () => {
+      socket.addEventListener("close", (event) => {
         if (socketRef.current === socket) {
           socketRef.current = null;
         }
@@ -480,17 +504,34 @@ export function useChatController({
           return;
         }
         setConnectionState("closed");
+        const lifecycleReconnect = isLikelyPageLifecycleDisconnect();
+        if (lifecycleReconnect) {
+          updatePageLifecycleRecovery(true);
+          setChatError("");
+        }
         const attempt = reconnectAttemptRef.current;
         if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+          updatePageLifecycleRecovery(false);
           setChatError(getChatErrorMessage({ code: "socket_reconnect_stopped" }));
-          logRef.current?.(`chat reconnect stopped after ${MAX_RECONNECT_ATTEMPTS} attempts`);
+          logRef.current?.(
+            `chat reconnect stopped after ${MAX_RECONNECT_ATTEMPTS} attempts; close code=${event.code}, reason=${event.reason || ""}, wasClean=${event.wasClean}`
+          );
           return;
         }
 
         const delay = getReconnectDelayMs(attempt);
         reconnectAttemptRef.current = attempt + 1;
-        showReconnectCountdown(delay);
-        logRef.current?.(`chat reconnect scheduled in ${delay}ms (attempt ${attempt + 1})`);
+        if (lifecycleReconnect) {
+          logRef.current?.(
+            `chat reconnect scheduled silently after page lifecycle close in ${delay}ms (attempt ${attempt + 1}, code=${event.code}, reason=${event.reason || ""}, wasClean=${event.wasClean})`
+          );
+        } else {
+          updatePageLifecycleRecovery(false);
+          showReconnectCountdown(delay);
+          logRef.current?.(
+            `chat reconnect scheduled in ${delay}ms (attempt ${attempt + 1}, code=${event.code}, reason=${event.reason || ""}, wasClean=${event.wasClean})`
+          );
+        }
         if (reconnectTimerRef.current) {
           clearTimeout(reconnectTimerRef.current);
           reconnectTimerRef.current = null;
@@ -507,14 +548,60 @@ export function useChatController({
       });
 
       socket.addEventListener("error", () => {
+        if (isLikelyPageLifecycleDisconnect()) {
+          updatePageLifecycleRecovery(true);
+          setChatError("");
+          return;
+        }
+        updatePageLifecycleRecovery(false);
         setChatError(getChatErrorMessage({ code: "socket_error_waiting" }));
       });
     };
 
     connect();
 
+    function reconnectAfterPageRestore(source) {
+      pageHiddenRef.current = false;
+      lastPageVisibleAtRef.current = Date.now();
+
+      const currentSocket = socketRef.current;
+      if (currentSocket && currentSocket.readyState < WebSocket.CLOSING) {
+        return;
+      }
+
+      clearReconnectTimers();
+      reconnectAttemptRef.current = 0;
+      updatePageLifecycleRecovery(true);
+      setChatError("");
+      logRef.current?.(`chat reconnecting after page ${source}`);
+      connect();
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        pageHiddenRef.current = true;
+        return;
+      }
+      reconnectAfterPageRestore("visibilitychange");
+    }
+
+    function handlePageShow() {
+      reconnectAfterPageRestore("pageshow");
+    }
+
+    function handleFocus() {
+      reconnectAfterPageRestore("focus");
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("focus", handleFocus);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("focus", handleFocus);
       clearReconnectTimers();
       clearBroadcastControlRequests();
       if (socketRef.current) {
@@ -548,6 +635,19 @@ export function useChatController({
     }
 
     socketRef.current.send(JSON.stringify(payload));
+    return true;
+  }
+
+  function retractMessage(messageId) {
+    const normalizedMessageId = String(messageId || "").trim();
+    if (!normalizedMessageId || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    socketRef.current.send(JSON.stringify({
+      type: "message.retract",
+      messageId: normalizedMessageId
+    }));
     return true;
   }
 
@@ -642,8 +742,10 @@ export function useChatController({
     cohostInvite,
     cohostInviteResponse,
     cohostActive,
+    recoveringFromPageLifecycle,
     sendMessage,
     sendEvent,
+    retractMessage,
     requestBroadcastControl,
     releaseBroadcastControl,
     setCohostInviteAllowed,

@@ -5,93 +5,130 @@ import { useLiveMobileShellMode } from "../hooks/useLiveMobileShellMode.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
 import { FloatingToastPresence } from "./FloatingToast.jsx";
+import { WatchImageShareDialog } from "./watch/WatchSharePanels.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
+import { buildWatchShareImage } from "../lib/shareImage.js";
+
+const IMAGE_SHARE_EXIT_MS = 180;
 
 export function LivePage({
-  hidden,
-  roomDetails,
-  roomLabel,
-  roomAvatarUrl,
-  shareTarget,
-  watchLink,
-  publishBlocked,
-  publishBlockedReason,
-  roomInfoBlockedReason = "",
-  publishBadge,
-  cameraOptions,
-  microphoneOptions,
-  publishQualityOptions,
-  publishProtocolOptions,
-  selectedCameraId,
-  selectedMicrophoneId,
-  publishQualityId,
-  publishProtocol,
-  webRtcPublishUrl,
-  webRtcPlaybackUrl,
-  cameraEnabled,
-  microphoneEnabled,
-  cameraMode,
-  isPublishing,
-  isStarting = false,
-  previewActive,
-  previewHasVideo,
-  previewPending,
-  previewSourceType,
-  screenShareSupported,
-  screenShareActive,
-  syntheticPublishing,
-  previewVideoRef,
-  onCameraChange,
-  onMicrophoneChange,
-  onPublishQualityChange,
-  onPublishProtocolChange,
-  onWebRtcPublishUrlChange,
-  onWebRtcPlaybackUrlChange,
-  onCycleCamera,
-  onToggleMicrophone,
-  onTogglePublish,
-  onStartPublish,
-  onStopPublish,
-  onShare,
-  onStartScreenShare,
-  onStopScreenShare,
-  commentSpeechEnabled = false,
-  commentSpeechSupported = false,
-  onCommentSpeechEnabledChange,
-  liveNotificationEnabled = true,
-  onLiveNotificationEnabledChange,
-  locationSharingEnabled = false,
-  locationSharingSupported = false,
-  locationSharingPending = false,
-  onLocationSharingEnabledChange,
-  cohostInvitesAllowed = true,
-  cohostInvite = null,
-  cohostInviteResponse = null,
-  cohostActive = null,
-  cohostRecentHosts = [],
-  onCohostInvitesAllowedChange,
-  onCohostDisconnect,
-  onCohostInviteRequest,
-  onCohostInviteRespond,
-  onStartSynthetic,
-  onStopSynthetic,
-  chatMessages,
-  chatDraft,
-  chatConnectionState,
-  chatOnlineCount,
-  chatLoggedInViewers = [],
-  chatReadOnly,
-  chatError,
-  authAvailable,
-  authLoading,
-  authUser,
-  onChatDraftChange,
-  onChatSend,
-  onChatRequireLogin,
-  onRoomDetailsChange,
-  onRequestClose,
-  onSelectLiveMode
+  view = {},
+  room = {},
+  share = {},
+  publish = {},
+  media = {},
+  settings = {},
+  cohost = {},
+  chat = {},
+  auth = {},
+  actions = {},
 }) {
+  const { hidden } = view;
+  const {
+    details: roomDetails,
+    label: roomLabel,
+    avatarUrl: roomAvatarUrl,
+    infoBlockedReason: roomInfoBlockedReason = "",
+    siteIconUrl = "",
+    siteTitle = "",
+  } = room;
+  const {
+    target: shareTarget,
+    watchLink,
+  } = share;
+  const {
+    blocked: publishBlocked,
+    blockedReason: publishBlockedReason,
+    badge: publishBadge,
+    isPublishing,
+    isStarting = false,
+    syntheticPublishing,
+  } = publish;
+  const {
+    cameraOptions,
+    microphoneOptions,
+    publishQualityOptions,
+    publishProtocolOptions,
+    selectedCameraId,
+    selectedMicrophoneId,
+    publishQualityId,
+    publishProtocol,
+    webRtcPublishUrl,
+    webRtcPlaybackUrl,
+    cameraEnabled,
+    microphoneEnabled,
+    cameraMode,
+    previewActive,
+    previewHasVideo,
+    previewPending,
+    previewSourceType,
+    screenShareSupported,
+    screenShareActive,
+    previewVideoRef,
+  } = media;
+  const {
+    commentSpeechEnabled = false,
+    commentSpeechSupported = false,
+    liveNotificationEnabled = true,
+    locationSharingEnabled = false,
+    locationSharingSupported = false,
+    locationSharingPending = false,
+  } = settings;
+  const {
+    invitesAllowed: cohostInvitesAllowed = true,
+    invite: cohostInvite = null,
+    inviteResponse: cohostInviteResponse = null,
+    active: cohostActive = null,
+    recentHosts: cohostRecentHosts = [],
+  } = cohost;
+  const {
+    messages: chatMessages,
+    draft: chatDraft,
+    connectionState: chatConnectionState,
+    onlineCount: chatOnlineCount,
+    loggedInViewers: chatLoggedInViewers = [],
+    readOnly: chatReadOnly,
+    error: chatError,
+    recovering: chatRecovering = false,
+    canRetractMessages = false,
+  } = chat;
+  const {
+    available: authAvailable,
+    loading: authLoading,
+    user: authUser,
+  } = auth;
+  const {
+    onCameraChange,
+    onMicrophoneChange,
+    onPublishQualityChange,
+    onPublishProtocolChange,
+    onWebRtcPublishUrlChange,
+    onWebRtcPlaybackUrlChange,
+    onCycleCamera,
+    onToggleMicrophone,
+    onTogglePublish,
+    onStartPublish,
+    onStopPublish,
+    onShare,
+    onStartScreenShare,
+    onStopScreenShare,
+    onCommentSpeechEnabledChange,
+    onLiveNotificationEnabledChange,
+    onLocationSharingEnabledChange,
+    onCohostInvitesAllowedChange,
+    onCohostDisconnect,
+    onCohostInviteRequest,
+    onCohostInviteRespond,
+    onStartSynthetic,
+    onStopSynthetic,
+    onChatDraftChange,
+    onChatSend,
+    onChatMessageRetract,
+    onChatRequireLogin,
+    onRoomDetailsChange,
+    onRequestClose,
+    onSelectLiveMode,
+  } = actions;
   const compactViewport = useCompactViewport();
   const portraitViewport = usePortraitViewport();
   const previewOrientation = useMediaOrientation({
@@ -107,8 +144,13 @@ export function LivePage({
   const [roomCoverError, setRoomCoverError] = useState("");
   const [roomCoverStatus, setRoomCoverStatus] = useState("");
   const [toastMessage, setToastMessage] = useState("");
+  const [shareImageUrl, setShareImageUrl] = useState("");
+  const [shareImageLoading, setShareImageLoading] = useState(false);
+  const [imageShareMounted, setImageShareMounted] = useState(false);
+  const [imageShareClosing, setImageShareClosing] = useState(false);
   const roomCoverInputRef = useRef(null);
   const toastTimerRef = useRef(null);
+  const imageShareCloseTimerRef = useRef(null);
   const lastCohostResponseIdRef = useRef("");
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mediaMode = cameraEnabled ? "video" : "voice";
@@ -135,6 +177,10 @@ export function LivePage({
       clearTimeout(toastTimerRef.current);
       toastTimerRef.current = null;
     }
+    if (imageShareCloseTimerRef.current) {
+      clearTimeout(imageShareCloseTimerRef.current);
+      imageShareCloseTimerRef.current = null;
+    }
   }, []);
 
   function showToast(message) {
@@ -157,6 +203,167 @@ export function LivePage({
       setToastMessage("");
       toastTimerRef.current = null;
     }, 2200);
+  }
+
+  async function writeClipboardText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function copyLiveLink() {
+    if (!watchLink) {
+      return;
+    }
+
+    const copied = await writeClipboardText(watchLink);
+    showToast(copied ? "复制成功" : "复制失败");
+  }
+
+  async function shareLiveLink() {
+    if (!watchLink || !shareSupported || !onShare) {
+      return;
+    }
+
+    try {
+      await onShare();
+    } catch (error) {
+      if (!(error instanceof Error && error.name === "AbortError")) {
+        console.error("live room share failed", error);
+        showToast("分享失败");
+      }
+    }
+  }
+
+  async function getShareImageBlob() {
+    if (!shareImageUrl) {
+      return null;
+    }
+
+    const response = await fetch(shareImageUrl);
+    return response.blob();
+  }
+
+  function getShareImageFileName() {
+    const name = (roomDetails?.title || roomLabel || "直播间")
+      .replace(/[\\/:*?"<>|]+/g, "")
+      .trim();
+    return `${name || "直播间"}分享图.png`;
+  }
+
+  async function shareLiveImage() {
+    if (!shareImageUrl) {
+      return;
+    }
+
+    try {
+      const blob = await getShareImageBlob();
+      if (!blob) {
+        return;
+      }
+      const file = new File([blob], getShareImageFileName(), { type: "image/png" });
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: roomDetails?.title || roomLabel,
+          text: `${roomLabel || "主播"}的直播间`,
+        });
+        return;
+      }
+      await shareLiveLink();
+    } catch (error) {
+      if (!(error instanceof Error && error.name === "AbortError")) {
+        console.error("live room share image failed", error);
+        showToast("分享失败");
+      }
+    }
+  }
+
+  async function copyLiveImage() {
+    if (!shareImageUrl || typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+      showToast("复制失败");
+      return;
+    }
+
+    try {
+      const blob = await getShareImageBlob();
+      if (!blob) {
+        showToast("复制失败");
+        return;
+      }
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": blob,
+        }),
+      ]);
+      showToast("复制成功");
+    } catch (error) {
+      console.error("live room share image copy failed", error);
+      showToast("复制失败");
+    }
+  }
+
+  function saveLiveImage() {
+    if (!shareImageUrl) {
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = shareImageUrl;
+    link.download = getShareImageFileName();
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function closeImageShareModal() {
+    if (imageShareCloseTimerRef.current) {
+      clearTimeout(imageShareCloseTimerRef.current);
+    }
+    setImageShareClosing(true);
+    imageShareCloseTimerRef.current = window.setTimeout(() => {
+      setImageShareMounted(false);
+      setImageShareClosing(false);
+      imageShareCloseTimerRef.current = null;
+    }, IMAGE_SHARE_EXIT_MS);
+  }
+
+  async function openImageShareModal() {
+    if (!watchLink) {
+      return;
+    }
+
+    if (imageShareCloseTimerRef.current) {
+      clearTimeout(imageShareCloseTimerRef.current);
+      imageShareCloseTimerRef.current = null;
+    }
+    setImageShareMounted(true);
+    setImageShareClosing(false);
+    setShareImageUrl("");
+    setShareImageLoading(true);
+
+    try {
+      const imageUrl = await buildWatchShareImage({
+        watchLink,
+        roomLabel,
+        roomTitle: roomDetails?.title || "",
+        hostDisplayName: roomLabel,
+        hostAvatarUrl: roomAvatarUrl,
+        roomCoverUrl,
+        siteIconUrl,
+        siteTitle,
+      });
+      setShareImageUrl(imageUrl);
+    } catch (error) {
+      console.error("live room share image failed", error);
+      setImageShareMounted(false);
+      showToast("生成失败");
+    } finally {
+      setShareImageLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -303,110 +510,151 @@ export function LivePage({
   }
 
   const pageProps = {
-    hidden,
-    roomLabel,
-    roomAvatarUrl,
-    shareTarget,
-    watchLink,
-    publishBlocked,
-    publishBlockedReason,
-    roomInfoBlockedReason,
-    publishBadge,
-    cameraOptions,
-    microphoneOptions,
-    publishQualityOptions,
-    publishProtocolOptions,
-    selectedCameraId,
-    selectedMicrophoneId,
-    publishQualityId,
-    publishProtocol,
-    webRtcPublishUrl,
-    webRtcPlaybackUrl,
-    cameraEnabled,
-    mediaMode,
-    microphoneEnabled,
-    cameraMode,
-    isPublishing,
-    isStarting,
-    previewActive,
-    previewHasVideo,
-    previewPending,
-    previewSourceType,
-    screenShareSupported,
-    screenShareActive,
-    syntheticPublishing,
-    previewVideoRef,
-    mirrorPreview,
-    onCameraChange,
-    onMicrophoneChange,
-    onPublishQualityChange,
-    onPublishProtocolChange,
-    onWebRtcPublishUrlChange,
-    onWebRtcPlaybackUrlChange,
-    onCycleCamera,
-    onToggleMicrophone,
-    onTogglePublish,
-    onStartPublish,
-    onStopPublish,
-    onShare,
-    onStartScreenShare,
-    onStopScreenShare,
-    commentSpeechEnabled,
-    commentSpeechSupported,
-    onCommentSpeechEnabledChange,
-    liveNotificationEnabled,
-    onLiveNotificationEnabledChange,
-    locationSharingEnabled,
-    locationSharingSupported,
-    locationSharingPending,
-    onLocationSharingEnabledChange,
-    cohostInvitesAllowed,
-    cohostInvite,
-    cohostActive,
-    cohostRecentHosts,
-    onCohostInvitesAllowedChange,
-    onCohostDisconnect,
-    onCohostInviteRequest: handleCohostInviteRequest,
-    onCohostInviteRespond: handleCohostInviteRespond,
-    onStartSynthetic,
-    onStopSynthetic,
-    chatMessages,
-    chatDraft,
-    chatConnectionState,
-    chatOnlineCount,
-    chatLoggedInViewers,
-    chatReadOnly,
-    chatError,
-    authAvailable,
-    authLoading,
-    authUser,
-    onChatDraftChange,
-    onChatSend,
-    onChatRequireLogin,
-    onRequestClose: requestClose,
-    onSelectLiveMode,
-    shareSupported,
-    roomCoverUrl,
-    roomCoverLoading,
-    roomCoverBusy,
-    roomCoverError,
-    roomCoverStatus,
-    roomCoverInputRef,
-    onPickCover: handleRoomCoverPick,
-    onOpenCoverPicker: openRoomCoverPicker,
-    roomTitle: roomDetails?.title || "",
-    roomWelcomeMessage: roomDetails?.welcomeMessage || "",
-    onSaveRoomTitle: handleRoomTitleSave,
-    onSaveRoomWelcomeMessage: handleRoomWelcomeMessageSave,
-    onRoomInfoBlocked: () => showToast(roomInfoBlockedReason)
+    view: {
+      hidden,
+      shareSupported,
+    },
+    room: {
+      label: roomLabel,
+      avatarUrl: roomAvatarUrl,
+      title: roomDetails?.title || "",
+      welcomeMessage: roomDetails?.welcomeMessage || "",
+      coverUrl: roomCoverUrl,
+      coverLoading: roomCoverLoading,
+      coverBusy: roomCoverBusy,
+      coverError: roomCoverError,
+      coverStatus: roomCoverStatus,
+      coverInputRef: roomCoverInputRef,
+      infoBlockedReason: roomInfoBlockedReason,
+      siteIconUrl,
+      siteTitle,
+    },
+    share: {
+      target: shareTarget,
+      watchLink,
+    },
+    publish: {
+      blocked: publishBlocked,
+      blockedReason: publishBlockedReason,
+      badge: publishBadge,
+      isPublishing,
+      isStarting,
+      syntheticPublishing,
+    },
+    media: {
+      cameraOptions,
+      microphoneOptions,
+      publishQualityOptions,
+      publishProtocolOptions,
+      selectedCameraId,
+      selectedMicrophoneId,
+      publishQualityId,
+      publishProtocol,
+      webRtcPublishUrl,
+      webRtcPlaybackUrl,
+      cameraEnabled,
+      mediaMode,
+      microphoneEnabled,
+      cameraMode,
+      previewActive,
+      previewHasVideo,
+      previewPending,
+      previewSourceType,
+      screenShareSupported,
+      screenShareActive,
+      previewVideoRef,
+      mirrorPreview,
+    },
+    settings: {
+      commentSpeechEnabled,
+      commentSpeechSupported,
+      liveNotificationEnabled,
+      locationSharingEnabled,
+      locationSharingSupported,
+      locationSharingPending,
+    },
+    cohost: {
+      invitesAllowed: cohostInvitesAllowed,
+      invite: cohostInvite,
+      active: cohostActive,
+      recentHosts: cohostRecentHosts,
+    },
+    chat: {
+      messages: chatMessages,
+      draft: chatDraft,
+      connectionState: chatConnectionState,
+      onlineCount: chatOnlineCount,
+      loggedInViewers: chatLoggedInViewers,
+      readOnly: chatReadOnly,
+      error: chatError,
+      recovering: chatRecovering,
+      canRetractMessages,
+    },
+    auth: {
+      available: authAvailable,
+      loading: authLoading,
+      user: authUser,
+    },
+    actions: {
+      onCameraChange,
+      onMicrophoneChange,
+      onPublishQualityChange,
+      onPublishProtocolChange,
+      onWebRtcPublishUrlChange,
+      onWebRtcPlaybackUrlChange,
+      onCycleCamera,
+      onToggleMicrophone,
+      onTogglePublish,
+      onStartPublish,
+      onStopPublish,
+      onShare: shareLiveLink,
+      onCopyShareLink: copyLiveLink,
+      onOpenImageShare: openImageShareModal,
+      onStartScreenShare,
+      onStopScreenShare,
+      onCommentSpeechEnabledChange,
+      onLiveNotificationEnabledChange,
+      onLocationSharingEnabledChange,
+      onCohostInvitesAllowedChange,
+      onCohostDisconnect,
+      onCohostInviteRequest: handleCohostInviteRequest,
+      onCohostInviteRespond: handleCohostInviteRespond,
+      onStartSynthetic,
+      onStopSynthetic,
+      onChatDraftChange,
+      onChatSend,
+      onChatMessageRetract,
+      onChatRequireLogin,
+      onRequestClose: requestClose,
+      onSelectLiveMode,
+      onPickCover: handleRoomCoverPick,
+      onOpenCoverPicker: openRoomCoverPicker,
+      onSaveRoomTitle: handleRoomTitleSave,
+      onSaveRoomWelcomeMessage: handleRoomWelcomeMessageSave,
+      onRoomInfoBlocked: () => showToast(roomInfoBlockedReason),
+    },
   };
   const visibleToastMessage = roomInfoBlockedReason || toastMessage;
 
   if (useMobileShell) {
     return (
       <>
-        <LiveMobilePage {...pageProps} shellMode={mobileShellMode} />
+        <LiveMobilePage {...pageProps} view={{ ...pageProps.view, shellMode: mobileShellMode }} />
         <FloatingToastPresence className="live-page-toast live-page-toast-mobile">{visibleToastMessage}</FloatingToastPresence>
+        {imageShareMounted ? (
+          <WatchImageShareDialog
+            imageShareClosing={imageShareClosing}
+            imageShareReady={Boolean(shareImageUrl && !shareImageLoading)}
+            onClose={closeImageShareModal}
+            onCopyImage={copyLiveImage}
+            onSaveImage={saveLiveImage}
+            onShareImage={shareLiveImage}
+            roomLabel={roomLabel}
+            shareImageLoading={shareImageLoading}
+            shareImageUrl={shareImageUrl}
+            shareSupported={shareSupported}
+          />
+        ) : null}
       </>
     );
   }
@@ -415,6 +663,20 @@ export function LivePage({
     <>
       <LiveDesktopPage {...pageProps} />
       <FloatingToastPresence className="live-page-toast live-page-toast-desktop">{visibleToastMessage}</FloatingToastPresence>
+      {imageShareMounted ? (
+        <WatchImageShareDialog
+          imageShareClosing={imageShareClosing}
+          imageShareReady={Boolean(shareImageUrl && !shareImageLoading)}
+          onClose={closeImageShareModal}
+          onCopyImage={copyLiveImage}
+          onSaveImage={saveLiveImage}
+          onShareImage={shareLiveImage}
+          roomLabel={roomLabel}
+          shareImageLoading={shareImageLoading}
+          shareImageUrl={shareImageUrl}
+          shareSupported={shareSupported}
+        />
+      ) : null}
     </>
   );
 }

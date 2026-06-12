@@ -137,6 +137,11 @@ export class ChatRoomDO {
       return;
     }
 
+    if (payload?.type === "message.retract") {
+      await this.handleMessageRetract(ws, session, payload);
+      return;
+    }
+
     if (payload?.type === "stream.started") {
       await this.handleStreamStarted(ws, session, payload);
       return;
@@ -410,6 +415,35 @@ export class ChatRoomDO {
     this.broadcast({
       type: "message.created",
       message
+    });
+  }
+
+  async handleMessageRetract(ws, session, payload) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
+      this.sendError(ws, "forbidden_message_retract");
+      return;
+    }
+
+    const messageId = typeof payload.messageId === "string" ? payload.messageId.trim() : "";
+    if (!messageId) {
+      this.sendError(ws, "message_missing");
+      return;
+    }
+
+    const nextMessages = this.recentMessages.filter((message) => message.id !== messageId);
+    if (nextMessages.length === this.recentMessages.length) {
+      return;
+    }
+
+    const persisted = await this.persistStorageOrNotify(ws, "recentMessages", nextMessages);
+    if (!persisted) {
+      return;
+    }
+    this.recentMessages = nextMessages;
+
+    this.broadcast({
+      type: "message.retracted",
+      messageId
     });
   }
 

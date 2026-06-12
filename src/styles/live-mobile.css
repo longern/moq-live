@@ -334,7 +334,7 @@
 .chat-panel-live-mobile .chat-message-list {
   flex: 0 1 auto;
   width: 100%;
-  align-items: flex-start;
+  align-items: stretch;
   min-height: 0;
   max-height: var(--live-chat-list-max-height);
   padding: 0 2px 6px 0;
@@ -388,7 +388,7 @@
   height: 0;
 }
 
-.chat-panel-live-mobile .chat-message-card {
+.chat-panel-live-mobile .chat-message-hit-area {
   max-width: min(84%, 320px);
   grid-template-columns: 16px minmax(0, 1fr);
   gap: 4px;
@@ -401,7 +401,7 @@
 
 .live-mobile-page[data-shell="immersive"]
   .chat-panel-live-mobile
-  .chat-message-card {
+  .chat-message-hit-area {
   grid-template-columns: 18px minmax(0, 1fr);
 }
 

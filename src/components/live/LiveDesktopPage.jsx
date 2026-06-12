@@ -197,16 +197,49 @@ function MorePanel({
   );
 }
 
-export function LiveDesktopPage(props) {
+export function LiveDesktopPage({
+  view = {},
+  room: roomInfo = {},
+  share = {},
+  publish = {},
+  media = {},
+  settings = {},
+  chat = {},
+  auth = {},
+  actions = {},
+}) {
   const [openPanel, setOpenPanel] = useState("");
   const {
     hidden,
-    room,
-    roomLabel,
-    roomAvatarUrl,
-    publishBlocked,
-    publishBlockedReason,
-    publishBadge,
+    shareSupported,
+  } = view;
+  const {
+    id: room,
+    label: roomLabel,
+    avatarUrl: roomAvatarUrl,
+    coverUrl: roomCoverUrl,
+    coverLoading: roomCoverLoading,
+    coverBusy: roomCoverBusy,
+    coverError: roomCoverError,
+    coverStatus: roomCoverStatus,
+    coverInputRef: roomCoverInputRef,
+    title: roomTitle,
+    welcomeMessage: roomWelcomeMessage,
+    infoBlockedReason: roomInfoBlockedReason,
+  } = roomInfo;
+  const {
+    target: shareTarget,
+    watchLink,
+  } = share;
+  const {
+    blocked: publishBlocked,
+    blockedReason: publishBlockedReason,
+    badge: publishBadge,
+    isPublishing,
+    isStarting = false,
+    syntheticPublishing,
+  } = publish;
+  const {
     cameraOptions,
     microphoneOptions,
     publishQualityOptions = [],
@@ -218,10 +251,9 @@ export function LiveDesktopPage(props) {
     webRtcPublishUrl,
     webRtcPlaybackUrl,
     cameraEnabled,
+    mediaMode,
     microphoneEnabled,
     cameraMode,
-    isPublishing,
-    isStarting = false,
     previewActive,
     previewHasVideo,
     previewPending,
@@ -230,6 +262,31 @@ export function LiveDesktopPage(props) {
     screenShareActive,
     previewVideoRef,
     mirrorPreview,
+  } = media;
+  const {
+    commentSpeechEnabled,
+    commentSpeechSupported,
+    liveNotificationEnabled,
+    locationSharingEnabled,
+    locationSharingSupported,
+    locationSharingPending,
+  } = settings;
+  const {
+    messages: chatMessages,
+    draft: chatDraft,
+    connectionState: chatConnectionState,
+    onlineCount: chatOnlineCount,
+    readOnly: chatReadOnly,
+    error: chatError,
+    recovering: chatRecovering = false,
+    canRetractMessages = false,
+  } = chat;
+  const {
+    available: authAvailable,
+    loading: authLoading,
+    user: authUser,
+  } = auth;
+  const {
     onCameraChange,
     onMicrophoneChange,
     onPublishQualityChange,
@@ -242,35 +299,10 @@ export function LiveDesktopPage(props) {
     onShare,
     onStartScreenShare,
     onStopScreenShare,
-    chatMessages,
-    chatDraft,
-    chatConnectionState,
-    chatOnlineCount,
-    chatReadOnly,
-    chatError,
-    authAvailable,
-    authLoading,
-    authUser,
     onChatDraftChange,
     onChatSend,
+    onChatMessageRetract,
     onChatRequireLogin,
-    shareSupported,
-    watchLink,
-    shareTarget,
-    roomCoverUrl,
-    roomCoverLoading,
-    roomCoverBusy,
-    roomCoverError,
-    roomCoverStatus,
-    roomCoverInputRef,
-    roomTitle,
-    roomWelcomeMessage,
-    commentSpeechEnabled,
-    commentSpeechSupported,
-    liveNotificationEnabled,
-    locationSharingEnabled,
-    locationSharingSupported,
-    locationSharingPending,
     onSaveRoomTitle,
     onSaveRoomWelcomeMessage,
     onCommentSpeechEnabledChange,
@@ -280,12 +312,10 @@ export function LiveDesktopPage(props) {
     onOpenCoverPicker,
     onRequestClose,
     onSelectLiveMode,
-    roomInfoBlockedReason,
-    onRoomInfoBlocked
-  } = props;
+    onRoomInfoBlocked,
+  } = actions;
   const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
   const hasSingleMicrophone = (microphoneOptions?.length ?? 0) === 1;
-  const mediaMode = props.mediaMode;
   const publishControlActive = isPublishing || isStarting;
   const screenShareUnavailableReason = !screenShareSupported
     ? "当前浏览器不支持屏幕分享"
@@ -611,6 +641,9 @@ export function LiveDesktopPage(props) {
             onlineCount={chatOnlineCount}
             readOnly={chatReadOnly}
             chatError={chatError}
+            chatRecovering={chatRecovering}
+            canRetractMessages={canRetractMessages}
+            onRetractMessage={onChatMessageRetract}
             title="评论"
             showWelcome={false}
           />

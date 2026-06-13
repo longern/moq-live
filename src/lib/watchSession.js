@@ -18,29 +18,29 @@ export function getViewerPosition() {
   });
 }
 
-export function buildHostLocationLabel(province) {
+export function buildHostLocationLabel(province, t = null) {
   const normalizedProvince = province === "未知" ? "" : province;
-  return normalizedProvince || "位置未知";
+  return normalizedProvince || t?.("profile.locationUnknown") || "位置未知";
 }
 
-export function formatHostGender(value) {
+export function formatHostGender(value, t = null) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) {
     return "";
   }
   if (["male", "m", "man", "男", "男性"].includes(normalized)) {
-    return "男";
+    return t?.("profile.gender.male") || "男";
   }
   if (["female", "f", "woman", "女", "女性"].includes(normalized)) {
-    return "女";
+    return t?.("profile.gender.female") || "女";
   }
   if (["other", "nonbinary", "non-binary", "其他"].includes(normalized)) {
-    return "其他";
+    return t?.("profile.gender.other") || "其他";
   }
   return "";
 }
 
-export function formatHostAge(birthDate) {
+export function formatHostAge(birthDate, t = null) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birthDate || "").trim());
   if (!match) {
     return "";
@@ -77,15 +77,15 @@ export function formatHostAge(birthDate) {
     age -= 1;
   }
 
-  return age >= 0 && age <= 130 ? `${age}岁` : "";
+  return age >= 0 && age <= 130 ? t?.("profile.age", { age }) || `${age}岁` : "";
 }
 
-export function buildHostProfileInfoItems({ gender, birthDate, province, distanceText }) {
+export function buildHostProfileInfoItems({ gender, birthDate, province, distanceText, t = null }) {
   return [
-    formatHostGender(gender),
-    formatHostAge(birthDate),
-    buildHostLocationLabel(province),
-    distanceText ? `距你 ${distanceText}` : "",
+    formatHostGender(gender, t),
+    formatHostAge(birthDate, t),
+    buildHostLocationLabel(province, t),
+    distanceText ? t?.("profile.distanceFromYou", { distance: distanceText }) || `距你 ${distanceText}` : "",
   ].filter(Boolean);
 }
 

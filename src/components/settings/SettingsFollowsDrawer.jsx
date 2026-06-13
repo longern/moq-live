@@ -1,15 +1,19 @@
 import { UserAvatar } from "../UserAvatar.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 function PaginationControls({
   disabled = false,
   hasMore,
   loading,
   onLoadMore,
-  remainingLabel = "没有更多了",
+  remainingLabel,
 }) {
+  const { t } = useI18n();
+  const terminalLabel = remainingLabel || t("follows.noMore");
+
   if (!hasMore && !loading) {
-    return <div className="pagination-terminal">{remainingLabel}</div>;
+    return <div className="pagination-terminal">{terminalLabel}</div>;
   }
 
   return (
@@ -20,7 +24,7 @@ function PaginationControls({
         disabled={disabled || loading}
         onClick={onLoadMore}
       >
-        {loading ? "加载中" : "加载更多"}
+        {loading ? t("common.loading") : t("follows.loadMore")}
       </button>
     </div>
   );
@@ -34,8 +38,9 @@ function FollowListItem({
   showFollowingAction,
   unfollowDisabled,
 }) {
+  const { t } = useI18n();
   const user = item?.user || {};
-  const primary = user.displayName || user.handle || user.email || "匿名用户";
+  const primary = user.displayName || user.handle || user.email || t("common.anonymousUser");
   const secondary = user.handle ? `@${user.handle}` : user.email || "";
   const watchTarget = user.handle || user.id || "";
 
@@ -75,7 +80,7 @@ function FollowListItem({
               onRequestUnfollow(user);
             }}
           >
-            已关注
+            {t("follows.followingState")}
           </button>
         ) : null}
       </div>
@@ -90,33 +95,34 @@ function UnfollowConfirmDialog({
   onConfirm,
   user,
 }) {
-  const name = user?.displayName || user?.handle || user?.email || "该用户";
+  const { t } = useI18n();
+  const name = user?.displayName || user?.handle || user?.email || t("common.user");
 
   return (
     <div className="follow-confirm-layer">
       <button
         type="button"
         className="follow-confirm-backdrop"
-        aria-label="关闭取消关注确认框"
+        aria-label={t("follows.closeConfirm")}
         onClick={onCancel}
       />
       <section
         className="follow-confirm-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="取消关注确认"
+        aria-label={t("follows.confirmAria")}
       >
         <div className="follow-confirm-copy">
-          <strong>取消关注？</strong>
-          <span>{name}</span>
+          <strong>{t("follows.confirmTitle")}</strong>
+          <span>{t("follows.confirmMessage", { name })}</span>
         </div>
         {error ? <p className="inline-warning">{error}</p> : null}
         <div className="follow-confirm-actions">
           <button type="button" className="secondary" onClick={onCancel} disabled={loading}>
-            取消
+            {t("common.cancel")}
           </button>
           <button type="button" className="primary" onClick={onConfirm} disabled={loading}>
-            {loading ? "处理中" : "确认"}
+            {loading ? t("common.processing") : t("common.confirm")}
           </button>
         </div>
       </section>
@@ -144,30 +150,31 @@ export function SettingsFollowsDrawer({
   unfollowError,
   transitionClassName,
 }) {
+  const { t } = useI18n();
   const initialLoading = loading && !items.length;
   const showFollowingAction = type === "following";
 
   return (
     <SettingsPanelShell
       backdropClassName="auth-panel-backdrop"
-      backdropLabel={`关闭${title}列表`}
+      backdropLabel={t("follows.closeList", { title })}
       bodyClassName="follows-panel-body"
-      closeLabel="返回"
+      closeLabel={t("common.back")}
       closeButtonClassName="account-panel-close"
       headClassName="account-panel-head"
       onClose={onClose}
       panelClassName="auth-panel auth-panel-follows"
-      panelLabel={`${title}列表`}
+      panelLabel={t("follows.panelLabel", { title })}
       title={title}
       transitionClassName={transitionClassName}
     >
       {initialLoading ? (
-        <div className="follow-list-state">加载中</div>
+        <div className="follow-list-state">{t("common.loading")}</div>
       ) : error ? (
         <div className="follow-list-state is-error">
           <span>{error}</span>
           <button type="button" className="secondary" onClick={onRetry}>
-            重试
+            {t("follows.retry")}
           </button>
         </div>
       ) : items.length ? (
@@ -192,7 +199,7 @@ export function SettingsFollowsDrawer({
           />
         </>
       ) : (
-        <div className="follow-list-state">暂无{title}</div>
+        <div className="follow-list-state">{t("follows.empty", { title })}</div>
       )}
       {pendingUnfollowUser ? (
         <UnfollowConfirmDialog

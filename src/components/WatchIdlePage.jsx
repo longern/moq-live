@@ -3,27 +3,30 @@ import { ArrowRight, Image } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 
 function RoomCoverPlaceholder() {
+  const { t } = useI18n();
+
   return (
     <div className="watch-room-cover-placeholder" aria-hidden="true">
       <Image />
-      <span>暂无封面</span>
+      <span>{t("watch.noCover")}</span>
     </div>
   );
 }
 
-function getRoomTitle(room) {
+function getRoomTitle(room, t) {
   if (room.title) {
     return room.title;
   }
 
-  const hostName = room.host.displayName || room.host.handle || room.host.email || "匿名主播";
-  return `${hostName}的直播间`;
+  const hostName = room.host.displayName || room.host.handle || room.host.email || t("watch.anonymousHost");
+  return t("watch.roomOf", { room: hostName });
 }
 
-function getRoomSubtitle(room) {
-  return room.host.displayName || room.host.handle || room.host.email || "匿名主播";
+function getRoomSubtitle(room, t) {
+  return room.host.displayName || room.host.handle || room.host.email || t("watch.anonymousHost");
 }
 
 function getRoomOpenTarget(room) {
@@ -36,9 +39,10 @@ function getRoomHref(room) {
 }
 
 function WatchRoomCard({ room, onOpenRoom }) {
+  const { t } = useI18n();
   const [coverBroken, setCoverBroken] = useState(false);
-  const roomTitle = getRoomTitle(room);
-  const roomSubtitle = getRoomSubtitle(room);
+  const roomTitle = getRoomTitle(room, t);
+  const roomSubtitle = getRoomSubtitle(room, t);
   const hasCover = Boolean(room.coverUrl) && !coverBroken;
   const openTarget = getRoomOpenTarget(room);
 
@@ -55,7 +59,7 @@ function WatchRoomCard({ room, onOpenRoom }) {
         {hasCover ? (
           <img
             src={room.coverUrl}
-            alt={`${roomTitle}封面`}
+            alt={t("watch.coverAlt", { title: roomTitle })}
             onError={() => {
               setCoverBroken(true);
             }}
@@ -96,6 +100,7 @@ export function WatchIdlePage({
   onStart,
   onOpenRoom
 }) {
+  const { t } = useI18n();
   const [roomsState, setRoomsState] = useState({
     loading: true,
     error: "",
@@ -159,24 +164,24 @@ export function WatchIdlePage({
             <input
               id="namespace"
               value={room}
-              placeholder="输入主播号"
-              aria-label="主播号"
+              placeholder={t("watch.inputHostHandle")}
+              aria-label={t("accountPanel.handle")}
               enterKeyHint="go"
               autoCapitalize="off"
               autoCorrect="off"
               onInput={onRoomInput}
             />
-            <button type="submit" id="start" aria-label="加入直播间" disabled={!room.trim()}>
+            <button type="submit" id="start" aria-label={t("watch.joinRoom")} disabled={!room.trim()}>
               <JoinIcon />
             </button>
           </form>
           <section className={`watch-room-section${roomsState.items.length ? "" : " is-empty"}`}>
             {roomsState.loading ? (
               <div className="watch-room-state is-loading">
-                <LoadingSpinner className="watch-room-loading-spinner" label="正在加载直播间" />
+                <LoadingSpinner className="watch-room-loading-spinner" label={t("watch.loadingRooms")} />
               </div>
             ) : roomsState.error ? (
-              <div className="watch-room-state is-error">直播间列表加载失败：{roomsState.error}</div>
+              <div className="watch-room-state is-error">{t("watch.roomListFailed", { error: roomsState.error })}</div>
             ) : roomsState.items.length ? (
               <div className="watch-room-grid">
                 {roomsState.items.map((item) => (
@@ -184,7 +189,7 @@ export function WatchIdlePage({
                 ))}
               </div>
             ) : (
-              <div className="watch-room-state">暂时还没有直播间</div>
+              <div className="watch-room-state">{t("watch.noRooms")}</div>
             )}
           </section>
         </div>

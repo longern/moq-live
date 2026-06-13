@@ -291,10 +291,15 @@ export async function getSessionUser(db, request) {
       sessions.expires_at AS session_expires_at,
       users.primary_email AS primary_email,
       users.avatar_url AS avatar_url,
+      users.gender AS gender,
+      users.birth_date AS birth_date,
+      users.bio AS bio,
+      rooms.last_location_province AS location_province,
       users.follower_count AS follower_count,
       users.following_count AS following_count
     FROM ${TABLES.sessions} AS sessions
     INNER JOIN ${TABLES.users} AS users ON users.id = sessions.user_id
+    LEFT JOIN ${TABLES.rooms} AS rooms ON rooms.host_user_id = users.id
     WHERE sessions.session_token_hash = ?
       AND sessions.revoked_at IS NULL
       AND sessions.expires_at > ?
@@ -838,6 +843,10 @@ function buildUserPayload(row) {
     ),
     email: row.primary_email,
     avatarUrl: row.avatar_url,
+    gender: row.gender || "",
+    birthDate: row.birth_date || "",
+    bio: row.bio || "",
+    locationProvince: row.location_province || row.last_location_province || "",
     followerCount: Math.max(0, Number(row.follower_count || 0)),
     followingCount: Math.max(0, Number(row.following_count || 0)),
   };
@@ -847,17 +856,22 @@ async function getUserRowById(db, userId) {
   return db
     .prepare(
       `SELECT
-      id AS user_id,
-      handle,
-      handle_changed_at,
-      display_name,
-      display_name_changed_at,
-      primary_email,
-      avatar_url,
-      follower_count,
-      following_count
-     FROM ${TABLES.users}
-     WHERE id = ?
+      users.id AS user_id,
+      users.handle AS handle,
+      users.handle_changed_at AS handle_changed_at,
+      users.display_name AS display_name,
+      users.display_name_changed_at AS display_name_changed_at,
+      users.primary_email AS primary_email,
+      users.avatar_url AS avatar_url,
+      users.gender AS gender,
+      users.birth_date AS birth_date,
+      users.bio AS bio,
+      rooms.last_location_province AS location_province,
+      users.follower_count AS follower_count,
+      users.following_count AS following_count
+     FROM ${TABLES.users} AS users
+     LEFT JOIN ${TABLES.rooms} AS rooms ON rooms.host_user_id = users.id
+     WHERE users.id = ?
      LIMIT 1`,
     )
     .bind(userId)

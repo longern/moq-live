@@ -1,4 +1,5 @@
 import { ChevronLeft } from "lucide-react";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 
 function BackIcon() {
   return <ChevronLeft aria-hidden="true" />;
@@ -22,6 +23,7 @@ export function LoginDrawer({
   onMicrosoftLogin,
   transitionClassName = ""
 }) {
+  const { t } = useI18n();
   const transitionSuffix = transitionClassName ? ` ${transitionClassName}` : "";
 
   return (
@@ -29,25 +31,25 @@ export function LoginDrawer({
       <button
         type="button"
         className={`auth-panel-backdrop${transitionSuffix}`}
-        aria-label="关闭登录页面"
+        aria-label={t("settings.closeLoginPage")}
         onClick={onClose}
       />
-      <aside className={`auth-panel auth-panel-login${transitionSuffix}`} aria-label="登录页面">
+      <aside className={`auth-panel auth-panel-login${transitionSuffix}`} aria-label={t("settings.loginPage")}>
         <div className="login-panel-head">
           <button
             type="button"
             className="login-panel-close"
-            aria-label="返回"
+            aria-label={t("common.back")}
             onClick={onClose}
           >
             <BackIcon />
           </button>
-          <strong>登录</strong>
+          <strong>{t("account.login")}</strong>
           <span className="panel-head-spacer" aria-hidden="true" />
         </div>
         <div className="login-panel-body">
           <div className="login-panel-copy">
-            <h2>登录账号</h2>
+            <h2>{t("settings.loginAccount")}</h2>
           </div>
 
           <button
@@ -59,10 +61,10 @@ export function LoginDrawer({
             <span className="login-provider-icon" aria-hidden="true">
               <MicrosoftIcon />
             </span>
-            <span>{authLoading ? "鉴权检查中" : "继续登录"}</span>
+            <span>{authLoading ? t("settings.checkingAuth") : t("settings.continueLogin")}</span>
           </button>
 
-          {!authAvailable ? <p className="inline-warning">Auth API 未连接，当前环境无法完成登录。</p> : null}
+          {!authAvailable ? <p className="inline-warning">{t("settings.authUnavailable")}</p> : null}
         </div>
       </aside>
     </>

@@ -7,6 +7,7 @@ import { buildWatchLink, generateRoomId } from "../lib/routeState.js";
 import { describePublishState } from "../lib/status.js";
 import { getPublishBlockReason, isPublishBlocked } from "../lib/roomPolicy.js";
 import { createApiError, createAppError, getAppErrorMessage } from "../lib/appErrors.js";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 import { normalizeStreamProtocol } from "../lib/streamProtocol.js";
 
 const STREAM_SETTINGS_STORAGE_PREFIX = "moq-live:stream-settings";
@@ -397,6 +398,8 @@ export function LiveRoute({
   siteTitle = "",
   onRouteReady,
 }) {
+  const { t } = useI18n();
+
   useEffect(() => {
     onRouteReady?.();
   }, [onRouteReady]);
@@ -563,11 +566,11 @@ export function LiveRoute({
   const liveRoomLabel = authState.user?.displayName
     || authState.user?.email
     || liveRoom
-    || "等待生成频道号";
+    || t("live.waitRoomId");
   const liveRoomAvatarUrl = authState.user?.avatarUrl || "";
   const liveShareTarget = authState.user?.handle?.trim() || (liveRoom ? `ns:${liveRoom}` : "");
   const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
-  const publishBadge = describePublishState(publisher.publishStatusKind);
+  const publishBadge = describePublishState(publisher.publishStatusKind, t);
   const liveStreamActive = publisher.publisherIsPublishing || publisher.syntheticPublishing;
   const publishProtocol = normalizeStreamProtocol(publisher.publishProtocol);
   const webRtcPublishUrl = publisher.webRtcPublishUrl || "";

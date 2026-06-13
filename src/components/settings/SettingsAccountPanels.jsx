@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { UserAvatar } from "../UserAvatar.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 function ChevronIcon() {
   return <ChevronRight />;
@@ -24,13 +25,15 @@ function EditIcon() {
 }
 
 export function SettingsProfileAvatar({ authUser }) {
+  const { t } = useI18n();
+
   return (
     <UserAvatar
       avatarUrl={authUser?.avatarUrl}
       displayName={authUser?.displayName}
       email={authUser?.email}
       className="my-profile-avatar"
-      imgAlt={authUser?.displayName || "用户头像"}
+      imgAlt={authUser?.displayName || t("common.userAvatar")}
       monogramClassName="is-monogram"
       placeholderClassName="is-placeholder"
     />
@@ -128,12 +131,14 @@ export function AccountEditDrawer({
   title,
   transitionClassName,
 }) {
+  const { t } = useI18n();
+
   return (
     <SettingsPanelShell
       backdropClassName="auth-panel-backdrop auth-panel-edit-backdrop"
       backdropLabel={closeLabel}
       bodyClassName="account-edit-panel-body"
-      closeLabel="返回"
+      closeLabel={t("common.back")}
       closeButtonClassName="account-panel-close"
       headClassName="account-panel-head"
       onClose={onCancel}
@@ -166,7 +171,7 @@ export function AccountEditDrawer({
         {status ? <p className="status">{status}</p> : null}
         <div className="account-edit-actions">
           <button type="submit" className="primary" disabled={saveDisabled}>
-            {saving ? "保存中" : "保存"}
+            {saving ? t("common.saving") : t("common.save")}
           </button>
         </div>
       </form>
@@ -213,18 +218,20 @@ export function AccountDrawer({
   submitHandle,
   transitionClassName,
 }) {
+  const { t } = useI18n();
+
   return (
     <SettingsPanelShell
       backdropClassName="auth-panel-backdrop"
-      backdropLabel="关闭账号页面"
+      backdropLabel={t("accountPanel.closeAccountPage")}
       bodyClassName="account-panel-body"
-      closeLabel="返回"
+      closeLabel={t("common.back")}
       closeButtonClassName="account-panel-close"
       headClassName="account-panel-head"
       onClose={onClose}
       panelClassName="auth-panel auth-panel-account"
-      panelLabel="账号页面"
-      title="账号"
+      panelLabel={t("accountPanel.accountPage")}
+      title={t("settings.account")}
       transitionClassName={transitionClassName}
     >
       <AccountDetailsContent
@@ -307,14 +314,15 @@ export function AccountDetailsContent({
   submitDisplayName,
   submitHandle,
 }) {
+  const { locale, t } = useI18n();
   const handleNote = handleIsDefault
-    ? "默认主播号可随时设置一次专属地址。"
+    ? t("accountPanel.handleDefaultNote")
     : handleCooldownActive
-      ? `自定义后 30 天内只能修改一次，下次可修改时间：${new Date(authUser.nextHandleChangeAt).toLocaleString()}`
-      : "自定义后 30 天内只能修改一次。";
+      ? t("accountPanel.handleCooldownNote", { time: new Date(authUser.nextHandleChangeAt).toLocaleString(locale) })
+      : t("accountPanel.handleNote");
   const displayNameNote = displayNameCooldownActive
-    ? `显示名 7 天内只能修改一次，下次可修改时间：${new Date(authUser.nextDisplayNameChangeAt).toLocaleString()}`
-    : "显示名需要唯一，且 7 天内只能修改一次。";
+    ? t("accountPanel.displayNameCooldownNote", { time: new Date(authUser.nextDisplayNameChangeAt).toLocaleString(locale) })
+    : t("accountPanel.displayNameNote");
 
   function handleAvatarItemKeyDown(event) {
     if (avatarSaving) {
@@ -335,7 +343,7 @@ export function AccountDetailsContent({
           role="button"
           tabIndex={avatarSaving ? -1 : 0}
           aria-disabled={avatarSaving}
-          aria-label="上传新头像"
+          aria-label={t("accountPanel.uploadAvatar")}
           onClick={() => {
             if (!avatarSaving) {
               onOpenAvatarPicker();
@@ -343,7 +351,7 @@ export function AccountDetailsContent({
           }}
           onKeyDown={handleAvatarItemKeyDown}
         >
-          <span className="account-list-label">头像</span>
+          <span className="account-list-label">{t("accountPanel.avatar")}</span>
           <div className="account-list-value account-list-avatar">
             <input
               ref={avatarInputRef}
@@ -362,24 +370,24 @@ export function AccountDetailsContent({
         </div>
 
         <div className="account-list-item">
-          <span className="account-list-label">邮箱</span>
+          <span className="account-list-label">{t("accountPanel.email")}</span>
           <span className="account-list-value">
-            <strong>{authUser.email || "未绑定"}</strong>
+            <strong>{authUser.email || t("common.notBound")}</strong>
           </span>
         </div>
 
         <AccountEditableField
-          cancelAriaLabel="取消编辑主播号"
-          editAriaLabel="编辑主播号"
+          cancelAriaLabel={t("accountPanel.cancelEditHandle")}
+          editAriaLabel={t("accountPanel.editHandle")}
           editing={handleEditing}
           inputValue={handleInput}
-          label="主播号"
+          label={t("accountPanel.handle")}
           maxLength={24}
           note={(
             <>
               {handleNote}
               <br />
-              仅支持小写字母、数字、下划线，长度 6-24，不能为纯数字，且不能以下划线开头或结尾。
+              {t("accountPanel.handleRule")}
             </>
           )}
           onCancelEditing={cancelHandleEditing}
@@ -392,18 +400,18 @@ export function AccountDetailsContent({
             void submitHandle();
           }}
           onStartEditing={startHandleEditing}
-          placeholder="输入唯一主播号"
-          saveAriaLabel="保存主播号"
+          placeholder={t("accountPanel.handlePlaceholder")}
+          saveAriaLabel={t("accountPanel.saveHandle")}
           saveDisabled={handleSaving || !handleInput.trim() || handleUnchanged}
-          value={authUser.handle || "未设置"}
+          value={authUser.handle || t("common.notSet")}
         />
 
         <AccountEditableField
-          cancelAriaLabel="取消编辑显示名"
-          editAriaLabel="编辑显示名"
+          cancelAriaLabel={t("accountPanel.cancelEditDisplayName")}
+          editAriaLabel={t("accountPanel.editDisplayName")}
           editing={displayNameEditing}
           inputValue={displayNameInput}
-          label="显示名"
+          label={t("accountPanel.displayName")}
           maxLength={32}
           note={displayNameNote}
           onCancelEditing={cancelDisplayNameEditing}
@@ -416,15 +424,15 @@ export function AccountDetailsContent({
             void submitDisplayName();
           }}
           onStartEditing={startDisplayNameEditing}
-          placeholder="输入想显示的名称"
-          saveAriaLabel="保存显示名"
+          placeholder={t("accountPanel.displayNamePlaceholder")}
+          saveAriaLabel={t("accountPanel.saveDisplayName")}
           saveDisabled={
             displayNameSaving
             || displayNameCooldownActive
             || !displayNameInput.trim()
             || displayNameUnchanged
           }
-          value={authUser.displayName || "未设置"}
+          value={authUser.displayName || t("common.notSet")}
         />
       </div>
 
@@ -445,7 +453,7 @@ export function AccountDetailsContent({
               onLogout();
             }}
           >
-            退出登录
+            {t("account.logout")}
           </button>
         </div>
       </div>

@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const DRAWER_EXIT_MS = 220;
 
 export function SwipeableDrawer({
   open,
   onClose,
-  ariaLabel = "关闭面板",
+  ariaLabel = "",
   className = "",
   panelClassName = "",
   portal = false,
   viewport = false,
   children,
 }) {
+  const { t } = useI18n();
+  const resolvedAriaLabel = ariaLabel || t("common.closePanel");
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -186,7 +189,7 @@ export function SwipeableDrawer({
       <button
         type="button"
         className={backdropClassName}
-        aria-label={ariaLabel}
+        aria-label={resolvedAriaLabel}
         onClick={onClose}
       />
       <div

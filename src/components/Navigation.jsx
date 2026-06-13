@@ -1,24 +1,27 @@
 import { CircleUserRound, Eye, Video } from "lucide-react";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const navItems = [
   {
     id: "watch",
-    label: "收看",
+    labelKey: "nav.watch",
     icon: <Eye />
   },
   {
     id: "live",
-    label: "开播",
+    labelKey: "nav.live",
     icon: <Video />
   },
   {
     id: "settings",
-    label: "我的",
+    labelKey: "nav.settings",
     icon: <CircleUserRound />
   }
 ];
 
 function NavButton({ item, currentPage, onSelect, onPreloadLive, mobile = false }) {
+  const { t } = useI18n();
+  const label = t(item.labelKey);
   const active = currentPage === item.id;
   const preloadProps = item.id === "live"
     ? {
@@ -41,10 +44,10 @@ function NavButton({ item, currentPage, onSelect, onPreloadLive, mobile = false 
           <span className="nav-icon" aria-hidden="true">
             {item.icon}
           </span>
-          <span className="nav-label">{item.label}</span>
+          <span className="nav-label">{label}</span>
         </>
       ) : (
-        item.label
+        label
       )}
     </button>
   );
@@ -62,6 +65,7 @@ function getNavHref(pageId) {
 }
 
 function NavLink({ item, currentPage, onSelect, onPreloadLive }) {
+  const { t } = useI18n();
   const active = currentPage === item.id;
   const preloadProps = item.id === "live"
     ? {
@@ -82,7 +86,7 @@ function NavLink({ item, currentPage, onSelect, onPreloadLive }) {
         onSelect(item.id);
       }}
     >
-      {item.label}
+      {t(item.labelKey)}
     </a>
   );
 }

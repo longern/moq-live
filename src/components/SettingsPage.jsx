@@ -488,8 +488,15 @@ export function SettingsPage({
   const handleCooldownActive = Boolean(
     authUser?.nextHandleChangeAt && Date.parse(authUser.nextHandleChangeAt) > Date.now()
   );
-  const profileName = authPending ? t("account.checking") : authUser?.displayName || authUser?.email || t("account.login");
-  const profileSubtitle = authPending ? t("account.checking") : authUser ? (authUser.email || t("account.signedIn")) : null;
+  const profileHandleLabel = authUser?.handle ? `@${authUser.handle}` : "";
+  const profileName = authPending
+    ? t("account.checking")
+    : authUser?.displayName || authUser?.handle || authUser?.email || t("account.login");
+  const profileSubtitle = authPending
+    ? t("account.checking")
+    : authUser
+      ? profileHandleLabel || t("account.signedIn")
+      : null;
   const profileFollowerCount = Math.max(0, Number(authUser?.followerCount || 0));
   const profileFollowingCount = Math.max(0, Number(authUser?.followingCount || 0) + profileFollowingAdjustment);
   const visibleFollowsPanelType = followsPanelType || renderedFollowsPanelType;

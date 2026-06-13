@@ -801,6 +801,10 @@ export class ChatRoomDO {
 
     const normalized = normalizeRoomLocation(location);
     const province = normalized.enabled ? sanitizeLocationProvince(normalized.province) : "";
+    if (normalized.enabled && normalized.geocodingAttempted && !province) {
+      return;
+    }
+
     const updatedAt = normalized.enabled && province
       ? sanitizeIsoTimestamp(normalized.provinceResolvedAt) || sanitizeIsoTimestamp(normalized.updatedAt) || new Date().toISOString()
       : null;

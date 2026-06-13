@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Camera, Copy, QrCode, Share } from "lucide-react";
 import { ChatPanel } from "../ChatPanel.jsx";
 import { StatusPill } from "../StatusPill.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
@@ -13,6 +14,7 @@ import {
   ScreenShareIcon,
   ShareIcon
 } from "./liveIcons.jsx";
+import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
 import { LiveMoreMenu } from "./LiveMoreMenu.jsx";
 import { LivePreviewStage } from "./LivePreviewStage.jsx";
 import { LiveQualityMenu } from "./LiveQualityMenu.jsx";
@@ -104,34 +106,90 @@ function MicrophonePanel({
   );
 }
 
+function LiveDesktopShareMenuItem({
+  icon,
+  label,
+  onClick,
+  disabled = false,
+  ariaLabel = label,
+}) {
+  return (
+    <LiveMenuItem
+      className="live-more-menu-item live-desktop-share-menu-item"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+    >
+      <span className="live-more-menu-icon">{icon}</span>
+      <span className="live-more-menu-label">{label}</span>
+    </LiveMenuItem>
+  );
+}
+
 function ShareLinkPanel({
   watchLink,
-  shareTarget,
+  onCopyLink,
+  onOpenImageShare,
+  onOpenScreenshotShare,
   onShare,
+  screenshotShareAvailable = false,
   shareSupported,
+  onClose,
 }) {
-  const sharingNamespace = shareTarget.startsWith("ns:");
+  async function handleShareLink() {
+    await onShare?.();
+    onClose?.();
+  }
+
+  async function handleCopyLink() {
+    await onCopyLink?.();
+    onClose?.();
+  }
+
+  function handleImageShare() {
+    onClose?.();
+    onOpenImageShare?.();
+  }
+
+  function handleScreenshotShare() {
+    onClose?.();
+    onOpenScreenshotShare?.();
+  }
 
   return (
-    <>
-      <div className="live-desktop-panel-head">
-        <strong>直播链接</strong>
-        <span>{watchLink ? "可直接分享" : "等待生成"}</span>
-      </div>
-      <label>
-        {sharingNamespace ? "直播 namespace" : "主播号"}
-        <input id="liveRoomId" value={shareTarget} readOnly />
-      </label>
-      <label>
-        观看链接
-        <input id="watchLinkInput" value={watchLink} readOnly />
-      </label>
-      <div className="action-row">
-        <button type="button" id="copyRoomLink" className="primary" onClick={onShare} disabled={!shareSupported || !watchLink}>
-          分享直播间
-        </button>
-      </div>
-    </>
+    <div className="live-more-menu-shell" aria-label="分享直播间">
+      <div className="live-more-menu-title">分享直播间</div>
+      <LiveMenuList className="live-more-menu-list live-desktop-share-menu-list">
+        <LiveDesktopShareMenuItem
+          icon={<Share aria-hidden="true" />}
+          label="分享"
+          onClick={handleShareLink}
+          disabled={!watchLink || !shareSupported}
+          ariaLabel="分享直播间"
+        />
+        <LiveDesktopShareMenuItem
+          icon={<QrCode aria-hidden="true" />}
+          label="图片分享"
+          onClick={handleImageShare}
+          disabled={!watchLink}
+          ariaLabel="图片分享"
+        />
+        <LiveDesktopShareMenuItem
+          icon={<Camera aria-hidden="true" />}
+          label="截屏分享"
+          onClick={handleScreenshotShare}
+          disabled={!watchLink || !screenshotShareAvailable}
+          ariaLabel="截屏分享"
+        />
+        <LiveDesktopShareMenuItem
+          icon={<Copy aria-hidden="true" />}
+          label="复制链接"
+          onClick={handleCopyLink}
+          disabled={!watchLink}
+          ariaLabel="复制直播链接"
+        />
+      </LiveMenuList>
+    </div>
   );
 }
 
@@ -304,6 +362,9 @@ export function LiveDesktopPage({
     onToggleMicrophone,
     onTogglePublish,
     onShare,
+    onCopyShareLink,
+    onOpenImageShare,
+    onOpenScreenshotShare,
     onStartScreenShare,
     onStopScreenShare,
     onChatDraftChange,
@@ -431,9 +492,13 @@ export function LiveDesktopPage({
   ) : openPanel === "link" ? (
     <ShareLinkPanel
       watchLink={watchLink}
-      shareTarget={shareTarget}
+      onCopyLink={onCopyShareLink}
+      onOpenImageShare={onOpenImageShare}
+      onOpenScreenshotShare={onOpenScreenshotShare}
       onShare={onShare}
+      screenshotShareAvailable={mediaMode === "video" && previewActive && previewHasVideo}
       shareSupported={shareSupported}
+      onClose={() => setOpenPanel("")}
     />
   ) : openPanel === "more" ? (
     <MorePanel

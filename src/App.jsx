@@ -19,6 +19,7 @@ import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from ".
 import { describePlayerState, RETAINED_PLAYER_LAYOUT_STATES } from "./lib/status.js";
 import { getWatchTestChannel } from "./lib/watchTestChannels.js";
 import { createApiError, getAppErrorMessage } from "./lib/appErrors.js";
+import { useI18n } from "./i18n/I18nProvider.jsx";
 import {
   setPushPermissionReminderDismissed,
   shouldPromptForPushPermission,
@@ -31,12 +32,12 @@ import {
   normalizeStreamProtocol,
 } from "./lib/streamProtocol.js";
 
-function getAvatarLabel(authState) {
+function getAvatarLabel(authState, t) {
   if (!authState.user) {
-    return "匿名";
+    return t("common.anonymous");
   }
 
-  return authState.user.displayName || authState.user.email || "用户";
+  return authState.user.displayName || authState.user.email || t("common.user");
 }
 
 function isNamespaceWatchTarget(value) {
@@ -212,7 +213,7 @@ function LiveRouteActivationContent({ children, onClose }) {
           type="button"
           className="live-page-close"
           onClick={onClose}
-          aria-label="退出开播页"
+          aria-label={t("common.close")}
         >
           <X />
         </button>
@@ -225,6 +226,7 @@ function LiveRouteActivationContent({ children, onClose }) {
 }
 
 export function App() {
+  const { t } = useI18n();
   const siteTitle = __APP_TITLE__;
   const [logText, setLogText] = useState("");
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
@@ -505,18 +507,18 @@ export function App() {
   const watchStageMessage = watchingTestChannel
     ? ""
     : watchingNamespace
-    ? (directWatchNamespace ? "正在连接公共频道。" : "等待输入公共频道号。")
+    ? (directWatchNamespace ? t("watch.connectPublicChannel") : t("watch.waitPublicChannel"))
     : watchRoomResolution.loading
-      ? "加载中"
+      ? t("common.loading")
       : watchRoomResolution.error
-        ? `进入失败：${watchRoomResolution.error}`
+        ? t("watch.enterFailed", { error: watchRoomResolution.error })
         : !resolvedWatchRoomId ||!chat.roomStateReady
-          ? "加载中"
+          ? t("common.loading")
             : chat.streamState.isLive
-              ? (resolvedWatchPlaybackReady ? "" : "加载中")
+              ? (resolvedWatchPlaybackReady ? "" : t("common.loading"))
               : watchStreamEnded
-                ? "直播已结束"
-                : "尚未开播";
+                ? t("watch.ended")
+                : t("watch.offair");
 
   watchPlaybackRelayUrlRef.current = resolvedWatchRelayUrl;
   watchPlaybackNamespaceRef.current = resolvedWatchNamespace;
@@ -530,14 +532,14 @@ export function App() {
   const watchRoomLabel = watchingTestChannel
     ? watchTestChannel.label
     : watchingNamespace
-    ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "等待输入 namespace")
+    ? (directWatchNamespace ? `ns:${directWatchNamespace}` : t("watch.waitNamespace"))
     : watchRoomResolution.hostDisplayName
       || watchRoomResolution.hostHandle
       || chat.roomMeta.title
       || watchRoomResolution.title
       || watchHandle
       || watchRoom
-      || "等待输入主播号";
+      || t("watch.waitHostHandle");
   const watchChatRoomLabel = watchingTestChannel
     ? watchTestChannel.label
     : watchingNamespace
@@ -549,10 +551,10 @@ export function App() {
   const watchRoomTitle = watchingTestChannel
     ? watchTestChannel.title
     : watchingNamespace
-    ? (directWatchNamespace ? `公共频道 ${directWatchNamespace}` : "公共频道")
+    ? t("watch.publicChannel", { namespace: directWatchNamespace })
     : chat.roomMeta.title
       || watchRoomResolution.title
-      || (watchChatRoomLabel ? `${watchChatRoomLabel}的直播间` : watchRoomLabel);
+      || (watchChatRoomLabel ? t("watch.roomOf", { room: watchChatRoomLabel }) : watchRoomLabel);
   const watchHostDisplayName = watchingTestChannel
     ? watchTestChannel.hostDisplayName
     : watchingNamespace
@@ -566,10 +568,10 @@ export function App() {
     : watchRoomResolution.hostUserId || "";
   const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.hostAvatarUrl || "";
   const watchHostLocationProvince = watchingNamespace || watchingTestChannel
-    ? "位置未知"
+    ? t("profile.locationUnknown")
     : chat.streamState.isLive
-      ? chat.roomLocation.province || watchRoomResolution.lastLocationProvince || "位置未知"
-      : watchRoomResolution.lastLocationProvince || "位置未知";
+      ? chat.roomLocation.province || watchRoomResolution.lastLocationProvince || t("profile.locationUnknown")
+      : watchRoomResolution.lastLocationProvince || t("profile.locationUnknown");
   const watchHostLocationAvailable = !watchingNamespace
     && !watchingTestChannel
     && (
@@ -619,7 +621,7 @@ export function App() {
   const effectivePlayerOrientation = watchTestChannel?.orientation ?? player.playerOrientation;
   const effectivePlayerStatusKind = watchingTestChannel ? "live" : player.playerStatusKind;
   const effectivePlayerStatus = watchTestChannel?.statusMessage ?? player.playerStatus;
-  const playerBadge = describePlayerState(effectivePlayerStatusKind);
+  const playerBadge = describePlayerState(effectivePlayerStatusKind, t);
   const buildLabel = `Build ${__BUILD_HASH__}`;
   const watchPlayerShellActive = shouldUseWatchPlayerShell({
     page,
@@ -631,7 +633,7 @@ export function App() {
   const watchRoomShellActive = page === "watch" && watchJoined;
   const mobileWatchJoinedClass = watchRoomShellActive ? " app-container-watch-joined" : "";
   const requireLoginForLive = false;
-  const avatarLabel = getAvatarLabel(authState);
+  const avatarLabel = getAvatarLabel(authState, t);
   const avatarStateClass = authState.loading
     ? " is-loading"
     : authState.user
@@ -640,12 +642,12 @@ export function App() {
         ? " is-unavailable"
         : "";
   const avatarTitle = authState.loading
-    ? "正在检查登录状态"
+    ? t("account.checking")
     : authState.user
-      ? (authState.user.email || authState.user.displayName || "已登录")
+      ? (authState.user.email || authState.user.displayName || t("account.signedIn"))
       : !authState.available
-        ? "Auth API 未连接"
-        : "匿名用户";
+        ? t("account.authApiDisconnected")
+        : t("common.anonymousUser");
   const showWatchPage = page === "watch" || (page === "live" && liveBackdropPage === "watch");
   const showSettingsPage = page === "settings" || (page === "live" && liveBackdropPage === "settings");
 
@@ -953,7 +955,7 @@ export function App() {
       }
       setPushPromptOpen(false);
     } catch (error) {
-      setPushPromptError("通知开启失败，请稍后再试");
+      setPushPromptError(t("push.enableFailed"));
       log(`push subscription failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setPushPromptBusy(false);
@@ -1363,7 +1365,7 @@ export function App() {
       if (streamEnded) {
         handledWatchPlaybackRef.current = { roomId: "", startedAt: "", protocol: "" };
         void player.stopPlayer({
-          finalStatus: "直播已结束",
+          finalStatus: t("watch.ended"),
           finalKind: "ended",
           logMessage: "stopped player because stream ended",
         });
@@ -1553,12 +1555,12 @@ export function App() {
     } else if (liveActivation.missing) {
       liveActivationContent = (
         <LiveActivationGate
-          title="开通直播功能"
-          message="开通后会为你的账号创建直播间，并用于主播分享、封面和聊天室管理。"
+          title={t("liveActivation.title")}
+          message={t("liveActivation.message")}
           error={liveActivation.error}
           busy={liveActivation.creating}
-          primaryLabel="开通"
-          secondaryLabel="暂不开通"
+          primaryLabel={t("liveActivation.primary")}
+          secondaryLabel={t("liveActivation.secondary")}
           onPrimary={() => {
             void activateLiveRoom();
           }}
@@ -1588,7 +1590,7 @@ export function App() {
               event.preventDefault();
               returnToWatchHome();
             }}
-            aria-label={`返回${siteTitle}收看页`}
+            aria-label={t("watch.backToWatch", { title: siteTitle })}
           >
             {siteIconUrl ? (
               <img className="brand-icon" src={siteIconUrl} alt="" aria-hidden="true" />
@@ -1615,8 +1617,8 @@ export function App() {
                 name="watch_room"
                 type="text"
                 value={topbarWatchRoom}
-                placeholder="输入主播号"
-                aria-label="输入主播号进入直播间"
+                placeholder={t("watch.inputHostHandle")}
+                aria-label={t("watch.inputHostHandleAria")}
                 autoComplete="off"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -1652,7 +1654,7 @@ export function App() {
                   className="auth-avatar-button"
                   aria-haspopup="menu"
                   aria-expanded={authMenuOpen ? "true" : "false"}
-                  aria-label={authState.user ? `账户菜单：${avatarLabel}` : "账户菜单：匿名用户"}
+                  aria-label={t("account.menuAria", { label: authState.user ? avatarLabel : t("common.anonymousUser") })}
                   title={avatarTitle}
                   onClick={() => {
                     setAuthMenuOpen((current) => !current);
@@ -1663,7 +1665,7 @@ export function App() {
                     displayName={authState.user?.displayName}
                     email={authState.user?.email}
                     className={`auth-avatar${avatarStateClass}`}
-                    imgAlt={authState.user?.displayName || "用户头像"}
+                    imgAlt={authState.user?.displayName || t("common.userAvatar")}
                     imgWidth={40}
                     imgHeight={40}
                     loading={authState.loading}
@@ -1672,7 +1674,7 @@ export function App() {
                   />
                 </button>
 
-                <div className={`auth-menu-dropdown${authMenuOpen ? " is-open" : ""}`} role="menu" aria-label="账户">
+                <div className={`auth-menu-dropdown${authMenuOpen ? " is-open" : ""}`} role="menu" aria-label={t("account.menu")}>
                   {authState.user ? (
                     <>
                       <button
@@ -1684,7 +1686,7 @@ export function App() {
                           selectPagePreservingLiveBackdrop("settings", { updateAutorun: false });
                         }}
                       >
-                        个人中心
+                        {t("account.personalCenter")}
                       </button>
                       <button
                         type="button"
@@ -1695,7 +1697,7 @@ export function App() {
                           void logout();
                         }}
                       >
-                        退出登录
+                        {t("account.logout")}
                       </button>
                     </>
                   ) : (
@@ -1708,9 +1710,9 @@ export function App() {
                         startMicrosoftLogin();
                       }}
                       disabled={authState.loading || !authState.available}
-                      title={!authState.available ? "Auth API 未连接" : undefined}
+                      title={!authState.available ? t("account.authApiDisconnected") : undefined}
                     >
-                      立即登录
+                      {t("account.loginNow")}
                     </button>
                   )}
                 </div>
@@ -1791,7 +1793,7 @@ export function App() {
               muted: cohostPlayer.playerMuted,
               ref: cohostPlayer.playerRef,
               status: cohostPlayer.playerStatus,
-              badge: describePlayerState(cohostPlayer.playerStatusKind),
+              badge: describePlayerState(cohostPlayer.playerStatusKind, t),
               orientation: cohostPlayer.playerOrientation,
             }}
             testPlayback={watchTestChannel}
@@ -1938,21 +1940,21 @@ export function App() {
           <button
             type="button"
             className="push-permission-backdrop"
-            aria-label="关闭通知权限提示"
+            aria-label={t("push.closePrompt")}
             onClick={closePushPrompt}
           />
           <div className="push-permission-dialog" role="dialog" aria-modal="true" aria-labelledby="push-permission-title">
             <button
               type="button"
               className="push-permission-close"
-              aria-label="关闭通知权限提示"
+              aria-label={t("push.closePrompt")}
               onClick={closePushPrompt}
             >
               <X aria-hidden="true" />
             </button>
             <div className="push-permission-copy">
-              <strong id="push-permission-title">开启开播通知</strong>
-              <span>接收开播通知，不错过每一个精彩瞬间。</span>
+              <strong id="push-permission-title">{t("push.title")}</strong>
+              <span>{t("push.message")}</span>
             </div>
             <label className="push-permission-check">
               <input
@@ -1962,15 +1964,15 @@ export function App() {
                   setPushPromptDismissChecked(event.currentTarget.checked);
                 }}
               />
-              <span>不再提醒</span>
+              <span>{t("push.doNotRemind")}</span>
             </label>
             {pushPromptError ? <p className="push-permission-error">{pushPromptError}</p> : null}
             <div className="push-permission-actions">
               <button type="button" className="secondary" onClick={closePushPrompt}>
-                稍后
+                {t("push.later")}
               </button>
               <button type="button" className="primary" onClick={enablePushNotifications} disabled={pushPromptBusy}>
-                {pushPromptBusy ? "开启中" : "开启通知"}
+                {pushPromptBusy ? t("push.enabling") : t("push.enable")}
               </button>
             </div>
           </div>

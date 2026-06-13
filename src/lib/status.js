@@ -19,10 +19,18 @@ const PUBLISH_BADGES = {
 
 export const RETAINED_PLAYER_LAYOUT_STATES = new Set(["ended", "error", "left", "offair"]);
 
-export function describePlayerState(kind = "idle") {
-  return PLAYER_BADGES[kind] || PLAYER_BADGES.idle;
+export function describePlayerState(kind = "idle", t = null) {
+  const badge = PLAYER_BADGES[kind] || PLAYER_BADGES.idle;
+  return {
+    ...badge,
+    label: t?.(`status.player.${kind}`) || badge.label,
+  };
 }
 
-export function describePublishState(kind = "idle") {
-  return PUBLISH_BADGES[kind] || PUBLISH_BADGES.idle;
+export function describePublishState(kind = "idle", t = null) {
+  const badge = PUBLISH_BADGES[kind] || PUBLISH_BADGES.idle;
+  return {
+    ...badge,
+    label: t?.(`status.publish.${kind}`) || badge.label,
+  };
 }

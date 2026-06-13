@@ -1,5 +1,6 @@
 import { CircleUserRound } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 
 function getAvatarText(displayName, email, initialsLength) {
   const source = String(displayName || email || "").trim();
@@ -16,7 +17,7 @@ export function UserAvatar({
   displayName,
   email,
   className = "",
-  imgAlt = "用户头像",
+  imgAlt = "",
   imgWidth,
   imgHeight,
   initialsLength = 1,
@@ -26,6 +27,7 @@ export function UserAvatar({
   monogramClassName = "",
   placeholderClassName = ""
 }) {
+  const { t } = useI18n();
   const initials = getAvatarText(displayName, email, initialsLength);
   const modeClassName = avatarUrl
     ? ""
@@ -39,7 +41,7 @@ export function UserAvatar({
       {loading ? (
         <LoadingSpinner className={loadingClassName} ariaHidden />
       ) : avatarUrl ? (
-        <img src={avatarUrl} alt={imgAlt} width={imgWidth} height={imgHeight} />
+        <img src={avatarUrl} alt={imgAlt || t("common.userAvatar")} width={imgWidth} height={imgHeight} />
       ) : initials ? (
         <span>{initials}</span>
       ) : (

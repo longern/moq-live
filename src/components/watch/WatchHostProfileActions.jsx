@@ -1,4 +1,5 @@
 import { Bell, BellOff } from "lucide-react";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 export function WatchHostProfileActions({
   authAvailable,
@@ -9,6 +10,8 @@ export function WatchHostProfileActions({
   notifyLiveStarted = false,
   onNotifyLiveToggle,
 }) {
+  const { t } = useI18n();
+
   if (!followButton) {
     return null;
   }
@@ -17,7 +20,7 @@ export function WatchHostProfileActions({
   }
 
   const NotificationIcon = notifyLiveStarted ? Bell : BellOff;
-  const notificationLabel = notifyLiveStarted ? "关闭开播通知" : "接收开播通知";
+  const notificationLabel = notifyLiveStarted ? t("hostActions.notifyOff") : t("hostActions.notifyOn");
   return (
     <div className="watch-host-profile-actions">
       {followButton}

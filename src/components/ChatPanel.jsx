@@ -5,34 +5,35 @@ import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { SwipeableDrawer } from "./SwipeableDrawer.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 import { useToast } from "./FloatingToast.jsx";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const CHAT_MESSAGE_MENU_MARGIN = 8;
 const CHAT_MESSAGE_MENU_TOUCH_GAP = 10;
 const CHAT_MESSAGE_MENU_EXIT_MS = 120;
 const CHAT_MUTE_OPTIONS = [
-  { id: "10m", label: "10 分钟", durationMs: 10 * 60_000 },
-  { id: "1h", label: "1 小时", durationMs: 60 * 60_000 },
-  { id: "24h", label: "24 小时", durationMs: 24 * 60 * 60_000 },
-  { id: "7d", label: "7 天", durationMs: 7 * 24 * 60 * 60_000 },
+  { id: "10m", labelKey: "chat.muteOptions.tenMinutes", durationMs: 10 * 60_000 },
+  { id: "1h", labelKey: "chat.muteOptions.oneHour", durationMs: 60 * 60_000 },
+  { id: "24h", labelKey: "chat.muteOptions.oneDay", durationMs: 24 * 60 * 60_000 },
+  { id: "7d", labelKey: "chat.muteOptions.sevenDays", durationMs: 7 * 24 * 60 * 60_000 },
 ];
 
-function getConnectionLabel(state) {
+function getConnectionLabel(state, t) {
   if (state === "connected") {
-    return "已连接";
+    return t("chat.connected");
   }
   if (state === "idle") {
-    return "加载中";
+    return t("chat.loading");
   }
   if (state === "connecting") {
-    return "连接中";
+    return t("chat.connecting");
   }
   if (state === "reconnecting") {
-    return "重连中";
+    return t("chat.reconnecting");
   }
   if (state === "closed") {
-    return "连接已断开";
+    return t("chat.closed");
   }
-  return "未连接";
+  return t("chat.disconnected");
 }
 
 function getComposerState({
@@ -43,15 +44,16 @@ function getComposerState({
   connectionState,
   draft,
   readOnly,
+  t,
 }) {
   if (!authUser) {
     return {
       mode: "guest",
       inputDisabled: true,
-      inputPlaceholder: authLoading ? "加载中" : authAvailable ? "登录后参与聊天" : "登录服务未连接",
+      inputPlaceholder: authLoading ? t("chat.loading") : authAvailable ? t("chat.loginToChat") : t("chat.authDisconnected"),
       buttonDisabled: !authAvailable || authLoading,
       buttonDisabledReason: !authAvailable || authLoading ? "blocked" : "guest",
-      buttonLabel: "登录"
+      buttonLabel: t("account.login")
     };
   }
 
@@ -63,10 +65,10 @@ function getComposerState({
   return {
     mode: "member",
     inputDisabled: !canInteract,
-    inputPlaceholder: isLoading ? "加载中" : isBlocked ? "不可发送消息" : "输入聊天内容",
+    inputPlaceholder: isLoading ? t("chat.loading") : isBlocked ? t("chat.blocked") : t("chat.input"),
     buttonDisabled: !canInteract || !hasDraft,
     buttonDisabledReason: !canInteract ? "blocked" : !hasDraft ? "empty" : "ready",
-    buttonLabel: "发送"
+    buttonLabel: t("chat.send")
   };
 }
 
@@ -106,8 +108,9 @@ function ChatMessageMutePanel({
   onMute,
   onMuteRetractMessageChange,
 }) {
-  const targetName = message?.user?.displayName || message?.user?.email || "该用户";
-  const messageText = String(message?.text || "").trim() || "这条评论";
+  const { t } = useI18n();
+  const targetName = message?.user?.displayName || message?.user?.email || t("common.user");
+  const messageText = String(message?.text || "").trim() || t("chat.thisComment");
 
   return (
     <div className="chat-message-mute-panel" role="none">
@@ -115,8 +118,8 @@ function ChatMessageMutePanel({
         <span className="chat-message-author chat-message-mute-target-name">{targetName}</span>
         <p>{messageText}</p>
       </div>
-      <div className="chat-message-mute-title">禁言时长</div>
-      <ul className="chat-message-mute-options" aria-label="选择禁言时间">
+      <div className="chat-message-mute-title">{t("chat.muteDuration")}</div>
+      <ul className="chat-message-mute-options" aria-label={t("chat.chooseMuteDuration")}>
         {CHAT_MUTE_OPTIONS.map((option) => (
           <li key={option.id} className="chat-message-mute-option-item">
             <button
@@ -124,7 +127,7 @@ function ChatMessageMutePanel({
               className="chat-message-mute-option"
               onClick={() => onMute(option)}
             >
-              <span>{option.label}</span>
+              <span>{t(option.labelKey)}</span>
             </button>
           </li>
         ))}
@@ -135,14 +138,14 @@ function ChatMessageMutePanel({
           checked={muteRetractMessage}
           onChange={(event) => onMuteRetractMessageChange(event.currentTarget.checked)}
         />
-        <span>同时撤回这条评论</span>
+        <span>{t("chat.retractSameMessage")}</span>
       </label>
       <button
         type="button"
         className="chat-message-mute-cancel"
         onClick={onCancel}
       >
-        取消
+        {t("common.cancel")}
       </button>
     </div>
   );
@@ -162,6 +165,8 @@ function ChatMessageContextMenu({
   positioned,
   top,
 }) {
+  const { t } = useI18n();
+
   if (!open) {
     return null;
   }
@@ -171,7 +176,7 @@ function ChatMessageContextMenu({
       <button
         type="button"
         className={`chat-message-context-backdrop${closing ? " is-closing" : ""}`}
-        aria-label="关闭评论操作菜单"
+        aria-label={t("chat.closeContextMenu")}
         onClick={onClose}
       />
       <div
@@ -193,7 +198,7 @@ function ChatMessageContextMenu({
           <span className="chat-message-context-icon">
             <Copy aria-hidden="true" />
           </span>
-          <span>复制</span>
+          <span>{t("chat.copy")}</span>
         </button>
         {canRetract ? (
           <button
@@ -205,7 +210,7 @@ function ChatMessageContextMenu({
             <span className="chat-message-context-icon">
               <RotateCcw aria-hidden="true" />
             </span>
-            <span>撤回</span>
+            <span>{t("chat.retract")}</span>
           </button>
         ) : null}
         {canMute ? (
@@ -218,7 +223,7 @@ function ChatMessageContextMenu({
             <span className="chat-message-context-icon">
               <Ban aria-hidden="true" />
             </span>
-            <span>禁言</span>
+            <span>{t("chat.mute")}</span>
           </button>
         ) : null}
       </div>
@@ -234,6 +239,8 @@ function ChatMessageMuteDialog({
   onMuteRetractMessageChange,
   open,
 }) {
+  const { t } = useI18n();
+
   if (!open) {
     return null;
   }
@@ -243,23 +250,23 @@ function ChatMessageMuteDialog({
       <button
         type="button"
         className="chat-message-mute-dialog-backdrop"
-        aria-label="关闭禁言对话框"
+        aria-label={t("chat.closeMuteDialog")}
         onClick={onClose}
       />
       <section
         className="chat-message-mute-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="禁言用户"
+        aria-label={t("chat.muteUser")}
       >
         <header className="chat-message-mute-dialog-header">
           <div className="chat-message-mute-dialog-copy">
-            <strong>禁言用户</strong>
+            <strong>{t("chat.muteUser")}</strong>
           </div>
           <button
             type="button"
             className="chat-message-mute-dialog-close"
-            aria-label="关闭禁言对话框"
+            aria-label={t("chat.closeMuteDialog")}
             onClick={onClose}
           >
             <X aria-hidden="true" />
@@ -301,13 +308,14 @@ export function ChatPanel({
   canRetractMessages = false,
   variant = "default",
   className = "",
-  title = "聊天室",
+  title = "",
   welcomeMessage = "",
   showComposer = true,
   showWelcome = true,
   onRetractMessage,
   onMuteMessage,
 }) {
+  const { t } = useI18n();
   const composerInputId = useId();
   const { showToast } = useToast();
   const listRef = useRef(null);
@@ -519,7 +527,7 @@ export function ChatPanel({
   async function copyContextMessage() {
     const text = String(contextMenu.message?.text || "");
     if (!text) {
-      showToast("复制失败");
+      showToast(t("chat.copyFailed"));
       closeMessageMenu();
       return;
     }
@@ -541,7 +549,7 @@ export function ChatPanel({
       copied = document.execCommand("copy");
       textarea.remove();
     } finally {
-      showToast(copied ? "复制成功" : "复制失败");
+      showToast(copied ? t("chat.copied") : t("chat.copyFailed"));
       closeMessageMenu();
     }
   }
@@ -609,7 +617,8 @@ export function ChatPanel({
     chatRecovering,
     connectionState,
     draft,
-    readOnly
+    readOnly,
+    t,
   });
   const floating = variant === "floating";
   const panelClassName = [
@@ -621,8 +630,8 @@ export function ChatPanel({
     showWelcome && connectionState === "connected" && messages.length === 0;
   const configuredWelcomeText = String(welcomeMessage || "").trim();
   const welcomeText = configuredWelcomeText || (roomLabel
-    ? `欢迎来到 ${roomLabel} 的直播间`
-    : "欢迎来到直播间");
+    ? t("chat.welcome", { room: roomLabel })
+    : t("chat.welcome"));
   const showSendSpinner =
     composerState.mode === "member" && chatRecovering;
 
@@ -631,10 +640,10 @@ export function ChatPanel({
       {!floating ? (
         <div className="control-head chat-panel-head">
           <div className="chat-panel-title-row">
-            <h3>{title}</h3>
-            <span className="chat-panel-online-count">{onlineCount} 在线</span>
+            <h3>{title || t("chat.title")}</h3>
+            <span className="chat-panel-online-count">{onlineCount} {t("chat.online")}</span>
           </div>
-          <span className={`chat-connection-state is-${connectionState}`}>{getConnectionLabel(connectionState)}</span>
+          <span className={`chat-connection-state is-${connectionState}`}>{getConnectionLabel(connectionState, t)}</span>
         </div>
       ) : null}
 
@@ -659,13 +668,13 @@ export function ChatPanel({
                 displayName={message.user?.displayName}
                 email={message.user?.email}
                 className="chat-avatar"
-                imgAlt={message.user?.displayName || "用户头像"}
+                imgAlt={message.user?.displayName || t("common.userAvatar")}
                 placeholderClassName="is-placeholder"
               />
               <div className="chat-message-body">
                 <p className="chat-message-line">
                   <span className="chat-message-author">
-                    {message.user?.displayName || message.user?.email || "匿名用户"}
+                    {message.user?.displayName || message.user?.email || t("chat.anonymousUser")}
                   </span>
                   <span className="chat-message-text">{message.text}</span>
                 </p>
@@ -678,7 +687,7 @@ export function ChatPanel({
           <article className="chat-message-card chat-message-card-system chat-message-card-system-no-avatar">
             <div className="chat-message-body chat-message-body-system">
               <p className="chat-message-line chat-message-line-system">
-                <span className="chat-message-author">系统</span>
+                <span className="chat-message-author">{t("chat.system")}</span>
                 <span className="chat-message-text">{welcomeText}</span>
               </p>
             </div>
@@ -715,7 +724,7 @@ export function ChatPanel({
       <SwipeableDrawer
         open={muteDrawer.open}
         onClose={closeMuteDrawer}
-        ariaLabel="关闭禁言面板"
+        ariaLabel={t("chat.closeMutePanel")}
         className="chat-message-mute-drawer"
         panelClassName="chat-message-mute-drawer-panel"
         portal
@@ -803,7 +812,7 @@ export function ChatPanel({
               {showSendSpinner ? (
                 <LoadingSpinner
                   className="chat-send-button-spinner"
-                  label="正在恢复连接"
+                  label={t("chat.restoring")}
                 />
               ) : null}
             </button>

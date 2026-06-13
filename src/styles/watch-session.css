@@ -665,7 +665,21 @@
   text-align: left;
 }
 
-.watch-host-profile-info-chip {
+.profile-info-chips {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  color: rgba(235, 244, 251, 0.58);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.profile-info-chip {
   min-width: 0;
   max-width: 100%;
   min-height: 22px;
@@ -689,8 +703,8 @@
   color: rgba(235, 244, 251, 0.82);
 }
 
-.watch-host-profile-location:not(:disabled):hover .watch-host-profile-info-chip,
-.watch-host-profile-location:not(:disabled):focus-visible .watch-host-profile-info-chip {
+.watch-host-profile-location:not(:disabled):hover .profile-info-chip,
+.watch-host-profile-location:not(:disabled):focus-visible .profile-info-chip {
   background: rgba(235, 244, 251, 0.08);
 }
 
@@ -789,10 +803,9 @@
   line-height: 1.2;
 }
 
-.watch-host-profile-bio {
+.profile-bio {
   min-width: 0;
   min-height: 42px;
-  margin: -2px 2px 0;
   color: rgba(235, 244, 251, 0.74);
   font-size: 0.86rem;
   line-height: 1.55;
@@ -800,8 +813,12 @@
   white-space: pre-wrap;
 }
 
-.watch-host-profile-bio.is-placeholder {
+.profile-bio.is-placeholder {
   color: rgba(235, 244, 251, 0.38);
+}
+
+.watch-host-profile-bio {
+  margin: -2px 2px 0;
 }
 
 .watch-host-follow-button-profile {

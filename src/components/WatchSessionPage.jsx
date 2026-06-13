@@ -43,6 +43,7 @@ import {
 } from "../lib/watchSession.js";
 import { getWatchStageView } from "../lib/watchStageView.js";
 import { usePortraitViewport } from "../hooks/useMediaQuery.js";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const WatchTestCanvas = import.meta.env.DEV
   ? lazy(() => import("./WatchTestCanvas.jsx").then((module) => ({ default: module.WatchTestCanvas })))
@@ -65,6 +66,7 @@ export function WatchSessionPage({
   actions = {},
   testPlayback
 }) {
+  const { t } = useI18n();
   const {
     userId: hostUserId,
     handle: hostHandle,
@@ -73,7 +75,7 @@ export function WatchSessionPage({
     gender: hostGender = "",
     birthDate: hostBirthDate = "",
     bio: hostBio = "",
-    locationProvince: hostLocationProvince = "位置未知",
+    locationProvince: hostLocationProvince = t("profile.locationUnknown"),
     locationAvailable: hostLocationAvailable = false,
     distanceAvailable: hostDistanceAvailable = hostLocationAvailable,
     locationUpdatedAt: hostLocationUpdatedAt = "",
@@ -196,6 +198,7 @@ export function WatchSessionPage({
     birthDate: hostBirthDate,
     province: hostLocationProvince,
     distanceText: hostDistanceText,
+    t,
   });
   const hostLocationClickable = Boolean(
     hostDistanceAvailable

@@ -12,9 +12,11 @@ import {
   SettingsProfileAvatar,
 } from "./settings/SettingsAccountPanels.jsx";
 import { SettingsFollowsDrawer } from "./settings/SettingsFollowsDrawer.jsx";
+import { ProfileBio, ProfileInfoChips } from "./ProfileInfoSummary.jsx";
 import { SettingsPanelShell } from "./settings/SettingsPanelShell.jsx";
 import { formatAudienceCount } from "../lib/audience.js";
 import { createApiError, createAppError, getAppErrorMessage } from "../lib/appErrors.js";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const FOLLOWS_PAGE_SIZE = 20;
 
@@ -29,13 +31,13 @@ function createEmptyFollowsState() {
   };
 }
 
-function formatHistoryTime(value) {
+function formatHistoryTime(value, locale) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return "";
   }
 
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(locale, {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
@@ -127,8 +129,8 @@ function SectionBlock({ title, action = null, children }) {
   );
 }
 
-function getFollowsPanelTitle(type) {
-  return type === "followers" ? "粉丝" : "关注";
+function getFollowsPanelTitle(type, t) {
+  return type === "followers" ? t("follows.titleFollowers") : t("follows.titleFollowing");
 }
 
 function ProfileSummaryCard({
@@ -142,6 +144,9 @@ function ProfileSummaryCard({
   profileSubtitle,
   onOpenProfilePanel
 }) {
+  const { t } = useI18n();
+  const profileLocationProvince = authUser?.locationProvince || authUser?.lastLocationProvince || t("profile.locationUnknown");
+
   return (
     <section className="my-account-card">
       <button
@@ -161,38 +166,49 @@ function ProfileSummaryCard({
         </span>
       </button>
       {authUser ? (
-        <div className="my-profile-stats" aria-label="关注和粉丝">
+        <ProfileInfoChips
+          className="profile-info-chips my-profile-info-chips"
+          gender={authUser.gender}
+          birthDate={authUser.birthDate}
+          province={profileLocationProvince}
+        />
+      ) : null}
+      {authUser ? (
+        <div className="my-profile-stats" aria-label={t("profile.statsAria")}>
           <button
             type="button"
             className="my-profile-stat my-profile-stat-button"
             onClick={onOpenFollowing}
-            aria-label={`查看关注列表，${formatAudienceCount(followingCount)} 关注`}
+            aria-label={t("profile.followingListAria", { count: formatAudienceCount(followingCount) })}
           >
             <strong>{formatAudienceCount(followingCount)}</strong>
-            <span>关注</span>
+            <span>{t("profile.following")}</span>
           </button>
           <hr className="my-profile-stat-divider" aria-hidden="true" />
           <button
             type="button"
             className="my-profile-stat my-profile-stat-button"
             onClick={onOpenFollowers}
-            aria-label={`查看粉丝列表，${formatAudienceCount(followerCount)} 粉丝`}
+            aria-label={t("profile.followersListAria", { count: formatAudienceCount(followerCount) })}
           >
             <strong>{formatAudienceCount(followerCount)}</strong>
-            <span>粉丝</span>
+            <span>{t("profile.followers")}</span>
           </button>
         </div>
       ) : null}
+      {authUser ? <ProfileBio className="profile-bio my-profile-bio" bio={authUser.bio} /> : null}
     </section>
   );
 }
 
 function WatchHistorySection({ historyItems, onClearWatchHistory, onOpenWatchHistoryItem }) {
+  const { t } = useI18n();
+
   return (
     <SectionBlock
-      title="观看历史"
+      title={t("settings.history")}
       action={historyItems.length ? (
-        <button type="button" className="my-section-link" onClick={onClearWatchHistory}>清空</button>
+        <button type="button" className="my-section-link" onClick={onClearWatchHistory}>{t("settings.clear")}</button>
       ) : null}
     >
       {historyItems.length ? (
@@ -222,7 +238,7 @@ function WatchHistorySection({ historyItems, onClearWatchHistory, onOpenWatchHis
         </ul>
       ) : (
         <div className="my-empty-state">
-          <span>暂无观看历史</span>
+          <span>{t("settings.noHistory")}</span>
         </div>
       )}
     </SectionBlock>
@@ -235,19 +251,21 @@ function AdvancedSettingsContent({
   logRef,
   logText
 }) {
+  const { t } = useI18n();
+
   return (
     <>
-      <SectionBlock title="诊断">
+      <SectionBlock title={t("settings.diagnostics")}>
         <div className="my-info-row">
-          <strong>Auth API</strong>
+          <strong>{t("settings.authApi")}</strong>
           <span>{authApiStatus}</span>
         </div>
         <div className="my-info-row">
-          <strong>Build</strong>
+          <strong>{t("settings.build")}</strong>
           <span id="buildSubtitle">{buildLabel}</span>
         </div>
         <article className="my-log-block">
-          <h3>开发日志</h3>
+          <h3>{t("settings.devLog")}</h3>
           <pre id="log" ref={logRef}>{logText}</pre>
         </article>
       </SectionBlock>
@@ -263,18 +281,20 @@ function SettingsDrawer({
   onClose,
   transitionClassName
 }) {
+  const { t } = useI18n();
+
   return (
     <SettingsPanelShell
       backdropClassName="settings-panel-backdrop"
-      backdropLabel="关闭设置面板"
+      backdropLabel={t("settings.closeSettingsPanel")}
       bodyClassName="settings-panel-body"
-      closeLabel="返回"
+      closeLabel={t("common.back")}
       closeButtonClassName="settings-panel-close"
       headClassName="settings-panel-head"
       onClose={onClose}
       panelClassName="settings-panel"
-      panelLabel="设置面板"
-      title="设置"
+      panelLabel={t("settings.settingsPanel")}
+      title={t("settings.title")}
       transitionClassName={transitionClassName}
     >
       <AdvancedSettingsContent
@@ -291,23 +311,24 @@ function DesktopSettingsSidebar({
   activeSection,
   onSelectSection
 }) {
+  const { t } = useI18n();
   const items = [
     {
       id: "account",
-      title: "账号信息"
+      title: t("settings.accountInfo")
     },
     {
       id: "history",
-      title: "观看历史"
+      title: t("settings.history")
     },
     {
       id: "advanced",
-      title: "高级设置"
+      title: t("settings.advanced")
     }
   ];
 
   return (
-    <nav className="desktop-settings-sidebar" aria-label="个人中心">
+    <nav className="desktop-settings-sidebar" aria-label={t("account.personalCenter")}>
       <div className="desktop-settings-list">
         {items.map((item) => {
           const active = activeSection === item.id;
@@ -356,6 +377,7 @@ export function SettingsPage({
   logText,
   logRef
 }) {
+  const { locale, t } = useI18n();
   const [handleInput, setHandleInput] = useState("");
   const [handleError, setHandleError] = useState("");
   const [handleStatus, setHandleStatus] = useState("");
@@ -466,17 +488,17 @@ export function SettingsPage({
   const handleCooldownActive = Boolean(
     authUser?.nextHandleChangeAt && Date.parse(authUser.nextHandleChangeAt) > Date.now()
   );
-  const profileName = authPending ? "账号加载中" : authUser?.displayName || authUser?.email || "登录";
-  const profileSubtitle = authPending ? "正在检查登录状态" : authUser ? (authUser.email || "已登录") : null;
+  const profileName = authPending ? t("account.checking") : authUser?.displayName || authUser?.email || t("account.login");
+  const profileSubtitle = authPending ? t("account.checking") : authUser ? (authUser.email || t("account.signedIn")) : null;
   const profileFollowerCount = Math.max(0, Number(authUser?.followerCount || 0));
   const profileFollowingCount = Math.max(0, Number(authUser?.followingCount || 0) + profileFollowingAdjustment);
   const visibleFollowsPanelType = followsPanelType || renderedFollowsPanelType;
   const activeFollowsState = visibleFollowsPanelType ? followsState[visibleFollowsPanelType] : createEmptyFollowsState();
-  const authApiStatus = authAvailable ? "已连接" : "未连接";
+  const authApiStatus = authAvailable ? t("settings.connected") : t("settings.disconnected");
   const historyItems = useMemo(() => (watchHistoryItems ?? []).map((item) => ({
     ...item,
-    displayTime: formatHistoryTime(item.watchedAt)
-  })), [watchHistoryItems]);
+    displayTime: formatHistoryTime(item.watchedAt, locale)
+  })), [locale, watchHistoryItems]);
 
   async function submitDisplayName() {
     if (!authUser || !onUpdateDisplayName) {
@@ -491,7 +513,7 @@ export function SettingsPage({
       const payload = await onUpdateDisplayName(displayNameInput);
       const nextValue = payload.user?.displayName || displayNameInput;
       setDisplayNameInput(nextValue);
-      setDisplayNameStatus("显示名已更新");
+      setDisplayNameStatus(t("accountPanel.displayNameUpdated"));
       setDisplayNameEditing(false);
       setMobileEditPanel((current) => (current === "displayName" ? null : current));
     } catch (error) {
@@ -514,7 +536,7 @@ export function SettingsPage({
       const payload = await onUpdateHandle(handleInput.trim().toLocaleLowerCase());
       const nextValue = payload.user?.handle || handleInput.trim().toLocaleLowerCase();
       setHandleInput(nextValue);
-      setHandleStatus("主播号已更新");
+      setHandleStatus(t("accountPanel.handleUpdated"));
       setHandleEditing(false);
       setMobileEditPanel((current) => (current === "handle" ? null : current));
     } catch (error) {
@@ -767,7 +789,7 @@ export function SettingsPage({
     try {
       const resizedFile = await resizeAvatarFile(file, 192);
       await onUpdateAvatar(resizedFile);
-      setAvatarStatus("头像已更新");
+      setAvatarStatus(t("accountPanel.avatarUpdated"));
     } catch (error) {
       setAvatarError(getAppErrorMessage(error));
     } finally {
@@ -784,7 +806,7 @@ export function SettingsPage({
             <button
               type="button"
               className="my-page-settings-button"
-              aria-label="打开设置"
+              aria-label={t("account.settingsButtonAria")}
               onClick={() => {
                 setSettingsPanelOpen(true);
               }}
@@ -821,7 +843,7 @@ export function SettingsPage({
             <div className="my-page-content">
               <div className="desktop-settings-content my-page-sections">
                 {desktopSection === "account" ? (
-                  <SectionBlock title="账号信息">
+                  <SectionBlock title={t("settings.accountInfo")}>
                     {authUser ? (
                       <AccountDetailsContent
                         authUser={authUser}
@@ -865,14 +887,14 @@ export function SettingsPage({
                       />
                     ) : (
                       <div className="my-empty-state my-login-empty">
-                        <span>{authPending ? "正在检查登录状态" : "登录后可以管理头像、主播号和显示名。"}</span>
+                        <span>{authPending ? t("account.checking") : t("settings.loginHint")}</span>
                         <button
                           type="button"
                           className="my-plain-login-button"
                           onClick={openLoginPanel}
                           disabled={authPending}
                         >
-                          继续登录
+                          {t("settings.continueLogin")}
                         </button>
                       </div>
                     )}
@@ -975,20 +997,20 @@ export function SettingsPage({
         <MobilePanelPresence open={mobileEditPanel === "handle" && Boolean(authUser)}>
           {({ transitionClassName }) => (authUser ? (
             <AccountEditDrawer
-              closeLabel="关闭主播号编辑页面"
+              closeLabel={t("accountPanel.closeHandleEditPage")}
               error={handleError}
               inputValue={handleInput}
-              label="主播号"
+              label={t("accountPanel.handle")}
               maxLength={24}
               note={(
                 <>
                   {handleIsDefault
-                    ? "默认主播号可随时设置一次专属地址。"
+                    ? t("accountPanel.handleDefaultNote")
                     : handleCooldownActive
-                      ? `自定义后 30 天内只能修改一次，下次可修改时间：${new Date(authUser.nextHandleChangeAt).toLocaleString()}`
-                      : "自定义后 30 天内只能修改一次。"}
+                      ? t("accountPanel.handleCooldownNote", { time: new Date(authUser.nextHandleChangeAt).toLocaleString(locale) })
+                      : t("accountPanel.handleNote")}
                   <br />
-                  仅支持小写字母、数字、下划线，长度 6-24，不能为纯数字，且不能以下划线开头或结尾。
+                  {t("accountPanel.handleRule")}
                 </>
               )}
               onCancel={cancelHandleEditing}
@@ -1000,11 +1022,11 @@ export function SettingsPage({
               onSave={() => {
                 void submitHandle();
               }}
-              placeholder="输入唯一主播号"
+              placeholder={t("accountPanel.handlePlaceholder")}
               saveDisabled={handleSaving || !handleInput.trim() || handleUnchanged}
               saving={handleSaving}
               status={handleStatus}
-              title="编辑主播号"
+              title={t("accountPanel.editPageTitleHandle")}
               transitionClassName={transitionClassName}
             />
           ) : null)}
@@ -1013,14 +1035,14 @@ export function SettingsPage({
         <MobilePanelPresence open={mobileEditPanel === "displayName" && Boolean(authUser)}>
           {({ transitionClassName }) => (authUser ? (
             <AccountEditDrawer
-              closeLabel="关闭显示名编辑页面"
+              closeLabel={t("accountPanel.closeDisplayNameEditPage")}
               error={displayNameError}
               inputValue={displayNameInput}
-              label="显示名"
+              label={t("accountPanel.displayName")}
               maxLength={32}
               note={displayNameCooldownActive
-                ? `显示名 7 天内只能修改一次，下次可修改时间：${new Date(authUser.nextDisplayNameChangeAt).toLocaleString()}`
-                : "显示名需要唯一，且 7 天内只能修改一次。"}
+                ? t("accountPanel.displayNameCooldownNote", { time: new Date(authUser.nextDisplayNameChangeAt).toLocaleString(locale) })
+                : t("accountPanel.displayNameNote")}
               onCancel={cancelDisplayNameEditing}
               onInput={(event) => {
                 setDisplayNameInput(event.currentTarget.value);
@@ -1030,7 +1052,7 @@ export function SettingsPage({
               onSave={() => {
                 void submitDisplayName();
               }}
-              placeholder="输入想显示的名称"
+              placeholder={t("accountPanel.displayNamePlaceholder")}
               saveDisabled={
                 displayNameSaving
                 || displayNameCooldownActive
@@ -1039,7 +1061,7 @@ export function SettingsPage({
               }
               saving={displayNameSaving}
               status={displayNameStatus}
-              title="编辑显示名"
+              title={t("accountPanel.editPageTitleDisplayName")}
               transitionClassName={transitionClassName}
             />
           ) : null)}
@@ -1069,7 +1091,7 @@ export function SettingsPage({
                 void confirmUnfollow();
               }}
               pendingUnfollowUser={pendingUnfollowUser}
-              title={getFollowsPanelTitle(visibleFollowsPanelType)}
+              title={getFollowsPanelTitle(visibleFollowsPanelType, t)}
               type={visibleFollowsPanelType}
               unfollowBusy={unfollowBusy}
               unfollowError={unfollowError}

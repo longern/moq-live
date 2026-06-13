@@ -15,9 +15,13 @@
 
 .my-page-main {
   display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
+  grid-template-columns: minmax(240px, 280px) 1px minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  border: 0;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
 }
 
 .my-page-aside,
@@ -479,20 +483,20 @@
 .desktop-settings-list {
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 
 .desktop-settings-list-item {
   width: 100%;
   min-width: 0;
   min-height: 56px;
-  padding: 14px 16px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   border: 0;
   border-radius: 0;
@@ -502,9 +506,6 @@
   box-shadow: none;
 }
 
-.desktop-settings-list-item + .desktop-settings-list-item {
-  border-top: 1px solid rgba(255, 255, 255, 0.055);
-}
 
 .desktop-settings-list-item:hover,
 .desktop-settings-list-item.is-active {
@@ -530,9 +531,6 @@
   font-weight: 650;
 }
 
-.desktop-settings-list-item.is-active .my-row-chevron {
-  color: var(--accent-2);
-}
 
 .my-profile-chevron svg,
 .my-row-chevron svg {
@@ -556,6 +554,16 @@
   margin-top: 0;
 }
 
+.desktop-settings-content.my-page-sections {
+  gap: 0;
+}
+
+.desktop-settings-content .my-section {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .my-section {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 24px;
@@ -577,8 +585,8 @@
   color: var(--muted);
   font-size: 0.84rem;
   line-height: 1.2;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   white-space: nowrap;
 }
 
@@ -604,6 +612,14 @@
 
 .my-page-content .my-section {
   min-height: 320px;
+}
+
+.my-page-divider {
+  width: 1px;
+  min-height: 100%;
+  margin: 0;
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .my-info-row,

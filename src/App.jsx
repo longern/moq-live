@@ -206,6 +206,8 @@ function LiveRouteFrame({ children, closing, shellMode }) {
 }
 
 function LiveRouteActivationContent({ children, onClose }) {
+  const { t } = useI18n();
+
   return (
     <div className="live-route-activation-content" role="status" aria-live="polite">
       <div className="live-page-top">

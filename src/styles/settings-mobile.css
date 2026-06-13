@@ -11,6 +11,9 @@
   .my-page-main {
     grid-template-columns: 1fr;
     gap: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
   }
 
   .my-account-card {
@@ -47,7 +50,8 @@
   }
 
   .desktop-settings-sidebar,
-  .desktop-settings-content {
+  .desktop-settings-content,
+  .my-page-divider {
     display: none;
   }
 

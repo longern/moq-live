@@ -346,9 +346,6 @@ function DesktopSettingsSidebar({
               <span>
                 <strong>{item.title}</strong>
               </span>
-              <span className="my-row-chevron" aria-hidden="true">
-                <ChevronIcon />
-              </span>
             </button>
           );
         })}
@@ -846,6 +843,8 @@ export function SettingsPage({
                 />
               </div>
             </aside>
+
+            <hr className="my-page-divider" aria-hidden="true" />
 
             <div className="my-page-content">
               <div className="desktop-settings-content my-page-sections">

@@ -8,9 +8,12 @@
     padding: 0 0 calc(16px + env(safe-area-inset-bottom));
   }
 
-  .my-page-main {
-    grid-template-columns: 1fr;
-    gap: 0;
+  .profile-page-layout {
+    display: none;
+  }
+
+  .mobile-profile-layout {
+    display: block;
   }
 
   .my-account-card {
@@ -46,15 +49,6 @@
     padding: 8px 10px 10px;
   }
 
-  .desktop-settings-sidebar,
-  .desktop-settings-content {
-    display: none;
-  }
-
-  .mobile-settings-profile {
-    display: block;
-  }
-
   .mobile-settings-content.my-page-sections {
     display: flex;
     flex-direction: column;
@@ -88,7 +82,7 @@
     background: transparent;
   }
 
-  .my-page-content .my-section {
+  .profile-page-content .my-section {
     min-height: 0;
   }
 

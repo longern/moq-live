@@ -13,15 +13,20 @@
   padding: 20px 0 36px;
 }
 
-.my-page-main {
+.profile-page-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
+  min-height: 100vh;
+  grid-template-columns: minmax(240px, 280px) 1px minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
 }
 
-.my-page-aside,
-.my-page-content {
+.profile-page-aside,
+.profile-page-content {
   min-width: 0;
 }
 
@@ -180,7 +185,7 @@
 }
 
 .my-profile-bio {
-  margin: -2px 18px 16px;
+  margin: 0 18px 16px;
 }
 
 .my-profile-stats {
@@ -467,8 +472,7 @@
   font-weight: 650;
 }
 
-.mobile-settings-profile,
-.mobile-settings-content.my-page-sections {
+.mobile-profile-layout {
   display: none;
 }
 
@@ -479,20 +483,20 @@
 .desktop-settings-list {
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 
 .desktop-settings-list-item {
   width: 100%;
   min-width: 0;
   min-height: 56px;
-  padding: 14px 16px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   border: 0;
   border-radius: 0;
@@ -500,10 +504,6 @@
   color: var(--text);
   text-align: left;
   box-shadow: none;
-}
-
-.desktop-settings-list-item + .desktop-settings-list-item {
-  border-top: 1px solid rgba(255, 255, 255, 0.055);
 }
 
 .desktop-settings-list-item:hover,
@@ -530,10 +530,6 @@
   font-weight: 650;
 }
 
-.desktop-settings-list-item.is-active .my-row-chevron {
-  color: var(--accent-2);
-}
-
 .my-profile-chevron svg,
 .my-row-chevron svg {
   width: 18px;
@@ -554,6 +550,16 @@
 
 .my-page-sections > .my-section:first-child {
   margin-top: 0;
+}
+
+.desktop-settings-content.my-page-sections {
+  gap: 0;
+}
+
+.desktop-settings-content .my-section {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .my-section {
@@ -577,8 +583,8 @@
   color: var(--muted);
   font-size: 0.84rem;
   line-height: 1.2;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   white-space: nowrap;
 }
 
@@ -602,8 +608,16 @@
   gap: 0;
 }
 
-.my-page-content .my-section {
+.profile-page-content .my-section {
   min-height: 320px;
+}
+
+.profile-page-divider {
+  width: 1px;
+  min-height: 100%;
+  margin: 0;
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .my-info-row,

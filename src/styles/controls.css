@@ -24,7 +24,7 @@ select {
 
 input,
 textarea {
-  caret-color: var(--primary);
+  caret-color: color-mix(in srgb, var(--primary) 64%, white);
 }
 
 textarea {

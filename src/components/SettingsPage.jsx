@@ -346,9 +346,6 @@ function DesktopSettingsSidebar({
               <span>
                 <strong>{item.title}</strong>
               </span>
-              <span className="my-row-chevron" aria-hidden="true">
-                <ChevronIcon />
-              </span>
             </button>
           );
         })}
@@ -488,8 +485,15 @@ export function SettingsPage({
   const handleCooldownActive = Boolean(
     authUser?.nextHandleChangeAt && Date.parse(authUser.nextHandleChangeAt) > Date.now()
   );
-  const profileName = authPending ? t("account.checking") : authUser?.displayName || authUser?.email || t("account.login");
-  const profileSubtitle = authPending ? t("account.checking") : authUser ? (authUser.email || t("account.signedIn")) : null;
+  const profileHandleLabel = authUser?.handle ? `@${authUser.handle}` : "";
+  const profileName = authPending
+    ? t("account.checking")
+    : authUser?.displayName || authUser?.handle || authUser?.email || t("account.login");
+  const profileSubtitle = authPending
+    ? t("account.checking")
+    : authUser
+      ? profileHandleLabel || t("account.signedIn")
+      : null;
   const profileFollowerCount = Math.max(0, Number(authUser?.followerCount || 0));
   const profileFollowingCount = Math.max(0, Number(authUser?.followingCount || 0) + profileFollowingAdjustment);
   const visibleFollowsPanelType = followsPanelType || renderedFollowsPanelType;
@@ -815,32 +819,17 @@ export function SettingsPage({
             </button>
           </div>
 
-          <div className="my-page-main">
-            <aside className="my-page-aside">
+          <div className="profile-page-layout">
+            <aside className="profile-page-aside">
               <DesktopSettingsSidebar
                 activeSection={desktopSection}
                 onSelectSection={setDesktopSection}
               />
-              <div className="mobile-settings-profile">
-                <ProfileSummaryCard
-                  authPending={authPending}
-                  authUser={authUser}
-                  followerCount={profileFollowerCount}
-                  followingCount={profileFollowingCount}
-                  profileName={profileName}
-                  profileSubtitle={profileSubtitle}
-                  onOpenFollowers={() => {
-                    openFollowsPanel("followers");
-                  }}
-                  onOpenFollowing={() => {
-                    openFollowsPanel("following");
-                  }}
-                  onOpenProfilePanel={openProfilePanel}
-                />
-              </div>
             </aside>
 
-            <div className="my-page-content">
+            <hr className="profile-page-divider" aria-hidden="true" />
+
+            <div className="profile-page-content">
               <div className="desktop-settings-content my-page-sections">
                 {desktopSection === "account" ? (
                   <SectionBlock title={t("settings.accountInfo")}>
@@ -918,14 +907,31 @@ export function SettingsPage({
                   />
                 ) : null}
               </div>
+            </div>
+          </div>
 
-              <div className="mobile-settings-content my-page-sections">
-                <WatchHistorySection
-                  historyItems={historyItems}
-                  onClearWatchHistory={onClearWatchHistory}
-                  onOpenWatchHistoryItem={onOpenWatchHistoryItem}
-                />
-              </div>
+          <div className="mobile-profile-layout">
+            <ProfileSummaryCard
+              authPending={authPending}
+              authUser={authUser}
+              followerCount={profileFollowerCount}
+              followingCount={profileFollowingCount}
+              profileName={profileName}
+              profileSubtitle={profileSubtitle}
+              onOpenFollowers={() => {
+                openFollowsPanel("followers");
+              }}
+              onOpenFollowing={() => {
+                openFollowsPanel("following");
+              }}
+              onOpenProfilePanel={openProfilePanel}
+            />
+            <div className="mobile-settings-content my-page-sections">
+              <WatchHistorySection
+                historyItems={historyItems}
+                onClearWatchHistory={onClearWatchHistory}
+                onOpenWatchHistoryItem={onOpenWatchHistoryItem}
+              />
             </div>
           </div>
         </div>

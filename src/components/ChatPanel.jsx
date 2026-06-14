@@ -312,6 +312,7 @@ export function ChatPanel({
   welcomeMessage = "",
   showComposer = true,
   showWelcome = true,
+  composerTrailingAction = null,
   onRetractMessage,
   onMuteMessage,
 }) {
@@ -776,6 +777,11 @@ export function ChatPanel({
             >
               {composerState.buttonLabel}
             </button>
+            {composerTrailingAction ? (
+              <span className="chat-composer-extra">
+                {composerTrailingAction}
+              </span>
+            ) : null}
           </div>
         ) : (
           <form
@@ -816,6 +822,11 @@ export function ChatPanel({
                 />
               ) : null}
             </button>
+            {composerTrailingAction ? (
+              <span className="chat-composer-extra">
+                {composerTrailingAction}
+              </span>
+            ) : null}
           </form>
         )
       ) : null}

@@ -13,10 +13,11 @@ export function RegistrationDisplayNameModal({
   const { t } = useI18n();
 
   return (
-    <div className="registration-name-layer" role="presentation">
+    <div className="registration-name-layer" role="presentation" onClick={(event) => event.stopPropagation()}>
       <div
         className="registration-name-dialog"
         role="dialog"
+        onClick={(event) => event.stopPropagation()}
         aria-modal="true"
         aria-labelledby="registration-name-title"
       >
@@ -47,8 +48,8 @@ export function RegistrationDisplayNameModal({
           </label>
           {error ? <p className="registration-name-error">{error}</p> : null}
           <div className="registration-name-actions">
-            <button type="button" className="secondary" onClick={onClose} disabled={saving}>
-              {t("common.cancel")}
+            <button type="button" className="registration-name-skip" onClick={onClose} disabled={saving}>
+              {t("common.skip")}
             </button>
             <button type="submit" className="primary" disabled={saving || !inputValue.trim()}>
               {saving ? t("common.saving") : t("common.save")}

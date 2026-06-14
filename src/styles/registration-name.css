@@ -68,12 +68,17 @@
 .registration-name-field input {
   width: 100%;
   min-height: 46px;
-  border: 1px solid rgba(148, 163, 184, 0.36);
+  border: 0;
   border-radius: 14px;
   padding: 0 14px;
   background: rgba(248, 250, 252, 0.92);
   color: inherit;
   font: inherit;
+}
+
+.registration-name-field input:focus-visible {
+  outline: 2px solid var(--primary-ring, rgba(64, 92, 255, 0.62));
+  outline-offset: 2px;
 }
 
 .registration-name-error {
@@ -86,4 +91,30 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.registration-name-skip {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted, #64748b);
+  box-shadow: none;
+}
+
+.registration-name-skip:hover,
+.registration-name-skip:focus-visible {
+  color: var(--text, #0f172a);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.registration-name-skip:focus-visible {
+  outline: 2px solid var(--primary-ring, rgba(64, 92, 255, 0.62));
+  outline-offset: 2px;
+}
+
+.registration-name-skip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

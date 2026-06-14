@@ -836,6 +836,7 @@ export function SettingsPage({
                     {authUser ? (
                       <AccountDetailsContent
                         authUser={authUser}
+                        desktopLayout
                         avatarError={avatarError}
                         avatarInputRef={avatarInputRef}
                         avatarSaving={avatarSaving}

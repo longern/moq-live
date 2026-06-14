@@ -9,6 +9,7 @@ export const enMessages = {
     saving: "Saving",
     save: "Save",
     cancel: "Cancel",
+    skip: "Skip",
     confirm: "Confirm",
     processing: "Processing",
     back: "Back",

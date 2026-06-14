@@ -7,6 +7,7 @@ import {
   Play,
   Radio,
   Share,
+  MoreHorizontal,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -963,6 +964,23 @@ export function WatchSessionPage({
     };
   }, [shareMenuMounted]);
 
+  function renderMobileMoreButton(className = "") {
+    return (
+      <button
+        type="button"
+        className={`stage-mobile-more chat-composer-more${moreOpen ? " is-active" : ""}${className ? ` ${className}` : ""}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          openMoreSheet();
+        }}
+        aria-label="更多操作"
+        aria-expanded={moreOpen}
+      >
+        <MoreHorizontal aria-hidden="true" />
+      </button>
+    );
+  }
+
   function renderMobileHud(className = "", persistent = false) {
     const visible = immersiveShell
       ? !immersiveControlsHidden || playerBadge.state === "error"
@@ -980,6 +998,7 @@ export function WatchSessionPage({
         onOpenHostProfile={openHostProfile}
         onOpenMoreSheet={openMoreSheet}
         onStop={onStop}
+        showMoreButton={!immersiveShell}
         visible={visible}
       />
     );
@@ -1143,6 +1162,7 @@ export function WatchSessionPage({
                   chatRecovering={chatRecovering}
                   variant="floating"
                   className="chat-panel-watch-overlay"
+                  composerTrailingAction={renderMobileMoreButton()}
                 />
               </div>
             ) : null}

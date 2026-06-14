@@ -9,6 +9,7 @@ export const zhCNMessages = {
     saving: "保存中",
     save: "保存",
     cancel: "取消",
+    skip: "跳过",
     confirm: "确认",
     processing: "处理中",
     back: "返回",

@@ -278,6 +278,7 @@ export function AccountDrawer({
 
 export function AccountDetailsContent({
   authUser,
+  desktopLayout = false,
   avatarError,
   avatarInputRef,
   avatarSaving,
@@ -336,7 +337,7 @@ export function AccountDetailsContent({
   }
 
   return (
-    <div className="my-account-form">
+    <div className={`my-account-form${desktopLayout ? " is-desktop-form" : ""}`}>
       <div className="account-panel-list">
         <div
           className="account-list-item account-list-item-avatar account-list-item-button"
@@ -364,7 +365,7 @@ export function AccountDetailsContent({
               <SettingsProfileAvatar authUser={authUser} />
             </div>
             <span className="account-list-chevron" aria-hidden="true">
-              <ChevronIcon />
+              {desktopLayout ? <EditIcon /> : <ChevronIcon />}
             </span>
           </div>
         </div>

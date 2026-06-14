@@ -389,12 +389,20 @@
   padding: 10px 0;
 }
 
+.desktop-settings-content .my-account-form.is-desktop-form .account-list-item,
+.desktop-settings-content .my-account-form.is-desktop-form .account-editable-row-main {
+  grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+  column-gap: 16px;
+}
+
 .desktop-settings-content .my-account-form.is-desktop-form .account-list-label {
   align-self: center;
   color: rgba(153, 174, 193, 0.9);
+  min-width: 120px;
   font-size: inherit;
   line-height: 1.5;
   text-align: right;
+  white-space: nowrap;
 }
 
 .desktop-settings-content .my-account-form.is-desktop-form .account-list-value,
@@ -452,7 +460,7 @@
 }
 
 .desktop-settings-content .my-account-form.is-desktop-form .account-editable-collapse-inner {
-  margin-left: calc(var(--account-list-label-width) + var(--account-list-gap));
+  margin-left: 136px;
 }
 
 .desktop-settings-content .my-account-form.is-desktop-form .account-editable-note {
@@ -466,5 +474,5 @@
 
 .desktop-settings-content .my-account-form.is-desktop-form .my-account-actions {
   justify-content: flex-start;
-  padding-left: calc(var(--account-list-label-width) + var(--account-list-gap));
+  padding-left: 136px;
 }

@@ -705,6 +705,13 @@ pre {
 }
 
 .chat-composer-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: rgba(235, 244, 251, 0.92);
+  box-shadow: none;
   width: 36px;
   min-width: 36px;
   height: 36px;
@@ -716,6 +723,7 @@ pre {
 .chat-composer-more svg {
   width: 18px;
   height: 18px;
+  fill: currentColor;
 }
 
 .chat-composer-extra:has(.watch-composer-more-mobile) {

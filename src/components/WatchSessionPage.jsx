@@ -968,7 +968,7 @@ export function WatchSessionPage({
     return (
       <button
         type="button"
-        className={`stage-mobile-more chat-composer-more${moreOpen ? " is-active" : ""}${className ? ` ${className}` : ""}`}
+        className={`chat-composer-more watch-composer-more${moreOpen ? " is-active" : ""}${className ? ` ${className}` : ""}`}
         onClick={(event) => {
           event.stopPropagation();
           openMoreSheet();

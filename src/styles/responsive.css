@@ -1105,3 +1105,18 @@
     color: #ffd6de;
   }
 }
+
+@media (max-width: 980px) {
+  .chat-composer-extra:has(.watch-composer-more-mobile) {
+    display: inline-flex;
+    width: 36px;
+    opacity: 1;
+  }
+
+  .chat-composer:has(input:focus) .chat-composer-extra:has(.watch-composer-more-mobile),
+  .chat-composer-readonly:has(input:focus) .chat-composer-extra:has(.watch-composer-more-mobile),
+  .chat-composer-floating:has(input:focus) .chat-composer-extra:has(.watch-composer-more-mobile) {
+    width: 0;
+    opacity: 0;
+  }
+}

@@ -964,7 +964,7 @@ export function WatchSessionPage({
     };
   }, [shareMenuMounted]);
 
-  function renderMobileMoreButton(className = "") {
+  function renderMobileMoreButton(className = "watch-composer-more-mobile") {
     return (
       <button
         type="button"
@@ -998,7 +998,7 @@ export function WatchSessionPage({
         onOpenHostProfile={openHostProfile}
         onOpenMoreSheet={openMoreSheet}
         onStop={onStop}
-        showMoreButton={!immersiveShell}
+        showMoreButton={false}
         visible={visible}
       />
     );
@@ -1320,6 +1320,7 @@ export function WatchSessionPage({
             readOnly={chatReadOnly}
             chatError={chatError}
             chatRecovering={chatRecovering}
+            composerTrailingAction={renderMobileMoreButton()}
           />
         </aside>
       </div>

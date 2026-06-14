@@ -717,3 +717,9 @@ pre {
   width: 18px;
   height: 18px;
 }
+
+.chat-composer-extra:has(.watch-composer-more-mobile) {
+  display: none;
+  width: 0;
+  opacity: 0;
+}

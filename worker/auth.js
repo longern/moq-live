@@ -486,7 +486,11 @@ export async function upsertMicrosoftUser(db, claims) {
     ]);
 
     await ensureUserHandle(db, existingIdentity.user_id);
-    return existingIdentity.user_id;
+    return {
+      userId: existingIdentity.user_id,
+      isNewUser: false,
+      oauthDisplayName: displayName,
+    };
   }
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -541,7 +545,11 @@ export async function upsertMicrosoftUser(db, claims) {
           ),
       ]);
 
-      return userId;
+      return {
+        userId,
+        isNewUser: true,
+        oauthDisplayName: displayName,
+      };
     } catch (error) {
       if (
         String(error?.message || error)

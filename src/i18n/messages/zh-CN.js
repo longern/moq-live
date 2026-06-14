@@ -58,6 +58,11 @@ export const zhCNMessages = {
     inputHostHandleAria: "输入主播号进入直播间",
     backToWatch: ({ title } = {}) => `返回${title || ""}收看页`,
   },
+  registrationName: {
+    title: "完善显示名",
+    message: "欢迎加入！请填写你想在直播间展示的显示名。",
+    close: "关闭显示名填写弹窗",
+  },
   account: {
     checking: "正在检查登录状态",
     signedIn: "已登录",

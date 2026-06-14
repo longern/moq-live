@@ -58,6 +58,11 @@ export const enMessages = {
     inputHostHandleAria: "Enter a host handle to open the live room",
     backToWatch: ({ title } = {}) => `Back to ${title || ""} watch page`,
   },
+  registrationName: {
+    title: "Set your display name",
+    message: "Welcome! Enter the display name you want to show in live rooms.",
+    close: "Close display name dialog",
+  },
   account: {
     checking: "Checking sign-in status",
     signedIn: "Signed in",

@@ -7,6 +7,7 @@ export function useAuthController({ log, onAuthenticated }) {
     available: true,
     user: null
   });
+  const [registrationPrompt, setRegistrationPrompt] = useState(null);
   const onAuthenticatedRef = useRef(onAuthenticated);
 
   onAuthenticatedRef.current = onAuthenticated;
@@ -155,9 +156,20 @@ export function useAuthController({ log, onAuthenticated }) {
   useEffect(() => {
     const url = new URL(window.location.href);
     const authError = url.searchParams.get("auth_error");
+    const isNewUser = url.searchParams.get("auth_new_user") === "1";
+    const oauthDisplayName = url.searchParams.get("oauth_display_name") || "";
     if (authError) {
       log(`auth failed: ${authError}`);
       url.searchParams.delete("auth_error");
+    }
+    if (isNewUser) {
+      setRegistrationPrompt({
+        oauthDisplayName,
+      });
+      url.searchParams.delete("auth_new_user");
+      url.searchParams.delete("oauth_display_name");
+    }
+    if (authError || isNewUser) {
       history.replaceState({}, "", url);
     }
 
@@ -166,6 +178,8 @@ export function useAuthController({ log, onAuthenticated }) {
 
   return {
     authState,
+    registrationPrompt,
+    dismissRegistrationPrompt: () => setRegistrationPrompt(null),
     refreshAuthState,
     startMicrosoftLogin,
     logout,

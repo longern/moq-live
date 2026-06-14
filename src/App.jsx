@@ -1,29 +1,44 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
-import { DesktopNavigation, MobileNavigation } from "./components/Navigation.jsx";
+import { MobileNavigation } from "./components/Navigation.jsx";
+import { AppTopbar } from "./components/AppTopbar.jsx";
 import { LoginDrawer } from "./components/LoginDrawer.jsx";
+import { PushPermissionPrompt } from "./components/PushPermissionPrompt.jsx";
+import { RegistrationDisplayNameModal } from "./components/RegistrationDisplayNameModal.jsx";
 import { MobilePanelPresence } from "./components/MobilePanelPresence.jsx";
-import { UserAvatar } from "./components/UserAvatar.jsx";
 import { SettingsPage } from "./components/SettingsPage.jsx";
-import { WatchPage } from "./components/WatchPage.jsx";
+import { AppWatchPageSection } from "./components/AppWatchPageSection.jsx";
 import { LiveActivationGate } from "./components/live/LiveActivationGate.jsx";
 import { LiveActivationLoading } from "./components/live/LiveActivationLoading.jsx";
+import { LiveRouteActivationContent, LiveRouteFrame } from "./components/LiveRouteShell.jsx";
 import { useAuthController } from "./hooks/useAuthController.js";
+import { usePushPermissionPromptController } from "./hooks/usePushPermissionPromptController.js";
+import { useRegistrationDisplayNamePrompt } from "./hooks/useRegistrationDisplayNamePrompt.js";
 import { useChatController } from "./hooks/useChatController.js";
 import { useLiveRoomActivation } from "./hooks/useLiveRoomActivation.js";
 import { useCompactViewport, usePortraitViewport } from "./hooks/useMediaQuery.js";
 import { usePlayerController } from "./hooks/usePlayerController.js";
 import { useRouteController } from "./hooks/useRouteController.js";
 import { buildWatchLink, getRelayHostValue, writeRoute } from "./lib/routeState.js";
+import {
+  createInitialWatchFollowState,
+  createInitialWatchRoomResolution,
+  getAvatarLabel,
+  getDesiredWatchPlaybackTarget,
+  getHandleWatchValue,
+  getNamespaceWatchValue,
+  getWatchPlayerLayoutScopeKey,
+  isNamespaceWatchTarget,
+  playerSessionMatchesWatchTarget,
+  shouldUseWatchPlayerShell,
+  watchPlaybackRecordMatches,
+} from "./lib/appViewState.js";
 import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from "./lib/watchHistory.js";
 import { describePlayerState, RETAINED_PLAYER_LAYOUT_STATES } from "./lib/status.js";
 import { getWatchTestChannel } from "./lib/watchTestChannels.js";
-import { createApiError, getAppErrorMessage } from "./lib/appErrors.js";
+import { createApiError } from "./lib/appErrors.js";
 import { useI18n } from "./i18n/I18nProvider.jsx";
 import {
-  setPushPermissionReminderDismissed,
   shouldPromptForPushPermission,
-  subscribeCurrentUserToWebPush,
 } from "./lib/webPush.js";
 import {
   DEFAULT_STREAM_PROTOCOL,
@@ -31,148 +46,6 @@ import {
   STREAM_PROTOCOL_WEBRTC,
   normalizeStreamProtocol,
 } from "./lib/streamProtocol.js";
-
-function getAvatarLabel(authState, t) {
-  if (!authState.user) {
-    return t("common.anonymous");
-  }
-
-  return authState.user.displayName || authState.user.email || t("common.user");
-}
-
-function isNamespaceWatchTarget(value) {
-  return value.trim().toLowerCase().startsWith("ns:");
-}
-
-function getNamespaceWatchValue(value) {
-  if (!isNamespaceWatchTarget(value)) {
-    return "";
-  }
-
-  return value.trim().slice(3).trim();
-}
-
-function getHandleWatchValue(value) {
-  return value.trim().replace(/^@+/, "").toLowerCase();
-}
-
-function getWatchPlayerLayoutScopeKey({
-  normalizedWatchInput,
-  watchTestChannel,
-  watchingNamespace,
-  directWatchNamespace,
-  watchHandle,
-}) {
-  if (!normalizedWatchInput) {
-    return "";
-  }
-
-  if (watchTestChannel) {
-    return `test:${watchTestChannel.id}`;
-  }
-
-  if (watchingNamespace) {
-    return `namespace:${directWatchNamespace || normalizedWatchInput.toLowerCase()}`;
-  }
-
-  return `room:${watchHandle || normalizedWatchInput.toLowerCase()}`;
-}
-
-function shouldUseWatchPlayerShell({
-  page,
-  watchJoined,
-  playerSession,
-  playerStatusKind,
-  playerOrientation,
-}) {
-  if (page !== "watch" || !watchJoined) {
-    return false;
-  }
-
-  if (playerSession) {
-    return true;
-  }
-
-  return (
-    playerOrientation === "portrait" &&
-    RETAINED_PLAYER_LAYOUT_STATES.has(playerStatusKind)
-  );
-}
-
-function getDesiredWatchPlaybackTarget({
-  page,
-  watchRouteCommitted,
-  watchingNamespace,
-  directWatchNamespace,
-  resolvedWatchRoomId,
-  roomStateReady,
-  isLive,
-  playbackReady,
-  protocol,
-  relayUrl,
-  namespace,
-  webRtcUrl,
-  startedAt,
-}) {
-  if (page !== "watch" || !watchRouteCommitted) {
-    return null;
-  }
-
-  if (watchingNamespace) {
-    if (!directWatchNamespace) {
-      return null;
-    }
-    const roomId = `namespace:${directWatchNamespace.toLowerCase()}`;
-    return {
-      roomId,
-      startedAt: "__namespace__",
-      protocol: STREAM_PROTOCOL_MOQ,
-      relayUrl,
-      namespace,
-      webRtcUrl: "",
-    };
-  }
-
-  if (!resolvedWatchRoomId || !roomStateReady || !isLive || !playbackReady) {
-    return null;
-  }
-
-  const targetStartedAt = startedAt || "__live__";
-  return {
-    roomId: resolvedWatchRoomId,
-    startedAt: targetStartedAt,
-    protocol,
-    relayUrl,
-    namespace,
-    webRtcUrl,
-  };
-}
-
-function playerSessionMatchesWatchTarget(playerSession, target) {
-  if (!playerSession || !target || playerSession.protocol !== target.protocol) {
-    return false;
-  }
-
-  if (target.protocol === STREAM_PROTOCOL_WEBRTC) {
-    return (
-      playerSession.webRtcUrl === target.webRtcUrl &&
-      playerSession.namespace === target.namespace
-    );
-  }
-
-  return (
-    playerSession.relayUrl === target.relayUrl &&
-    playerSession.namespace === target.namespace
-  );
-}
-
-function watchPlaybackRecordMatches(record, target) {
-  return (
-    record.roomId === target.roomId &&
-    record.startedAt === target.startedAt &&
-    record.protocol === target.protocol
-  );
-}
 
 let liveRouteModulePromise = null;
 
@@ -193,42 +66,8 @@ const LiveRoute = lazy(loadLiveRoute);
 
 const LIVE_ROUTE_FRAME_EXIT_MS = 280;
 
-function LiveRouteFrame({ children, closing, shellMode }) {
-  return (
-    <section
-      className={`page page-immersive live-route-frame${closing ? " is-closing" : ""}`}
-      data-page="live"
-      data-shell={shellMode}
-    >
-      {children}
-    </section>
-  );
-}
-
-function LiveRouteActivationContent({ children, onClose }) {
-  const { t } = useI18n();
-
-  return (
-    <div className="live-route-activation-content" role="status" aria-live="polite">
-      <div className="live-page-top">
-        <button
-          type="button"
-          className="live-page-close"
-          onClick={onClose}
-          aria-label={t("common.close")}
-        >
-          <X />
-        </button>
-      </div>
-      <div className="live-route-activation-body">
-        {children}
-      </div>
-    </div>
-  );
-}
-
 export function App() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const siteTitle = __APP_TITLE__;
   const [logText, setLogText] = useState("");
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
@@ -350,6 +189,8 @@ export function App() {
 
   const {
     authState,
+    registrationPrompt,
+    dismissRegistrationPrompt,
     refreshAuthState,
     startMicrosoftLogin,
     logout,
@@ -357,6 +198,11 @@ export function App() {
     updateHandle,
     updateAvatar
   } = useAuthController({ log });
+  const registrationDisplayName = useRegistrationDisplayNamePrompt({
+    dismissRegistrationPrompt,
+    locale,
+    updateDisplayName,
+  });
   const {
     liveActivation,
     liveChatRoomId,
@@ -369,42 +215,11 @@ export function App() {
     log,
   });
 
-  const [watchRoomResolution, setWatchRoomResolution] = useState({
-    loading: false,
-    error: "",
-    roomId: "",
-    hostUserId: "",
-    hostHandle: "",
-    hostDisplayName: "",
-    hostAvatarUrl: "",
-    hostGender: "",
-    hostBirthDate: "",
-    hostBio: "",
-    lastLocationProvince: "",
-    lastLocationUpdatedAt: "",
-    hostFollowerCount: 0,
-    hostFollowingCount: 0,
-    title: "",
-    welcomeMessage: "",
-    coverUrl: ""
-  });
-  const [watchFollowState, setWatchFollowState] = useState({
-    hostUserId: "",
-    following: false,
-    notifyLiveStarted: false,
-    followerCount: 0,
-    followingCount: 0,
-    loading: false,
-    busy: false,
-    notifyBusy: false,
-    error: ""
-  });
+  const [watchRoomResolution, setWatchRoomResolution] = useState(createInitialWatchRoomResolution);
+  const [watchFollowState, setWatchFollowState] = useState(createInitialWatchFollowState);
   const [watchStreamEnded, setWatchStreamEnded] = useState(false);
   const [topbarWatchRoom, setTopbarWatchRoom] = useState("");
-  const [pushPromptOpen, setPushPromptOpen] = useState(false);
-  const [pushPromptDismissChecked, setPushPromptDismissChecked] = useState(false);
-  const [pushPromptBusy, setPushPromptBusy] = useState(false);
-  const [pushPromptError, setPushPromptError] = useState("");
+  const pushPrompt = usePushPermissionPromptController({ t });
 
   const watchPlaybackRelayUrlRef = useRef("");
   const watchPlaybackNamespaceRef = useRef("");
@@ -686,6 +501,7 @@ export function App() {
     setSettingsLoginPanelRequestKey((current) => current + 1);
   }
 
+
   function returnToWatchHomeNow() {
     if (liveRouteCloseTimerRef.current) {
       clearTimeout(liveRouteCloseTimerRef.current);
@@ -841,9 +657,9 @@ export function App() {
         error: ""
       });
       if (!currentlyFollowing && payload.following && shouldPromptForPushPermission()) {
-        setPushPromptDismissChecked(false);
+        pushPrompt.setDismissChecked(false);
         setPushPromptError("");
-        setPushPromptOpen(true);
+        pushPrompt.setOpen(true);
       }
     } catch (error) {
       const message = getAppErrorMessage(error);
@@ -917,9 +733,9 @@ export function App() {
         error: ""
       });
       if (nextNotifyLiveStarted && payload.following && payload.notifyLiveStarted && shouldPromptForPushPermission()) {
-        setPushPromptDismissChecked(false);
+        pushPrompt.setDismissChecked(false);
         setPushPromptError("");
-        setPushPromptOpen(true);
+        pushPrompt.setOpen(true);
       }
     } catch (error) {
       const message = getAppErrorMessage(error);
@@ -938,31 +754,6 @@ export function App() {
     }
   }
 
-  function closePushPrompt() {
-    if (pushPromptDismissChecked) {
-      setPushPermissionReminderDismissed(true);
-    }
-    setPushPromptOpen(false);
-    setPushPromptError("");
-    setPushPromptBusy(false);
-  }
-
-  async function enablePushNotifications() {
-    setPushPromptBusy(true);
-    setPushPromptError("");
-    try {
-      const subscribed = await subscribeCurrentUserToWebPush();
-      if (pushPromptDismissChecked || subscribed) {
-        setPushPermissionReminderDismissed(true);
-      }
-      setPushPromptOpen(false);
-    } catch (error) {
-      setPushPromptError(t("push.enableFailed"));
-      log(`push subscription failed: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setPushPromptBusy(false);
-    }
-  }
 
   useEffect(() => {
     if (logRef.current) {
@@ -1584,278 +1375,90 @@ export function App() {
   return (
     <>
       <div className={`app-container${mobileWatchJoinedClass}`}>
-        <header className="topbar">
-          <a
-            href={window.location.pathname}
-            className="brand brand-button"
-            onClick={(event) => {
-              event.preventDefault();
-              returnToWatchHome();
-            }}
-            aria-label={t("watch.backToWatch", { title: siteTitle })}
-          >
-            {siteIconUrl ? (
-              <img className="brand-icon" src={siteIconUrl} alt="" aria-hidden="true" />
-            ) : null}
-            <span className="brand-title">{siteTitle}</span>
-          </a>
-
-          <div className="topbar-right">
-            <form
-              className="topbar-watch-form"
-              role="search"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const nextWatchRoom = topbarWatchRoom.trim();
-                if (!nextWatchRoom) {
-                  return;
-                }
-                beginWatch(nextWatchRoom);
-                setTopbarWatchRoom("");
-              }}
-            >
-              <input
-                id="topbar-watch-room"
-                name="watch_room"
-                type="text"
-                value={topbarWatchRoom}
-                placeholder={t("watch.inputHostHandle")}
-                aria-label={t("watch.inputHostHandleAria")}
-                autoComplete="off"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck="false"
-                enterKeyHint="go"
-                onInput={(event) => {
-                  setTopbarWatchRoom(event.currentTarget.value);
-                }}
-              />
-            </form>
-            <DesktopNavigation
-              currentPage={page}
-              onSelect={(nextPage) => selectPageWithGuard(nextPage)}
-              onPreloadLive={preloadLiveRoute}
-            />
-            <div className="auth-toolbar">
-              <div
-                ref={authMenuRef}
-                className="auth-menu-shell"
-                onMouseEnter={openAuthMenu}
-                onMouseLeave={scheduleCloseAuthMenu}
-                onFocus={openAuthMenu}
-                onBlur={(event) => {
-                  const nextTarget = event.relatedTarget;
-                  if (nextTarget instanceof Node && authMenuRef.current?.contains(nextTarget)) {
-                    return;
-                  }
-                  scheduleCloseAuthMenu();
-                }}
-              >
-                <button
-                  type="button"
-                  className="auth-avatar-button"
-                  aria-haspopup="menu"
-                  aria-expanded={authMenuOpen ? "true" : "false"}
-                  aria-label={t("account.menuAria", { label: authState.user ? avatarLabel : t("common.anonymousUser") })}
-                  title={avatarTitle}
-                  onClick={() => {
-                    setAuthMenuOpen((current) => !current);
-                  }}
-                >
-                  <UserAvatar
-                    avatarUrl={authState.user?.avatarUrl}
-                    displayName={authState.user?.displayName}
-                    email={authState.user?.email}
-                    className={`auth-avatar${avatarStateClass}`}
-                    imgAlt={authState.user?.displayName || t("common.userAvatar")}
-                    imgWidth={40}
-                    imgHeight={40}
-                    loading={authState.loading}
-                    loadingClassName="auth-avatar-loading-spinner"
-                    iconClassName="auth-avatar-icon"
-                  />
-                </button>
-
-                <div className={`auth-menu-dropdown${authMenuOpen ? " is-open" : ""}`} role="menu" aria-label={t("account.menu")}>
-                  {authState.user ? (
-                    <>
-                      <button
-                        type="button"
-                        className="auth-menu-item"
-                        role="menuitem"
-                        onClick={() => {
-                          closeAuthMenu();
-                          selectPagePreservingLiveBackdrop("settings", { updateAutorun: false });
-                        }}
-                      >
-                        {t("account.personalCenter")}
-                      </button>
-                      <button
-                        type="button"
-                        className="auth-menu-item"
-                        role="menuitem"
-                        onClick={() => {
-                          closeAuthMenu();
-                          void logout();
-                        }}
-                      >
-                        {t("account.logout")}
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="auth-menu-item"
-                      role="menuitem"
-                      onClick={() => {
-                        closeAuthMenu();
-                        startMicrosoftLogin();
-                      }}
-                      disabled={authState.loading || !authState.available}
-                      title={!authState.available ? t("account.authApiDisconnected") : undefined}
-                    >
-                      {t("account.loginNow")}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <AppTopbar
+          authMenuOpen={authMenuOpen}
+          authMenuRef={authMenuRef}
+          authState={authState}
+          avatarLabel={avatarLabel}
+          avatarStateClass={avatarStateClass}
+          avatarTitle={avatarTitle}
+          onAuthMenuClose={closeAuthMenu}
+          onAuthMenuOpen={openAuthMenu}
+          onAuthMenuScheduleClose={scheduleCloseAuthMenu}
+          onAuthMenuToggle={() => {
+            setAuthMenuOpen((current) => !current);
+          }}
+          onBeginWatch={beginWatch}
+          onLogout={() => {
+            void logout();
+          }}
+          onOpenSettings={() => {
+            selectPagePreservingLiveBackdrop("settings", { updateAutorun: false });
+          }}
+          onPreloadLive={preloadLiveRoute}
+          onReturnHome={returnToWatchHome}
+          onSelectPage={(nextPage) => selectPageWithGuard(nextPage)}
+          onStartMicrosoftLogin={startMicrosoftLogin}
+          onTopbarWatchRoomChange={setTopbarWatchRoom}
+          page={page}
+          siteIconUrl={siteIconUrl}
+          siteTitle={siteTitle}
+          topbarWatchRoom={topbarWatchRoom}
+        />
 
         <main className="page-shell">
-          <WatchPage
-            siteTitle={siteTitle}
-            hidden={!showWatchPage}
-            watchJoined={watchJoined}
-            roomLabel={watchRoomLabel}
-            roomTitle={watchRoomTitle}
-            welcomeMessage={watchWelcomeMessage}
-            room={watchRoom}
-            onRoomInput={(event) => {
-              setWatchRoomValue(event.currentTarget.value);
-            }}
-            onStart={() => {
-              beginWatch();
-            }}
-            onOpenRoom={(nextRoom) => {
-              beginWatch(nextRoom);
-            }}
-            host={{
-              userId: watchHostUserId,
-              handle: watchRoomResolution.hostHandle,
-              displayName: watchHostDisplayName,
-              avatarUrl: watchHostAvatarUrl,
-              gender: watchRoomResolution.hostGender,
-              birthDate: watchRoomResolution.hostBirthDate,
-              bio: watchRoomResolution.hostBio,
-              locationProvince: watchHostLocationProvince,
-              locationAvailable: watchHostLocationAvailable,
-              distanceAvailable: watchHostDistanceAvailable,
-              locationUpdatedAt: watchHostLocationUpdatedAt,
-              followerCount: watchHostFollowerCount,
-              followingCount: watchHostFollowingCount,
-              icon: watchHostIcon,
-              following: watchFollowState.hostUserId === watchHostUserId && watchFollowState.following,
-              followLoading: authState.loading ||
-                (
-                  watchFollowState.hostUserId === watchHostUserId &&
-                  watchFollowState.loading
-                ),
-              followBusy: watchFollowState.hostUserId === watchHostUserId && watchFollowState.busy,
-              notifyLiveStarted: watchFollowState.hostUserId === watchHostUserId && watchFollowState.notifyLiveStarted,
-              notifyBusy: watchFollowState.hostUserId === watchHostUserId && watchFollowState.notifyBusy,
-            }}
-            media={{
-              roomCoverUrl: watchRoomCoverUrl,
+          <AppWatchPageSection
+            context={{
+              authState,
+              autorunRef,
+              beginWatch,
+              chat,
+              cohostActive,
+              cohostPlayer,
+              effectivePlayerFreezeFrameUrl,
+              effectivePlayerOrientation,
+              effectivePlayerSession,
+              effectivePlayerStarted,
+              effectivePlayerStatus,
+              effectivePlayerStatusKind,
+              log,
+              player,
+              playerBadge,
+              selectPageWithGuard,
+              setLoginPromptOpen,
+              setWatchRoomValue,
+              setWatchRouteCommitted,
+              showWatchPage,
               siteIconUrl,
-              watchLink: watchPageLink,
-              stageLoading: watchStageLoading,
-              stageMessage: watchStageMessage,
-            }}
-            player={{
-              statusMessage: effectivePlayerStatus,
-              statusKind: effectivePlayerStatusKind,
-              badge: playerBadge,
-              fullscreenActive: player.fullscreenActive,
-              paused: watchingTestChannel ? false : player.playerPaused,
-              muted: watchingTestChannel ? true : player.playerMuted,
-              showTapToUnmute: watchingTestChannel ? false : player.showTapToUnmute,
-              orientation: effectivePlayerOrientation,
-              stageRef: player.watchStageRef,
-              session: effectivePlayerSession,
-              started: effectivePlayerStarted,
-              freezeFrameUrl: effectivePlayerFreezeFrameUrl,
-              ref: player.playerRef,
-            }}
-            cohost={{
-              active: cohostActive,
-              session: cohostPlayer.playerSession,
-              started: cohostPlayer.playerStarted,
-              muted: cohostPlayer.playerMuted,
-              ref: cohostPlayer.playerRef,
-              status: cohostPlayer.playerStatus,
-              badge: describePlayerState(cohostPlayer.playerStatusKind, t),
-              orientation: cohostPlayer.playerOrientation,
-            }}
-            testPlayback={watchTestChannel}
-            auth={{
-              available: authState.available,
-              loading: authState.loading,
-              user: authState.user,
-            }}
-            chat={{
-              room: watchChatRoom,
-              roomLabel: watchChatRoomLabel,
-              messages: chat.messages,
-              draft: chat.draft,
-              connectionState: chat.connectionState,
-              onlineCount: chat.onlineCount,
-              loggedInViewers: chat.loggedInViewers,
-              readOnly: chat.readOnly,
-              error: chat.chatError,
-              recovering: chat.recoveringFromPageLifecycle,
-            }}
-            actions={{
-              onStop: () => {
-                autorunRef.current = false;
-                setWatchRouteCommitted(false);
-                setWatchRoomValue("");
-                selectPageWithGuard("watch", { updateAutorun: false });
-                void player.stopPlayer();
-                void cohostPlayer.stopPlayer();
-              },
-              onTogglePlayback: () => {
-                void player.togglePlayerPlayback().catch((error) => {
-                  log(`toggle playback failed: ${error instanceof Error ? error.message : String(error)}`);
-                });
-              },
-              onToggleMute: () => {
-                void player.togglePlayerMute().catch((error) => {
-                  log(`toggle mute failed: ${error instanceof Error ? error.message : String(error)}`);
-                });
-              },
-              onDismissTapToUnmute: () => {
-                void player.dismissTapToUnmute().catch((error) => {
-                  log(`tap to unmute failed: ${error instanceof Error ? error.message : String(error)}`);
-                });
-              },
-              onFullscreen: () => {
-                void player.fullscreenPlayer().catch((error) => {
-                  log(`fullscreen failed: ${error instanceof Error ? error.message : String(error)}`);
-                });
-              },
-              onHostFollowToggle: toggleWatchFollow,
-              onHostNotifyLiveToggle: toggleWatchLiveNotification,
-              onChatDraftChange: (event) => {
-                chat.setDraft(event.currentTarget.value);
-              },
-              onChatSend: () => {
-                chat.sendMessage();
-              },
-              onChatRequireLogin: () => {
-                setLoginPromptOpen(true);
-              },
+              siteTitle,
+              t,
+              toggleWatchFollow,
+              toggleWatchLiveNotification,
+              watchChatRoom,
+              watchChatRoomLabel,
+              watchFollowState,
+              watchHostAvatarUrl,
+              watchHostDisplayName,
+              watchHostDistanceAvailable,
+              watchHostFollowerCount,
+              watchHostFollowingCount,
+              watchHostIcon,
+              watchHostLocationAvailable,
+              watchHostLocationProvince,
+              watchHostLocationUpdatedAt,
+              watchHostUserId,
+              watchJoined,
+              watchingTestChannel,
+              watchPageLink,
+              watchRoom,
+              watchRoomCoverUrl,
+              watchRoomLabel,
+              watchRoomResolution,
+              watchRoomTitle,
+              watchStageLoading,
+              watchStageMessage,
+              watchTestChannel,
+              watchWelcomeMessage,
             }}
           />
 
@@ -1937,48 +1540,27 @@ export function App() {
           onPreloadLive={preloadLiveRoute}
         />
       )}
-      {pushPromptOpen ? (
-        <div className="push-permission-layer" role="presentation">
-          <button
-            type="button"
-            className="push-permission-backdrop"
-            aria-label={t("push.closePrompt")}
-            onClick={closePushPrompt}
-          />
-          <div className="push-permission-dialog" role="dialog" aria-modal="true" aria-labelledby="push-permission-title">
-            <button
-              type="button"
-              className="push-permission-close"
-              aria-label={t("push.closePrompt")}
-              onClick={closePushPrompt}
-            >
-              <X aria-hidden="true" />
-            </button>
-            <div className="push-permission-copy">
-              <strong id="push-permission-title">{t("push.title")}</strong>
-              <span>{t("push.message")}</span>
-            </div>
-            <label className="push-permission-check">
-              <input
-                type="checkbox"
-                checked={pushPromptDismissChecked}
-                onChange={(event) => {
-                  setPushPromptDismissChecked(event.currentTarget.checked);
-                }}
-              />
-              <span>{t("push.doNotRemind")}</span>
-            </label>
-            {pushPromptError ? <p className="push-permission-error">{pushPromptError}</p> : null}
-            <div className="push-permission-actions">
-              <button type="button" className="secondary" onClick={closePushPrompt}>
-                {t("push.later")}
-              </button>
-              <button type="button" className="primary" onClick={enablePushNotifications} disabled={pushPromptBusy}>
-                {pushPromptBusy ? t("push.enabling") : t("push.enable")}
-              </button>
-            </div>
-          </div>
-        </div>
+      {pushPrompt.open ? (
+        <PushPermissionPrompt
+          busy={pushPrompt.busy}
+          dismissChecked={pushPrompt.dismissChecked}
+          error={pushPrompt.error}
+          onClose={pushPrompt.close}
+          onDismissCheckedChange={pushPrompt.setDismissChecked}
+          onEnable={pushPrompt.enable}
+        />
+      ) : null}
+
+      {registrationPrompt ? (
+        <RegistrationDisplayNameModal
+          error={registrationDisplayName.error}
+          inputValue={registrationDisplayName.input}
+          onChange={registrationDisplayName.changeInput}
+          onClose={registrationDisplayName.close}
+          onSubmit={registrationDisplayName.submit}
+          placeholder={registrationPrompt.oauthDisplayName}
+          saving={registrationDisplayName.saving}
+        />
       ) : null}
       <MobilePanelPresence open={loginPromptOpen}>
         {({ transitionClassName }) => (

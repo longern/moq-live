@@ -159,9 +159,9 @@ export const enMessages = {
   watchSheet: {
     closeMore: "Close more actions",
     moreActions: "More watch actions",
-    shareWatchLink: "Share watch link",
+    shareWatchLink: "Share",
     imageShare: "Image share",
-    copyWatchLink: "Copy watch link",
+    copyWatchLink: "Copy link",
     pipOpen: "Picture in picture",
     pipClose: "Close picture in picture",
     pipOpenShort: "Picture in picture",

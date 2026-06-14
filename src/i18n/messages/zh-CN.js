@@ -159,9 +159,9 @@ export const zhCNMessages = {
   watchSheet: {
     closeMore: "关闭更多操作",
     moreActions: "更多观看操作",
-    shareWatchLink: "分享观看链接",
+    shareWatchLink: "分享",
     imageShare: "图片分享",
-    copyWatchLink: "复制观看链接",
+    copyWatchLink: "复制链接",
     pipOpen: "小窗播放",
     pipClose: "关闭小窗播放",
     pipOpenShort: "小窗播放",

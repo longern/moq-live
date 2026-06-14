@@ -1285,7 +1285,7 @@ export function WatchSessionPage({
                 className="watch-desktop-share-button"
                 onClick={openShareMenu}
                 disabled={!watchLink}
-                aria-label="分享观看链接"
+                aria-label="分享"
                 aria-haspopup="dialog"
                 aria-expanded={shareMenuMounted ? "true" : "false"}
               >

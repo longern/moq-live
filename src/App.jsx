@@ -196,6 +196,7 @@ export function App() {
     logout,
     updateDisplayName,
     updateHandle,
+    updateBio,
     updateAvatar
   } = useAuthController({ log });
   const registrationDisplayName = useRegistrationDisplayNamePrompt({
@@ -1516,6 +1517,7 @@ export function App() {
             }}
             onUpdateDisplayName={(displayName) => updateDisplayName(displayName)}
             onUpdateHandle={(handle) => updateHandle(handle)}
+            onUpdateBio={(bio) => updateBio(bio)}
             onUpdateAvatar={(file) => updateAvatar(file)}
             onOpenFollowUserRoom={(target) => {
               beginWatch(target);

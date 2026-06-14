@@ -47,6 +47,7 @@ function AccountEditableField({
   inputValue,
   label,
   maxLength,
+  multiline = false,
   note,
   onCancelEditing,
   onInput,
@@ -64,12 +65,22 @@ function AccountEditableField({
 
         {editing ? (
           <div className="account-editable-value account-editable-value-editing">
-            <input
-              value={inputValue}
-              maxLength={maxLength}
-              onInput={onInput}
-              placeholder={placeholder}
-            />
+            {multiline ? (
+              <textarea
+                value={inputValue}
+                maxLength={maxLength}
+                onInput={onInput}
+                placeholder={placeholder}
+                rows={3}
+              />
+            ) : (
+              <input
+                value={inputValue}
+                maxLength={maxLength}
+                onInput={onInput}
+                placeholder={placeholder}
+              />
+            )}
             <div className="account-icon-actions">
               <button
                 type="button"
@@ -120,6 +131,7 @@ export function AccountEditDrawer({
   inputValue,
   label,
   maxLength,
+  multiline = false,
   note,
   onCancel,
   onInput,
@@ -158,13 +170,24 @@ export function AccountEditDrawer({
       >
         <label className="account-edit-field">
           <span>{label}</span>
-          <input
-            value={inputValue}
-            maxLength={maxLength}
-            onInput={onInput}
-            placeholder={placeholder}
-            autoFocus
-          />
+          {multiline ? (
+            <textarea
+              value={inputValue}
+              maxLength={maxLength}
+              onInput={onInput}
+              placeholder={placeholder}
+              rows={4}
+              autoFocus
+            />
+          ) : (
+            <input
+              value={inputValue}
+              maxLength={maxLength}
+              onInput={onInput}
+              placeholder={placeholder}
+              autoFocus
+            />
+          )}
         </label>
         <p className="account-edit-note">{note}</p>
         {error ? <p className="inline-warning">{error}</p> : null}
@@ -186,6 +209,7 @@ export function AccountDrawer({
   avatarSaving,
   avatarStatus,
   cancelDisplayNameEditing,
+  cancelBioEditing,
   cancelHandleEditing,
   displayNameCooldownActive,
   displayNameEditing,
@@ -194,6 +218,12 @@ export function AccountDrawer({
   displayNameSaving,
   displayNameStatus,
   displayNameUnchanged,
+  bioEditing,
+  bioError,
+  bioInput,
+  bioSaving,
+  bioStatus,
+  bioUnchanged,
   handleCooldownActive,
   handleEditing,
   handleError,
@@ -209,12 +239,17 @@ export function AccountDrawer({
   setDisplayNameError,
   setDisplayNameInput,
   setDisplayNameStatus,
+  setBioError,
+  setBioInput,
+  setBioStatus,
   setHandleError,
   setHandleInput,
   setHandleStatus,
   startDisplayNameEditing,
+  startBioEditing,
   startHandleEditing,
   submitDisplayName,
+  submitBio,
   submitHandle,
   transitionClassName,
 }) {
@@ -241,6 +276,7 @@ export function AccountDrawer({
         avatarSaving={avatarSaving}
         avatarStatus={avatarStatus}
         cancelDisplayNameEditing={cancelDisplayNameEditing}
+        cancelBioEditing={cancelBioEditing}
         cancelHandleEditing={cancelHandleEditing}
         displayNameCooldownActive={displayNameCooldownActive}
         displayNameEditing={displayNameEditing}
@@ -249,6 +285,12 @@ export function AccountDrawer({
         displayNameSaving={displayNameSaving}
         displayNameStatus={displayNameStatus}
         displayNameUnchanged={displayNameUnchanged}
+        bioEditing={bioEditing}
+        bioError={bioError}
+        bioInput={bioInput}
+        bioSaving={bioSaving}
+        bioStatus={bioStatus}
+        bioUnchanged={bioUnchanged}
         handleCooldownActive={handleCooldownActive}
         handleEditing={handleEditing}
         handleError={handleError}
@@ -264,12 +306,17 @@ export function AccountDrawer({
         setDisplayNameError={setDisplayNameError}
         setDisplayNameInput={setDisplayNameInput}
         setDisplayNameStatus={setDisplayNameStatus}
+        setBioError={setBioError}
+        setBioInput={setBioInput}
+        setBioStatus={setBioStatus}
         setHandleError={setHandleError}
         setHandleInput={setHandleInput}
         setHandleStatus={setHandleStatus}
         startDisplayNameEditing={startDisplayNameEditing}
+        startBioEditing={startBioEditing}
         startHandleEditing={startHandleEditing}
         submitDisplayName={submitDisplayName}
+        submitBio={submitBio}
         submitHandle={submitHandle}
       />
     </SettingsPanelShell>
@@ -285,6 +332,7 @@ export function AccountDetailsContent({
   avatarSaving,
   avatarStatus,
   cancelDisplayNameEditing,
+  cancelBioEditing,
   cancelHandleEditing,
   displayNameCooldownActive,
   displayNameEditing,
@@ -293,6 +341,12 @@ export function AccountDetailsContent({
   displayNameSaving,
   displayNameStatus,
   displayNameUnchanged,
+  bioEditing,
+  bioError,
+  bioInput,
+  bioSaving,
+  bioStatus,
+  bioUnchanged,
   handleCooldownActive,
   handleEditing,
   handleError,
@@ -308,12 +362,17 @@ export function AccountDetailsContent({
   setDisplayNameError,
   setDisplayNameInput,
   setDisplayNameStatus,
+  setBioError,
+  setBioInput,
+  setBioStatus,
   setHandleError,
   setHandleInput,
   setHandleStatus,
   startDisplayNameEditing,
+  startBioEditing,
   startHandleEditing,
   submitDisplayName,
+  submitBio,
   submitHandle,
 }) {
   const { locale, t } = useI18n();
@@ -436,6 +495,31 @@ export function AccountDetailsContent({
           }
           value={authUser.displayName || t("common.notSet")}
         />
+
+        <AccountEditableField
+          cancelAriaLabel={t("accountPanel.cancelEditBio")}
+          editAriaLabel={t("accountPanel.editBio")}
+          editing={bioEditing}
+          inputValue={bioInput}
+          label={t("accountPanel.bio")}
+          maxLength={160}
+          multiline
+          note={t("accountPanel.bioNote")}
+          onCancelEditing={cancelBioEditing}
+          onInput={(event) => {
+            setBioInput(event.currentTarget.value);
+            setBioError("");
+            setBioStatus("");
+          }}
+          onSave={() => {
+            void submitBio();
+          }}
+          onStartEditing={startBioEditing}
+          placeholder={t("accountPanel.bioPlaceholder")}
+          saveAriaLabel={t("accountPanel.saveBio")}
+          saveDisabled={bioSaving || bioUnchanged}
+          value={authUser.bio || t("common.notSet")}
+        />
       </div>
 
       <div className="my-account-form-content">
@@ -443,6 +527,8 @@ export function AccountDetailsContent({
         {handleStatus ? <p className="status">{handleStatus}</p> : null}
         {displayNameError ? <p className="inline-warning">{displayNameError}</p> : null}
         {displayNameStatus ? <p className="status">{displayNameStatus}</p> : null}
+        {bioError ? <p className="inline-warning">{bioError}</p> : null}
+        {bioStatus ? <p className="status">{bioStatus}</p> : null}
         {avatarError ? <p className="inline-warning">{avatarError}</p> : null}
         {avatarStatus ? <p className="status">{avatarStatus}</p> : null}
 

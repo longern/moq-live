@@ -147,7 +147,8 @@
   justify-content: flex-end;
 }
 
-.account-editable-value-editing input {
+.account-editable-value-editing input,
+.account-editable-value-editing textarea {
   flex: 0 1 240px;
   min-width: 0;
   width: auto;
@@ -455,7 +456,8 @@
   justify-content: flex-start;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-editable-value-editing input {
+.desktop-settings-content .my-account-form.is-desktop-form .account-editable-value-editing input,
+.account-editable-value-editing textarea {
   flex: 0 1 260px;
 }
 

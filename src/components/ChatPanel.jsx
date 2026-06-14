@@ -313,6 +313,7 @@ export function ChatPanel({
   showComposer = true,
   showWelcome = true,
   composerTrailingAction = null,
+  composerTrailingActionClassName = "",
   onRetractMessage,
   onMuteMessage,
 }) {
@@ -746,7 +747,7 @@ export function ChatPanel({
 
       {showComposer ? (
         composerState.mode === "guest" ? (
-          <div className={`chat-composer chat-composer-readonly${floating ? " chat-composer-floating" : ""}`}>
+          <div className={`chat-composer chat-composer-readonly chat-composer-shell${floating ? " chat-composer-floating" : ""}`}>
             <input
               id={`${composerInputId}-readonly`}
               name="chat_message_readonly"
@@ -778,14 +779,14 @@ export function ChatPanel({
               {composerState.buttonLabel}
             </button>
             {composerTrailingAction ? (
-              <span className="chat-composer-extra">
+              <span className={`chat-composer-extra${composerTrailingActionClassName ? ` ${composerTrailingActionClassName}` : ""}`}>
                 {composerTrailingAction}
               </span>
             ) : null}
           </div>
         ) : (
           <form
-            className={`chat-composer${floating ? " chat-composer-floating" : ""}`}
+            className={`chat-composer chat-composer-shell${floating ? " chat-composer-floating" : ""}`}
             autoComplete="off"
             onSubmit={(event) => {
               event.preventDefault();
@@ -823,7 +824,7 @@ export function ChatPanel({
               ) : null}
             </button>
             {composerTrailingAction ? (
-              <span className="chat-composer-extra">
+              <span className={`chat-composer-extra${composerTrailingActionClassName ? ` ${composerTrailingActionClassName}` : ""}`}>
                 {composerTrailingAction}
               </span>
             ) : null}

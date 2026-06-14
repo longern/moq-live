@@ -1163,6 +1163,7 @@ export function WatchSessionPage({
                   variant="floating"
                   className="chat-panel-watch-overlay"
                   composerTrailingAction={renderMobileMoreButton()}
+                  composerTrailingActionClassName="watch-composer-more-extra"
                 />
               </div>
             ) : null}
@@ -1321,6 +1322,7 @@ export function WatchSessionPage({
             chatError={chatError}
             chatRecovering={chatRecovering}
             composerTrailingAction={renderMobileMoreButton()}
+            composerTrailingActionClassName="watch-composer-more-extra"
           />
         </aside>
       </div>

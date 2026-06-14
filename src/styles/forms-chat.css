@@ -696,9 +696,7 @@ pre {
     margin 180ms ease;
 }
 
-.chat-composer:has(input:focus) .chat-composer-extra,
-.chat-composer-readonly:has(input:focus) .chat-composer-extra,
-.chat-composer-floating:has(input:focus) .chat-composer-extra {
+.chat-composer-shell:has(input:focus) .chat-composer-extra {
   width: 0;
   opacity: 0;
   pointer-events: none;
@@ -726,7 +724,7 @@ pre {
   fill: currentColor;
 }
 
-.chat-composer-extra:has(.watch-composer-more-mobile) {
+.watch-composer-more-extra {
   display: none;
   width: 0;
   opacity: 0;

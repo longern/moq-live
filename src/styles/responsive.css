@@ -1107,24 +1107,18 @@
 }
 
 @media (max-width: 980px) {
-  .chat-composer-extra:has(.watch-composer-more-mobile) {
+  .watch-composer-more-extra {
     display: inline-flex;
     width: 36px;
     opacity: 1;
   }
 
-  .chat-composer:has(input:focus) .chat-composer-extra:has(.watch-composer-more-mobile),
-  .chat-composer-readonly:has(input:focus) .chat-composer-extra:has(.watch-composer-more-mobile),
-  .chat-composer-floating:has(input:focus) .chat-composer-extra:has(.watch-composer-more-mobile) {
+  .chat-composer-shell:has(input:focus) .watch-composer-more-extra {
     width: 0;
     opacity: 0;
   }
-}
 
-@media (max-width: 980px) {
-  .chat-composer .chat-composer-more,
-  .chat-composer-readonly .chat-composer-more,
-  .chat-composer-floating .chat-composer-more {
+  .chat-composer-shell .chat-composer-more {
     width: 36px;
     min-width: 36px;
     height: 36px;

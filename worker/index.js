@@ -1390,10 +1390,10 @@ async function handleMicrosoftCallback(env, request) {
   try {
     const tokenPayload = await exchangeMicrosoftCode(request, env, code, oauthState.codeVerifier);
     const claims = await verifyMicrosoftIdToken(tokenPayload.id_token, env, oauthState.nonce);
-    const userId = await upsertMicrosoftUser(db, claims);
+    const authUser = await upsertMicrosoftUser(db, claims);
     const session = await createSession(
       db,
-      userId,
+      authUser.userId,
       {
         ip: request.headers.get("CF-Connecting-IP"),
         userAgent: request.headers.get("user-agent")
@@ -1401,7 +1401,13 @@ async function handleMicrosoftCallback(env, request) {
       authConfig.sessionTtlDays
     );
 
-    return redirect(oauthState.redirectTo, {
+    const redirectTo = new URL(oauthState.redirectTo, "https://moq.local");
+    if (authUser.isNewUser) {
+      redirectTo.searchParams.set("auth_new_user", "1");
+      redirectTo.searchParams.set("oauth_display_name", authUser.oauthDisplayName || "");
+    }
+
+    return redirect(`${redirectTo.pathname}${redirectTo.search}${redirectTo.hash}`, {
       headers: buildCallbackCookieHeaders(request, session.token, session.expiresAt)
     });
   } catch (callbackError) {

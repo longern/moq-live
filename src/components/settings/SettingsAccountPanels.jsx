@@ -279,6 +279,7 @@ export function AccountDrawer({
 export function AccountDetailsContent({
   authUser,
   desktopLayout = false,
+  showLogout = true,
   avatarError,
   avatarInputRef,
   avatarSaving,
@@ -445,18 +446,20 @@ export function AccountDetailsContent({
         {avatarError ? <p className="inline-warning">{avatarError}</p> : null}
         {avatarStatus ? <p className="status">{avatarStatus}</p> : null}
 
-        <div className="my-account-actions">
-          <button
-            type="button"
-            className="my-plain-danger-button"
-            onClick={() => {
-              onClose();
-              onLogout();
-            }}
-          >
-            {t("account.logout")}
-          </button>
-        </div>
+        {showLogout ? (
+          <div className="my-account-actions">
+            <button
+              type="button"
+              className="my-plain-danger-button"
+              onClick={() => {
+                onClose();
+                onLogout();
+              }}
+            >
+              {t("account.logout")}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

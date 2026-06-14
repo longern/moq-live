@@ -19,6 +19,7 @@ const HANDLE_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const MAX_ROOM_COVER_BYTES = 5 * 1024 * 1024;
 const MAX_ROOM_TITLE_LENGTH = 80;
 const MAX_ROOM_WELCOME_MESSAGE_LENGTH = 160;
+const MAX_BIO_LENGTH = 160;
 const ROOM_COVER_TYPES = {
   "image/avif": "avif",
   "image/jpeg": "jpg",
@@ -574,8 +575,9 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
 
   const hasDisplayNameUpdate = Object.hasOwn(nextProfile, "displayName");
   const hasHandleUpdate = Object.hasOwn(nextProfile, "handle");
+  const hasBioUpdate = Object.hasOwn(nextProfile, "bio");
 
-  if (!hasDisplayNameUpdate && !hasHandleUpdate) {
+  if (!hasDisplayNameUpdate && !hasHandleUpdate && !hasBioUpdate) {
     throw createHttpError(
       400,
       "No profile fields provided",
@@ -587,6 +589,7 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
   let nextDisplayNameChangedAt = currentUser.display_name_changed_at;
   let nextHandle = currentUser.handle;
   let nextHandleChangedAt = currentUser.handle_changed_at;
+  let nextBio = currentUser.bio || "";
   let changed = false;
 
   if (hasDisplayNameUpdate) {
@@ -667,6 +670,14 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
     }
   }
 
+  if (hasBioUpdate) {
+    const bio = sanitizeBio(nextProfile.bio);
+    if ((currentUser.bio || "") !== bio) {
+      nextBio = bio;
+      changed = true;
+    }
+  }
+
   if (!changed) {
     return buildUserPayload(currentUser);
   }
@@ -675,7 +686,7 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
   await db
     .prepare(
       `UPDATE ${TABLES.users}
-     SET handle = ?, handle_changed_at = ?, display_name = ?, display_name_changed_at = ?, updated_at = ?
+     SET handle = ?, handle_changed_at = ?, display_name = ?, display_name_changed_at = ?, bio = ?, updated_at = ?
      WHERE id = ?`,
     )
     .bind(
@@ -683,6 +694,7 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
       nextHandleChangedAt,
       nextDisplayName,
       nextDisplayNameChangedAt,
+      nextBio,
       now,
       userId,
     )
@@ -941,6 +953,19 @@ function sanitizeDisplayName(value) {
     value: displayName,
     normalized: normalizeDisplayName(displayName),
   };
+}
+
+function sanitizeBio(value) {
+  if (typeof value !== "string") {
+    throw createHttpError(400, "invalid_bio", "invalid_bio");
+  }
+
+  const bio = value.trim().replace(/[\t ]+/g, " ").replace(/\n{3,}/g, "\n\n");
+  if (Array.from(bio).length > MAX_BIO_LENGTH) {
+    throw createHttpError(400, "invalid_bio", "invalid_bio");
+  }
+
+  return bio;
 }
 
 function sanitizeRoomTitle(value) {

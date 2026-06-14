@@ -12,6 +12,7 @@ export function WatchMobileHud({
   onOpenHostProfile,
   onOpenMoreSheet,
   onStop,
+  showMoreButton = true,
   visible = false,
 }) {
   return (
@@ -66,17 +67,19 @@ export function WatchMobileHud({
           <Users aria-hidden="true" />
           <span>{audienceCountText}</span>
         </button>
-        <button
-          type="button"
-          className="stage-mobile-more"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenMoreSheet?.();
-          }}
-          aria-label="更多操作"
-        >
-          <MoreHorizontal aria-hidden="true" />
-        </button>
+        {showMoreButton ? (
+          <button
+            type="button"
+            className="stage-mobile-more"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenMoreSheet?.();
+            }}
+            aria-label="更多操作"
+          >
+            <MoreHorizontal aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
     </div>
   );

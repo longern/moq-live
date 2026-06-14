@@ -7,6 +7,7 @@ import {
   Play,
   Radio,
   Share,
+  MoreHorizontal,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -963,6 +964,23 @@ export function WatchSessionPage({
     };
   }, [shareMenuMounted]);
 
+  function renderMobileMoreButton(className = "watch-composer-more-mobile") {
+    return (
+      <button
+        type="button"
+        className={`chat-composer-more watch-composer-more${moreOpen ? " is-active" : ""}${className ? ` ${className}` : ""}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          openMoreSheet();
+        }}
+        aria-label="更多操作"
+        aria-expanded={moreOpen}
+      >
+        <MoreHorizontal aria-hidden="true" />
+      </button>
+    );
+  }
+
   function renderMobileHud(className = "", persistent = false) {
     const visible = immersiveShell
       ? !immersiveControlsHidden || playerBadge.state === "error"
@@ -980,6 +998,7 @@ export function WatchSessionPage({
         onOpenHostProfile={openHostProfile}
         onOpenMoreSheet={openMoreSheet}
         onStop={onStop}
+        showMoreButton={false}
         visible={visible}
       />
     );
@@ -1143,6 +1162,8 @@ export function WatchSessionPage({
                   chatRecovering={chatRecovering}
                   variant="floating"
                   className="chat-panel-watch-overlay"
+                  composerTrailingAction={renderMobileMoreButton()}
+                  composerTrailingActionClassName="watch-composer-more-extra"
                 />
               </div>
             ) : null}
@@ -1264,7 +1285,7 @@ export function WatchSessionPage({
                 className="watch-desktop-share-button"
                 onClick={openShareMenu}
                 disabled={!watchLink}
-                aria-label="分享观看链接"
+                aria-label="分享"
                 aria-haspopup="dialog"
                 aria-expanded={shareMenuMounted ? "true" : "false"}
               >
@@ -1300,6 +1321,8 @@ export function WatchSessionPage({
             readOnly={chatReadOnly}
             chatError={chatError}
             chatRecovering={chatRecovering}
+            composerTrailingAction={renderMobileMoreButton()}
+            composerTrailingActionClassName="watch-composer-more-extra"
           />
         </aside>
       </div>

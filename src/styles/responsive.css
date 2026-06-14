@@ -1105,3 +1105,24 @@
     color: #ffd6de;
   }
 }
+
+@media (max-width: 980px) {
+  .watch-composer-more-extra {
+    display: inline-flex;
+    width: 36px;
+    opacity: 1;
+  }
+
+  .chat-composer-shell:has(input:focus) .watch-composer-more-extra {
+    width: 0;
+    opacity: 0;
+  }
+
+  .chat-composer-shell .chat-composer-more {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+  }
+}

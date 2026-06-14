@@ -364,6 +364,7 @@ export function SettingsPage({
   onLogout,
   onUpdateDisplayName,
   onUpdateHandle,
+  onUpdateBio,
   onUpdateAvatar,
   onOpenFollowUserRoom,
   watchHistoryItems,
@@ -385,6 +386,11 @@ export function SettingsPage({
   const [displayNameStatus, setDisplayNameStatus] = useState("");
   const [displayNameSaving, setDisplayNameSaving] = useState(false);
   const [displayNameEditing, setDisplayNameEditing] = useState(false);
+  const [bioInput, setBioInput] = useState("");
+  const [bioError, setBioError] = useState("");
+  const [bioStatus, setBioStatus] = useState("");
+  const [bioSaving, setBioSaving] = useState(false);
+  const [bioEditing, setBioEditing] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [loginPanelOpen, setLoginPanelOpen] = useState(false);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
@@ -419,6 +425,11 @@ export function SettingsPage({
       setDisplayNameStatus("");
       setDisplayNameSaving(false);
       setDisplayNameEditing(false);
+      setBioInput("");
+      setBioError("");
+      setBioStatus("");
+      setBioSaving(false);
+      setBioEditing(false);
       setMobileEditPanel(null);
       setFollowsPanelType(null);
       setRenderedFollowsPanelType(null);
@@ -447,6 +458,11 @@ export function SettingsPage({
     setDisplayNameStatus("");
     setDisplayNameSaving(false);
     setDisplayNameEditing(false);
+    setBioInput(authUser.bio || "");
+    setBioError("");
+    setBioStatus("");
+    setBioSaving(false);
+    setBioEditing(false);
     setFollowsPanelType(null);
     setRenderedFollowsPanelType(null);
     setFollowsState({
@@ -478,6 +494,9 @@ export function SettingsPage({
   const normalizedCurrentDisplayName = (authUser?.displayName || "").trim().replace(/\s+/g, " ").toLocaleLowerCase();
   const normalizedDraftDisplayName = displayNameInput.trim().replace(/\s+/g, " ").toLocaleLowerCase();
   const displayNameUnchanged = normalizedDraftDisplayName && normalizedDraftDisplayName === normalizedCurrentDisplayName;
+  const normalizedCurrentBio = (authUser?.bio || "").trim();
+  const normalizedDraftBio = bioInput.trim();
+  const bioUnchanged = normalizedDraftBio === normalizedCurrentBio;
   const normalizedCurrentHandle = authUser?.handle || "";
   const normalizedDraftHandle = handleInput.trim().toLocaleLowerCase();
   const handleUnchanged = normalizedDraftHandle && normalizedDraftHandle === normalizedCurrentHandle;
@@ -524,6 +543,29 @@ export function SettingsPage({
       setDisplayNameError(getAppErrorMessage(error));
     } finally {
       setDisplayNameSaving(false);
+    }
+  }
+
+  async function submitBio() {
+    if (!authUser || !onUpdateBio) {
+      return;
+    }
+
+    setBioSaving(true);
+    setBioError("");
+    setBioStatus("");
+
+    try {
+      const payload = await onUpdateBio(bioInput);
+      const nextValue = payload.user?.bio || "";
+      setBioInput(nextValue);
+      setBioStatus(t("accountPanel.bioUpdated"));
+      setBioEditing(false);
+      setMobileEditPanel((current) => (current === "bio" ? null : current));
+    } catch (error) {
+      setBioError(getAppErrorMessage(error));
+    } finally {
+      setBioSaving(false);
     }
   }
 
@@ -742,6 +784,20 @@ export function SettingsPage({
     }
   }
 
+  function startBioEditing() {
+    if (!authUser) {
+      return;
+    }
+
+    setBioInput(authUser.bio || "");
+    setBioError("");
+    setBioStatus("");
+    setBioEditing(true);
+    if (isMobilePanelViewport) {
+      setMobileEditPanel("bio");
+    }
+  }
+
   function startHandleEditing() {
     if (!authUser) {
       return;
@@ -772,6 +828,15 @@ export function SettingsPage({
     setDisplayNameSaving(false);
     setDisplayNameEditing(false);
     setMobileEditPanel((current) => (current === "displayName" ? null : current));
+  }
+
+  function cancelBioEditing() {
+    setBioInput(authUser?.bio || "");
+    setBioError("");
+    setBioStatus("");
+    setBioSaving(false);
+    setBioEditing(false);
+    setMobileEditPanel((current) => (current === "bio" ? null : current));
   }
 
   function openAvatarPicker() {
@@ -836,11 +901,14 @@ export function SettingsPage({
                     {authUser ? (
                       <AccountDetailsContent
                         authUser={authUser}
+                        desktopLayout
+                        showLogout={false}
                         avatarError={avatarError}
                         avatarInputRef={avatarInputRef}
                         avatarSaving={avatarSaving}
                         avatarStatus={avatarStatus}
                         cancelDisplayNameEditing={cancelDisplayNameEditing}
+                        cancelBioEditing={cancelBioEditing}
                         cancelHandleEditing={cancelHandleEditing}
                         displayNameCooldownActive={displayNameCooldownActive}
                         displayNameEditing={displayNameEditing}
@@ -849,6 +917,12 @@ export function SettingsPage({
                         displayNameSaving={displayNameSaving}
                         displayNameStatus={displayNameStatus}
                         displayNameUnchanged={displayNameUnchanged}
+                        bioEditing={bioEditing}
+                        bioError={bioError}
+                        bioInput={bioInput}
+                        bioSaving={bioSaving}
+                        bioStatus={bioStatus}
+                        bioUnchanged={bioUnchanged}
                         handleCooldownActive={handleCooldownActive}
                         handleEditing={handleEditing}
                         handleError={handleError}
@@ -866,12 +940,17 @@ export function SettingsPage({
                         setDisplayNameError={setDisplayNameError}
                         setDisplayNameInput={setDisplayNameInput}
                         setDisplayNameStatus={setDisplayNameStatus}
+                        setBioError={setBioError}
+                        setBioInput={setBioInput}
+                        setBioStatus={setBioStatus}
                         setHandleError={setHandleError}
                         setHandleInput={setHandleInput}
                         setHandleStatus={setHandleStatus}
                         startDisplayNameEditing={startDisplayNameEditing}
+                        startBioEditing={startBioEditing}
                         startHandleEditing={startHandleEditing}
                         submitDisplayName={submitDisplayName}
+                        submitBio={submitBio}
                         submitHandle={submitHandle}
                       />
                     ) : (
@@ -960,6 +1039,7 @@ export function SettingsPage({
               avatarSaving={avatarSaving}
               avatarStatus={avatarStatus}
               cancelDisplayNameEditing={cancelDisplayNameEditing}
+              cancelBioEditing={cancelBioEditing}
               cancelHandleEditing={cancelHandleEditing}
               displayNameCooldownActive={displayNameCooldownActive}
               displayNameEditing={!isMobilePanelViewport && displayNameEditing}
@@ -968,6 +1048,12 @@ export function SettingsPage({
               displayNameSaving={displayNameSaving}
               displayNameStatus={displayNameStatus}
               displayNameUnchanged={displayNameUnchanged}
+              bioEditing={!isMobilePanelViewport && bioEditing}
+              bioError={bioError}
+              bioInput={bioInput}
+              bioSaving={bioSaving}
+              bioStatus={bioStatus}
+              bioUnchanged={bioUnchanged}
               handleCooldownActive={handleCooldownActive}
               handleEditing={!isMobilePanelViewport && handleEditing}
               handleError={handleError}
@@ -988,12 +1074,17 @@ export function SettingsPage({
               setDisplayNameError={setDisplayNameError}
               setDisplayNameInput={setDisplayNameInput}
               setDisplayNameStatus={setDisplayNameStatus}
+              setBioError={setBioError}
+              setBioInput={setBioInput}
+              setBioStatus={setBioStatus}
               setHandleError={setHandleError}
               setHandleInput={setHandleInput}
               setHandleStatus={setHandleStatus}
               startDisplayNameEditing={startDisplayNameEditing}
+              startBioEditing={startBioEditing}
               startHandleEditing={startHandleEditing}
               submitDisplayName={submitDisplayName}
+              submitBio={submitBio}
               submitHandle={submitHandle}
               transitionClassName={transitionClassName}
             />
@@ -1068,6 +1159,37 @@ export function SettingsPage({
               saving={displayNameSaving}
               status={displayNameStatus}
               title={t("accountPanel.editPageTitleDisplayName")}
+              transitionClassName={transitionClassName}
+            />
+          ) : null)}
+        </MobilePanelPresence>
+
+
+
+        <MobilePanelPresence open={mobileEditPanel === "bio" && Boolean(authUser)}>
+          {({ transitionClassName }) => (authUser ? (
+            <AccountEditDrawer
+              closeLabel={t("accountPanel.closeBioEditPage")}
+              error={bioError}
+              inputValue={bioInput}
+              label={t("accountPanel.bio")}
+              maxLength={160}
+              multiline
+              note={t("accountPanel.bioNote")}
+              onCancel={cancelBioEditing}
+              onInput={(event) => {
+                setBioInput(event.currentTarget.value);
+                setBioError("");
+                setBioStatus("");
+              }}
+              onSave={() => {
+                void submitBio();
+              }}
+              placeholder={t("profile.noBio")}
+              saveDisabled={bioSaving || bioUnchanged}
+              saving={bioSaving}
+              status={bioStatus}
+              title={t("accountPanel.editPageTitleBio")}
               transitionClassName={transitionClassName}
             />
           ) : null)}

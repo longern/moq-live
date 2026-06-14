@@ -681,3 +681,51 @@ pre {
   font-size: 0.74rem;
   line-height: 1;
 }
+
+.chat-composer-extra {
+  flex: 0 0 auto;
+  width: 36px;
+  min-width: 0;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    width 180ms ease,
+    opacity 160ms ease,
+    margin 180ms ease;
+}
+
+.chat-composer-shell:has(input:focus) .chat-composer-extra {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chat-composer-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: rgba(235, 244, 251, 0.92);
+  box-shadow: none;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.chat-composer-more svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.watch-composer-more-extra {
+  display: none;
+  width: 0;
+  opacity: 0;
+}

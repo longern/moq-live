@@ -101,6 +101,10 @@ export function useAuthController({ log, onAuthenticated }) {
     return updateProfile({ handle });
   }
 
+  async function updateBio(bio) {
+    return updateProfile({ bio });
+  }
+
   async function updateAvatar(file) {
     const formData = new FormData();
     formData.set("avatar", file);
@@ -185,6 +189,7 @@ export function useAuthController({ log, onAuthenticated }) {
     logout,
     updateDisplayName,
     updateHandle,
+    updateBio,
     updateAvatar,
     removeAvatar
   };

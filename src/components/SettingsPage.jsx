@@ -1185,7 +1185,7 @@ export function SettingsPage({
               onSave={() => {
                 void submitBio();
               }}
-              placeholder={t("accountPanel.bioPlaceholder")}
+              placeholder={t("profile.noBio")}
               saveDisabled={bioSaving || bioUnchanged}
               saving={bioSaving}
               status={bioStatus}

@@ -4,6 +4,7 @@ import {
   Pencil,
   X,
 } from "lucide-react";
+import { ProfileBio } from "../ProfileInfoSummary.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
@@ -57,6 +58,7 @@ function AccountEditableField({
   saveAriaLabel,
   saveDisabled,
   value,
+  valueNode = null,
 }) {
   return (
     <div className={`account-editable-row${editing ? " is-editing" : ""}`}>
@@ -103,7 +105,7 @@ function AccountEditableField({
           </div>
         ) : (
           <div className="account-editable-value account-editable-value-inline">
-            <strong>{value}</strong>
+            {valueNode || <strong>{value}</strong>}
             <button
               type="button"
               className="account-icon-button"
@@ -515,10 +517,11 @@ export function AccountDetailsContent({
             void submitBio();
           }}
           onStartEditing={startBioEditing}
-          placeholder={t("accountPanel.bioPlaceholder")}
+          placeholder={t("profile.noBio")}
           saveAriaLabel={t("accountPanel.saveBio")}
           saveDisabled={bioSaving || bioUnchanged}
-          value={authUser.bio || t("common.notSet")}
+          value={authUser.bio || t("profile.noBio")}
+          valueNode={<ProfileBio className="profile-bio account-profile-bio" bio={authUser.bio} />}
         />
       </div>
 

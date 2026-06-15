@@ -809,7 +809,7 @@ export class ChatRoomDO {
       return;
     }
     this.roomState = nextRoomState;
-    await this.writeRoomLastLocation(session.room, previousLocation);
+    await this.writeUserLastLocation(session.user?.id, previousLocation);
     this.broadcast({
       type: "stream.stopped",
       stream: this.roomState.stream,
@@ -906,15 +906,15 @@ export class ChatRoomDO {
       return;
     }
     this.roomState = nextRoomState;
-    await this.writeRoomLastLocation(session.room, nextLocation);
+    await this.writeUserLastLocation(session.user?.id, nextLocation);
     this.broadcast({
       type: "room.location.updated",
       location: getPublicRoomLocation(nextLocation),
     });
   }
 
-  async writeRoomLastLocation(roomId, location) {
-    if (!roomId || !this.env?.APP_DB) {
+  async writeUserLastLocation(userId, location) {
+    if (!userId || !this.env?.APP_DB) {
       return;
     }
 
@@ -933,15 +933,15 @@ export class ChatRoomDO {
 
     try {
       await this.env.APP_DB.prepare(
-        `UPDATE moq_rooms
+        `UPDATE moq_users
          SET last_location_province = ?, last_location_updated_at = ?
          WHERE id = ?`,
       )
-        .bind(province || null, updatedAt, roomId)
+        .bind(province || null, updatedAt, userId)
         .run();
     } catch (error) {
       console.warn(
-        "Failed to persist room last location",
+        "Failed to persist user last location",
         error instanceof Error ? error.message : String(error),
       );
     }

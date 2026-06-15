@@ -295,12 +295,12 @@ export async function getSessionUser(db, request) {
       users.gender AS gender,
       users.birth_date AS birth_date,
       users.bio AS bio,
-      rooms.last_location_province AS location_province,
+      users.last_location_province AS location_province,
+      users.last_location_updated_at AS location_updated_at,
       users.follower_count AS follower_count,
       users.following_count AS following_count
     FROM ${TABLES.sessions} AS sessions
     INNER JOIN ${TABLES.users} AS users ON users.id = sessions.user_id
-    LEFT JOIN ${TABLES.rooms} AS rooms ON rooms.host_user_id = users.id
     WHERE sessions.session_token_hash = ?
       AND sessions.revoked_at IS NULL
       AND sessions.expires_at > ?
@@ -866,7 +866,9 @@ function buildUserPayload(row) {
     gender: row.gender || "",
     birthDate: row.birth_date || "",
     bio: row.bio || "",
-    locationProvince: row.location_province || row.last_location_province || "",
+    locationProvince: row.location_province || "",
+    lastLocationProvince: row.location_province || "",
+    lastLocationUpdatedAt: row.location_updated_at || "",
     followerCount: Math.max(0, Number(row.follower_count || 0)),
     followingCount: Math.max(0, Number(row.following_count || 0)),
   };
@@ -886,11 +888,11 @@ async function getUserRowById(db, userId) {
       users.gender AS gender,
       users.birth_date AS birth_date,
       users.bio AS bio,
-      rooms.last_location_province AS location_province,
+      users.last_location_province AS location_province,
+      users.last_location_updated_at AS location_updated_at,
       users.follower_count AS follower_count,
       users.following_count AS following_count
      FROM ${TABLES.users} AS users
-     LEFT JOIN ${TABLES.rooms} AS rooms ON rooms.host_user_id = users.id
      WHERE users.id = ?
      LIMIT 1`,
     )

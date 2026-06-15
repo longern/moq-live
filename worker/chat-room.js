@@ -11,6 +11,8 @@ const STREAM_PROTOCOL_WEBRTC = "webrtc";
 const COHOST_INVITE_TTL_MS = 60_000;
 const BIG_DATA_CLOUD_REVERSE_GEOCODE_URL = "https://api-bdc.net/data/reverse-geocode-client";
 const BIG_DATA_CLOUD_TIMEOUT_MS = 3_000;
+const LOCATIONIQ_REVERSE_GEOCODE_URL = "https://us1.locationiq.com/v1/reverse";
+const LOCATIONIQ_TIMEOUT_MS = 3_000;
 
 export class ChatRoomDO {
   constructor(ctx, env) {
@@ -768,7 +770,7 @@ export class ChatRoomDO {
         const resolvedAt = new Date().toISOString();
         nextLocation = {
           ...nextLocation,
-          province: await reverseGeocodeProvince(nextLocation.latitude, nextLocation.longitude),
+          province: await reverseGeocodeProvince(nextLocation.latitude, nextLocation.longitude, this.env),
           provinceResolvedAt: resolvedAt,
           geocodingAttempted: true
         };
@@ -1596,7 +1598,62 @@ function formatDistanceText(distanceMeters) {
   return `${Math.round(distanceMeters / 1_000)} km`;
 }
 
-async function reverseGeocodeProvince(latitude, longitude) {
+async function reverseGeocodeProvince(latitude, longitude, env) {
+  const locationIqApiKey = String(env?.LOCATIONIQ_API_KEY ?? "").trim();
+  if (locationIqApiKey) {
+    const locationIqProvince = await reverseGeocodeProvinceWithLocationIq(latitude, longitude, locationIqApiKey);
+    if (locationIqProvince) {
+      return locationIqProvince;
+    }
+  }
+
+  return reverseGeocodeProvinceWithBigDataCloud(latitude, longitude);
+}
+
+async function reverseGeocodeProvinceWithLocationIq(latitude, longitude, apiKey) {
+  const url = new URL(LOCATIONIQ_REVERSE_GEOCODE_URL);
+  url.searchParams.set("key", apiKey);
+  url.searchParams.set("lat", String(latitude));
+  url.searchParams.set("lon", String(longitude));
+  url.searchParams.set("format", "json");
+  url.searchParams.set("accept-language", "zh");
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, LOCATIONIQ_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: { accept: "application/json" },
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      return "";
+    }
+
+    const payload = await response.json().catch(() => null);
+    const address = payload?.address ?? {};
+    return sanitizeLocationProvince(
+      address.state
+        || address.province
+        || address.region
+        || address.city
+        || address.town
+        || address.village
+        || address.country
+        || payload?.display_name
+        || ""
+    );
+  } catch (error) {
+    console.warn("LocationIQ reverse geocode failed", error instanceof Error ? error.message : String(error));
+    return "";
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function reverseGeocodeProvinceWithBigDataCloud(latitude, longitude) {
   const url = new URL(BIG_DATA_CLOUD_REVERSE_GEOCODE_URL);
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("longitude", String(longitude));

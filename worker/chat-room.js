@@ -1642,7 +1642,6 @@ async function reverseGeocodeProvinceWithLocationIq(latitude, longitude, apiKey)
         || address.town
         || address.village
         || address.country
-        || payload?.display_name
         || ""
     );
   } catch (error) {

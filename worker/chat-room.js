@@ -1932,7 +1932,7 @@ async function reverseGeocodeProvinceWithBigDataCloud(
     const payload = await response.json().catch(() => null);
     return sanitizeLocationProvince(
       payload?.principalSubdivision ||
-        payload?.locality ||
+        payload?.city ||
         payload?.countryName ||
         "",
     );

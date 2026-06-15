@@ -4,6 +4,12 @@ dist/
 .dev.vars
 .wrangler/
 
+.env.local
+public.local/
+
+wrangler.jsonc
+wrangler.toml
+
 *.log
 npm-debug.log*
 yarn-debug.log*

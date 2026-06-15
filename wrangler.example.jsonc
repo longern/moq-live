@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "moq-live",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-04-12",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/share/*"],
+  },
+  "routes": [
+    {
+      "pattern": "tv.your-domain.com",
+      "zone_name": "your-domain.com",
+      "custom_domain": true,
+    },
+  ],
+  "d1_databases": [
+    {
+      "binding": "APP_DB",
+      "database_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "APP_MEDIA",
+      "bucket_name": "moq-live-app-media",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHAT_ROOM",
+        "class_name": "ChatRoomDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ChatRoomDO"],
+    },
+  ],
+  "workers_dev": true,
+  "preview_urls": true,
+}

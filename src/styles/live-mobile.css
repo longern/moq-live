@@ -479,7 +479,7 @@
 
 .chat-panel-live-mobile .chat-message-line {
   display: block;
-  font-size: 0.86rem;
+  font-size: 0.875rem;
   line-height: 1.42;
 }
 
@@ -487,18 +487,11 @@
   .chat-panel-live-mobile
   .chat-message-line {
   display: inline;
-  font-size: 0.9rem;
 }
 
 .chat-panel-live-mobile .chat-message-author {
-  font-size: 0.86rem;
+  font-size: 0.875rem;
   line-height: 1.42;
-}
-
-.live-mobile-page[data-shell="immersive"]
-  .chat-panel-live-mobile
-  .chat-message-author {
-  font-size: 0.9rem;
 }
 
 .chat-panel-live-mobile .chat-composer-floating {

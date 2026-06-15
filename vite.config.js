@@ -5,6 +5,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const moqNetAdapterModulePath = "/node_modules/@moq/net/ietf/adapter.js";
@@ -278,6 +279,10 @@ export default defineConfig(({ mode }) => {
         },
       }),
       patchMoqNetPublishDoneDetails(),
+      viteStaticCopy({
+        targets: [{ src: "public.local/**/*", dest: "./" }],
+        silent: true,
+      }),
       react(),
     ],
     optimizeDeps: {

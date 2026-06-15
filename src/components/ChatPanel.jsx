@@ -171,7 +171,7 @@ function ChatMessageContextMenu({
     return null;
   }
 
-  return (
+  const menu = (
     <>
       <button
         type="button"
@@ -229,6 +229,12 @@ function ChatMessageContextMenu({
       </div>
     </>
   );
+
+  if (typeof document === "undefined") {
+    return menu;
+  }
+
+  return createPortal(menu, document.body);
 }
 
 function ChatMessageMuteDialog({

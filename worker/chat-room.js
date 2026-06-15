@@ -9,10 +9,9 @@ const DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE = "Exceeded allowed rows writ
 const STREAM_PROTOCOL_MOQ = "moq";
 const STREAM_PROTOCOL_WEBRTC = "webrtc";
 const COHOST_INVITE_TTL_MS = 60_000;
-const BIG_DATA_CLOUD_REVERSE_GEOCODE_URL = "https://api-bdc.net/data/reverse-geocode-client";
+const BIG_DATA_CLOUD_REVERSE_GEOCODE_URL = "https://api-bdc.net/data/reverse-geocode";
+const BIG_DATA_CLOUD_FREE_REVERSE_GEOCODE_URL = "https://api-bdc.net/data/reverse-geocode-client";
 const BIG_DATA_CLOUD_TIMEOUT_MS = 3_000;
-const LOCATIONIQ_REVERSE_GEOCODE_URL = "https://us1.locationiq.com/v1/reverse";
-const LOCATIONIQ_TIMEOUT_MS = 3_000;
 
 export class ChatRoomDO {
   constructor(ctx, env) {
@@ -1599,64 +1598,34 @@ function formatDistanceText(distanceMeters) {
 }
 
 async function reverseGeocodeProvince(latitude, longitude, env) {
-  const locationIqApiKey = String(env?.LOCATIONIQ_API_KEY ?? "").trim();
-  if (locationIqApiKey) {
-    const locationIqProvince = await reverseGeocodeProvinceWithLocationIq(latitude, longitude, locationIqApiKey);
-    if (locationIqProvince) {
-      return locationIqProvince;
-    }
-  }
-
-  return reverseGeocodeProvinceWithBigDataCloud(latitude, longitude);
-}
-
-async function reverseGeocodeProvinceWithLocationIq(latitude, longitude, apiKey) {
-  const url = new URL(LOCATIONIQ_REVERSE_GEOCODE_URL);
-  url.searchParams.set("key", apiKey);
-  url.searchParams.set("lat", String(latitude));
-  url.searchParams.set("lon", String(longitude));
-  url.searchParams.set("format", "json");
-  url.searchParams.set("accept-language", "zh");
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, LOCATIONIQ_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(url.toString(), {
-      headers: { accept: "application/json" },
-      signal: controller.signal
-    });
-    if (!response.ok) {
-      return "";
-    }
-
-    const payload = await response.json().catch(() => null);
-    const address = payload?.address ?? {};
-    return sanitizeLocationProvince(
-      address.state
-        || address.province
-        || address.region
-        || address.city
-        || address.town
-        || address.village
-        || address.country
-        || ""
+  const bigDataCloudApiKey = String(env?.BIGDATACLOUD_API_KEY ?? "").trim();
+  if (bigDataCloudApiKey) {
+    const authenticatedProvince = await reverseGeocodeProvinceWithBigDataCloud(
+      latitude,
+      longitude,
+      BIG_DATA_CLOUD_REVERSE_GEOCODE_URL,
+      bigDataCloudApiKey
     );
-  } catch (error) {
-    console.warn("LocationIQ reverse geocode failed", error instanceof Error ? error.message : String(error));
-    return "";
-  } finally {
-    clearTimeout(timeoutId);
+    if (authenticatedProvince) {
+      return authenticatedProvince;
+    }
   }
+
+  return reverseGeocodeProvinceWithBigDataCloud(
+    latitude,
+    longitude,
+    BIG_DATA_CLOUD_FREE_REVERSE_GEOCODE_URL
+  );
 }
 
-async function reverseGeocodeProvinceWithBigDataCloud(latitude, longitude) {
-  const url = new URL(BIG_DATA_CLOUD_REVERSE_GEOCODE_URL);
+async function reverseGeocodeProvinceWithBigDataCloud(latitude, longitude, endpoint, apiKey = "") {
+  const url = new URL(endpoint);
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("longitude", String(longitude));
   url.searchParams.set("localityLanguage", "zh");
+  if (apiKey) {
+    url.searchParams.set("key", apiKey);
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {

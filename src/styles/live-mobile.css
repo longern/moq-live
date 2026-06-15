@@ -503,7 +503,6 @@
 
 .chat-panel-live-mobile .chat-composer-floating {
   display: flex;
-  gap: 8px;
   align-items: center;
 }
 

@@ -121,7 +121,7 @@ function SectionBlock({ title, action = null, children }) {
   return (
     <section className="my-section">
       <div className="my-section-head">
-        <span className="my-section-title">{title}</span>
+        <h3 className="my-section-title">{title}</h3>
         {action}
       </div>
       <div className="my-section-body">{children}</div>
@@ -506,10 +506,10 @@ export function SettingsPage({
   );
   const profileHandleLabel = authUser?.handle ? `@${authUser.handle}` : "";
   const profileName = authPending
-    ? t("account.checking")
+    ? t("account.loading")
     : authUser?.displayName || authUser?.handle || authUser?.email || t("account.login");
   const profileSubtitle = authPending
-    ? t("account.checking")
+    ? null
     : authUser
       ? profileHandleLabel || t("account.signedIn")
       : null;

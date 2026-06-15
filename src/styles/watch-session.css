@@ -99,12 +99,16 @@
   background: #000;
 }
 
-#playerMount.watch-player-mount.is-cohost .watch-player-tile.is-media-portrait .watch-player-media {
+#playerMount.watch-player-mount.is-cohost
+  .watch-player-tile.is-media-portrait
+  .watch-player-media {
   width: min(100cqw, calc(100cqh * 9 / 16));
   height: min(100cqh, calc(100cqw * 16 / 9));
 }
 
-#playerMount.watch-player-mount.is-cohost .watch-player-tile.is-media-landscape .watch-player-media {
+#playerMount.watch-player-mount.is-cohost
+  .watch-player-tile.is-media-landscape
+  .watch-player-media {
   width: min(100cqw, calc(100cqh * 16 / 9));
   height: min(100cqh, calc(100cqw * 9 / 16));
 }
@@ -164,7 +168,8 @@
   border-radius: 18px;
   background: rgba(15, 23, 42, 0.96);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
-  animation: watch-share-image-dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: watch-share-image-dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1)
+    both;
 }
 
 .watch-share-image-layer.is-closing .watch-share-image-dialog {
@@ -485,7 +490,8 @@
 }
 
 .watch-desktop-host-profile-trigger:hover .watch-desktop-host-profile-popover,
-.watch-desktop-host-profile-trigger:focus-within .watch-desktop-host-profile-popover {
+.watch-desktop-host-profile-trigger:focus-within
+  .watch-desktop-host-profile-popover {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -496,7 +502,8 @@
     visibility 0s linear 320ms;
 }
 
-.watch-desktop-host-profile-trigger:focus-within .watch-desktop-host-profile-popover {
+.watch-desktop-host-profile-trigger:focus-within
+  .watch-desktop-host-profile-popover {
   transition:
     opacity 150ms ease,
     transform 170ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -556,7 +563,11 @@
 
 .watch-host-follow-button.is-primary:hover:not(:disabled),
 .watch-host-follow-button.is-primary:focus-visible {
-  background: linear-gradient(180deg, var(--primary-hover), var(--primary-strong));
+  background: linear-gradient(
+    180deg,
+    var(--primary-hover),
+    var(--primary-strong)
+  );
   box-shadow: 0 12px 28px var(--primary-shadow);
 }
 
@@ -805,12 +816,16 @@
 
 .profile-bio {
   min-width: 0;
-  min-height: 42px;
   color: rgba(235, 244, 251, 0.74);
   font-size: 0.86rem;
   line-height: 1.55;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.watch-host-profile-panel .profile-bio,
+.watch-desktop-host-profile-popover .profile-bio {
+  min-height: 64px;
 }
 
 .profile-bio.is-placeholder {
@@ -1061,7 +1076,10 @@
   .live-layout .live-stage-frame .publisher-host {
     width: min(
       100%,
-      calc(var(--stage-max-height) * var(--stage-aspect-width) / var(--stage-aspect-height))
+      calc(
+        var(--stage-max-height) * var(--stage-aspect-width) /
+          var(--stage-aspect-height)
+      )
     );
     height: 100%;
     margin-inline: auto;

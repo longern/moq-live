@@ -52,7 +52,7 @@ export function AppTopbar({
         {siteIconUrl ? (
           <img className="brand-icon" src={siteIconUrl} alt="" aria-hidden="true" />
         ) : null}
-        <span className="brand-title">{siteTitle}</span>
+        <h1 className="brand-title">{siteTitle}</h1>
       </a>
 
       <div className="topbar-right">

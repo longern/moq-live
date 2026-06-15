@@ -663,7 +663,7 @@
     .chat-panel-watch-overlay
     .chat-composer-floating {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
     padding-right: 0;
   }

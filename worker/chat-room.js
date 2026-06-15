@@ -5,12 +5,15 @@ const RATE_LIMIT_WINDOW_MS = 5_000;
 const RATE_LIMIT_MAX_MESSAGES = 4;
 const MAX_CHAT_MUTE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_ROOM_TITLE_LENGTH = 80;
-const DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE = "Exceeded allowed rows written in Durable Objects free tier.";
+const DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE =
+  "Exceeded allowed rows written in Durable Objects free tier.";
 const STREAM_PROTOCOL_MOQ = "moq";
 const STREAM_PROTOCOL_WEBRTC = "webrtc";
 const COHOST_INVITE_TTL_MS = 60_000;
-const BIG_DATA_CLOUD_REVERSE_GEOCODE_URL = "https://api-bdc.net/data/reverse-geocode";
-const BIG_DATA_CLOUD_FREE_REVERSE_GEOCODE_URL = "https://api-bdc.net/data/reverse-geocode-client";
+const BIG_DATA_CLOUD_REVERSE_GEOCODE_URL =
+  "https://api-bdc.net/data/reverse-geocode";
+const BIG_DATA_CLOUD_FREE_REVERSE_GEOCODE_URL =
+  "https://api-bdc.net/data/reverse-geocode-client";
 const BIG_DATA_CLOUD_TIMEOUT_MS = 3_000;
 
 export class ChatRoomDO {
@@ -20,8 +23,11 @@ export class ChatRoomDO {
     this.recentMessages = [];
     this.roomState = getDefaultRoomState();
     this.ready = this.ctx.blockConcurrencyWhile(async () => {
-      this.recentMessages = (await this.ctx.storage.get("recentMessages")) ?? [];
-      this.roomState = normalizeRoomState((await this.ctx.storage.get("roomState")) ?? null);
+      this.recentMessages =
+        (await this.ctx.storage.get("recentMessages")) ?? [];
+      this.roomState = normalizeRoomState(
+        (await this.ctx.storage.get("roomState")) ?? null,
+      );
     });
   }
 
@@ -33,7 +39,9 @@ export class ChatRoomDO {
       if (!isDurableObjectWriteLimitError(error)) {
         throw error;
       }
-      console.warn("Skipped pruning chat messages because Durable Object write quota was exceeded.");
+      console.warn(
+        "Skipped pruning chat messages because Durable Object write quota was exceeded.",
+      );
     }
     const url = new URL(request.url);
 
@@ -43,7 +51,7 @@ export class ChatRoomDO {
         stream: this.roomState.stream,
         roomMeta: this.roomState.roomMeta,
         location: getPublicRoomLocation(this.roomState.location),
-        cohost: this.roomState.cohost
+        cohost: this.roomState.cohost,
       });
     }
 
@@ -51,7 +59,10 @@ export class ChatRoomDO {
       return await this.handleCohostInviteRequest(request);
     }
 
-    if (request.method === "POST" && url.pathname.endsWith("/cohost/response")) {
+    if (
+      request.method === "POST" &&
+      url.pathname.endsWith("/cohost/response")
+    ) {
       return await this.handleCohostInviteResponse(request);
     }
 
@@ -59,7 +70,10 @@ export class ChatRoomDO {
       return await this.handleCohostActiveUpdate(request);
     }
 
-    if (request.method === "POST" && url.pathname.endsWith("/location/distance")) {
+    if (
+      request.method === "POST" &&
+      url.pathname.endsWith("/location/distance")
+    ) {
       return await this.handleLocationDistance(request);
     }
 
@@ -72,7 +86,10 @@ export class ChatRoomDO {
     }
 
     const room = request.headers.get("x-chat-room") ?? "";
-    const role = request.headers.get("x-chat-role") === "broadcaster" ? "broadcaster" : "viewer";
+    const role =
+      request.headers.get("x-chat-role") === "broadcaster"
+        ? "broadcaster"
+        : "viewer";
     const isRoomOwner = request.headers.get("x-chat-room-owner") === "1";
     const readOnly = request.headers.get("x-chat-read-only") !== "0";
     const user = parseUserHeader(request.headers.get("x-chat-user"));
@@ -94,7 +111,7 @@ export class ChatRoomDO {
       readOnly,
       user,
       connectedAt: Date.now(),
-      sentAt: []
+      sentAt: [],
     });
 
     this.send(server, {
@@ -112,17 +129,22 @@ export class ChatRoomDO {
         this.roomState.moderation,
         Date.now(),
         this.roomState.stream.isLive,
-        canControlBroadcast
+        canControlBroadcast,
       ),
       chatMute: getPublicChatMute(
-        getActiveChatMute(this.roomState.moderation, user?.id, Date.now(), this.roomState.stream.isLive)
-      )
+        getActiveChatMute(
+          this.roomState.moderation,
+          user?.id,
+          Date.now(),
+          this.roomState.stream.isLive,
+        ),
+      ),
     });
     this.broadcastPresence();
 
     return new Response(null, {
       status: 101,
-      webSocket: client
+      webSocket: client,
     });
   }
 
@@ -137,7 +159,11 @@ export class ChatRoomDO {
 
     let payload = null;
     try {
-      payload = JSON.parse(typeof rawData === "string" ? rawData : new TextDecoder().decode(rawData));
+      payload = JSON.parse(
+        typeof rawData === "string"
+          ? rawData
+          : new TextDecoder().decode(rawData),
+      );
     } catch {
       this.sendError(ws, "invalid_json");
       return;
@@ -204,7 +230,7 @@ export class ChatRoomDO {
     }
 
     this.sendError(ws, "unsupported_event", {
-      eventType: typeof payload?.type === "string" ? payload.type : ""
+      eventType: typeof payload?.type === "string" ? payload.type : "",
     });
   }
 
@@ -252,7 +278,10 @@ export class ChatRoomDO {
         group.find(({ session }) => session.canControlBroadcast) ??
         group
           .slice()
-          .sort((left, right) => left.session.connectedAt - right.session.connectedAt)[0];
+          .sort(
+            (left, right) =>
+              left.session.connectedAt - right.session.connectedAt,
+          )[0];
       for (const entry of group) {
         const canControlBroadcast = entry === activeController;
         if (entry.session.canControlBroadcast === canControlBroadcast) {
@@ -260,7 +289,7 @@ export class ChatRoomDO {
         }
         const nextSession = {
           ...entry.session,
-          canControlBroadcast
+          canControlBroadcast,
         };
         entry.socket.serializeAttachment(nextSession);
         this.send(entry.socket, {
@@ -270,8 +299,8 @@ export class ChatRoomDO {
             this.roomState.moderation,
             Date.now(),
             this.roomState.stream.isLive,
-            canControlBroadcast
-          )
+            canControlBroadcast,
+          ),
         });
       }
     }
@@ -280,7 +309,7 @@ export class ChatRoomDO {
   broadcastPresence() {
     this.broadcast({
       type: "presence.snapshot",
-      ...this.getPresenceSnapshot()
+      ...this.getPresenceSnapshot(),
     });
   }
 
@@ -306,17 +335,18 @@ export class ChatRoomDO {
       loggedInViewersById.set(session.user.id, {
         id: session.user.id,
         displayName: session.user.displayName || "已登录用户",
-        avatarUrl: session.user.avatarUrl || ""
+        avatarUrl: session.user.avatarUrl || "",
       });
     }
 
-    const loggedInViewers = Array.from(loggedInViewersById.values()).sort((left, right) => (
-      left.displayName.localeCompare(right.displayName, "zh-Hans-CN")
-    ));
+    const loggedInViewers = Array.from(loggedInViewersById.values()).sort(
+      (left, right) =>
+        left.displayName.localeCompare(right.displayName, "zh-Hans-CN"),
+    );
 
     return {
       onlineCount: anonymousViewerCount + loggedInViewers.length,
-      loggedInViewers
+      loggedInViewers,
     };
   }
 
@@ -356,7 +386,7 @@ export class ChatRoomDO {
   sendError(socket, code, details = undefined) {
     const payload = {
       type: "error",
-      code
+      code,
     };
     if (details !== undefined) {
       payload.details = details;
@@ -394,12 +424,12 @@ export class ChatRoomDO {
       this.roomState.moderation,
       session.user.id,
       Date.now(),
-      this.roomState.stream.isLive
+      this.roomState.stream.isLive,
     );
     if (activeMute) {
       this.sendError(ws, "chat_muted", {
         expiresAt: activeMute.expiresAt,
-        untilStreamEnds: activeMute.untilStreamEnds
+        untilStreamEnds: activeMute.untilStreamEnds,
       });
       return;
     }
@@ -412,14 +442,16 @@ export class ChatRoomDO {
 
     if (text.length > MAX_MESSAGE_LENGTH) {
       this.sendError(ws, "message_too_long", {
-        maxLength: MAX_MESSAGE_LENGTH
+        maxLength: MAX_MESSAGE_LENGTH,
       });
       return;
     }
 
     const now = Date.now();
     const sentAt = Array.isArray(session.sentAt)
-      ? session.sentAt.filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
+      ? session.sentAt.filter(
+          (timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS,
+        )
       : [];
 
     if (sentAt.length >= RATE_LIMIT_MAX_MESSAGES) {
@@ -430,7 +462,7 @@ export class ChatRoomDO {
     sentAt.push(now);
     ws.serializeAttachment({
       ...session,
-      sentAt
+      sentAt,
     });
 
     const message = {
@@ -440,14 +472,21 @@ export class ChatRoomDO {
       sentAt: new Date(now).toISOString(),
       user: {
         id: session.user.id,
-        displayName: session.user.displayName || session.user.email || "匿名用户",
+        displayName:
+          session.user.displayName || session.user.email || "匿名用户",
         avatarUrl: session.user.avatarUrl || "",
-        email: session.user.email || ""
-      }
+        email: session.user.email || "",
+      },
     };
 
-    const nextMessages = this.recentMessages.concat(message).slice(-MAX_RECENT_MESSAGES);
-    const persisted = await this.persistStorageOrNotify(ws, "recentMessages", nextMessages);
+    const nextMessages = this.recentMessages
+      .concat(message)
+      .slice(-MAX_RECENT_MESSAGES);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "recentMessages",
+      nextMessages,
+    );
     if (!persisted) {
       return;
     }
@@ -455,7 +494,7 @@ export class ChatRoomDO {
 
     this.broadcast({
       type: "message.created",
-      message
+      message,
     });
   }
 
@@ -465,18 +504,25 @@ export class ChatRoomDO {
       return;
     }
 
-    const messageId = typeof payload.messageId === "string" ? payload.messageId.trim() : "";
+    const messageId =
+      typeof payload.messageId === "string" ? payload.messageId.trim() : "";
     if (!messageId) {
       this.sendError(ws, "message_missing");
       return;
     }
 
-    const nextMessages = this.recentMessages.filter((message) => message.id !== messageId);
+    const nextMessages = this.recentMessages.filter(
+      (message) => message.id !== messageId,
+    );
     if (nextMessages.length === this.recentMessages.length) {
       return;
     }
 
-    const persisted = await this.persistStorageOrNotify(ws, "recentMessages", nextMessages);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "recentMessages",
+      nextMessages,
+    );
     if (!persisted) {
       return;
     }
@@ -484,7 +530,7 @@ export class ChatRoomDO {
 
     this.broadcast({
       type: "message.retracted",
-      messageId
+      messageId,
     });
   }
 
@@ -494,13 +540,16 @@ export class ChatRoomDO {
       return;
     }
 
-    const messageId = typeof payload.messageId === "string" ? payload.messageId.trim() : "";
+    const messageId =
+      typeof payload.messageId === "string" ? payload.messageId.trim() : "";
     if (!messageId) {
       this.sendError(ws, "message_missing");
       return;
     }
 
-    const targetMessage = this.recentMessages.find((message) => message.id === messageId);
+    const targetMessage = this.recentMessages.find(
+      (message) => message.id === messageId,
+    );
     if (!targetMessage) {
       this.sendError(ws, "message_missing");
       return;
@@ -513,7 +562,9 @@ export class ChatRoomDO {
     }
 
     const untilStreamEnds = payload.untilStreamEnds === true;
-    const durationMs = untilStreamEnds ? null : sanitizeMuteDurationMs(payload.durationMs);
+    const durationMs = untilStreamEnds
+      ? null
+      : sanitizeMuteDurationMs(payload.durationMs);
     if (!untilStreamEnds && durationMs === null) {
       this.sendError(ws, "invalid_mute_duration");
       return;
@@ -524,40 +575,56 @@ export class ChatRoomDO {
     const mute = {
       userId: targetUserId,
       displayName: sanitizeMuteDisplayName(
-        targetMessage.user?.displayName || targetMessage.user?.email || "用户"
+        targetMessage.user?.displayName || targetMessage.user?.email || "用户",
       ),
       mutedAt,
-      expiresAt: untilStreamEnds ? null : new Date(now + durationMs).toISOString(),
-      untilStreamEnds
+      expiresAt: untilStreamEnds
+        ? null
+        : new Date(now + durationMs).toISOString(),
+      untilStreamEnds,
     };
-    const currentModeration = normalizeModerationState(this.roomState.moderation, now, this.roomState.stream.isLive);
+    const currentModeration = normalizeModerationState(
+      this.roomState.moderation,
+      now,
+      this.roomState.stream.isLive,
+    );
     const nextModeration = {
       ...currentModeration,
       mutedUsers: currentModeration.mutedUsers
         .filter((entry) => entry.userId !== targetUserId)
-        .concat(mute)
+        .concat(mute),
     };
     const nextRoomState = {
       ...this.roomState,
-      moderation: nextModeration
+      moderation: nextModeration,
     };
-    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
     if (!persisted) {
       return;
     }
     this.roomState = nextRoomState;
 
     if (payload.retractMessage === true) {
-      const nextMessages = this.recentMessages.filter((message) => message.id !== messageId);
+      const nextMessages = this.recentMessages.filter(
+        (message) => message.id !== messageId,
+      );
       if (nextMessages.length !== this.recentMessages.length) {
-        const messagesPersisted = await this.persistStorageOrNotify(ws, "recentMessages", nextMessages);
+        const messagesPersisted = await this.persistStorageOrNotify(
+          ws,
+          "recentMessages",
+          nextMessages,
+        );
         if (!messagesPersisted) {
           return;
         }
         this.recentMessages = nextMessages;
         this.broadcast({
           type: "message.retracted",
-          messageId
+          messageId,
         });
       }
     }
@@ -566,7 +633,12 @@ export class ChatRoomDO {
       type: "message.muted",
       id: `mute-${Date.now().toString(36)}-${crypto.randomUUID()}`,
       mute: getPublicChatMute(mute),
-      moderation: getPublicModerationState(this.roomState.moderation, Date.now(), this.roomState.stream.isLive, true)
+      moderation: getPublicModerationState(
+        this.roomState.moderation,
+        Date.now(),
+        this.roomState.stream.isLive,
+        true,
+      ),
     });
   }
 
@@ -582,9 +654,18 @@ export class ChatRoomDO {
       return;
     }
 
-    const currentModeration = normalizeModerationState(this.roomState.moderation, Date.now(), this.roomState.stream.isLive);
-    const removedMute = currentModeration.mutedUsers.find((entry) => entry.userId === targetUserId) || null;
-    const nextMutedUsers = currentModeration.mutedUsers.filter((entry) => entry.userId !== targetUserId);
+    const currentModeration = normalizeModerationState(
+      this.roomState.moderation,
+      Date.now(),
+      this.roomState.stream.isLive,
+    );
+    const removedMute =
+      currentModeration.mutedUsers.find(
+        (entry) => entry.userId === targetUserId,
+      ) || null;
+    const nextMutedUsers = currentModeration.mutedUsers.filter(
+      (entry) => entry.userId !== targetUserId,
+    );
     if (nextMutedUsers.length === currentModeration.mutedUsers.length) {
       return;
     }
@@ -593,10 +674,14 @@ export class ChatRoomDO {
       ...this.roomState,
       moderation: {
         ...currentModeration,
-        mutedUsers: nextMutedUsers
-      }
+        mutedUsers: nextMutedUsers,
+      },
     };
-    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
     if (!persisted) {
       return;
     }
@@ -607,7 +692,12 @@ export class ChatRoomDO {
       id: `unmute-${Date.now().toString(36)}-${crypto.randomUUID()}`,
       userId: targetUserId,
       mute: getPublicChatMute(removedMute),
-      moderation: getPublicModerationState(this.roomState.moderation, Date.now(), this.roomState.stream.isLive, true)
+      moderation: getPublicModerationState(
+        this.roomState.moderation,
+        Date.now(),
+        this.roomState.stream.isLive,
+        true,
+      ),
     });
   }
 
@@ -615,7 +705,10 @@ export class ChatRoomDO {
     const targetUserId = String(payload?.mute?.userId || payload?.userId || "");
     for (const socket of this.ctx.getWebSockets()) {
       const session = normalizeAttachment(socket.deserializeAttachment());
-      const isController = session?.isRoomOwner && session.role === "broadcaster" && session.canControlBroadcast;
+      const isController =
+        session?.isRoomOwner &&
+        session.role === "broadcaster" &&
+        session.canControlBroadcast;
       const isTarget = targetUserId && session?.user?.id === targetUserId;
       if (!isController && !isTarget) {
         continue;
@@ -639,7 +732,9 @@ export class ChatRoomDO {
     const nextStream = {
       isLive: true,
       protocol: sanitizeStreamProtocol(payload.stream?.protocol),
-      startedAt: sanitizeIsoTimestamp(payload.stream?.startedAt) ?? new Date().toISOString()
+      startedAt:
+        sanitizeIsoTimestamp(payload.stream?.startedAt) ??
+        new Date().toISOString(),
     };
     if (this.roomState.stream.isLive) {
       return;
@@ -652,10 +747,14 @@ export class ChatRoomDO {
       cohost: {
         ...this.roomState.cohost,
         invitesAllowed: true,
-        active: null
-      }
+        active: null,
+      },
     };
-    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
     if (!persisted) {
       return;
     }
@@ -663,19 +762,19 @@ export class ChatRoomDO {
     await this.writeRoomLastStartedAt(session.room, nextStream.startedAt);
     this.broadcast({
       type: "stream.started",
-      stream: nextStream
+      stream: nextStream,
     });
     this.broadcast({
       type: "room.location.updated",
-      location: getPublicRoomLocation(nextRoomState.location)
+      location: getPublicRoomLocation(nextRoomState.location),
     });
     this.broadcast({
       type: "cohost.invites.changed",
-      invitesAllowed: nextRoomState.cohost.invitesAllowed
+      invitesAllowed: nextRoomState.cohost.invitesAllowed,
     });
     this.broadcast({
       type: "cohost.active.changed",
-      active: nextRoomState.cohost.active
+      active: nextRoomState.cohost.active,
     });
   }
 
@@ -697,11 +796,15 @@ export class ChatRoomDO {
       location: getDefaultRoomLocation(),
       cohost: {
         ...this.roomState.cohost,
-        active: null
+        active: null,
       },
-      moderation: clearStreamScopedMutes(this.roomState.moderation)
+      moderation: clearStreamScopedMutes(this.roomState.moderation),
     };
-    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
     if (!persisted) {
       return;
     }
@@ -709,15 +812,15 @@ export class ChatRoomDO {
     await this.writeRoomLastLocation(session.room, previousLocation);
     this.broadcast({
       type: "stream.stopped",
-      stream: this.roomState.stream
+      stream: this.roomState.stream,
     });
     this.broadcast({
       type: "room.location.updated",
-      location: getPublicRoomLocation(this.roomState.location)
+      location: getPublicRoomLocation(this.roomState.location),
     });
     this.broadcast({
       type: "cohost.active.changed",
-      active: null
+      active: null,
     });
     await this.clearPeerCohostActive(previousActive);
   }
@@ -734,8 +837,8 @@ export class ChatRoomDO {
         relayUrl: sanitizeUrl(payload.roomMeta?.stream?.relayUrl),
         namespace: sanitizeNamespace(payload.roomMeta?.stream?.namespace),
         protocol: sanitizeStreamProtocol(payload.roomMeta?.stream?.protocol),
-        webRtcUrl: sanitizeUrl(payload.roomMeta?.stream?.webRtcUrl)
-      }
+        webRtcUrl: sanitizeUrl(payload.roomMeta?.stream?.webRtcUrl),
+      },
     };
     if (areRoomMetaEqual(this.roomState.roomMeta, nextRoomMeta)) {
       return;
@@ -743,16 +846,20 @@ export class ChatRoomDO {
 
     const nextRoomState = {
       ...this.roomState,
-      roomMeta: nextRoomMeta
+      roomMeta: nextRoomMeta,
     };
-    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
     if (!persisted) {
       return;
     }
     this.roomState = nextRoomState;
     this.broadcast({
       type: "room.updated",
-      roomMeta: nextRoomMeta
+      roomMeta: nextRoomMeta,
     });
   }
 
@@ -764,14 +871,21 @@ export class ChatRoomDO {
 
     let nextLocation = normalizeRoomLocationInput(payload.location);
     if (nextLocation.enabled) {
-      nextLocation = applyStoredRoomLocationResolution(nextLocation, this.roomState.location);
+      nextLocation = applyStoredRoomLocationResolution(
+        nextLocation,
+        this.roomState.location,
+      );
       if (this.roomState.stream.isLive && !nextLocation.geocodingAttempted) {
         const resolvedAt = new Date().toISOString();
         nextLocation = {
           ...nextLocation,
-          province: await reverseGeocodeProvince(nextLocation.latitude, nextLocation.longitude, this.env),
+          province: await reverseGeocodeProvince(
+            nextLocation.latitude,
+            nextLocation.longitude,
+            this.env,
+          ),
           provinceResolvedAt: resolvedAt,
-          geocodingAttempted: true
+          geocodingAttempted: true,
         };
       }
     }
@@ -781,9 +895,13 @@ export class ChatRoomDO {
 
     const nextRoomState = {
       ...this.roomState,
-      location: nextLocation
+      location: nextLocation,
     };
-    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
     if (!persisted) {
       return;
     }
@@ -791,7 +909,7 @@ export class ChatRoomDO {
     await this.writeRoomLastLocation(session.room, nextLocation);
     this.broadcast({
       type: "room.location.updated",
-      location: getPublicRoomLocation(nextLocation)
+      location: getPublicRoomLocation(nextLocation),
     });
   }
 
@@ -801,23 +919,33 @@ export class ChatRoomDO {
     }
 
     const normalized = normalizeRoomLocation(location);
-    const province = normalized.enabled ? sanitizeLocationProvince(normalized.province) : "";
+    const province = normalized.enabled
+      ? sanitizeLocationProvince(normalized.province)
+      : "";
     if (normalized.enabled && normalized.geocodingAttempted && !province) {
       return;
     }
 
-    const updatedAt = normalized.enabled && province
-      ? sanitizeIsoTimestamp(normalized.provinceResolvedAt) || sanitizeIsoTimestamp(normalized.updatedAt) || new Date().toISOString()
-      : null;
+    const updatedAt =
+      normalized.enabled && province
+        ? sanitizeIsoTimestamp(normalized.provinceResolvedAt) ||
+          sanitizeIsoTimestamp(normalized.updatedAt) ||
+          new Date().toISOString()
+        : null;
 
     try {
       await this.env.APP_DB.prepare(
         `UPDATE moq_rooms
          SET last_location_province = ?, last_location_updated_at = ?
-         WHERE id = ?`
-      ).bind(province || null, updatedAt, roomId).run();
+         WHERE id = ?`,
+      )
+        .bind(province || null, updatedAt, roomId)
+        .run();
     } catch (error) {
-      console.warn("Failed to persist room last location", error instanceof Error ? error.message : String(error));
+      console.warn(
+        "Failed to persist room last location",
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 
@@ -826,46 +954,72 @@ export class ChatRoomDO {
       return;
     }
 
-    const normalizedStartedAt = sanitizeIsoTimestamp(startedAt) || new Date().toISOString();
+    const normalizedStartedAt =
+      sanitizeIsoTimestamp(startedAt) || new Date().toISOString();
     try {
       await this.env.APP_DB.prepare(
         `UPDATE moq_rooms
          SET last_started_at = ?
-         WHERE id = ?`
-      ).bind(normalizedStartedAt, roomId).run();
+         WHERE id = ?`,
+      )
+        .bind(normalizedStartedAt, roomId)
+        .run();
     } catch (error) {
-      console.warn("Failed to persist room live start", error instanceof Error ? error.message : String(error));
+      console.warn(
+        "Failed to persist room live start",
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 
   async handleLocationDistance(request) {
     const hostLocation = normalizeRoomLocation(this.roomState.location);
     if (!hostLocation.enabled) {
-      return json({ ok: false, error: "Location unavailable", code: "location_unavailable" }, { status: 404 });
+      return json(
+        {
+          ok: false,
+          error: "Location unavailable",
+          code: "location_unavailable",
+        },
+        { status: 404 },
+      );
     }
     if (!this.roomState.stream.isLive) {
-      return json({ ok: false, error: "Distance unavailable", code: "distance_unavailable" }, { status: 409 });
+      return json(
+        {
+          ok: false,
+          error: "Distance unavailable",
+          code: "distance_unavailable",
+        },
+        { status: 409 },
+      );
     }
 
     const payload = await request.json().catch(() => null);
     const viewerLatitude = sanitizeCoordinate(payload?.latitude, -90, 90);
     const viewerLongitude = sanitizeCoordinate(payload?.longitude, -180, 180);
     if (viewerLatitude === null || viewerLongitude === null) {
-      return json({ ok: false, error: "Invalid location", code: "invalid_location" }, { status: 400 });
+      return json(
+        { ok: false, error: "Invalid location", code: "invalid_location" },
+        { status: 400 },
+      );
     }
 
-    const distanceMeters = calculateDistanceMeters({
-      latitude: hostLocation.latitude,
-      longitude: hostLocation.longitude
-    }, {
-      latitude: viewerLatitude,
-      longitude: viewerLongitude
-    });
+    const distanceMeters = calculateDistanceMeters(
+      {
+        latitude: hostLocation.latitude,
+        longitude: hostLocation.longitude,
+      },
+      {
+        latitude: viewerLatitude,
+        longitude: viewerLongitude,
+      },
+    );
 
     return json({
       ok: true,
       distanceMeters,
-      distanceText: formatDistanceText(distanceMeters)
+      distanceText: formatDistanceText(distanceMeters),
     });
   }
 
@@ -877,7 +1031,7 @@ export class ChatRoomDO {
 
     const nextCohost = {
       ...this.roomState.cohost,
-      invitesAllowed: payload.invitesAllowed !== false
+      invitesAllowed: payload.invitesAllowed !== false,
     };
     if (this.roomState.cohost.invitesAllowed === nextCohost.invitesAllowed) {
       return;
@@ -885,16 +1039,20 @@ export class ChatRoomDO {
 
     const nextRoomState = {
       ...this.roomState,
-      cohost: nextCohost
+      cohost: nextCohost,
     };
-    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
     if (!persisted) {
       return;
     }
     this.roomState = nextRoomState;
     this.broadcast({
       type: "cohost.invites.changed",
-      invitesAllowed: nextCohost.invitesAllowed
+      invitesAllowed: nextCohost.invitesAllowed,
     });
   }
 
@@ -913,10 +1071,14 @@ export class ChatRoomDO {
       ...this.roomState,
       cohost: {
         ...this.roomState.cohost,
-        active: null
-      }
+        active: null,
+      },
     };
-    const persisted = await this.persistStorageOrNotify(ws, "roomState", nextRoomState);
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
     if (!persisted) {
       return;
     }
@@ -924,7 +1086,7 @@ export class ChatRoomDO {
     this.roomState = nextRoomState;
     this.broadcast({
       type: "cohost.active.changed",
-      active: null
+      active: null,
     });
     await this.clearPeerCohostActive(previousActive);
   }
@@ -933,15 +1095,32 @@ export class ChatRoomDO {
     const payload = await request.json().catch(() => ({}));
     const invite = normalizeCohostInvite(payload.invite);
     if (!invite) {
-      return json({ ok: false, error: "Invalid cohost invite", code: "invalid_cohost_invite" }, { status: 400 });
+      return json(
+        {
+          ok: false,
+          error: "Invalid cohost invite",
+          code: "invalid_cohost_invite",
+        },
+        { status: 400 },
+      );
     }
 
     if (!this.roomState.stream.isLive || !this.hasActiveBroadcastController()) {
-      return json({ ok: false, error: "Room is not live", code: "room_not_live" }, { status: 409 });
+      return json(
+        { ok: false, error: "Room is not live", code: "room_not_live" },
+        { status: 409 },
+      );
     }
 
     if (this.roomState.cohost.invitesAllowed === false) {
-      return json({ ok: false, error: "Cohost invites are blocked", code: "cohost_invites_blocked" }, { status: 403 });
+      return json(
+        {
+          ok: false,
+          error: "Cohost invites are blocked",
+          code: "cohost_invites_blocked",
+        },
+        { status: 403 },
+      );
     }
 
     let delivered = 0;
@@ -956,13 +1135,16 @@ export class ChatRoomDO {
       }
       this.send(socket, {
         type: "cohost.invite.received",
-        invite
+        invite,
       });
       delivered += 1;
     }
 
     if (delivered === 0) {
-      return json({ ok: false, error: "Room is not live", code: "room_not_live" }, { status: 409 });
+      return json(
+        { ok: false, error: "Room is not live", code: "room_not_live" },
+        { status: 409 },
+      );
     }
 
     return json({ ok: true, delivered });
@@ -972,12 +1154,19 @@ export class ChatRoomDO {
     const payload = await request.json().catch(() => ({}));
     const response = normalizeCohostInviteResponse(payload.response);
     if (!response) {
-      return json({ ok: false, error: "Invalid cohost response", code: "invalid_cohost_response" }, { status: 400 });
+      return json(
+        {
+          ok: false,
+          error: "Invalid cohost response",
+          code: "invalid_cohost_response",
+        },
+        { status: 400 },
+      );
     }
 
     this.broadcast({
       type: "cohost.invite.responded",
-      response
+      response,
     });
     return json({ ok: true });
   }
@@ -987,17 +1176,17 @@ export class ChatRoomDO {
     const active = normalizeCohostActive(payload.active);
     const nextCohost = {
       ...this.roomState.cohost,
-      active
+      active,
     };
     const nextRoomState = {
       ...this.roomState,
-      cohost: nextCohost
+      cohost: nextCohost,
     };
     this.roomState = nextRoomState;
     await this.ctx.storage.put("roomState", nextRoomState);
     this.broadcast({
       type: "cohost.active.changed",
-      active
+      active,
     });
     return json({ ok: true });
   }
@@ -1008,14 +1197,21 @@ export class ChatRoomDO {
     }
 
     try {
-      const stub = this.env.CHAT_ROOM.get(this.env.CHAT_ROOM.idFromName(active.peerRoomId));
-      await stub.fetch(new Request("https://chat-room.internal/cohost/active", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ active: null })
-      }));
+      const stub = this.env.CHAT_ROOM.get(
+        this.env.CHAT_ROOM.idFromName(active.peerRoomId),
+      );
+      await stub.fetch(
+        new Request("https://chat-room.internal/cohost/active", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ active: null }),
+        }),
+      );
     } catch (error) {
-      console.warn("Failed to clear peer cohost state", error instanceof Error ? error.message : String(error));
+      console.warn(
+        "Failed to clear peer cohost state",
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 
@@ -1029,7 +1225,7 @@ export class ChatRoomDO {
     this.send(ws, {
       type: "broadcast.control.checked",
       requestId,
-      canControlBroadcast
+      canControlBroadcast,
     });
 
     if (!canControlBroadcast) {
@@ -1049,13 +1245,13 @@ export class ChatRoomDO {
     const hadControl = session.canControlBroadcast;
     ws.serializeAttachment({
       ...session,
-      canControlBroadcast: false
+      canControlBroadcast: false,
     });
 
     if (hadControl) {
       this.send(ws, {
         type: "broadcast.control.changed",
-        canControlBroadcast: false
+        canControlBroadcast: false,
       });
     }
     try {
@@ -1077,7 +1273,9 @@ export class ChatRoomDO {
       }
 
       this.sendError(ws, "storage_write_limited");
-      console.warn(`Skipped Durable Object write for ${key} because free tier row quota was exceeded.`);
+      console.warn(
+        `Skipped Durable Object write for ${key} because free tier row quota was exceeded.`,
+      );
       return false;
     }
   }
@@ -1088,7 +1286,7 @@ function json(payload, init = {}) {
   headers.set("content-type", "application/json; charset=utf-8");
   return new Response(JSON.stringify(payload), {
     ...init,
-    headers
+    headers,
   });
 }
 
@@ -1097,7 +1295,7 @@ function getDefaultRoomState() {
     stream: {
       isLive: false,
       protocol: STREAM_PROTOCOL_MOQ,
-      startedAt: null
+      startedAt: null,
     },
     roomMeta: {
       title: "",
@@ -1105,12 +1303,12 @@ function getDefaultRoomState() {
         relayUrl: "",
         namespace: "",
         protocol: STREAM_PROTOCOL_MOQ,
-        webRtcUrl: ""
-      }
+        webRtcUrl: "",
+      },
     },
     location: getDefaultRoomLocation(),
     cohost: getDefaultCohostState(),
-    moderation: getDefaultModerationState()
+    moderation: getDefaultModerationState(),
   };
 }
 
@@ -1119,7 +1317,7 @@ function normalizeRoomState(roomState) {
     stream: {
       isLive: Boolean(roomState?.stream?.isLive),
       protocol: sanitizeStreamProtocol(roomState?.stream?.protocol),
-      startedAt: sanitizeIsoTimestamp(roomState?.stream?.startedAt)
+      startedAt: sanitizeIsoTimestamp(roomState?.stream?.startedAt),
     },
     roomMeta: {
       title: sanitizeRoomTitle(roomState?.roomMeta?.title),
@@ -1127,34 +1325,38 @@ function normalizeRoomState(roomState) {
         relayUrl: sanitizeUrl(roomState?.roomMeta?.stream?.relayUrl),
         namespace: sanitizeNamespace(roomState?.roomMeta?.stream?.namespace),
         protocol: sanitizeStreamProtocol(roomState?.roomMeta?.stream?.protocol),
-        webRtcUrl: sanitizeUrl(roomState?.roomMeta?.stream?.webRtcUrl)
-      }
+        webRtcUrl: sanitizeUrl(roomState?.roomMeta?.stream?.webRtcUrl),
+      },
     },
     location: normalizeRoomLocation(roomState?.location),
     cohost: normalizeCohostState(roomState?.cohost),
     moderation: normalizeModerationState(
       roomState?.moderation,
       Date.now(),
-      Boolean(roomState?.stream?.isLive)
-    )
+      Boolean(roomState?.stream?.isLive),
+    ),
   };
 }
 
 function getDefaultModerationState() {
   return {
-    mutedUsers: []
+    mutedUsers: [],
   };
 }
 
-function normalizeModerationState(moderation, now = Date.now(), streamLive = false) {
+function normalizeModerationState(
+  moderation,
+  now = Date.now(),
+  streamLive = false,
+) {
   const mutedUsers = Array.isArray(moderation?.mutedUsers)
     ? moderation.mutedUsers
-      .map((entry) => normalizeChatMute(entry))
-      .filter((entry) => entry && isChatMuteActive(entry, now, streamLive))
+        .map((entry) => normalizeChatMute(entry))
+        .filter((entry) => entry && isChatMuteActive(entry, now, streamLive))
     : [];
 
   return {
-    mutedUsers
+    mutedUsers,
   };
 }
 
@@ -1165,7 +1367,9 @@ function normalizeChatMute(entry) {
   }
 
   const untilStreamEnds = entry?.untilStreamEnds === true;
-  const expiresAt = untilStreamEnds ? null : sanitizeIsoTimestamp(entry?.expiresAt);
+  const expiresAt = untilStreamEnds
+    ? null
+    : sanitizeIsoTimestamp(entry?.expiresAt);
   if (!untilStreamEnds && !expiresAt) {
     return null;
   }
@@ -1175,17 +1379,24 @@ function normalizeChatMute(entry) {
     displayName: sanitizeMuteDisplayName(entry?.displayName),
     mutedAt: sanitizeIsoTimestamp(entry?.mutedAt) || new Date().toISOString(),
     expiresAt,
-    untilStreamEnds
+    untilStreamEnds,
   };
 }
 
-function getActiveChatMute(moderation, userId, now = Date.now(), streamLive = false) {
+function getActiveChatMute(
+  moderation,
+  userId,
+  now = Date.now(),
+  streamLive = false,
+) {
   const normalizedUserId = String(userId || "").trim();
   if (!normalizedUserId) {
     return null;
   }
   const state = normalizeModerationState(moderation, now, streamLive);
-  return state.mutedUsers.find((entry) => entry.userId === normalizedUserId) || null;
+  return (
+    state.mutedUsers.find((entry) => entry.userId === normalizedUserId) || null
+  );
 }
 
 function isChatMuteActive(mute, now = Date.now(), streamLive = false) {
@@ -1207,14 +1418,19 @@ function getPublicChatMute(mute) {
     userId: mute.userId,
     displayName: mute.displayName,
     expiresAt: mute.expiresAt,
-    untilStreamEnds: mute.untilStreamEnds
+    untilStreamEnds: mute.untilStreamEnds,
   };
 }
 
-function getPublicModerationState(moderation, now = Date.now(), streamLive = false, canView = false) {
+function getPublicModerationState(
+  moderation,
+  now = Date.now(),
+  streamLive = false,
+  canView = false,
+) {
   if (!canView) {
     return {
-      mutedUsers: []
+      mutedUsers: [],
     };
   }
   const state = normalizeModerationState(moderation, now, streamLive);
@@ -1223,31 +1439,38 @@ function getPublicModerationState(moderation, now = Date.now(), streamLive = fal
       .map((entry) => getPublicChatMute(entry))
       .filter(Boolean)
       .sort((left, right) => {
-        const leftTime = left.untilStreamEnds ? Number.MAX_SAFE_INTEGER : Date.parse(left.expiresAt);
-        const rightTime = right.untilStreamEnds ? Number.MAX_SAFE_INTEGER : Date.parse(right.expiresAt);
-        return leftTime - rightTime || left.displayName.localeCompare(right.displayName, "zh-Hans-CN");
-      })
+        const leftTime = left.untilStreamEnds
+          ? Number.MAX_SAFE_INTEGER
+          : Date.parse(left.expiresAt);
+        const rightTime = right.untilStreamEnds
+          ? Number.MAX_SAFE_INTEGER
+          : Date.parse(right.expiresAt);
+        return (
+          leftTime - rightTime ||
+          left.displayName.localeCompare(right.displayName, "zh-Hans-CN")
+        );
+      }),
   };
 }
 
 function clearStreamScopedMutes(moderation) {
   const state = normalizeModerationState(moderation, Date.now(), true);
   return {
-    mutedUsers: state.mutedUsers.filter((entry) => !entry.untilStreamEnds)
+    mutedUsers: state.mutedUsers.filter((entry) => !entry.untilStreamEnds),
   };
 }
 
 function getDefaultCohostState() {
   return {
     invitesAllowed: true,
-    active: null
+    active: null,
   };
 }
 
 function normalizeCohostState(cohost) {
   return {
     invitesAllowed: cohost?.invitesAllowed === false ? false : true,
-    active: normalizeCohostActive(cohost?.active)
+    active: normalizeCohostActive(cohost?.active),
   };
 }
 
@@ -1260,7 +1483,7 @@ function getDefaultRoomLocation() {
     updatedAt: null,
     province: "",
     provinceResolvedAt: null,
-    geocodingAttempted: false
+    geocodingAttempted: false,
   };
 }
 
@@ -1280,10 +1503,11 @@ function normalizeRoomLocation(location) {
     latitude,
     longitude,
     accuracy: sanitizeAccuracy(location.accuracy),
-    updatedAt: sanitizeIsoTimestamp(location.updatedAt) ?? new Date().toISOString(),
+    updatedAt:
+      sanitizeIsoTimestamp(location.updatedAt) ?? new Date().toISOString(),
     province: sanitizeLocationProvince(location.province),
     provinceResolvedAt: sanitizeIsoTimestamp(location.provinceResolvedAt),
-    geocodingAttempted: location.geocodingAttempted === true
+    geocodingAttempted: location.geocodingAttempted === true,
   };
 }
 
@@ -1294,21 +1518,27 @@ function normalizeRoomLocationInput(location) {
         ...normalized,
         province: "",
         provinceResolvedAt: null,
-        geocodingAttempted: false
+        geocodingAttempted: false,
       }
     : normalized;
 }
 
 function applyStoredRoomLocationResolution(nextLocation, currentLocation) {
-  if (!nextLocation.enabled || !currentLocation?.enabled || currentLocation.geocodingAttempted !== true) {
+  if (
+    !nextLocation.enabled ||
+    !currentLocation?.enabled ||
+    currentLocation.geocodingAttempted !== true
+  ) {
     return nextLocation;
   }
 
   return {
     ...nextLocation,
     province: sanitizeLocationProvince(currentLocation.province),
-    provinceResolvedAt: sanitizeIsoTimestamp(currentLocation.provinceResolvedAt),
-    geocodingAttempted: true
+    provinceResolvedAt: sanitizeIsoTimestamp(
+      currentLocation.provinceResolvedAt,
+    ),
+    geocodingAttempted: true,
   };
 }
 
@@ -1317,7 +1547,7 @@ function getPublicRoomLocation(location) {
   return {
     hasLocation: normalized.enabled,
     province: normalized.enabled ? normalized.province : "",
-    updatedAt: normalized.enabled ? normalized.updatedAt : null
+    updatedAt: normalized.enabled ? normalized.updatedAt : null,
   };
 }
 
@@ -1332,26 +1562,45 @@ function normalizeAttachment(attachment) {
     isRoomOwner: attachment.isRoomOwner === true,
     canControlBroadcast: attachment.canControlBroadcast === true,
     readOnly: attachment.readOnly !== false ? true : false,
-    user: attachment.user && typeof attachment.user === "object" ? attachment.user : null,
-    connectedAt: Number.isFinite(attachment.connectedAt) ? attachment.connectedAt : 0,
-    sentAt: Array.isArray(attachment.sentAt) ? attachment.sentAt.filter((value) => typeof value === "number") : []
+    user:
+      attachment.user && typeof attachment.user === "object"
+        ? attachment.user
+        : null,
+    connectedAt: Number.isFinite(attachment.connectedAt)
+      ? attachment.connectedAt
+      : 0,
+    sentAt: Array.isArray(attachment.sentAt)
+      ? attachment.sentAt.filter((value) => typeof value === "number")
+      : [],
   };
 }
 
 function sanitizeRequestId(value) {
-  return String(value ?? "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
+  return String(value ?? "")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 80);
 }
 
 function sanitizeInviteId(value) {
-  return String(value ?? "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 96);
+  return String(value ?? "")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 96);
 }
 
 function sanitizeHandle(value) {
-  return String(value ?? "").trim().replace(/^@+/, "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 24);
+  return String(value ?? "")
+    .trim()
+    .replace(/^@+/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "")
+    .slice(0, 24);
 }
 
 function sanitizeDisplayName(value) {
-  return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, 48);
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 48);
 }
 
 function normalizeCohostUser(value) {
@@ -1365,10 +1614,12 @@ function normalizeCohostUser(value) {
   }
 
   return {
-    id: String(value.id ?? "").trim().slice(0, 128),
+    id: String(value.id ?? "")
+      .trim()
+      .slice(0, 128),
     handle,
     displayName: sanitizeDisplayName(value.displayName),
-    avatarUrl: sanitizeUrl(value.avatarUrl)
+    avatarUrl: sanitizeUrl(value.avatarUrl),
   };
 }
 
@@ -1391,7 +1642,7 @@ function normalizeCohostStream(value) {
     relayUrl,
     namespace,
     protocol,
-    webRtcUrl
+    webRtcUrl,
   };
 }
 
@@ -1404,7 +1655,8 @@ function normalizeCohostInvite(value) {
   const requesterRoomId = sanitizeNamespace(value.requesterRoomId);
   const targetRoomId = sanitizeNamespace(value.targetRoomId);
   const requester = normalizeCohostUser(value.requester);
-  const requestedAt = sanitizeIsoTimestamp(value.requestedAt) ?? new Date().toISOString();
+  const requestedAt =
+    sanitizeIsoTimestamp(value.requestedAt) ?? new Date().toISOString();
   if (!id || !requesterRoomId || !targetRoomId || !requester) {
     return null;
   }
@@ -1418,7 +1670,7 @@ function normalizeCohostInvite(value) {
     requesterRoomId,
     targetRoomId,
     requestedAt,
-    requester
+    requester,
   };
 }
 
@@ -1436,8 +1688,9 @@ function normalizeCohostInviteResponse(value) {
   return {
     id,
     accepted: Boolean(value.accepted),
-    respondedAt: sanitizeIsoTimestamp(value.respondedAt) ?? new Date().toISOString(),
-    target
+    respondedAt:
+      sanitizeIsoTimestamp(value.respondedAt) ?? new Date().toISOString(),
+    target,
   };
 }
 
@@ -1456,9 +1709,10 @@ function normalizeCohostActive(value) {
   return {
     id: sanitizeInviteId(value.id) || `cohost-${Date.now().toString(36)}`,
     peerRoomId,
-    acceptedAt: sanitizeIsoTimestamp(value.acceptedAt) ?? new Date().toISOString(),
+    acceptedAt:
+      sanitizeIsoTimestamp(value.acceptedAt) ?? new Date().toISOString(),
     peer,
-    stream
+    stream,
   };
 }
 
@@ -1475,11 +1729,15 @@ function parseUserHeader(headerValue) {
 }
 
 function sanitizeMessage(text) {
-  return String(text ?? "").replace(/\s+/g, " ").trim();
+  return String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function sanitizeRoomTitle(value) {
-  const title = String(value ?? "").trim().replace(/\s+/g, " ");
+  const title = String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
   return title.slice(0, MAX_ROOM_TITLE_LENGTH);
 }
 
@@ -1508,18 +1766,24 @@ function sanitizeUrl(value) {
 
   try {
     const url = new URL(nextValue);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : "";
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.toString()
+      : "";
   } catch {
     return "";
   }
 }
 
 function sanitizeNamespace(value) {
-  return String(value ?? "").trim().slice(0, 128);
+  return String(value ?? "")
+    .trim()
+    .slice(0, 128);
 }
 
 function sanitizeStreamProtocol(value) {
-  return value === STREAM_PROTOCOL_WEBRTC ? STREAM_PROTOCOL_WEBRTC : STREAM_PROTOCOL_MOQ;
+  return value === STREAM_PROTOCOL_WEBRTC
+    ? STREAM_PROTOCOL_WEBRTC
+    : STREAM_PROTOCOL_MOQ;
 }
 
 function sanitizeCoordinate(value, min, max) {
@@ -1539,11 +1803,19 @@ function sanitizeAccuracy(value) {
 }
 
 function sanitizeLocationProvince(value) {
-  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40);
 }
 
 function sanitizeMuteDisplayName(value) {
-  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || "用户";
+  return (
+    String(value ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 80) || "用户"
+  );
 }
 
 function sanitizeMuteDurationMs(value) {
@@ -1566,14 +1838,25 @@ function calculateDistanceMeters(left, right) {
   const deltaLongitude = toRadians(right.longitude - left.longitude);
   const sinLatitude = Math.sin(deltaLatitude / 2);
   const sinLongitude = Math.sin(deltaLongitude / 2);
-  const rawValue = sinLatitude * sinLatitude
-    + Math.cos(leftLatitude) * Math.cos(rightLatitude) * sinLongitude * sinLongitude;
+  const rawValue =
+    sinLatitude * sinLatitude +
+    Math.cos(leftLatitude) *
+      Math.cos(rightLatitude) *
+      sinLongitude *
+      sinLongitude;
   const value = Math.min(1, Math.max(0, rawValue));
-  return Math.max(0, Math.round(earthRadiusMeters * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))));
+  return Math.max(
+    0,
+    Math.round(
+      earthRadiusMeters *
+        2 *
+        Math.atan2(Math.sqrt(value), Math.sqrt(1 - value)),
+    ),
+  );
 }
 
 function toRadians(value) {
-  return value * Math.PI / 180;
+  return (value * Math.PI) / 180;
 }
 
 function formatDistanceText(distanceMeters) {
@@ -1604,7 +1887,7 @@ async function reverseGeocodeProvince(latitude, longitude, env) {
       latitude,
       longitude,
       BIG_DATA_CLOUD_REVERSE_GEOCODE_URL,
-      bigDataCloudApiKey
+      bigDataCloudApiKey,
     );
     if (authenticatedProvince) {
       return authenticatedProvince;
@@ -1614,11 +1897,16 @@ async function reverseGeocodeProvince(latitude, longitude, env) {
   return reverseGeocodeProvinceWithBigDataCloud(
     latitude,
     longitude,
-    BIG_DATA_CLOUD_FREE_REVERSE_GEOCODE_URL
+    BIG_DATA_CLOUD_FREE_REVERSE_GEOCODE_URL,
   );
 }
 
-async function reverseGeocodeProvinceWithBigDataCloud(latitude, longitude, endpoint, apiKey = "") {
+async function reverseGeocodeProvinceWithBigDataCloud(
+  latitude,
+  longitude,
+  endpoint,
+  apiKey = "",
+) {
   const url = new URL(endpoint);
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("longitude", String(longitude));
@@ -1635,7 +1923,7 @@ async function reverseGeocodeProvinceWithBigDataCloud(latitude, longitude, endpo
   try {
     const response = await fetch(url.toString(), {
       headers: { accept: "application/json" },
-      signal: controller.signal
+      signal: controller.signal,
     });
     if (!response.ok) {
       return "";
@@ -1643,13 +1931,16 @@ async function reverseGeocodeProvinceWithBigDataCloud(latitude, longitude, endpo
 
     const payload = await response.json().catch(() => null);
     return sanitizeLocationProvince(
-      payload?.principalSubdivision
-        || payload?.locality
-        || payload?.countryName
-        || ""
+      payload?.principalSubdivision ||
+        payload?.locality ||
+        payload?.countryName ||
+        "",
     );
   } catch (error) {
-    console.warn("BigDataCloud reverse geocode failed", error instanceof Error ? error.message : String(error));
+    console.warn(
+      "BigDataCloud reverse geocode failed",
+      error instanceof Error ? error.message : String(error),
+    );
     return "";
   } finally {
     clearTimeout(timeoutId);
@@ -1659,10 +1950,14 @@ async function reverseGeocodeProvinceWithBigDataCloud(latitude, longitude, endpo
 function areRoomMetaEqual(left, right) {
   return (
     String(left?.title ?? "") === String(right?.title ?? "") &&
-    String(left?.stream?.relayUrl ?? "") === String(right?.stream?.relayUrl ?? "") &&
-    String(left?.stream?.namespace ?? "") === String(right?.stream?.namespace ?? "") &&
-    String(left?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) === String(right?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) &&
-    String(left?.stream?.webRtcUrl ?? "") === String(right?.stream?.webRtcUrl ?? "")
+    String(left?.stream?.relayUrl ?? "") ===
+      String(right?.stream?.relayUrl ?? "") &&
+    String(left?.stream?.namespace ?? "") ===
+      String(right?.stream?.namespace ?? "") &&
+    String(left?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) ===
+      String(right?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) &&
+    String(left?.stream?.webRtcUrl ?? "") ===
+      String(right?.stream?.webRtcUrl ?? "")
   );
 }
 
@@ -1674,7 +1969,8 @@ function areRoomLocationsEqual(left, right) {
     Number(left?.accuracy) === Number(right?.accuracy) &&
     String(left?.updatedAt ?? "") === String(right?.updatedAt ?? "") &&
     String(left?.province ?? "") === String(right?.province ?? "") &&
-    String(left?.provinceResolvedAt ?? "") === String(right?.provinceResolvedAt ?? "") &&
+    String(left?.provinceResolvedAt ?? "") ===
+      String(right?.provinceResolvedAt ?? "") &&
     Boolean(left?.geocodingAttempted) === Boolean(right?.geocodingAttempted)
   );
 }
@@ -1689,7 +1985,7 @@ function isMessageFresh(message, now) {
 }
 
 function isDurableObjectWriteLimitError(error) {
-  return (error instanceof Error ? error.message : String(error ?? "")).includes(
-    DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE
-  );
+  return (
+    error instanceof Error ? error.message : String(error ?? "")
+  ).includes(DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE);
 }

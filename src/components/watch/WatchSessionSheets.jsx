@@ -150,7 +150,7 @@ export function WatchHostProfileContent({
               }}
               aria-label={t("profile.copyHostHandle", { handle: hostHandleText })}
             >
-              {hostHandleText}
+              {`@${hostHandleText}`}
             </button>
           ) : null}
         </div>

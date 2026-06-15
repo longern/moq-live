@@ -755,7 +755,7 @@
 
   .chat-composer,
   .chat-composer-floating {
-    gap: 8px;
+    gap: 6px;
   }
 
   .chat-composer input,

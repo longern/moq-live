@@ -120,8 +120,10 @@
   box-shadow: var(--chat-message-hit-shadow, none);
 }
 
-.chat-message-hit-area:active {
-  opacity: 0.86;
+@media (hover: none) and (pointer: coarse) {
+  .chat-message-hit-area:active {
+    opacity: 0.86;
+  }
 }
 
 .chat-panel-live-mobile,

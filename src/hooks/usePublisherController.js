@@ -64,7 +64,9 @@ const MICROPHONE_AUDIO_TRACKS = new WeakSet();
 function getPublishQuality(id) {
   return (
     PUBLISH_QUALITY_OPTIONS.find((option) => option.id === id) ??
-    PUBLISH_QUALITY_OPTIONS.find((option) => option.id === DEFAULT_PUBLISH_QUALITY_ID) ??
+    PUBLISH_QUALITY_OPTIONS.find(
+      (option) => option.id === DEFAULT_PUBLISH_QUALITY_ID,
+    ) ??
     PUBLISH_QUALITY_OPTIONS[0]
   );
 }
@@ -78,7 +80,10 @@ function getPublishQualityConfig(id) {
   };
 }
 
-function buildVideoConstraints(deviceId = "", qualityId = DEFAULT_PUBLISH_QUALITY_ID) {
+function buildVideoConstraints(
+  deviceId = "",
+  qualityId = DEFAULT_PUBLISH_QUALITY_ID,
+) {
   const quality = getPublishQuality(qualityId);
   const constraints = {
     width: { ideal: quality.width },
@@ -118,8 +123,7 @@ function shouldRetryDisplayMediaRequest(error) {
 }
 
 function buildSharedAudioConstraints() {
-  const supported =
-    navigator.mediaDevices?.getSupportedConstraints?.() ?? {};
+  const supported = navigator.mediaDevices?.getSupportedConstraints?.() ?? {};
   const constraints = {};
 
   if (supported.echoCancellation) {
@@ -139,8 +143,7 @@ function buildSharedAudioConstraints() {
 }
 
 function buildMicrophoneAudioConstraints(deviceId = "") {
-  const supported =
-    navigator.mediaDevices?.getSupportedConstraints?.() ?? {};
+  const supported = navigator.mediaDevices?.getSupportedConstraints?.() ?? {};
   const constraints = {};
 
   if (supported.echoCancellation) {
@@ -226,8 +229,12 @@ export function usePublisherController({
   const [microphoneOptions, setMicrophoneOptions] = useState([]);
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState("");
-  const [publishQualityId, setPublishQualityIdState] = useState(DEFAULT_PUBLISH_QUALITY_ID);
-  const [publishProtocol, setPublishProtocolState] = useState(DEFAULT_STREAM_PROTOCOL);
+  const [publishQualityId, setPublishQualityIdState] = useState(
+    DEFAULT_PUBLISH_QUALITY_ID,
+  );
+  const [publishProtocol, setPublishProtocolState] = useState(
+    DEFAULT_STREAM_PROTOCOL,
+  );
   const [webRtcPublishUrl, setWebRtcPublishUrlState] = useState("");
   const [webRtcPlaybackUrl, setWebRtcPlaybackUrlState] = useState("");
   const [cameraEnabled, setCameraEnabledState] = useState(true);
@@ -245,7 +252,8 @@ export function usePublisherController({
 
   const previewVideoRef = useRef(null);
   const internalSyntheticSessionRef = useRef(null);
-  const syntheticSessionRef = externalSyntheticSessionRef ?? internalSyntheticSessionRef;
+  const syntheticSessionRef =
+    externalSyntheticSessionRef ?? internalSyntheticSessionRef;
   const livePublisherRef = useRef(null);
   const pendingPublisherRef = useRef(null);
   const liveSessionManagerRef = useRef(createMediaSessionManager());
@@ -284,8 +292,13 @@ export function usePublisherController({
     setPublishStatus(message);
   }
 
-  function applyPublishQualityToSession(session, qualityId = publishQualityIdRef.current) {
-    session?.broadcast?.video?.hd?.config?.set?.(getPublishQualityConfig(qualityId));
+  function applyPublishQualityToSession(
+    session,
+    qualityId = publishQualityIdRef.current,
+  ) {
+    session?.broadcast?.video?.hd?.config?.set?.(
+      getPublishQualityConfig(qualityId),
+    );
   }
 
   async function applyWebRtcVideoBitrateToSession(
@@ -307,8 +320,14 @@ export function usePublisherController({
     publishQualityIdRef.current = normalizedQualityId;
     setPublishQualityIdState(normalizedQualityId);
     applyPublishQualityToSession(liveSession, normalizedQualityId);
-    applyPublishQualityToSession(pendingPublisherRef.current, normalizedQualityId);
-    applyPublishQualityToSession(syntheticSessionRef.current?.publisher, normalizedQualityId);
+    applyPublishQualityToSession(
+      pendingPublisherRef.current,
+      normalizedQualityId,
+    );
+    applyPublishQualityToSession(
+      syntheticSessionRef.current?.publisher,
+      normalizedQualityId,
+    );
 
     if (
       liveSession &&
@@ -316,7 +335,10 @@ export function usePublisherController({
       previewSourceTypeRef.current === PREVIEW_SOURCE_CAMERA &&
       cameraEnabledRef.current
     ) {
-      await switchPublishCamera(selectedCameraIdRef.current, normalizedQualityId);
+      await switchPublishCamera(
+        selectedCameraIdRef.current,
+        normalizedQualityId,
+      );
       return;
     }
 
@@ -440,9 +462,8 @@ export function usePublisherController({
       return;
     }
 
-    const videoTracks = session.publishTracks?.filter(
-      (track) => track.kind === "video",
-    ) ?? [];
+    const videoTracks =
+      session.publishTracks?.filter((track) => track.kind === "video") ?? [];
 
     if (session.protocol === STREAM_PROTOCOL_WEBRTC) {
       void session.connection?.replaceVideoTrack?.(null).catch((error) => {
@@ -460,9 +481,8 @@ export function usePublisherController({
       }
     }
 
-    session.publishTracks = session.publishTracks?.filter(
-      (track) => track.kind !== "video",
-    ) ?? [];
+    session.publishTracks =
+      session.publishTracks?.filter((track) => track.kind !== "video") ?? [];
 
     for (const track of videoTracks) {
       try {
@@ -531,12 +551,16 @@ export function usePublisherController({
     try {
       session.broadcast?.close?.();
     } catch (error) {
-      log(`publish close warning: ${error instanceof Error ? error.message : String(error)}`);
+      log(
+        `publish close warning: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
     try {
       session.connection?.close?.();
     } catch (error) {
-      log(`connection close warning: ${error instanceof Error ? error.message : String(error)}`);
+      log(
+        `connection close warning: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
     session.cleanupPublishTracks?.();
     if (livePublisherRef.current === session) {
@@ -706,11 +730,17 @@ export function usePublisherController({
 
   function stopLivePreview({ resetSource = false } = {}) {
     const stream = liveSessionManagerRef.current.stopActiveStream();
-    if (previewMediaStreamRef.current === stream || !previewMediaStreamRef.current) {
+    if (
+      previewMediaStreamRef.current === stream ||
+      !previewMediaStreamRef.current
+    ) {
       clearPreviewState({ resetSource });
       return;
     }
-    if (resetSource && previewSourceTypeRef.current !== PREVIEW_SOURCE_SYNTHETIC) {
+    if (
+      resetSource &&
+      previewSourceTypeRef.current !== PREVIEW_SOURCE_SYNTHETIC
+    ) {
       previewSourceTypeRef.current = DEFAULT_PREVIEW_SOURCE;
       setPreviewSourceType(DEFAULT_PREVIEW_SOURCE);
     }
@@ -771,10 +801,14 @@ export function usePublisherController({
 
     setPublishTrackEnabled(
       "video",
-      previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN ? true : nextEnabled,
+      previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN
+        ? true
+        : nextEnabled,
     );
 
-    const hasPreviewVideoTrack = Boolean(previewStream?.getVideoTracks?.().length);
+    const hasPreviewVideoTrack = Boolean(
+      previewStream?.getVideoTracks?.().length,
+    );
     const nextHasVideo =
       previewSourceTypeRef.current === PREVIEW_SOURCE_CAMERA
         ? nextEnabled && hasPreviewVideoTrack
@@ -862,7 +896,10 @@ export function usePublisherController({
     updatePreviewState(stream, sourceType);
   }
 
-  async function switchPublishCamera(cameraId, qualityId = publishQualityIdRef.current) {
+  async function switchPublishCamera(
+    cameraId,
+    qualityId = publishQualityIdRef.current,
+  ) {
     const session = livePublisherRef.current;
     if (!session || !publisherIsPublishingRef.current) {
       return false;
@@ -909,11 +946,14 @@ export function usePublisherController({
       );
 
       if (session.protocol === STREAM_PROTOCOL_WEBRTC) {
-        const replaced = await session.connection?.replaceVideoTrack?.(newPublishTrack);
+        const replaced =
+          await session.connection?.replaceVideoTrack?.(newPublishTrack);
         if (!replaced) {
           throw createAppError("webrtc_video_sender_unavailable");
         }
-        await session.connection?.setVideoMaxBitrate?.(qualityConfig.maxBitrate);
+        await session.connection?.setVideoMaxBitrate?.(
+          qualityConfig.maxBitrate,
+        );
       } else {
         applyPublishQualityToSession(session, qualityId);
         session.broadcast.video.source.set(newPublishTrack);
@@ -958,7 +998,9 @@ export function usePublisherController({
       appliedCameraIdRef.current = cameraId;
       appliedPublishQualityIdRef.current = qualityId;
       updatePublishStatus("live", `直播已启动：${roomRef.current || "unset"}`);
-      log(`switched publish camera to ${cameraId || "default"} quality=${qualityId}`);
+      log(
+        `switched publish camera to ${cameraId || "default"} quality=${qualityId}`,
+      );
       return true;
     } catch (error) {
       const message = getAppErrorMessage(error);
@@ -987,8 +1029,9 @@ export function usePublisherController({
     const microphoneConstraints = {
       audio: buildMicrophoneAudioConstraints(selectedMicrophoneIdRef.current),
     };
-    const microphoneStream =
-      await navigator.mediaDevices.getUserMedia(microphoneConstraints);
+    const microphoneStream = await navigator.mediaDevices.getUserMedia(
+      microphoneConstraints,
+    );
     const microphoneTrack = microphoneStream.getAudioTracks()[0] ?? null;
     markMicrophoneAudioTrack(microphoneTrack);
     return microphoneTrack;
@@ -1114,7 +1157,10 @@ export function usePublisherController({
 
     let displayStream = null;
     let lastDisplayError = null;
-    const displayVideoConstraints = buildVideoConstraints("", publishQualityIdRef.current);
+    const displayVideoConstraints = buildVideoConstraints(
+      "",
+      publishQualityIdRef.current,
+    );
     for (const constraints of [
       {
         video: displayVideoConstraints,
@@ -1126,9 +1172,8 @@ export function usePublisherController({
       },
     ]) {
       try {
-        displayStream = await navigator.mediaDevices.getDisplayMedia(
-          constraints,
-        );
+        displayStream =
+          await navigator.mediaDevices.getDisplayMedia(constraints);
         break;
       } catch (error) {
         lastDisplayError = error;
@@ -1237,7 +1282,10 @@ export function usePublisherController({
           stopLivePreview({ resetSource: true });
           if (publisherIsPublishingRef.current) {
             void stopCameraPublish();
-            updatePublishStatus("error", getAppErrorMessage(createAppError("screen_share_unavailable")));
+            updatePublishStatus(
+              "error",
+              getAppErrorMessage(createAppError("screen_share_unavailable")),
+            );
             return;
           }
 
@@ -1330,10 +1378,8 @@ export function usePublisherController({
       const nextRelayUrl = new URL(relayUrlRef.current).toString();
       const canPublishVideo =
         previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN ||
-        (
-          previewSourceTypeRef.current === PREVIEW_SOURCE_CAMERA &&
-          cameraEnabledRef.current
-        );
+        (previewSourceTypeRef.current === PREVIEW_SOURCE_CAMERA &&
+          cameraEnabledRef.current);
       const previewVideoTrack = canPublishVideo
         ? stream.getVideoTracks()[0]
         : null;
@@ -1347,17 +1393,25 @@ export function usePublisherController({
       const previewVideo = previewVideoRef.current;
       const makeEven = (value) => Math.floor(value / 2) * 2;
       const publishVideoTrack = canPublishVideo
-        ? previewVideoTrack?.clone?.() ?? null
+        ? (previewVideoTrack?.clone?.() ?? null)
         : null;
       stableAudio = microphoneEnabledRef.current
         ? await createStableAudioPublishTrack(previewAudioTrack)
         : { track: null, cleanup: null };
       const publishAudioTrack = stableAudio.track;
       const width = previewVideoTrack
-        ? makeEven(previewVideo?.videoWidth || previewVideoTrack.getSettings?.().width || 640)
+        ? makeEven(
+            previewVideo?.videoWidth ||
+              previewVideoTrack.getSettings?.().width ||
+              640,
+          )
         : 0;
       const height = previewVideoTrack
-        ? makeEven(previewVideo?.videoHeight || previewVideoTrack.getSettings?.().height || 360)
+        ? makeEven(
+            previewVideo?.videoHeight ||
+              previewVideoTrack.getSettings?.().height ||
+              360,
+          )
         : 0;
 
       if (publishStartTokenRef.current !== startToken) {
@@ -1396,8 +1450,12 @@ export function usePublisherController({
         if (!nextWebRtcPlaybackUrl) {
           throw createAppError("webrtc_playback_url_missing");
         }
-        const qualityConfig = getPublishQualityConfig(publishQualityIdRef.current);
-        const publishTracks = [publishVideoTrack, publishAudioTrack].filter(Boolean);
+        const qualityConfig = getPublishQualityConfig(
+          publishQualityIdRef.current,
+        );
+        const publishTracks = [publishVideoTrack, publishAudioTrack].filter(
+          Boolean,
+        );
         const whipSession = await createWhipPublishSession({
           url: nextWebRtcPublishUrl,
           tracks: publishTracks,
@@ -1418,7 +1476,10 @@ export function usePublisherController({
           videoTrack: publishVideoTrack,
           audioTrack: publishAudioTrack,
           audioKind: previewAudioKind,
-          maxPixels: width && height ? width * height : VIDEO_TARGET_WIDTH * VIDEO_TARGET_HEIGHT,
+          maxPixels:
+            width && height
+              ? width * height
+              : VIDEO_TARGET_WIDTH * VIDEO_TARGET_HEIGHT,
           qualityId: publishQualityIdRef.current,
         });
       }
@@ -1466,10 +1527,7 @@ export function usePublisherController({
         updatePublishStatus("idle", "直播启动已取消。");
         return;
       }
-      updatePublishStatus(
-        "error",
-        `失败：${getAppErrorMessage(error)}`,
-      );
+      updatePublishStatus("error", `失败：${getAppErrorMessage(error)}`);
       throw error;
     } finally {
       if (pendingPublisherRef.current === session) {
@@ -1541,12 +1599,17 @@ export function usePublisherController({
       orientation: usePortraitSyntheticPreview ? "portrait" : "landscape",
     });
     const syntheticVideoTrack = syntheticMedia.mediaStream.getVideoTracks()[0];
-    const syntheticAudioTrack = syntheticMedia.mediaStream.getAudioTracks()[0] ?? null;
+    const syntheticAudioTrack =
+      syntheticMedia.mediaStream.getAudioTracks()[0] ?? null;
     const syntheticSettings = syntheticVideoTrack?.getSettings?.() ?? {};
-    const syntheticWidth = Math.floor((syntheticSettings.width || VIDEO_TARGET_WIDTH) / 2) * 2;
-    const syntheticHeight = Math.floor((syntheticSettings.height || VIDEO_TARGET_HEIGHT) / 2) * 2;
-    const publishVideoTrack = syntheticVideoTrack?.clone?.() ?? syntheticVideoTrack;
-    const publishAudioTrack = syntheticAudioTrack?.clone?.() ?? syntheticAudioTrack;
+    const syntheticWidth =
+      Math.floor((syntheticSettings.width || VIDEO_TARGET_WIDTH) / 2) * 2;
+    const syntheticHeight =
+      Math.floor((syntheticSettings.height || VIDEO_TARGET_HEIGHT) / 2) * 2;
+    const publishVideoTrack =
+      syntheticVideoTrack?.clone?.() ?? syntheticVideoTrack;
+    const publishAudioTrack =
+      syntheticAudioTrack?.clone?.() ?? syntheticAudioTrack;
     const publisher = createPublishSession({
       relayUrl: nextRelayUrl,
       namespace,
@@ -1583,10 +1646,7 @@ export function usePublisherController({
     setSyntheticPublishing(true);
     if (shouldPreviewSynthetic) {
       stopLivePreview();
-      updatePreviewState(
-        syntheticMedia.mediaStream,
-        PREVIEW_SOURCE_SYNTHETIC,
-      );
+      updatePreviewState(syntheticMedia.mediaStream, PREVIEW_SOURCE_SYNTHETIC);
       updatePublishStatus(
         "live",
         `合成推流已启动：${namespace}（预览已切换为${usePortraitSyntheticPreview ? "竖屏" : "横屏"}合成源）`,
@@ -1791,7 +1851,8 @@ export function usePublisherController({
     previewPending,
     previewSourceType,
     screenShareSupported,
-    screenShareActive: previewSourceType === PREVIEW_SOURCE_SCREEN && previewActive,
+    screenShareActive:
+      previewSourceType === PREVIEW_SOURCE_SCREEN && previewActive,
     syntheticPublishing,
     previewVideoRef,
     syntheticSessionRef,

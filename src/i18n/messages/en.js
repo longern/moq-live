@@ -147,6 +147,7 @@ export const enMessages = {
     remove: "Unfollow",
     confirmTitle: "Unfollow?",
     confirmMessage: ({ name } = {}) => `You will stop following ${name || "this user"}`,
+    confirmAction: "Unfollow",
     closeConfirm: "Close unfollow confirmation",
     confirmAria: "Unfollow confirmation",
     closeList: ({ title } = {}) => `Close ${title || ""} list`,

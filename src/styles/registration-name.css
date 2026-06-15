@@ -1,22 +1,24 @@
 .registration-name-layer {
   position: fixed;
   inset: 0;
-  z-index: 1100;
+  z-index: var(--z-modal-panel);
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(2, 6, 23, 0.56);
-  backdrop-filter: blur(10px);
+  background: rgba(4, 11, 17, 0.58);
+  backdrop-filter: blur(8px);
 }
 
 .registration-name-dialog {
   position: relative;
-  width: min(100%, 420px);
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 24px;
-  background: var(--surface, #ffffff);
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
-  color: var(--text, #0f172a);
+  width: min(420px, calc(100vw - 48px));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(11, 20, 31, 0.98), rgba(6, 13, 22, 0.98)),
+    radial-gradient(circle at top, rgba(16, 196, 182, 0.1), transparent 42%);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+  color: var(--text);
 }
 
 .registration-name-close {
@@ -30,8 +32,14 @@
   justify-content: center;
   border: 0;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.14);
-  color: currentColor;
+  background: transparent;
+  color: var(--muted);
+}
+
+.registration-name-close:hover,
+.registration-name-close:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
 }
 
 .registration-name-close svg {
@@ -53,11 +61,14 @@
 
 .registration-name-copy strong {
   font-size: 1.25rem;
+  line-height: 1.3;
+  color: var(--text);
 }
 
 .registration-name-copy span,
 .registration-name-field span {
-  color: var(--muted, #64748b);
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .registration-name-field {
@@ -71,19 +82,19 @@
   border: 0;
   border-radius: 14px;
   padding: 0 14px;
-  background: rgba(248, 250, 252, 0.92);
+  background: rgba(255, 255, 255, 0.06);
   color: inherit;
   font: inherit;
 }
 
 .registration-name-field input:focus-visible {
-  outline: 2px solid var(--primary-ring, rgba(64, 92, 255, 0.62));
+  outline: 2px solid var(--primary-ring);
   outline-offset: 2px;
 }
 
 .registration-name-error {
   margin: 0;
-  color: #dc2626;
+  color: var(--status-danger);
   font-size: 0.92rem;
 }
 
@@ -99,18 +110,18 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--muted, #64748b);
+  color: var(--muted);
   box-shadow: none;
 }
 
 .registration-name-skip:hover,
 .registration-name-skip:focus-visible {
-  color: var(--text, #0f172a);
-  background: rgba(148, 163, 184, 0.12);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .registration-name-skip:focus-visible {
-  outline: 2px solid var(--primary-ring, rgba(64, 92, 255, 0.62));
+  outline: 2px solid var(--primary-ring);
   outline-offset: 2px;
 }
 

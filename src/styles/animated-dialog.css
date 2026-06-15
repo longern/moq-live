@@ -1,0 +1,72 @@
+.animated-dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.animated-dialog-layer.is-closing {
+  pointer-events: none;
+}
+
+.animated-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  border: 0;
+  border-radius: 0;
+  background: rgba(4, 11, 17, 0.58);
+  animation: animated-dialog-backdrop-in 180ms ease both;
+}
+
+.animated-dialog-layer.is-closing .animated-dialog-backdrop {
+  animation: animated-dialog-backdrop-out 160ms ease both;
+}
+
+.animated-dialog {
+  position: relative;
+  z-index: var(--z-modal-panel);
+  animation: animated-dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animated-dialog-layer.is-closing .animated-dialog {
+  animation: animated-dialog-out 180ms ease both;
+}
+
+@keyframes animated-dialog-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes animated-dialog-backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes animated-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+@keyframes animated-dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-dialog-backdrop,
+  .animated-dialog,
+  .animated-dialog-layer.is-closing .animated-dialog-backdrop,
+  .animated-dialog-layer.is-closing .animated-dialog {
+    animation-duration: 1ms;
+  }
+}

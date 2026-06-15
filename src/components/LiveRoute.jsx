@@ -157,10 +157,10 @@ function getCurrentPosition() {
   }
 
   return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
+    navigator.geolocation.getCurrentPosition(resolve, (error) => reject(new Error(error.message)), {
       enableHighAccuracy: false,
-      maximumAge: 60_000,
-      timeout: 10_000,
+      maximumAge: 5 * 60 * 1000,
+      timeout: 15_000,
     });
   });
 }

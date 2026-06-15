@@ -533,7 +533,7 @@
 
 .watch-desktop-room-copy p {
   color: rgba(235, 244, 251, 0.72);
-  font-size: 0.88rem;
+  font-size: 0.875rem;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -974,7 +974,6 @@
   width: 248px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
@@ -994,20 +993,29 @@
 }
 
 .watch-desktop-share-title {
+  margin-bottom: 4px;
   padding: 4px 6px 6px;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   line-height: 1.2;
 }
 
+.watch-desktop-share-actions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .watch-desktop-share-action {
-  min-height: 42px;
+  width: 100%;
+  min-height: 40px;
   padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
   border-radius: 12px;
+  font-size: 0.875rem;
   background: transparent;
   color: var(--text);
   box-shadow: none;

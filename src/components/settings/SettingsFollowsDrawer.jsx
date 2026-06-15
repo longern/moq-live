@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { AnimatedDialog } from "../AnimatedDialog.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
@@ -93,40 +95,53 @@ function UnfollowConfirmDialog({
   loading,
   onCancel,
   onConfirm,
+  open,
   user,
 }) {
   const { t } = useI18n();
-  const name = user?.displayName || user?.handle || user?.email || t("common.user");
+  const [renderUser, setRenderUser] = useState(user);
+
+  useEffect(() => {
+    if (user) {
+      setRenderUser(user);
+    }
+  }, [user]);
+
+  const name = renderUser?.displayName || renderUser?.handle || renderUser?.email || t("common.user");
 
   return (
-    <div className="follow-confirm-layer">
-      <button
-        type="button"
-        className="follow-confirm-backdrop"
-        aria-label={t("follows.closeConfirm")}
-        onClick={onCancel}
-      />
-      <section
-        className="follow-confirm-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("follows.confirmAria")}
-      >
-        <div className="follow-confirm-copy">
-          <strong>{t("follows.confirmTitle")}</strong>
-          <span>{t("follows.confirmMessage", { name })}</span>
-        </div>
-        {error ? <p className="inline-warning">{error}</p> : null}
-        <div className="follow-confirm-actions">
-          <button type="button" className="secondary" onClick={onCancel} disabled={loading}>
-            {t("common.cancel")}
-          </button>
-          <button type="button" className="primary" onClick={onConfirm} disabled={loading}>
-            {loading ? t("common.processing") : t("common.confirm")}
-          </button>
-        </div>
-      </section>
-    </div>
+    <AnimatedDialog
+      ariaLabel={t("follows.confirmAria")}
+      backdropLabel={t("follows.closeConfirm")}
+      dialogClassName="follow-confirm-dialog"
+      onClose={onCancel}
+      open={open}
+    >
+      <div className="follow-confirm-copy">
+        <strong>{t("follows.confirmTitle")}</strong>
+        <span>{t("follows.confirmMessage", { name })}</span>
+      </div>
+      {error ? <p className="inline-warning">{error}</p> : null}
+      <div className="follow-confirm-actions">
+        <button
+          type="button"
+          className="follow-confirm-action-button"
+          onClick={onCancel}
+          disabled={loading}
+        >
+          {t("common.cancel")}
+        </button>
+        <hr className="follow-confirm-action-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="follow-confirm-action-button is-confirm"
+          onClick={onConfirm}
+          disabled={loading}
+        >
+          {loading ? t("common.processing") : t("follows.confirmAction")}
+        </button>
+      </div>
+    </AnimatedDialog>
   );
 }
 
@@ -201,15 +216,14 @@ export function SettingsFollowsDrawer({
       ) : (
         <div className="follow-list-state">{t("follows.empty", { title })}</div>
       )}
-      {pendingUnfollowUser ? (
-        <UnfollowConfirmDialog
-          error={unfollowError}
-          loading={unfollowBusy}
-          onCancel={onCancelUnfollow}
-          onConfirm={onConfirmUnfollow}
-          user={pendingUnfollowUser}
-        />
-      ) : null}
+      <UnfollowConfirmDialog
+        error={unfollowError}
+        loading={unfollowBusy}
+        onCancel={onCancelUnfollow}
+        onConfirm={onConfirmUnfollow}
+        open={Boolean(pendingUnfollowUser)}
+        user={pendingUnfollowUser}
+      />
     </SettingsPanelShell>
   );
 }

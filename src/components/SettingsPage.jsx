@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronRight,
+  History,
   SlidersHorizontal,
+  UserRound,
 } from "lucide-react";
 import { LoginDrawer } from "./LoginDrawer.jsx";
 import { MobilePanelPresence, useMobilePanelViewport } from "./MobilePanelPresence.jsx";
@@ -19,6 +21,7 @@ import { createApiError, createAppError, getAppErrorMessage } from "../lib/appEr
 import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const FOLLOWS_PAGE_SIZE = 20;
+const FOLLOWS_PANEL_TYPES = new Set(["following", "followers"]);
 
 function createEmptyFollowsState() {
   return {
@@ -131,6 +134,41 @@ function SectionBlock({ title, action = null, children }) {
 
 function getFollowsPanelTitle(type, t) {
   return type === "followers" ? t("follows.titleFollowers") : t("follows.titleFollowing");
+}
+
+function readRouteFollowsPanelType() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("p") !== "s") {
+    return null;
+  }
+
+  const panel = params.get("panel");
+  return FOLLOWS_PANEL_TYPES.has(panel) ? panel : null;
+}
+
+function writeSettingsFollowsPanelRoute(type, { historyMode = "push" } = {}) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const next = new URL(window.location.href);
+  next.search = "";
+  next.searchParams.set("p", "s");
+  if (FOLLOWS_PANEL_TYPES.has(type)) {
+    next.searchParams.set("panel", type);
+  }
+
+  const nextHref = `${next.pathname}${next.search}${next.hash}`;
+  const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextHref === currentHref) {
+    return;
+  }
+
+  history[historyMode === "push" ? "pushState" : "replaceState"]({}, "", next);
 }
 
 function ProfileSummaryCard({
@@ -315,14 +353,17 @@ function DesktopSettingsSidebar({
   const items = [
     {
       id: "account",
+      icon: UserRound,
       title: t("settings.accountInfo")
     },
     {
       id: "history",
+      icon: History,
       title: t("settings.history")
     },
     {
       id: "advanced",
+      icon: SlidersHorizontal,
       title: t("settings.advanced")
     }
   ];
@@ -332,6 +373,7 @@ function DesktopSettingsSidebar({
       <div className="desktop-settings-list">
         {items.map((item) => {
           const active = activeSection === item.id;
+          const ItemIcon = item.icon;
 
           return (
             <button
@@ -343,7 +385,10 @@ function DesktopSettingsSidebar({
                 onSelectSection(item.id);
               }}
             >
-              <span>
+              <span className="desktop-settings-list-icon" aria-hidden="true">
+                <ItemIcon />
+              </span>
+              <span className="desktop-settings-list-copy">
                 <strong>{item.title}</strong>
               </span>
             </button>
@@ -397,6 +442,7 @@ export function SettingsPage({
   const [mobileEditPanel, setMobileEditPanel] = useState(null);
   const [followsPanelType, setFollowsPanelType] = useState(null);
   const [renderedFollowsPanelType, setRenderedFollowsPanelType] = useState(null);
+  const [routeFollowsPanelType, setRouteFollowsPanelType] = useState(readRouteFollowsPanelType);
   const [followsState, setFollowsState] = useState(() => ({
     following: createEmptyFollowsState(),
     followers: createEmptyFollowsState(),
@@ -410,8 +456,21 @@ export function SettingsPage({
   const [avatarStatus, setAvatarStatus] = useState("");
   const [avatarSaving, setAvatarSaving] = useState(false);
   const avatarInputRef = useRef(null);
+  const followsPanelRoutePushedRef = useRef(false);
   const authPending = authLoading;
   const isMobilePanelViewport = useMobilePanelViewport();
+
+  useEffect(() => {
+    function handlePopState() {
+      followsPanelRoutePushedRef.current = false;
+      setRouteFollowsPanelType(readRouteFollowsPanelType());
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   useEffect(() => {
     if (!authUser) {
@@ -683,7 +742,7 @@ export function SettingsPage({
     }
   }
 
-  function openFollowsPanel(type) {
+  function openFollowsPanel(type, { updateRoute = isMobilePanelViewport } = {}) {
     if (authPending) {
       return;
     }
@@ -691,6 +750,12 @@ export function SettingsPage({
     if (!authUser) {
       openLoginPanel();
       return;
+    }
+
+    if (updateRoute && isMobilePanelViewport) {
+      writeSettingsFollowsPanelRoute(type, { historyMode: "push" });
+      followsPanelRoutePushedRef.current = true;
+      setRouteFollowsPanelType(type);
     }
 
     setFollowsPanelType(type);
@@ -701,16 +766,76 @@ export function SettingsPage({
     }
   }
 
+  function closeFollowsPanel({ updateRoute = true } = {}) {
+    setPendingUnfollowUser(null);
+    setFollowsPanelType(null);
+
+    if (!updateRoute || !isMobilePanelViewport || !readRouteFollowsPanelType()) {
+      return;
+    }
+
+    if (followsPanelRoutePushedRef.current) {
+      followsPanelRoutePushedRef.current = false;
+      history.back();
+      return;
+    }
+
+    writeSettingsFollowsPanelRoute(null, { historyMode: "replace" });
+    setRouteFollowsPanelType(null);
+  }
+
   function openFollowUserRoom(target) {
     const normalizedTarget = String(target || "").trim();
     if (!normalizedTarget) {
       return;
     }
 
-    setFollowsPanelType(null);
+    closeFollowsPanel({ updateRoute: false });
     setPendingUnfollowUser(null);
     onOpenFollowUserRoom?.(normalizedTarget);
   }
+
+  useEffect(() => {
+    if (hidden || !isMobilePanelViewport) {
+      return;
+    }
+
+    if (!routeFollowsPanelType) {
+      if (followsPanelType) {
+        setFollowsPanelType(null);
+        setPendingUnfollowUser(null);
+      }
+      return;
+    }
+
+    if (authPending) {
+      return;
+    }
+
+    if (!authUser) {
+      setFollowsPanelType(null);
+      setRenderedFollowsPanelType(null);
+      return;
+    }
+
+    if (followsPanelType !== routeFollowsPanelType) {
+      setFollowsPanelType(routeFollowsPanelType);
+      setRenderedFollowsPanelType(routeFollowsPanelType);
+
+      const currentState = followsState[routeFollowsPanelType] ?? createEmptyFollowsState();
+      if (!currentState.items.length && !currentState.loading) {
+        void loadFollows(routeFollowsPanelType, { reset: true });
+      }
+    }
+  }, [
+    authPending,
+    authUser,
+    followsPanelType,
+    followsState,
+    hidden,
+    isMobilePanelViewport,
+    routeFollowsPanelType,
+  ]);
 
   function requestUnfollow(user) {
     if (!user?.id) {
@@ -955,7 +1080,7 @@ export function SettingsPage({
                       />
                     ) : (
                       <div className="my-empty-state my-login-empty">
-                        <span>{authPending ? t("account.checking") : t("settings.loginHint")}</span>
+                        <span>{authPending ? t("account.loading") : t("settings.loginHint")}</span>
                         <button
                           type="button"
                           className="my-plain-login-button"
@@ -1204,7 +1329,7 @@ export function SettingsPage({
               loading={activeFollowsState.loading}
               loadingMore={activeFollowsState.loadingMore}
               onClose={() => {
-                setFollowsPanelType(null);
+                closeFollowsPanel();
               }}
               onLoadMore={() => {
                 void loadFollows(visibleFollowsPanelType);

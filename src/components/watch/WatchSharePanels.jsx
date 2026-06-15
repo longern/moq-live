@@ -115,24 +115,30 @@ export function WatchDesktopSharePanel({
         aria-label="分享到"
       >
         <div className="watch-desktop-share-title">分享到</div>
-        <button
-          type="button"
-          className="watch-desktop-share-action"
-          onClick={onCopyLink}
-          disabled={!watchLink}
-        >
-          <Copy aria-hidden="true" />
-          <span>复制链接</span>
-        </button>
-        <button
-          type="button"
-          className="watch-desktop-share-action"
-          onClick={onShareLink}
-          disabled={!watchLink || !shareSupported}
-        >
-          <Share aria-hidden="true" />
-          <span>分享</span>
-        </button>
+        <ul className="watch-desktop-share-actions">
+          <li>
+            <button
+              type="button"
+              className="watch-desktop-share-action"
+              onClick={onCopyLink}
+              disabled={!watchLink}
+            >
+              <Copy aria-hidden="true" />
+              <span>复制链接</span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              className="watch-desktop-share-action"
+              onClick={onShareLink}
+              disabled={!watchLink || !shareSupported}
+            >
+              <Share aria-hidden="true" />
+              <span>分享</span>
+            </button>
+          </li>
+        </ul>
       </section>
     </>
   );

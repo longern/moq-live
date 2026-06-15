@@ -405,33 +405,11 @@
   text-align: center;
 }
 
-.follow-confirm-layer {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal-panel);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.follow-confirm-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal-backdrop);
-  border: 0;
-  border-radius: 0;
-  background: rgba(4, 11, 17, 0.58);
-}
-
 .follow-confirm-dialog {
-  position: relative;
-  z-index: var(--z-modal-panel);
   width: min(320px, calc(100vw - 48px));
-  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 18px;
   background:
@@ -444,6 +422,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 20px 18px 18px;
   text-align: center;
 }
 
@@ -461,15 +440,61 @@
   overflow-wrap: anywhere;
 }
 
-.follow-confirm-actions {
-  display: flex;
-  gap: 10px;
+.follow-confirm-dialog .inline-warning {
+  margin: -4px 18px 14px;
 }
 
-.follow-confirm-actions button {
+.follow-confirm-actions {
+  display: flex;
+  width: 100%;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.follow-confirm-action-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 0;
+  border: 0;
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.follow-confirm-action-button {
   flex: 1 1 0;
-  min-height: 40px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
   font-weight: 650;
+  text-align: center;
+  box-shadow: none;
+}
+
+.follow-confirm-action-button:hover:not(:disabled),
+.follow-confirm-action-button:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.follow-confirm-action-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: -2px;
+}
+
+.follow-confirm-action-button.is-confirm {
+  color: #ff9dac;
+}
+
+.follow-confirm-action-button.is-confirm:hover:not(:disabled),
+.follow-confirm-action-button.is-confirm:focus-visible {
+  color: #ffd5dc;
+  background: rgba(255, 100, 121, 0.12);
+}
+
+.follow-confirm-action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .mobile-profile-layout {
@@ -493,7 +518,7 @@
   width: 100%;
   min-width: 0;
   min-height: 56px;
-  padding: 14px 18px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -516,7 +541,29 @@
   outline-offset: -2px;
 }
 
-.desktop-settings-list-item > span:first-child {
+.desktop-settings-list-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.desktop-settings-list-item:hover .desktop-settings-list-icon,
+.desktop-settings-list-item.is-active .desktop-settings-list-icon {
+  color: var(--text);
+}
+
+.desktop-settings-list-icon svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  stroke-width: 2.2;
+}
+
+.desktop-settings-list-copy {
   min-width: 0;
   display: flex;
   flex-direction: column;

@@ -37,9 +37,9 @@
 }
 
 .account-list-value strong {
-  font-size: 1rem;
-  line-height: 1.4;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
@@ -132,9 +132,9 @@
 }
 
 .account-editable-value strong {
-  font-size: 1rem;
-  line-height: 1.4;
-  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 
@@ -381,17 +381,25 @@
   border: 0;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-panel-list > * + * {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-panel-list
+  > *
+  + * {
   border-top: 0;
 }
 
 .desktop-settings-content .my-account-form.is-desktop-form .account-list-item,
-.desktop-settings-content .my-account-form.is-desktop-form .account-editable-row {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-editable-row {
   padding: 10px 0;
 }
 
 .desktop-settings-content .my-account-form.is-desktop-form .account-list-item,
-.desktop-settings-content .my-account-form.is-desktop-form .account-editable-row-main {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-editable-row-main {
   grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
   column-gap: 16px;
 }
@@ -407,70 +415,107 @@
 }
 
 .desktop-settings-content .my-account-form.is-desktop-form .account-list-value,
-.desktop-settings-content .my-account-form.is-desktop-form .account-editable-value {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-editable-value {
   justify-content: flex-start;
   text-align: left;
   font-size: inherit;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-list-value strong,
-.desktop-settings-content .my-account-form.is-desktop-form .account-editable-value strong {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-list-value
+  strong,
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-editable-value
+  strong {
   font-size: inherit;
   line-height: 1.5;
   font-weight: 500;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-list-item-button {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-list-item-button {
   cursor: default;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-list-item-button:hover {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-list-item-button:hover {
   background: transparent;
 }
 
 .desktop-settings-content .my-account-form.is-desktop-form .account-list-avatar,
-.desktop-settings-content .my-account-form.is-desktop-form .account-list-avatar-editable {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-list-avatar-editable {
   justify-content: flex-start;
   align-items: center;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-list-chevron,
-.desktop-settings-content .my-account-form.is-desktop-form .account-icon-button {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-list-chevron,
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-icon-button {
   width: 24px;
   min-width: 24px;
   height: 24px;
   min-height: 24px;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-list-chevron {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-list-chevron {
   color: var(--muted);
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-list-chevron svg,
-.desktop-settings-content .my-account-form.is-desktop-form .account-icon-button svg {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-list-chevron
+  svg,
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-icon-button
+  svg {
   width: 16px;
   height: 16px;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-editable-value-editing {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-editable-value-editing {
   justify-content: flex-start;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-editable-value-editing input,
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-editable-value-editing
+  input,
 .account-editable-value-editing textarea {
   flex: 0 1 260px;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-editable-collapse-inner {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-editable-collapse-inner {
   margin-left: 136px;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .account-editable-note {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-editable-note {
   font-size: inherit;
   text-align: left;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .my-account-form-content {
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .my-account-form-content {
   padding: 0;
 }
 

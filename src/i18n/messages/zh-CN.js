@@ -157,6 +157,7 @@ export const zhCNMessages = {
     remove: "取消关注",
     confirmTitle: "取消关注？",
     confirmMessage: ({ name } = {}) => `将不再关注 ${name || "该用户"}`,
+    confirmAction: "不再关注",
     closeConfirm: "关闭取消关注确认框",
     confirmAria: "取消关注确认",
     closeList: ({ title } = {}) => `关闭${title || ""}列表`,

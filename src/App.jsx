@@ -286,13 +286,13 @@ export function App() {
   const resolvedWatchRelayUrl = watchingTestChannel
     ? ""
     : watchingNamespace
-    ? relayUrl
-    : chat.roomMeta.stream.relayUrl || "";
+      ? relayUrl
+      : chat.roomMeta.stream.relayUrl || "";
   const resolvedWatchNamespace = watchingTestChannel
     ? watchTestChannel.id
     : watchingNamespace
-    ? directWatchNamespace
-    : chat.roomMeta.stream.namespace || "";
+      ? directWatchNamespace
+      : chat.roomMeta.stream.namespace || "";
   const resolvedWatchProtocol = watchingTestChannel || watchingNamespace
     ? STREAM_PROTOCOL_MOQ
     : normalizeStreamProtocol(chat.roomMeta.stream.protocol);
@@ -319,19 +319,19 @@ export function App() {
       watchingNamespace
         ? Boolean(directWatchNamespace)
         : watchRoomResolution.loading
-          || (!watchRoomResolution.error && (!resolvedWatchRoomId || !chat.roomStateReady))
-          || (chat.streamState.isLive && !resolvedWatchPlaybackReady)
+        || (!watchRoomResolution.error && (!resolvedWatchRoomId || !chat.roomStateReady))
+        || (chat.streamState.isLive && !resolvedWatchPlaybackReady)
     );
   const watchStageMessage = watchingTestChannel
     ? ""
     : watchingNamespace
-    ? (directWatchNamespace ? t("watch.connectPublicChannel") : t("watch.waitPublicChannel"))
-    : watchRoomResolution.loading
-      ? t("common.loading")
-      : watchRoomResolution.error
-        ? t("watch.enterFailed", { error: watchRoomResolution.error })
-        : !resolvedWatchRoomId ||!chat.roomStateReady
-          ? t("common.loading")
+      ? (directWatchNamespace ? t("watch.connectPublicChannel") : t("watch.waitPublicChannel"))
+      : watchRoomResolution.loading
+        ? t("common.loading")
+        : watchRoomResolution.error
+          ? t("watch.enterFailed", { error: watchRoomResolution.error })
+          : !resolvedWatchRoomId || !chat.roomStateReady
+            ? t("common.loading")
             : chat.streamState.isLive
               ? (resolvedWatchPlaybackReady ? "" : t("common.loading"))
               : watchStreamEnded
@@ -350,8 +350,8 @@ export function App() {
   const watchRoomLabel = watchingTestChannel
     ? watchTestChannel.label
     : watchingNamespace
-    ? (directWatchNamespace ? `ns:${directWatchNamespace}` : t("watch.waitNamespace"))
-    : watchRoomResolution.hostDisplayName
+      ? (directWatchNamespace ? `ns:${directWatchNamespace}` : t("watch.waitNamespace"))
+      : watchRoomResolution.hostDisplayName
       || watchRoomResolution.hostHandle
       || chat.roomMeta.title
       || watchRoomResolution.title
@@ -361,23 +361,23 @@ export function App() {
   const watchChatRoomLabel = watchingTestChannel
     ? watchTestChannel.label
     : watchingNamespace
-    ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
-    : watchRoomResolution.hostDisplayName
+      ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
+      : watchRoomResolution.hostDisplayName
       || watchRoomResolution.hostHandle
       || watchHandle
       || "";
   const watchRoomTitle = watchingTestChannel
     ? watchTestChannel.title
     : watchingNamespace
-    ? t("watch.publicChannel", { namespace: directWatchNamespace })
-    : chat.roomMeta.title
+      ? t("watch.publicChannel", { namespace: directWatchNamespace })
+      : chat.roomMeta.title
       || watchRoomResolution.title
       || (watchChatRoomLabel ? t("watch.roomOf", { room: watchChatRoomLabel }) : watchRoomLabel);
   const watchHostDisplayName = watchingTestChannel
     ? watchTestChannel.hostDisplayName
     : watchingNamespace
-    ? ""
-    : watchRoomResolution.hostDisplayName
+      ? ""
+      : watchRoomResolution.hostDisplayName
       || watchRoomResolution.hostHandle
       || watchHandle
       || "";
@@ -421,17 +421,17 @@ export function App() {
   const watchShareTarget = watchingTestChannel
     ? ""
     : watchingNamespace
-    ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
-    : watchRoomResolution.hostHandle || watchHandle || watchRoom;
+      ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
+      : watchRoomResolution.hostHandle || watchHandle || watchRoom;
   const watchPageLink = buildWatchLink(relayUrl, watchShareTarget);
   const relayHost = getRelayHostValue(relayUrl);
   const testPlayerSession = watchingTestChannel
     ? {
-        key: watchTestChannel.sessionKey,
-        token: -1,
-        relayUrl: "",
-        namespace: watchTestChannel.id,
-      }
+      key: watchTestChannel.sessionKey,
+      token: -1,
+      relayUrl: "",
+      namespace: watchTestChannel.id,
+    }
     : null;
   const effectivePlayerSession = testPlayerSession ?? player.playerSession;
   const effectivePlayerStarted = watchingTestChannel ? true : player.playerStarted;
@@ -460,7 +460,7 @@ export function App() {
         ? " is-unavailable"
         : "";
   const avatarTitle = authState.loading
-    ? t("account.checking")
+    ? t("account.loading")
     : authState.user
       ? (authState.user.email || authState.user.displayName || t("account.signedIn"))
       : !authState.available

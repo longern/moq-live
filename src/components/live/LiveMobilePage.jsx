@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "../ChatPanel.jsx";
 import { FloatingToast } from "../FloatingToast.jsx";
+import { LongPressTarget } from "../LongPressTarget.jsx";
 import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
 import { WatchHostProfileSheet } from "../watch/WatchSessionSheets.jsx";
@@ -398,6 +399,15 @@ export function LiveMobilePage({
     setOverlaysHidden(true);
   }
 
+  function handleStageLongPress(event) {
+    if (!canHideOverlays || !isPreviewSurfaceEvent(event)) {
+      return false;
+    }
+
+    setOverlaysHidden(true);
+    return true;
+  }
+
   async function submitCohostInvite(nextHandle = cohostHandle) {
     const handle = nextHandle.trim().replace(/^@+/, "");
     if (!handle || cohostBusy) {
@@ -481,7 +491,7 @@ export function LiveMobilePage({
           <div className="live-mobile-head-left">
             <button
               type="button"
-              className={`live-page-close${publishControlActive ? " is-live-control" : ""}`}
+              className={`live-page-close live-mobile-overlay-hideable${publishControlActive ? " is-live-control" : ""}`}
               onClick={publishControlActive ? onTogglePublish : onRequestClose}
               aria-label={publishControlActive ? (isStarting ? "取消开播" : "结束直播") : "退出开播页"}
             >
@@ -564,8 +574,10 @@ export function LiveMobilePage({
             </button>
           </div>
         </div>
-        <div
+        <LongPressTarget
           className="stage-frame live-stage-frame live-stage-frame-mobile"
+          longPressEnabled={canHideOverlays}
+          onLongPress={handleStageLongPress}
           onClick={handleStageClick}
           onContextMenu={handleStageContextMenu}
         >
@@ -712,7 +724,7 @@ export function LiveMobilePage({
               ) : null}
             </div>
           </div>
-        </div>
+        </LongPressTarget>
 
         {splitChatPanel ? (
           <ChatPanel

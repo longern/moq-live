@@ -14,6 +14,7 @@ import {
 import { ChatPanel } from "./ChatPanel.jsx";
 import { ToastViewport, useToast } from "./FloatingToast.jsx";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
+import { LongPressTarget } from "./LongPressTarget.jsx";
 import { StatusPill } from "./StatusPill.jsx";
 import { UserAvatar } from "./UserAvatar.jsx";
 import {
@@ -51,6 +52,18 @@ const WatchTestCanvas = import.meta.env.DEV
   : null;
 
 const IMAGE_SHARE_EXIT_MS = 180;
+const STAGE_LONG_PRESS_IGNORE_SELECTOR = [
+  "button",
+  "a",
+  "input",
+  "textarea",
+  "select",
+  "[role=\"button\"]",
+  ".chat-panel-block",
+  ".stage-controls",
+  ".stage-mobile-hud",
+  ".stage-unmute-prompt",
+].join(",");
 
 export function WatchSessionPage({
   hidden,
@@ -462,18 +475,21 @@ export function WatchSessionPage({
   }
 
   function handleStageClick() {
-    if (!touchModeRef.current || !playerSession || playerBadge.state === "error") {
+    if (!playerSession || playerBadge.state === "error") {
       return;
     }
     if (immersiveShell) {
       setImmersiveControlsHidden(false);
       return;
     }
+    if (!touchModeRef.current) {
+      return;
+    }
     revealControls();
   }
 
   function handleStageContextMenu(event) {
-    if (!touchModeRef.current || !playerSession || playerBadge.state === "error") {
+    if (!playerSession || playerBadge.state === "error") {
       return;
     }
 
@@ -484,10 +500,33 @@ export function WatchSessionPage({
       return;
     }
 
+    if (!touchModeRef.current) {
+      return;
+    }
+
     if (controlsVisible) {
       event.preventDefault();
       hideControls();
     }
+  }
+
+  function handleStageLongPress() {
+    if (!playerSession || playerBadge.state === "error") {
+      return false;
+    }
+
+    if (immersiveShell) {
+      clearHideTimer();
+      setImmersiveControlsHidden(true);
+      return true;
+    }
+
+    if (touchModeRef.current && controlsVisible) {
+      hideControls();
+      return true;
+    }
+
+    return false;
   }
 
   function openMoreSheet() {
@@ -1028,9 +1067,16 @@ export function WatchSessionPage({
       <div className="page-grid watch-layout">
         <section className="stage-column">
           {!immersiveShell ? renderMobileHud("stage-mobile-hud-top", true) : null}
-          <div
+          <LongPressTarget
             ref={stageRef}
             className={stageClassName}
+            longPressEnabled={Boolean(
+              playerSession
+                && playerBadge.state !== "error"
+                && (immersiveShell || controlsVisible)
+            )}
+            longPressIgnoreSelector={STAGE_LONG_PRESS_IGNORE_SELECTOR}
+            onLongPress={handleStageLongPress}
             onMouseMove={handleStagePointerMove}
             onMouseLeave={handleStagePointerLeave}
             onClick={handleStageClick}
@@ -1237,7 +1283,7 @@ export function WatchSessionPage({
                 </div>
               </div>
             ) : null}
-          </div>
+          </LongPressTarget>
           <div className="info-strip">
             <div className="info-item">
               <div className="watch-desktop-room-meta">
@@ -1285,12 +1331,12 @@ export function WatchSessionPage({
                     </div>
                   </div>
                 )}
-	                <div className="watch-desktop-room-copy">
-	                  <strong data-room-label>{roomTitle || roomLabel}</strong>
-	                  <p>{hostDisplayName || roomLabel}</p>
-	                </div>
-	                {renderHostFollowButton("watch-host-follow-button-desktop")}
-	              </div>
+                <div className="watch-desktop-room-copy">
+                  <strong data-room-label>{roomTitle || roomLabel}</strong>
+                  <p>{hostDisplayName || roomLabel}</p>
+                </div>
+                {renderHostFollowButton("watch-host-follow-button-desktop")}
+              </div>
             </div>
             <div className="info-item info-item-pill watch-desktop-status-actions">
               <button

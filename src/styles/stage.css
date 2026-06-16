@@ -39,6 +39,25 @@
   aspect-ratio: 9 / 16;
 }
 
+@supports (-webkit-touch-callout: none) {
+  @media (any-pointer: coarse) {
+    .long-press-target {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .long-press-target input,
+    .long-press-target textarea,
+    .long-press-target select,
+    .long-press-target [contenteditable="true"] {
+      -webkit-touch-callout: default;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+  }
+}
+
 .watch-element-pip-body {
   width: 100vw;
   height: 100vh;

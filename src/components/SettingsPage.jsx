@@ -22,6 +22,7 @@ import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const FOLLOWS_PAGE_SIZE = 20;
 const FOLLOWS_PANEL_TYPES = new Set(["following", "followers"]);
+const SETTINGS_ROUTE_PANEL_TYPES = new Set(["settings", "account", ...FOLLOWS_PANEL_TYPES]);
 
 function createEmptyFollowsState() {
   return {
@@ -136,7 +137,7 @@ function getFollowsPanelTitle(type, t) {
   return type === "followers" ? t("follows.titleFollowers") : t("follows.titleFollowing");
 }
 
-function readRouteFollowsPanelType() {
+function readRouteSettingsPanelType() {
   if (typeof window === "undefined") {
     return null;
   }
@@ -147,10 +148,10 @@ function readRouteFollowsPanelType() {
   }
 
   const panel = params.get("panel");
-  return FOLLOWS_PANEL_TYPES.has(panel) ? panel : null;
+  return SETTINGS_ROUTE_PANEL_TYPES.has(panel) ? panel : null;
 }
 
-function writeSettingsFollowsPanelRoute(type, { historyMode = "push" } = {}) {
+function writeSettingsPanelRoute(type, { historyMode = "push" } = {}) {
   if (typeof window === "undefined") {
     return;
   }
@@ -158,7 +159,7 @@ function writeSettingsFollowsPanelRoute(type, { historyMode = "push" } = {}) {
   const next = new URL(window.location.href);
   next.search = "";
   next.searchParams.set("p", "s");
-  if (FOLLOWS_PANEL_TYPES.has(type)) {
+  if (SETTINGS_ROUTE_PANEL_TYPES.has(type)) {
     next.searchParams.set("panel", type);
   }
 
@@ -442,7 +443,7 @@ export function SettingsPage({
   const [mobileEditPanel, setMobileEditPanel] = useState(null);
   const [followsPanelType, setFollowsPanelType] = useState(null);
   const [renderedFollowsPanelType, setRenderedFollowsPanelType] = useState(null);
-  const [routeFollowsPanelType, setRouteFollowsPanelType] = useState(readRouteFollowsPanelType);
+  const [routePanelType, setRoutePanelType] = useState(readRouteSettingsPanelType);
   const [followsState, setFollowsState] = useState(() => ({
     following: createEmptyFollowsState(),
     followers: createEmptyFollowsState(),
@@ -456,14 +457,14 @@ export function SettingsPage({
   const [avatarStatus, setAvatarStatus] = useState("");
   const [avatarSaving, setAvatarSaving] = useState(false);
   const avatarInputRef = useRef(null);
-  const followsPanelRoutePushedRef = useRef(false);
+  const settingsPanelRoutePushedRef = useRef(null);
   const authPending = authLoading;
   const isMobilePanelViewport = useMobilePanelViewport();
 
   useEffect(() => {
     function handlePopState() {
-      followsPanelRoutePushedRef.current = false;
-      setRouteFollowsPanelType(readRouteFollowsPanelType());
+      settingsPanelRoutePushedRef.current = null;
+      setRoutePanelType(readRouteSettingsPanelType());
     }
 
     window.addEventListener("popstate", handlePopState);
@@ -659,17 +660,65 @@ export function SettingsPage({
     setLoginPanelOpen(true);
   }
 
+  function openRoutedSettingsPanel(type, openPanel) {
+    if (isMobilePanelViewport) {
+      writeSettingsPanelRoute(type, { historyMode: "push" });
+      settingsPanelRoutePushedRef.current = type;
+      setRoutePanelType(type);
+    }
+
+    openPanel();
+  }
+
+  function closeRoutedSettingsPanel(type, closePanel) {
+    closePanel();
+
+    if (!isMobilePanelViewport || readRouteSettingsPanelType() !== type) {
+      return;
+    }
+
+    if (settingsPanelRoutePushedRef.current === type) {
+      settingsPanelRoutePushedRef.current = null;
+      history.back();
+      return;
+    }
+
+    writeSettingsPanelRoute(null, { historyMode: "replace" });
+    setRoutePanelType(null);
+  }
+
+  function openSettingsPanel() {
+    openRoutedSettingsPanel("settings", () => {
+      setSettingsPanelOpen(true);
+    });
+  }
+
+  function closeSettingsPanel() {
+    closeRoutedSettingsPanel("settings", () => {
+      setSettingsPanelOpen(false);
+    });
+  }
+
   function openProfilePanel() {
     if (authPending) {
       return;
     }
 
     if (authUser) {
-      setAccountPanelOpen(true);
+      openRoutedSettingsPanel("account", () => {
+        setAccountPanelOpen(true);
+      });
       return;
     }
 
     openLoginPanel();
+  }
+
+  function closeAccountPanel() {
+    closeRoutedSettingsPanel("account", () => {
+      setAccountPanelOpen(false);
+      setMobileEditPanel(null);
+    });
   }
 
   async function loadFollows(type, { reset = false } = {}) {
@@ -753,9 +802,9 @@ export function SettingsPage({
     }
 
     if (updateRoute && isMobilePanelViewport) {
-      writeSettingsFollowsPanelRoute(type, { historyMode: "push" });
-      followsPanelRoutePushedRef.current = true;
-      setRouteFollowsPanelType(type);
+      writeSettingsPanelRoute(type, { historyMode: "push" });
+      settingsPanelRoutePushedRef.current = type;
+      setRoutePanelType(type);
     }
 
     setFollowsPanelType(type);
@@ -770,18 +819,18 @@ export function SettingsPage({
     setPendingUnfollowUser(null);
     setFollowsPanelType(null);
 
-    if (!updateRoute || !isMobilePanelViewport || !readRouteFollowsPanelType()) {
+    if (!updateRoute || !isMobilePanelViewport || !FOLLOWS_PANEL_TYPES.has(readRouteSettingsPanelType())) {
       return;
     }
 
-    if (followsPanelRoutePushedRef.current) {
-      followsPanelRoutePushedRef.current = false;
+    if (settingsPanelRoutePushedRef.current === followsPanelType) {
+      settingsPanelRoutePushedRef.current = null;
       history.back();
       return;
     }
 
-    writeSettingsFollowsPanelRoute(null, { historyMode: "replace" });
-    setRouteFollowsPanelType(null);
+    writeSettingsPanelRoute(null, { historyMode: "replace" });
+    setRoutePanelType(null);
   }
 
   function openFollowUserRoom(target) {
@@ -800,7 +849,7 @@ export function SettingsPage({
       return;
     }
 
-    if (!routeFollowsPanelType) {
+    if (!FOLLOWS_PANEL_TYPES.has(routePanelType)) {
       if (followsPanelType) {
         setFollowsPanelType(null);
         setPendingUnfollowUser(null);
@@ -818,13 +867,13 @@ export function SettingsPage({
       return;
     }
 
-    if (followsPanelType !== routeFollowsPanelType) {
-      setFollowsPanelType(routeFollowsPanelType);
-      setRenderedFollowsPanelType(routeFollowsPanelType);
+    if (followsPanelType !== routePanelType) {
+      setFollowsPanelType(routePanelType);
+      setRenderedFollowsPanelType(routePanelType);
 
-      const currentState = followsState[routeFollowsPanelType] ?? createEmptyFollowsState();
+      const currentState = followsState[routePanelType] ?? createEmptyFollowsState();
       if (!currentState.items.length && !currentState.loading) {
-        void loadFollows(routeFollowsPanelType, { reset: true });
+        void loadFollows(routePanelType, { reset: true });
       }
     }
   }, [
@@ -834,8 +883,30 @@ export function SettingsPage({
     followsState,
     hidden,
     isMobilePanelViewport,
-    routeFollowsPanelType,
+    routePanelType,
   ]);
+
+  useEffect(() => {
+    if (hidden || !isMobilePanelViewport) {
+      return;
+    }
+
+    const routeSettingsPanelOpen = routePanelType === "settings";
+    const routeAccountPanelOpen = routePanelType === "account";
+    setSettingsPanelOpen(routeSettingsPanelOpen);
+
+    if (!routeAccountPanelOpen) {
+      setAccountPanelOpen(false);
+      setMobileEditPanel(null);
+      return;
+    }
+
+    if (authPending) {
+      return;
+    }
+
+    setAccountPanelOpen(Boolean(authUser));
+  }, [authPending, authUser, hidden, isMobilePanelViewport, routePanelType]);
 
   function requestUnfollow(user) {
     if (!user?.id) {
@@ -1001,9 +1072,7 @@ export function SettingsPage({
               type="button"
               className="my-page-settings-button"
               aria-label={t("account.settingsButtonAria")}
-              onClick={() => {
-                setSettingsPanelOpen(true);
-              }}
+              onClick={openSettingsPanel}
             >
               <SettingsIcon />
             </button>
@@ -1147,9 +1216,7 @@ export function SettingsPage({
               buildLabel={buildLabel}
               logRef={logRef}
               logText={logText}
-              onClose={() => {
-                setSettingsPanelOpen(false);
-              }}
+              onClose={closeSettingsPanel}
               transitionClassName={transitionClassName}
             />
           )}
@@ -1187,10 +1254,7 @@ export function SettingsPage({
               handleSaving={handleSaving}
               handleStatus={handleStatus}
               handleUnchanged={handleUnchanged}
-              onClose={() => {
-                setAccountPanelOpen(false);
-                setMobileEditPanel(null);
-              }}
+              onClose={closeAccountPanel}
               onLogout={onLogout}
               onOpenAvatarPicker={openAvatarPicker}
               onSelectAvatar={(event) => {

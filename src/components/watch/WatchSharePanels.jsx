@@ -1,5 +1,5 @@
 import { Copy, Download, Share, X } from "lucide-react";
-import { LoadingSpinner } from "../LoadingSpinner.jsx";
+import { LoadingSpinner } from "../primitives/LoadingSpinner.jsx";
 
 export function WatchImageShareDialog({
   imageShareClosing = false,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatedDialog } from "../AnimatedDialog.jsx";
-import { LoadingSpinner } from "../LoadingSpinner.jsx";
-import { UserAvatar } from "../UserAvatar.jsx";
+import { LoadingSpinner } from "../primitives/LoadingSpinner.jsx";
+import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 

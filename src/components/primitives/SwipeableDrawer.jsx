@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useI18n } from "../i18n/I18nProvider.jsx";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 const DRAWER_EXIT_MS = 220;
 

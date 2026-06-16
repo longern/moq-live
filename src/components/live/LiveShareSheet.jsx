@@ -1,5 +1,5 @@
 import { Camera, Copy, QrCode, Share } from "lucide-react";
-import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
+import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
 
 export function LiveShareSheet({
   open,

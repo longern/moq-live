@@ -1,10 +1,10 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Ban, Copy, RotateCcw, X } from "lucide-react";
-import { LoadingSpinner } from "./LoadingSpinner.jsx";
-import { SwipeableDrawer } from "./SwipeableDrawer.jsx";
-import { UserAvatar } from "./UserAvatar.jsx";
-import { useToast } from "./FloatingToast.jsx";
+import { LoadingSpinner } from "./primitives/LoadingSpinner.jsx";
+import { SwipeableDrawer } from "./primitives/SwipeableDrawer.jsx";
+import { UserAvatar } from "./primitives/UserAvatar.jsx";
+import { useToast } from "./primitives/FloatingToast.jsx";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const CHAT_MESSAGE_MENU_MARGIN = 8;

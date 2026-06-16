@@ -12,11 +12,11 @@ import {
   VolumeX,
 } from "lucide-react";
 import { ChatPanel } from "./ChatPanel.jsx";
-import { ToastViewport, useToast } from "./FloatingToast.jsx";
-import { LoadingSpinner } from "./LoadingSpinner.jsx";
-import { LongPressTarget } from "./LongPressTarget.jsx";
-import { StatusPill } from "./StatusPill.jsx";
-import { UserAvatar } from "./UserAvatar.jsx";
+import { ToastViewport, useToast } from "./primitives/FloatingToast.jsx";
+import { LoadingSpinner } from "./primitives/LoadingSpinner.jsx";
+import { LongPressTarget } from "./primitives/LongPressTarget.jsx";
+import { StatusPill } from "./primitives/StatusPill.jsx";
+import { UserAvatar } from "./primitives/UserAvatar.jsx";
 import {
   WatchAudienceSheet,
   WatchHostProfileContent,

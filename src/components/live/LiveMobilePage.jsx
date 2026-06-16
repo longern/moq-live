@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "../ChatPanel.jsx";
-import { FloatingToast } from "../FloatingToast.jsx";
-import { LongPressTarget } from "../LongPressTarget.jsx";
-import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
-import { UserAvatar } from "../UserAvatar.jsx";
+import { FloatingToast } from "../primitives/FloatingToast.jsx";
+import { LongPressTarget } from "../primitives/LongPressTarget.jsx";
+import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
+import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { WatchHostProfileSheet } from "../watch/WatchSessionSheets.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { formatAudienceCount } from "../../lib/audience.js";

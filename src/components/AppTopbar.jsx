@@ -1,5 +1,5 @@
 import { DesktopNavigation } from "./Navigation.jsx";
-import { UserAvatar } from "./UserAvatar.jsx";
+import { UserAvatar } from "./primitives/UserAvatar.jsx";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 
 export function AppTopbar({

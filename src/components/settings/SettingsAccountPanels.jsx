@@ -5,7 +5,7 @@ import {
   X,
 } from "lucide-react";
 import { ProfileBio } from "../ProfileInfoSummary.jsx";
-import { UserAvatar } from "../UserAvatar.jsx";
+import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 

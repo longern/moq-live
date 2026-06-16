@@ -1,4 +1,4 @@
-import { LoadingSpinner } from "../LoadingSpinner.jsx";
+import { LoadingSpinner } from "../primitives/LoadingSpinner.jsx";
 
 export function LivePreviewStage({
   previewVideoRef,

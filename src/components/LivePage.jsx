@@ -4,7 +4,7 @@ import { useCompactViewport, useMediaQuery, usePortraitViewport } from "../hooks
 import { useLiveMobileShellMode } from "../hooks/useLiveMobileShellMode.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
-import { ToastViewport, useToast } from "./FloatingToast.jsx";
+import { ToastViewport, useToast } from "./primitives/FloatingToast.jsx";
 import { WatchImageShareDialog } from "./watch/WatchSharePanels.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 import { buildLiveScreenshotShareImage, buildWatchShareImage } from "../lib/shareImage.js";

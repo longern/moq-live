@@ -1,6 +1,6 @@
 import { Copy, PictureInPicture2, QrCode, Share } from "lucide-react";
-import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
-import { UserAvatar } from "../UserAvatar.jsx";
+import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
+import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { ProfileBio, ProfileInfoChips } from "../ProfileInfoSummary.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Image } from "lucide-react";
-import { LoadingSpinner } from "./LoadingSpinner.jsx";
-import { UserAvatar } from "./UserAvatar.jsx";
+import { LoadingSpinner } from "./primitives/LoadingSpinner.jsx";
+import { UserAvatar } from "./primitives/UserAvatar.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 

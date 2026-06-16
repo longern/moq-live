@@ -1,5 +1,5 @@
 import { ChevronLeft, MoreHorizontal, Users } from "lucide-react";
-import { UserAvatar } from "../UserAvatar.jsx";
+import { UserAvatar } from "../primitives/UserAvatar.jsx";
 
 export function WatchMobileHud({
   audienceCountText,

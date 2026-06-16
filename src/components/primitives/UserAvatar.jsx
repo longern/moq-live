@@ -1,6 +1,6 @@
 import { CircleUserRound } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
-import { useI18n } from "../i18n/I18nProvider.jsx";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 function getAvatarText(displayName, email, initialsLength) {
   const source = String(displayName || email || "").trim();

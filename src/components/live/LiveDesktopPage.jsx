@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Camera, Copy, QrCode, Share } from "lucide-react";
 import { ChatPanel } from "../ChatPanel.jsx";
-import { useToast } from "../FloatingToast.jsx";
-import { StatusPill } from "../StatusPill.jsx";
-import { UserAvatar } from "../UserAvatar.jsx";
+import { useToast } from "../primitives/FloatingToast.jsx";
+import { StatusPill } from "../primitives/StatusPill.jsx";
+import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { WatchHostProfileContent } from "../watch/WatchSessionSheets.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { formatAudienceCount } from "../../lib/audience.js";

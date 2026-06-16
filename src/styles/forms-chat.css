@@ -135,11 +135,7 @@
   --chat-message-hit-shadow: none;
 }
 
-.chat-panel-live-mobile {
-  --chat-message-avatar-column: 16px;
-}
-
-.live-mobile-page[data-shell="immersive"] .chat-panel-live-mobile,
+.chat-panel-live-mobile,
 .chat-panel-watch-overlay {
   --chat-message-avatar-column: 18px;
 }

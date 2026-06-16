@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMediaOrientation } from "../hooks/useMediaOrientation.js";
-import { useCompactViewport, usePortraitViewport } from "../hooks/useMediaQuery.js";
+import { useCompactViewport, useMediaQuery, usePortraitViewport } from "../hooks/useMediaQuery.js";
 import { useLiveMobileShellMode } from "../hooks/useLiveMobileShellMode.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
@@ -137,6 +137,9 @@ export function LivePage({
   } = actions;
   const compactViewport = useCompactViewport();
   const portraitViewport = usePortraitViewport();
+  const landscapeSplitViewport = useMediaQuery(
+    "(min-width: 601px) and (max-width: 980px) and (orientation: landscape)",
+  );
   const previewOrientation = useMediaOrientation({
     mediaRef: previewVideoRef,
     active: previewActive && previewHasVideo,
@@ -171,6 +174,12 @@ export function LivePage({
     previewOrientation,
     previewSourceType,
   });
+  const mediaClass = `media-${mediaMode}`;
+  const mobileLayoutModeClass = mobileShellMode === "immersive"
+    ? "media-layout media-immersive"
+    : "media-layout media-portrait-split";
+  const mobileLayoutClass = `${mobileLayoutModeClass} ${mediaClass}`;
+  const desktopLayoutClass = landscapeSplitViewport ? `media-layout media-landscape-split ${mediaClass}` : mediaClass;
 
   function requestClose() {
     onRequestClose?.();
@@ -694,7 +703,10 @@ export function LivePage({
   if (useMobileShell) {
     return (
       <>
-        <LiveMobilePage {...pageProps} view={{ ...pageProps.view, shellMode: mobileShellMode }} />
+        <LiveMobilePage
+          {...pageProps}
+          view={{ ...pageProps.view, layoutClassName: mobileLayoutClass, shellMode: mobileShellMode }}
+        />
         {hidden ? null : <ToastViewport className="live-page-toast live-page-toast-mobile" message={roomInfoBlockedReason} />}
         {imageShareMounted ? (
           <WatchImageShareDialog
@@ -718,7 +730,7 @@ export function LivePage({
 
   return (
     <>
-      <LiveDesktopPage {...pageProps} />
+      <LiveDesktopPage {...pageProps} view={{ ...pageProps.view, layoutClassName: desktopLayoutClass }} />
       {hidden ? null : <ToastViewport className="live-page-toast live-page-toast-desktop" message={roomInfoBlockedReason} />}
       {imageShareMounted ? (
         <WatchImageShareDialog

@@ -69,8 +69,7 @@
   overflow: hidden;
 }
 
-.live-layout .live-chat-column .chat-panel-block,
-.live-mobile-page[data-shell="compact"] .chat-panel-live-split {
+.live-layout .live-chat-column .chat-panel-block {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -79,15 +78,13 @@
   border-bottom: 0;
 }
 
-.live-layout .live-chat-column .chat-panel-head,
-.live-mobile-page[data-shell="compact"] .chat-panel-live-split .chat-panel-head {
+.live-layout .live-chat-column .chat-panel-head {
   flex: 0 0 auto;
   margin: 0;
   padding-inline: 16px;
 }
 
-.live-layout .live-chat-column .chat-message-list,
-.live-mobile-page[data-shell="compact"] .chat-panel-live-split .chat-message-list {
+.live-layout .live-chat-column .chat-message-list {
   flex: 1 1 auto;
   max-height: none;
   min-height: 0;
@@ -96,16 +93,12 @@
 
 .live-layout .live-chat-column .chat-composer,
 .live-layout .live-chat-column .chat-composer-readonly,
-.live-layout .live-chat-column .inline-warning,
-.live-mobile-page[data-shell="compact"] .chat-panel-live-split .chat-composer,
-.live-mobile-page[data-shell="compact"] .chat-panel-live-split .chat-composer-readonly,
-.live-mobile-page[data-shell="compact"] .chat-panel-live-split .inline-warning {
+.live-layout .live-chat-column .inline-warning {
   flex: 0 0 auto;
   margin-inline: 16px;
 }
 
-.live-layout .live-chat-column .chat-message-card,
-.live-mobile-page[data-shell="compact"] .chat-panel-live-split .chat-message-card {
+.live-layout .live-chat-column .chat-message-card {
   margin-right: 0;
 }
 

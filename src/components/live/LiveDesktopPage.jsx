@@ -280,6 +280,7 @@ export function LiveDesktopPage({
   const [openPanel, setOpenPanel] = useState("");
   const {
     hidden,
+    layoutClassName = "",
     shareSupported,
   } = view;
   const {
@@ -568,7 +569,11 @@ export function LiveDesktopPage({
   const activePanelClassName = openPanel === "microphone" ? "is-microphone-panel" : "";
 
   return (
-    <section className="page page-immersive live-desktop-page" data-page="live" hidden={hidden}>
+    <section
+      className={`page page-immersive live-desktop-page${layoutClassName ? ` ${layoutClassName}` : ""}`}
+      data-page="live"
+      hidden={hidden}
+    >
       <div className="live-page-top">
         <div className="live-desktop-head-left">
           <button

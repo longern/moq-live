@@ -58,6 +58,7 @@ export function LiveMobilePage({
   const cameraNoticeTimerRef = useRef(null);
   const {
     hidden,
+    layoutClassName = "",
     shellMode = "compact",
     shareSupported,
   } = view;
@@ -468,7 +469,7 @@ export function LiveMobilePage({
 
   return (
     <section
-      className="page page-immersive live-mobile-page"
+      className={`page page-immersive live-mobile-page${layoutClassName ? ` ${layoutClassName}` : ""}`}
       data-page="live"
       data-media={mediaMode}
       data-shell={shellMode}

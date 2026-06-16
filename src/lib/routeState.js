@@ -1,6 +1,5 @@
 const DEFAULT_RELAY_URL = "https://draft-14.cloudflare.mediaoverquic.com/";
 const RELAY_URL_STORAGE_KEY = "moq-live.relay-url";
-const SETTINGS_PANEL_TYPES = new Set(["following", "followers"]);
 
 export function readStoredRelayUrl() {
   try {
@@ -93,10 +92,6 @@ export function writeRoute(
     next.searchParams.set("p", "l");
   } else if (page === "settings") {
     next.searchParams.set("p", "s");
-    const settingsPanel = new URLSearchParams(window.location.search).get("panel");
-    if (SETTINGS_PANEL_TYPES.has(settingsPanel)) {
-      next.searchParams.set("panel", settingsPanel);
-    }
   }
 
   const nextHref = `${next.pathname}${next.search}${next.hash}`;

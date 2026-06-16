@@ -48,12 +48,13 @@ function readStoredLocale() {
   }
 }
 
-function resolveInitialLocale() {
-  const storedLocale = normalizeLocale(readStoredLocale());
-  if (SUPPORTED_LOCALES.includes(storedLocale) && readStoredLocale()) {
+function resolveInitialLocalePreference() {
+  const storedValue = readStoredLocale();
+  const storedLocale = normalizeLocale(storedValue);
+  if (storedValue && SUPPORTED_LOCALES.includes(storedLocale)) {
     return storedLocale;
   }
-  return detectBrowserLocale();
+  return "system";
 }
 
 export function createTranslator(locale) {
@@ -77,26 +78,52 @@ export function createTranslator(locale) {
 }
 
 export function I18nProvider({ children }) {
-  const [locale, setLocaleState] = useState(resolveInitialLocale);
+  const [systemLocale, setSystemLocale] = useState(detectBrowserLocale);
+  const [localePreference, setLocalePreferenceState] = useState(resolveInitialLocalePreference);
+  const locale = localePreference === "system" ? systemLocale : normalizeLocale(localePreference);
 
   const value = useMemo(() => {
     const t = createTranslator(locale);
+    function setLocalePreference(nextLocalePreference) {
+      const normalized = nextLocalePreference === "system" ? "system" : normalizeLocale(nextLocalePreference);
+      setLocalePreferenceState(normalized);
+      if (typeof window !== "undefined") {
+        try {
+          if (normalized === "system") {
+            window.localStorage.removeItem(STORAGE_KEY);
+          } else {
+            window.localStorage.setItem(STORAGE_KEY, normalized);
+          }
+        } catch {
+          // Ignore storage failures; language remains active for this session.
+        }
+      }
+    }
+
     return {
       locale,
-      setLocale(nextLocale) {
-        const normalized = normalizeLocale(nextLocale);
-        setLocaleState(normalized);
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(STORAGE_KEY, normalized);
-          } catch {
-            // Ignore storage failures; language remains active for this session.
-          }
-        }
-      },
+      localePreference,
+      setLocale: setLocalePreference,
+      setLocalePreference,
+      systemLocale,
       t,
     };
-  }, [locale]);
+  }, [locale, localePreference, systemLocale]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    function handleLanguageChange() {
+      setSystemLocale(detectBrowserLocale());
+    }
+
+    window.addEventListener("languagechange", handleLanguageChange);
+    return () => {
+      window.removeEventListener("languagechange", handleLanguageChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -116,7 +143,10 @@ export function useI18n() {
   if (!context) {
     return {
       locale: DEFAULT_LOCALE,
+      localePreference: "system",
       setLocale: () => {},
+      setLocalePreference: () => {},
+      systemLocale: DEFAULT_LOCALE,
       t: createTranslator(DEFAULT_LOCALE),
     };
   }

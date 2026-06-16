@@ -158,13 +158,47 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  border: 0;
   border-radius: 999px;
   background: var(--watch-float-bg);
   color: var(--text);
+  font: inherit;
+  text-align: left;
+  box-shadow: none;
+  cursor: pointer;
 }
 
 .live-mobile-room-chip-head {
   flex: 0 1 auto;
+}
+
+.live-mobile-host-avatar-button {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+}
+
+.live-mobile-room-chip:hover,
+.live-mobile-room-chip:focus-visible,
+.live-mobile-host-avatar-button:hover,
+.live-mobile-host-avatar-button:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  transform: none;
+}
+
+.live-mobile-room-chip:focus-visible,
+.live-mobile-host-avatar-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
 }
 
 .live-mobile-head-avatar {

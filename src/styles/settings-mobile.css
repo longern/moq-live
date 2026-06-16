@@ -72,6 +72,10 @@
     gap: 12px;
   }
 
+  .settings-panel-body {
+    padding-right: 0;
+  }
+
   .my-page-sections > .my-section:first-child {
     margin-top: 10px;
   }
@@ -136,17 +140,7 @@
     border-radius: 0;
   }
 
-  .settings-panel-head {
-    min-height: calc(60px + env(safe-area-inset-top));
-    padding: env(safe-area-inset-top) 10px 0;
-  }
-
-  .account-panel-head {
-    min-height: calc(60px + env(safe-area-inset-top));
-    padding: env(safe-area-inset-top) 8px 0;
-  }
-
-  .login-panel-head {
+  .panel-page-head {
     min-height: calc(60px + env(safe-area-inset-top));
     padding: env(safe-area-inset-top) 8px 0;
   }

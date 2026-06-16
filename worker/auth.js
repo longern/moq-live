@@ -19,6 +19,7 @@ const HANDLE_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const MAX_ROOM_COVER_BYTES = 5 * 1024 * 1024;
 const MAX_ROOM_TITLE_LENGTH = 80;
 const MAX_ROOM_WELCOME_MESSAGE_LENGTH = 160;
+const CLOUDFLARE_API_BASE_URL = "https://api.cloudflare.com/client/v4";
 const MAX_BIO_LENGTH = 160;
 const ROOM_COVER_TYPES = {
   "image/avif": "avif",
@@ -909,6 +910,9 @@ async function getRoomRowByHostUserId(db, userId) {
       title,
       welcome_message,
       cover_url,
+      cloudflare_live_input_identifier,
+      web_rtc_publish_url,
+      web_rtc_playback_url,
       created_at,
       updated_at
      FROM ${TABLES.rooms}
@@ -933,6 +937,9 @@ function buildRoomPayload(row) {
     title: row.title || "",
     welcomeMessage: row.welcome_message || "",
     coverUrl: row.cover_url || "",
+    cloudflareLiveIdentifier: row.cloudflare_live_input_identifier || "",
+    webRtcPublishUrl: row.web_rtc_publish_url || "",
+    webRtcPlaybackUrl: row.web_rtc_playback_url || "",
     updatedAt: row.updated_at || "",
   };
 }
@@ -962,7 +969,10 @@ function sanitizeBio(value) {
     throw createHttpError(400, "invalid_bio", "invalid_bio");
   }
 
-  const bio = value.trim().replace(/[\t ]+/g, " ").replace(/\n{3,}/g, "\n\n");
+  const bio = value
+    .trim()
+    .replace(/[\t ]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n");
   if (Array.from(bio).length > MAX_BIO_LENGTH) {
     throw createHttpError(400, "invalid_bio", "invalid_bio");
   }
@@ -985,12 +995,20 @@ function sanitizeRoomTitle(value) {
 
 function sanitizeRoomWelcomeMessage(value) {
   if (typeof value !== "string") {
-    throw createHttpError(400, "invalid_room_welcome_message", "invalid_room_welcome_message");
+    throw createHttpError(
+      400,
+      "invalid_room_welcome_message",
+      "invalid_room_welcome_message",
+    );
   }
 
   const welcomeMessage = value.trim().replace(/\s+/g, " ");
   if (Array.from(welcomeMessage).length > MAX_ROOM_WELCOME_MESSAGE_LENGTH) {
-    throw createHttpError(400, "invalid_room_welcome_message", "invalid_room_welcome_message");
+    throw createHttpError(
+      400,
+      "invalid_room_welcome_message",
+      "invalid_room_welcome_message",
+    );
   }
 
   return welcomeMessage;
@@ -1157,17 +1175,126 @@ async function ensureUserRoom(db, userId) {
 
 export { ensureUserRoom };
 
+function getCloudflareStreamConfig(env) {
+  const apiToken = String(env?.CLOUDFLARE_API_TOKEN || "").trim();
+  const accountId = String(env?.CLOUDFLARE_ACCOUNT_ID || "").trim();
+  if (!apiToken || !accountId) {
+    return null;
+  }
+  return { apiToken, accountId };
+}
+
+async function createCloudflareLiveInput(env, roomId, userId) {
+  const config = getCloudflareStreamConfig(env);
+  if (!config) {
+    return null;
+  }
+
+  const response = await fetch(
+    `${CLOUDFLARE_API_BASE_URL}/accounts/${encodeURIComponent(config.accountId)}/stream/live_inputs`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.apiToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        enabled: true,
+        meta: {
+          roomId,
+          userId,
+        },
+        recording: {
+          mode: "off",
+        },
+      }),
+    },
+  );
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.success === false) {
+    const message =
+      payload?.errors?.[0]?.message ||
+      payload?.messages?.[0]?.message ||
+      `Cloudflare Stream live input creation failed with ${response.status}`;
+    throw new Error(message);
+  }
+
+  const result = payload?.result || {};
+  const identifier = String(result.uid || result.id || "").trim();
+  const publishUrl = String(result.webRTC?.url || "").trim();
+  const playbackUrl = String(result.webRTCPlayback?.url || "").trim();
+  if (!identifier || !publishUrl || !playbackUrl) {
+    throw new Error(
+      "Cloudflare Stream live input response missing WebRTC URLs",
+    );
+  }
+
+  return {
+    identifier,
+    publishUrl,
+    playbackUrl,
+  };
+}
+
+async function ensureRoomCloudflareLiveInput(env, db, room) {
+  if (!room?.id || room.cloudflare_live_input_identifier) {
+    return;
+  }
+
+  let liveInput;
+  try {
+    liveInput = await createCloudflareLiveInput(
+      env,
+      room.id,
+      room.host_user_id,
+    );
+  } catch (error) {
+    console.warn(
+      "Cloudflare Stream live input provisioning skipped:",
+      error instanceof Error ? error.message : String(error),
+    );
+    return;
+  }
+
+  if (!liveInput) {
+    return;
+  }
+
+  await db
+    .prepare(
+      `UPDATE ${TABLES.rooms}
+       SET cloudflare_live_input_identifier = ?,
+           web_rtc_publish_url = ?,
+           web_rtc_playback_url = ?,
+           updated_at = ?
+       WHERE id = ?
+         AND host_user_id = ?
+         AND (cloudflare_live_input_identifier IS NULL OR cloudflare_live_input_identifier = '')`,
+    )
+    .bind(
+      liveInput.identifier,
+      liveInput.publishUrl,
+      liveInput.playbackUrl,
+      new Date().toISOString(),
+      room.id,
+      room.host_user_id,
+    )
+    .run();
+}
+
 export async function getUserRoom(db, userId) {
   const room = await requireUserRoomRow(db, userId);
   return buildRoomPayload(room);
 }
 
-export async function createUserRoom(db, userId) {
+export async function createUserRoom(env, db, userId) {
   const roomId = await ensureUserRoom(db, userId);
-  const room = await getRoomRowByHostUserId(db, userId);
+  let room = await getRoomRowByHostUserId(db, userId);
   if (!room?.id || room.id !== roomId) {
     throw new Error("Failed to create user room");
   }
+  await ensureRoomCloudflareLiveInput(env, db, room);
+  room = await getRoomRowByHostUserId(db, userId);
   return buildRoomPayload(room);
 }
 

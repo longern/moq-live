@@ -304,9 +304,9 @@ function useLiveRoomChatSync({
       type: liveStreamActive ? "stream.started" : "stream.stopped",
       stream: liveStreamActive
         ? {
-            startedAt: new Date().toISOString(),
-            protocol: publishProtocol,
-          }
+          startedAt: new Date().toISOString(),
+          protocol: publishProtocol,
+        }
         : undefined,
     });
 
@@ -497,7 +497,7 @@ export function LiveRoute({
 
   useEffect(() => {
     const nextPublishUrl = liveRoomDetails?.webRtcPublishUrl || "";
-    const nextPlaybackUrl = liveRoomDetails?.webRtcPlaybackUrl || liveRoomDetails?.webRtcUrl || "";
+    const nextPlaybackUrl = liveRoomDetails?.webRtcPlaybackUrl || "";
     if (
       nextPublishUrl &&
       nextPublishUrl !== appliedWebRtcDefaultsRef.current.publishUrl &&
@@ -517,7 +517,6 @@ export function LiveRoute({
   }, [
     liveRoomDetails?.webRtcPlaybackUrl,
     liveRoomDetails?.webRtcPublishUrl,
-    liveRoomDetails?.webRtcUrl,
     publisher.webRtcPlaybackUrl,
     publisher.webRtcPublishUrl,
   ]);

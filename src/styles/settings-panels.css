@@ -28,17 +28,22 @@
   box-shadow: var(--shadow);
 }
 
-.settings-panel-head {
+.panel-page-head {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) 40px;
   align-items: center;
   gap: 12px;
 }
 
-.settings-panel-head strong {
+.panel-page-title {
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
   text-align: center;
-  font-size: 1.15rem;
+  font-size: 1rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-head-spacer {
@@ -46,7 +51,7 @@
   height: 40px;
 }
 
-.settings-panel-close {
+.panel-page-back {
   width: 40px;
   min-width: 40px;
   min-height: 40px;
@@ -58,11 +63,11 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
   line-height: 1;
 }
 
-.settings-panel-close svg {
+.panel-page-back svg {
   width: 22px;
   height: 22px;
   stroke: currentColor;
@@ -117,43 +122,7 @@
 }
 
 .account-panel-head {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 40px;
-  align-items: center;
-  gap: 12px;
   padding: 20px 20px 8px;
-}
-
-.account-panel-head strong {
-  margin: 0;
-  text-align: center;
-  font-size: 1.15rem;
-}
-
-.account-panel-close {
-  width: 40px;
-  min-width: 40px;
-  min-height: 40px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  justify-self: start;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--muted);
-  line-height: 1;
-}
-
-.account-panel-close svg {
-  width: 22px;
-  height: 22px;
-  stroke: currentColor;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  fill: none;
 }
 
 .account-panel-body {
@@ -206,17 +175,7 @@
 }
 
 .login-panel-head {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 40px;
-  align-items: center;
-  gap: 12px;
   padding: 18px 22px 4px;
-}
-
-.login-panel-head strong {
-  margin: 0;
-  text-align: center;
-  font-size: 1.15rem;
 }
 
 .login-panel-close {

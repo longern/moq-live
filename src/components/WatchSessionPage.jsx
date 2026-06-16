@@ -466,15 +466,28 @@ export function WatchSessionPage({
       return;
     }
     if (immersiveShell) {
-      clearHideTimer();
-      setImmersiveControlsHidden((current) => !current);
-      return;
-    }
-    if (controlsVisible) {
-      hideControls();
+      setImmersiveControlsHidden(false);
       return;
     }
     revealControls();
+  }
+
+  function handleStageContextMenu(event) {
+    if (!touchModeRef.current || !playerSession || playerBadge.state === "error") {
+      return;
+    }
+
+    if (immersiveShell) {
+      event.preventDefault();
+      clearHideTimer();
+      setImmersiveControlsHidden(true);
+      return;
+    }
+
+    if (controlsVisible) {
+      event.preventDefault();
+      hideControls();
+    }
   }
 
   function openMoreSheet() {
@@ -1021,6 +1034,7 @@ export function WatchSessionPage({
             onMouseMove={handleStagePointerMove}
             onMouseLeave={handleStagePointerLeave}
             onClick={handleStageClick}
+            onContextMenu={handleStageContextMenu}
           >
             <div id="playerMount" className={showCohostLayout ? "watch-player-mount is-cohost" : "watch-player-mount"}>
               <div className={getWatchPlayerTileClassName({

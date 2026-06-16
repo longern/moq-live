@@ -401,7 +401,7 @@
   .my-account-form.is-desktop-form
   .account-editable-row-main {
   grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
-  column-gap: 16px;
+  column-gap: 32px;
 }
 
 .desktop-settings-content .my-account-form.is-desktop-form .account-list-label {
@@ -503,7 +503,7 @@
 .desktop-settings-content
   .my-account-form.is-desktop-form
   .account-editable-collapse-inner {
-  margin-left: 136px;
+  margin-left: 152px;
 }
 
 .desktop-settings-content

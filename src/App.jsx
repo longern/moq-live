@@ -519,6 +519,19 @@ export function App() {
     void player.stopPlayer();
   }
 
+  function closeLiveRouteNow() {
+    if (liveRouteCloseTimerRef.current) {
+      clearTimeout(liveRouteCloseTimerRef.current);
+      liveRouteCloseTimerRef.current = null;
+    }
+    setLiveRouteClosing(false);
+    pendingProtectedPageRef.current = null;
+    autorunRef.current = false;
+    setLoginPromptOpen(false);
+    closeAuthMenu();
+    selectPagePreservingLiveBackdrop(liveBackdropPage, { updateAutorun: false });
+  }
+
   function returnToWatchHome() {
     if (pageRef.current !== "live") {
       returnToWatchHomeNow();
@@ -532,6 +545,22 @@ export function App() {
     liveRouteCloseTimerRef.current = window.setTimeout(() => {
       liveRouteCloseTimerRef.current = null;
       returnToWatchHomeNow();
+    }, LIVE_ROUTE_FRAME_EXIT_MS);
+  }
+
+  function closeLiveRoute() {
+    if (pageRef.current !== "live") {
+      closeLiveRouteNow();
+      return;
+    }
+
+    if (liveRouteCloseTimerRef.current) {
+      clearTimeout(liveRouteCloseTimerRef.current);
+    }
+    setLiveRouteClosing(true);
+    liveRouteCloseTimerRef.current = window.setTimeout(() => {
+      liveRouteCloseTimerRef.current = null;
+      closeLiveRouteNow();
     }, LIVE_ROUTE_FRAME_EXIT_MS);
   }
 
@@ -1358,7 +1387,7 @@ export function App() {
           onPrimary={() => {
             void activateLiveRoom();
           }}
-          onSecondary={returnToWatchHome}
+          onSecondary={closeLiveRoute}
         />
       );
     } else if (liveActivation.error) {
@@ -1466,7 +1495,7 @@ export function App() {
           {liveRouteFrameActive ? (
             <LiveRouteFrame closing={liveRouteClosing} shellMode={liveRouteShellMode}>
               {liveActivationShellContent ? (
-                <LiveRouteActivationContent onClose={returnToWatchHome}>
+                <LiveRouteActivationContent onClose={closeLiveRoute}>
                   {liveActivationShellContent}
                 </LiveRouteActivationContent>
               ) : null}
@@ -1494,7 +1523,7 @@ export function App() {
                     onRequireLogin={() => {
                       setLoginPromptOpen(true);
                     }}
-                    onReturnHome={returnToWatchHome}
+                    onReturnHome={closeLiveRoute}
                     syntheticSessionRef={syntheticSessionRef}
                     onRouteReady={() => {
                       setLiveRouteReady(true);

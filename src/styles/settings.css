@@ -61,7 +61,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
 }
 
 .my-page-settings-button svg {
@@ -517,8 +517,8 @@
 .desktop-settings-list-item {
   width: 100%;
   min-width: 0;
-  min-height: 56px;
-  padding: 14px 16px;
+  min-height: 48px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -563,18 +563,12 @@
   stroke-width: 2.2;
 }
 
-.desktop-settings-list-copy {
+.desktop-settings-list-text {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.desktop-settings-list-item strong {
-  display: block;
-  font-size: 1rem;
-  line-height: 1.35;
-  font-weight: 650;
+  font-size: 0.875rem;
 }
 
 .my-profile-chevron svg,
@@ -593,6 +587,100 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.settings-mobile-menu-shell {
+  width: 100%;
+  overflow: hidden;
+}
+
+.settings-mobile-menu-track {
+  display: flex;
+  width: 200%;
+  margin-left: 0;
+  transition: margin-left 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-mobile-menu-shell.is-editing .settings-mobile-menu-track {
+  margin-left: -100%;
+}
+
+.settings-mobile-menu-screen {
+  flex: 0 0 50%;
+  min-width: 0;
+}
+
+.settings-mobile-detail-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-mobile-menu-shell .live-more-menu-title {
+  margin-inline: 16px;
+}
+
+.settings-panel-card-frame {
+  padding-inline: 16px;
+}
+
+.settings-menu-list,
+.settings-language-list {
+  border-radius: 16px;
+}
+
+.settings-menu-item {
+  justify-content: space-between;
+}
+
+.settings-menu-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.9;
+}
+
+.settings-language-option {
+  justify-content: space-between;
+}
+
+.settings-language-option-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settings-language-option-copy strong {
+  overflow: hidden;
+  font-size: 0.94rem;
+  line-height: 1.25;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-language-option-copy span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-language-check {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #dbe5ff;
+}
+
+.settings-language-check svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
 }
 
 .my-page-sections > .my-section:first-child {

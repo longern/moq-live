@@ -185,7 +185,7 @@ async function handleMyRoomCreate(env, request) {
     return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
   }
 
-  const room = await createUserRoom(db, session.user.id);
+  const room = await createUserRoom(env, db, session.user.id);
   return json({
     ok: true,
     room

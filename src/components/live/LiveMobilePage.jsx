@@ -3,7 +3,10 @@ import { ChatPanel } from "../ChatPanel.jsx";
 import { FloatingToast } from "../FloatingToast.jsx";
 import { SwipeableDrawer } from "../SwipeableDrawer.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
+import { WatchHostProfileSheet } from "../watch/WatchSessionSheets.jsx";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { formatAudienceCount } from "../../lib/audience.js";
+import { buildHostProfileInfoItems } from "../../lib/watchSession.js";
 import {
   AudioVideoSettingsIcon,
   AudienceIcon,
@@ -37,9 +40,11 @@ export function LiveMobilePage({
   auth = {},
   actions = {},
 }) {
+  const { t } = useI18n();
   const [moreOpen, setMoreOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
+  const [hostProfileOpen, setHostProfileOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [qualityDrawerOpen, setQualityDrawerOpen] = useState(false);
   const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
@@ -48,6 +53,7 @@ export function LiveMobilePage({
   const [cohostBusy, setCohostBusy] = useState(false);
   const [cohostResponseBusy, setCohostResponseBusy] = useState(false);
   const [cameraNoticeVisible, setCameraNoticeVisible] = useState(false);
+  const [cameraNoticeMessage, setCameraNoticeMessage] = useState("未检测到可用摄像头");
   const cameraNoticeTimerRef = useRef(null);
   const {
     hidden,
@@ -168,7 +174,7 @@ export function LiveMobilePage({
   const hasInlineChatComposer = splitChatPanel;
   const showChatDrawerEntry = !hasInlineChatComposer;
   const showPassiveChatPreview = showChatDrawerEntry;
-  const showLiveHeader = isPublishing;
+  const showLiveHeader = publishControlActive;
   const showModeSwitch = !publishControlActive;
   const showStartButton = !isPublishing;
   const showCameraControl = !voiceMode;
@@ -176,6 +182,17 @@ export function LiveMobilePage({
   const showCohostControl = showMediaSettingsControl;
   const audienceCountText = formatAudienceCount(chatOnlineCount);
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
+  const hostDisplayName = authUser?.displayName || roomLabel;
+  const hostHandle = authUser?.handle || "";
+  const hostChipLabel = hostDisplayName || hostHandle || roomLabel;
+  const hostProfileInfoItems = buildHostProfileInfoItems({
+    gender: authUser?.gender,
+    birthDate: authUser?.birthDate,
+    province: authUser?.locationProvince || authUser?.lastLocationProvince,
+    t,
+  });
+  const hostFollowerCountText = formatAudienceCount(authUser?.followerCount || 0);
+  const hostFollowingCountText = formatAudienceCount(authUser?.followingCount || 0);
 
   useEffect(() => () => {
     if (cameraNoticeTimerRef.current) {
@@ -256,10 +273,41 @@ export function LiveMobilePage({
     setAudienceOpen(false);
   }
 
+  function openHostProfile(event) {
+    event?.stopPropagation();
+    setMoreOpen(false);
+    setChatDrawerOpen(false);
+    setAudienceOpen(false);
+    setShareOpen(false);
+    setQualityDrawerOpen(false);
+    setMediaSettingsOpen(false);
+    setCohostDrawerOpen(false);
+    setHostProfileOpen(true);
+  }
+
+  function closeHostProfile() {
+    setHostProfileOpen(false);
+  }
+
+  async function copyHostHandle(handleValue) {
+    const normalizedHandle = String(handleValue || "").trim();
+    if (!normalizedHandle) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(normalizedHandle);
+      showLiveMobileNotice("主播号复制成功");
+    } catch {
+      showLiveMobileNotice("复制失败");
+    }
+  }
+
   function openShareSheet() {
     setMoreOpen(false);
     setChatDrawerOpen(false);
     setAudienceOpen(false);
+    setHostProfileOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
     setCohostDrawerOpen(false);
@@ -275,6 +323,7 @@ export function LiveMobilePage({
     setChatDrawerOpen(false);
     setAudienceOpen(false);
     setShareOpen(false);
+    setHostProfileOpen(false);
     setMediaSettingsOpen(false);
     setCohostDrawerOpen(false);
     setQualityDrawerOpen(true);
@@ -290,6 +339,7 @@ export function LiveMobilePage({
     setAudienceOpen(false);
     setShareOpen(false);
     setQualityDrawerOpen(false);
+    setHostProfileOpen(false);
     setCohostDrawerOpen(false);
     setMediaSettingsOpen(true);
   }
@@ -309,6 +359,7 @@ export function LiveMobilePage({
     setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
+    setHostProfileOpen(false);
     setCohostDrawerOpen(true);
   }
 
@@ -346,8 +397,9 @@ export function LiveMobilePage({
     setCohostDrawerOpen(false);
   }
 
-  function showCameraUnavailableNotice() {
+  function showLiveMobileNotice(message) {
     setCameraNoticeVisible(true);
+    setCameraNoticeMessage(message);
     if (cameraNoticeTimerRef.current) {
       clearTimeout(cameraNoticeTimerRef.current);
     }
@@ -363,12 +415,26 @@ export function LiveMobilePage({
     }
 
     if (cameraUnavailable) {
-      showCameraUnavailableNotice();
+      showLiveMobileNotice("未检测到可用摄像头");
       return;
     }
 
     onCycleCamera();
   }
+
+  const hostAvatar = (
+    <UserAvatar
+      avatarUrl={roomAvatarUrl}
+      displayName={hostChipLabel}
+      className="live-mobile-head-avatar"
+      imgAlt={hostChipLabel || "主播头像"}
+      imgWidth={24}
+      imgHeight={24}
+      monogramClassName="is-monogram"
+      placeholderClassName="is-placeholder"
+      iconClassName="live-mobile-head-avatar-icon"
+    />
+  )
 
   return (
     <section
@@ -390,32 +456,24 @@ export function LiveMobilePage({
               {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
             </button>
             {showLiveHeader ? (
-              <div className="live-mobile-room-chip live-mobile-room-chip-head">
-                <UserAvatar
-                  avatarUrl={roomAvatarUrl}
-                  displayName={roomLabel}
-                  className="live-mobile-room-avatar"
-                  imgAlt={roomLabel || "主播头像"}
-                  imgWidth={24}
-                  imgHeight={24}
-                  monogramClassName="is-monogram"
-                  placeholderClassName="is-placeholder"
-                  iconClassName="live-mobile-room-avatar-icon"
-                />
+              <button
+                type="button"
+                className="live-mobile-room-chip live-mobile-room-chip-head"
+                onClick={openHostProfile}
+                aria-label="查看主播信息"
+              >
+                {hostAvatar}
                 <span className="live-mobile-room">{roomLabel}</span>
-              </div>
+              </button>
             ) : (
-              <UserAvatar
-                avatarUrl={roomAvatarUrl}
-                displayName={roomLabel}
-                className="live-mobile-head-avatar"
-                imgAlt={roomLabel || "主播头像"}
-                imgWidth={30}
-                imgHeight={30}
-                monogramClassName="is-monogram"
-                placeholderClassName="is-placeholder"
-                iconClassName="live-mobile-head-avatar-icon"
-              />
+              <button
+                type="button"
+                className="live-mobile-host-avatar-button"
+                onClick={openHostProfile}
+                aria-label="查看主播信息"
+              >
+                {hostAvatar}
+              </button>
             )}
           </div>
           <div className="live-mobile-head-center">
@@ -487,7 +545,7 @@ export function LiveMobilePage({
             <div className="live-mobile-warning">{publishBlockedReason}</div>
           ) : null}
           {cameraNoticeVisible ? (
-            <FloatingToast className="live-mobile-toast">未检测到可用摄像头</FloatingToast>
+            <FloatingToast className="live-mobile-toast">{cameraNoticeMessage}</FloatingToast>
           ) : null}
           <div className="live-mobile-bottom-stack">
             {showPassiveChatPreview ? (
@@ -715,6 +773,24 @@ export function LiveMobilePage({
             )}
           </SwipeableDrawer>
         ) : null}
+
+        <WatchHostProfileSheet
+          open={hostProfileOpen}
+          onClose={closeHostProfile}
+          hostAvatarUrl={roomAvatarUrl}
+          hostChipLabel={hostChipLabel}
+          hostDisplayName={hostDisplayName}
+          hostBio={authUser?.bio || ""}
+          hostProfileInfoItems={hostProfileInfoItems}
+          hostLocationClickable={false}
+          hostLocationPending={false}
+          onHostHandleCopy={copyHostHandle}
+          hostHandle={hostHandle}
+          roomLabel={roomLabel}
+          hostFollowerCountText={hostFollowerCountText}
+          hostFollowingCountText={hostFollowingCountText}
+          followButton={null}
+        />
 
         <SwipeableDrawer
           open={mediaSettingsOpen}

@@ -35,16 +35,16 @@ export function LoginDrawer({
         onClick={onClose}
       />
       <aside className={`auth-panel auth-panel-login${transitionSuffix}`} aria-label={t("settings.loginPage")}>
-        <div className="login-panel-head">
+        <div className="panel-page-head login-panel-head">
           <button
             type="button"
-            className="login-panel-close"
+            className="panel-page-back login-panel-close"
             aria-label={t("common.back")}
             onClick={onClose}
           >
             <BackIcon />
           </button>
-          <strong>{t("account.login")}</strong>
+          <strong className="panel-page-title">{t("account.login")}</strong>
           <span className="panel-head-spacer" aria-hidden="true" />
         </div>
         <div className="login-panel-body">

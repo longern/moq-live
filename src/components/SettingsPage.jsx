@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Check,
   ChevronRight,
+  CircleHelp,
   History,
+  Languages,
   SlidersHorizontal,
   UserRound,
 } from "lucide-react";
@@ -60,6 +63,76 @@ function ChevronIcon() {
 
 function SettingsIcon() {
   return <SlidersHorizontal />;
+}
+
+function SettingsPanelCard({ children }) {
+  return <div className="settings-panel-card-frame">{children}</div>;
+}
+
+function getLanguageDisplayName(locale) {
+  const normalizedLocale = String(locale || "").trim() || "en";
+  const languageCode = normalizedLocale.split(/[-_]/)[0] || normalizedLocale;
+  try {
+    const displayName = new Intl.DisplayNames([normalizedLocale], { type: "language" }).of(languageCode);
+    if (displayName) {
+      return displayName;
+    }
+  } catch {
+    // Fall through to a readable fallback for browsers without Intl.DisplayNames.
+  }
+  return languageCode === "zh" ? "中文" : languageCode.toUpperCase();
+}
+
+function SettingsMenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  ariaLabel = label,
+}) {
+  return (
+    <li className="live-menu-list-item">
+      <button
+        type="button"
+        className="live-menu-item live-more-menu-item settings-menu-item"
+        aria-label={ariaLabel}
+        onClick={onClick}
+      >
+        <span className="live-more-menu-icon settings-menu-icon" aria-hidden="true">
+          <Icon />
+        </span>
+        <span className="live-more-menu-label">{label}</span>
+        <ChevronIcon />
+      </button>
+    </li>
+  );
+}
+
+function LanguageOptionRow({
+  active,
+  label,
+  detail,
+  onClick,
+}) {
+  return (
+    <li className="live-menu-list-item">
+      <button
+        type="button"
+        className={`live-menu-item settings-language-option${active ? " is-active" : ""}`}
+        aria-pressed={active}
+        onClick={onClick}
+      >
+        <span className="settings-language-option-copy">
+          <strong>{label}</strong>
+          {detail ? <span>{detail}</span> : null}
+        </span>
+        {active ? (
+          <span className="settings-language-check" aria-hidden="true">
+            <Check />
+          </span>
+        ) : null}
+      </button>
+    </li>
+  );
 }
 
 function loadImageFromFile(file) {
@@ -288,17 +361,20 @@ function AdvancedSettingsContent({
   authApiStatus,
   buildLabel,
   logRef,
-  logText
+  logText,
+  showAuthApiStatus = true
 }) {
   const { t } = useI18n();
 
   return (
     <>
       <SectionBlock title={t("settings.diagnostics")}>
-        <div className="my-info-row">
-          <strong>{t("settings.authApi")}</strong>
-          <span>{authApiStatus}</span>
-        </div>
+        {showAuthApiStatus ? (
+          <div className="my-info-row">
+            <strong>{t("settings.authApi")}</strong>
+            <span>{authApiStatus}</span>
+          </div>
+        ) : null}
         <div className="my-info-row">
           <strong>{t("settings.build")}</strong>
           <span id="buildSubtitle">{buildLabel}</span>
@@ -313,14 +389,25 @@ function AdvancedSettingsContent({
 }
 
 function SettingsDrawer({
-  authApiStatus,
   buildLabel,
+  localePreference,
   logRef,
   logText,
   onClose,
+  onLocalePreferenceChange,
+  systemLocale,
   transitionClassName
 }) {
   const { t } = useI18n();
+  const [activePanel, setActivePanel] = useState("");
+  const panelTitle = activePanel === "language"
+    ? t("settings.language")
+    : activePanel === "diagnostics"
+      ? t("settings.issueDiagnostics")
+      : t("settings.title");
+  const systemLanguageLabel = getLanguageDisplayName(systemLocale);
+  const zhLanguageLabel = getLanguageDisplayName("zh-CN");
+  const enLanguageLabel = getLanguageDisplayName("en");
 
   return (
     <SettingsPanelShell
@@ -330,18 +417,87 @@ function SettingsDrawer({
       closeLabel={t("common.back")}
       closeButtonClassName="settings-panel-close"
       headClassName="settings-panel-head"
-      onClose={onClose}
+      onClose={() => {
+        if (activePanel) {
+          setActivePanel("");
+          return;
+        }
+        onClose();
+      }}
       panelClassName="settings-panel"
       panelLabel={t("settings.settingsPanel")}
-      title={t("settings.title")}
+      title={panelTitle}
       transitionClassName={transitionClassName}
     >
-      <AdvancedSettingsContent
-        authApiStatus={authApiStatus}
-        buildLabel={buildLabel}
-        logRef={logRef}
-        logText={logText}
-      />
+      <div className={`settings-mobile-menu-shell${activePanel ? " is-editing" : ""}`}>
+        <div className="settings-mobile-menu-track">
+          <div className="settings-mobile-menu-screen">
+            <div className="live-more-menu-title">{t("settings.title")}</div>
+            <SettingsPanelCard>
+              <ul className="live-menu-list settings-menu-list" aria-label={t("settings.title")}>
+                <SettingsMenuItem
+                  icon={Languages}
+                  label={t("settings.language")}
+                  onClick={() => {
+                    setActivePanel("language");
+                  }}
+                />
+                <SettingsMenuItem
+                  icon={CircleHelp}
+                  label={t("settings.issueDiagnostics")}
+                  onClick={() => {
+                    setActivePanel("diagnostics");
+                  }}
+                />
+              </ul>
+            </SettingsPanelCard>
+          </div>
+
+          <div className="settings-mobile-menu-screen settings-mobile-detail-screen">
+            {activePanel ? (
+              <>
+                {activePanel === "language" ? (
+                  <SettingsPanelCard>
+                    <ul className="live-menu-list settings-language-list" aria-label={t("settings.language")}>
+                      <LanguageOptionRow
+                        active={localePreference === "system"}
+                        label={t("settings.languageSystem")}
+                        detail={t("settings.languageSystemDetail", { language: systemLanguageLabel })}
+                        onClick={() => {
+                          onLocalePreferenceChange("system");
+                        }}
+                      />
+                      <LanguageOptionRow
+                        active={localePreference === "zh-CN"}
+                        label={zhLanguageLabel}
+                        onClick={() => {
+                          onLocalePreferenceChange("zh-CN");
+                        }}
+                      />
+                      <LanguageOptionRow
+                        active={localePreference === "en"}
+                        label={enLanguageLabel}
+                        onClick={() => {
+                          onLocalePreferenceChange("en");
+                        }}
+                      />
+                    </ul>
+                  </SettingsPanelCard>
+                ) : (
+                  <SettingsPanelCard>
+                    <AdvancedSettingsContent
+                      buildLabel={buildLabel}
+                      logRef={logRef}
+                      logText={logText}
+                      showAuthApiStatus={false}
+                    />
+                  </SettingsPanelCard>
+                )}
+              </>
+            ) : null}
+          </div>
+        </div>
+      </div>
     </SettingsPanelShell>
   );
 }
@@ -389,8 +545,8 @@ function DesktopSettingsSidebar({
               <span className="desktop-settings-list-icon" aria-hidden="true">
                 <ItemIcon />
               </span>
-              <span className="desktop-settings-list-copy">
-                <strong>{item.title}</strong>
+              <span className="desktop-settings-list-text">
+                {item.title}
               </span>
             </button>
           );
@@ -421,7 +577,7 @@ export function SettingsPage({
   logText,
   logRef
 }) {
-  const { locale, t } = useI18n();
+  const { locale, localePreference, setLocalePreference, systemLocale, t } = useI18n();
   const [handleInput, setHandleInput] = useState("");
   const [handleError, setHandleError] = useState("");
   const [handleStatus, setHandleStatus] = useState("");
@@ -1125,7 +1281,7 @@ export function SettingsPage({
                         handleSaving={handleSaving}
                         handleStatus={handleStatus}
                         handleUnchanged={handleUnchanged}
-                        onClose={() => {}}
+                        onClose={() => { }}
                         onLogout={onLogout}
                         onOpenAvatarPicker={openAvatarPicker}
                         onSelectAvatar={(event) => {
@@ -1212,11 +1368,13 @@ export function SettingsPage({
         <MobilePanelPresence open={settingsPanelOpen}>
           {({ transitionClassName }) => (
             <SettingsDrawer
-              authApiStatus={authApiStatus}
               buildLabel={buildLabel}
+              localePreference={localePreference}
               logRef={logRef}
               logText={logText}
               onClose={closeSettingsPanel}
+              onLocalePreferenceChange={setLocalePreference}
+              systemLocale={systemLocale}
               transitionClassName={transitionClassName}
             />
           )}

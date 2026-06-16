@@ -15,6 +15,8 @@ export function SettingsPanelShell({
   children,
 }) {
   const transitionSuffix = transitionClassName ? ` ${transitionClassName}` : "";
+  const headClassNames = ["panel-page-head", headClassName].filter(Boolean).join(" ");
+  const closeButtonClassNames = ["panel-page-back", closeButtonClassName].filter(Boolean).join(" ");
 
   return (
     <>
@@ -25,16 +27,16 @@ export function SettingsPanelShell({
         onClick={onClose}
       />
       <aside className={`${panelClassName}${transitionSuffix}`} aria-label={panelLabel}>
-        <div className={headClassName}>
+        <div className={headClassNames}>
           <button
             type="button"
-            className={closeButtonClassName}
+            className={closeButtonClassNames}
             aria-label={closeLabel}
             onClick={onClose}
           >
             <ChevronLeft aria-hidden="true" />
           </button>
-          <strong>{title}</strong>
+          <strong className="panel-page-title">{title}</strong>
           <span className="panel-head-spacer" aria-hidden="true" />
         </div>
         <div className={bodyClassName}>{children}</div>

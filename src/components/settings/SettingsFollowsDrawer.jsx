@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatedDialog } from "../AnimatedDialog.jsx";
+import { LoadingSpinner } from "../LoadingSpinner.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
@@ -184,7 +185,9 @@ export function SettingsFollowsDrawer({
       transitionClassName={transitionClassName}
     >
       {initialLoading ? (
-        <div className="follow-list-state">{t("common.loading")}</div>
+        <div className="follow-list-state">
+          <LoadingSpinner className="follow-list-loading-spinner" label={t("common.loading")} />
+        </div>
       ) : error ? (
         <div className="follow-list-state is-error">
           <span>{error}</span>

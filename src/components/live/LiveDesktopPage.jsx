@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import { Camera, Copy, QrCode, Share } from "lucide-react";
 import { ChatPanel } from "../ChatPanel.jsx";
+import { useToast } from "../FloatingToast.jsx";
 import { StatusPill } from "../StatusPill.jsx";
 import { UserAvatar } from "../UserAvatar.jsx";
+import { WatchHostProfileContent } from "../watch/WatchSessionSheets.jsx";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
+import { formatAudienceCount } from "../../lib/audience.js";
+import { buildHostProfileInfoItems } from "../../lib/watchSession.js";
 import {
   BroadcastIcon,
   CloseIcon,
@@ -270,6 +275,8 @@ export function LiveDesktopPage({
   auth = {},
   actions = {},
 }) {
+  const { t } = useI18n();
+  const { showToast } = useToast();
   const [openPanel, setOpenPanel] = useState("");
   const {
     hidden,
@@ -399,6 +406,17 @@ export function LiveDesktopPage({
       ? "停止屏幕分享"
       : "屏幕分享";
   const desktopHostId = shareTarget || room || roomLabel;
+  const hostDisplayName = authUser?.displayName || roomLabel;
+  const hostHandle = authUser?.handle || "";
+  const hostChipLabel = hostDisplayName || hostHandle || roomLabel;
+  const hostProfileInfoItems = buildHostProfileInfoItems({
+    gender: authUser?.gender,
+    birthDate: authUser?.birthDate,
+    province: authUser?.locationProvince || authUser?.lastLocationProvince,
+    t,
+  });
+  const hostFollowerCountText = formatAudienceCount(authUser?.followerCount || 0);
+  const hostFollowingCountText = formatAudienceCount(authUser?.followingCount || 0);
 
   useEffect(() => {
     if (!openPanel) {
@@ -453,6 +471,20 @@ export function LiveDesktopPage({
     }
 
     setOpenPanel((current) => (current === "microphone" ? "" : "microphone"));
+  }
+
+  async function copyHostHandle(handleValue) {
+    const normalizedHandle = String(handleValue || "").trim();
+    if (!normalizedHandle) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(normalizedHandle);
+      showToast("主播号复制成功");
+    } catch {
+      showToast("复制失败");
+    }
   }
 
   const activePanel = openPanel === "camera" ? (
@@ -548,17 +580,45 @@ export function LiveDesktopPage({
             {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
           </button>
           <div className="live-desktop-head-identity">
-            <UserAvatar
-              avatarUrl={roomAvatarUrl}
-              displayName={roomLabel}
-              className="live-desktop-head-avatar"
-              imgAlt={roomLabel || "主播头像"}
-              imgWidth={30}
-              imgHeight={30}
-              monogramClassName="is-monogram"
-              placeholderClassName="is-placeholder"
-              iconClassName="live-desktop-head-avatar-icon"
-            />
+            <div
+              className="live-desktop-host-profile-trigger"
+              role="group"
+              tabIndex={0}
+              aria-label="查看主播信息"
+            >
+              <UserAvatar
+                avatarUrl={roomAvatarUrl}
+                displayName={hostChipLabel}
+                className="live-desktop-head-avatar"
+                imgAlt={hostChipLabel || "主播头像"}
+                imgWidth={30}
+                imgHeight={30}
+                monogramClassName="is-monogram"
+                placeholderClassName="is-placeholder"
+                iconClassName="live-desktop-head-avatar-icon"
+              />
+              <div
+                className="live-desktop-host-profile-popover"
+                role="dialog"
+                aria-label="主播信息"
+              >
+                <WatchHostProfileContent
+                  hostAvatarUrl={roomAvatarUrl}
+                  hostChipLabel={hostChipLabel}
+                  hostDisplayName={hostDisplayName}
+                  hostBio={authUser?.bio || ""}
+                  hostProfileInfoItems={hostProfileInfoItems}
+                  hostLocationClickable={false}
+                  hostLocationPending={false}
+                  onHostHandleCopy={copyHostHandle}
+                  hostHandle={hostHandle}
+                  roomLabel={roomLabel}
+                  hostFollowerCountText={hostFollowerCountText}
+                  hostFollowingCountText={hostFollowingCountText}
+                  followButton={null}
+                />
+              </div>
+            </div>
             <span>{desktopHostId}</span>
           </div>
         </div>

@@ -185,11 +185,92 @@
   line-height: 1;
 }
 
-.live-desktop-head-identity span {
+.live-desktop-head-identity > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.live-desktop-host-profile-trigger {
+  position: relative;
+  min-width: 30px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  outline: none;
+}
+
+.live-desktop-host-profile-trigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--primary-ring);
+}
+
+.live-desktop-host-profile-trigger::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 320px;
+  height: 14px;
+  pointer-events: none;
+}
+
+.live-desktop-host-profile-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 8;
+  width: min(320px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(8, 15, 24, 0.96);
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.38);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-6px) scale(0.98);
+  transform-origin: left top;
+  transition:
+    opacity 150ms ease,
+    transform 170ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 170ms;
+}
+
+.live-desktop-host-profile-trigger:hover::after,
+.live-desktop-host-profile-trigger:focus-within::after {
+  pointer-events: auto;
+}
+
+.live-desktop-host-profile-trigger:hover .live-desktop-host-profile-popover,
+.live-desktop-host-profile-trigger:focus-within
+  .live-desktop-host-profile-popover {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 150ms ease 240ms,
+    transform 170ms cubic-bezier(0.22, 1, 0.36, 1) 240ms,
+    visibility 0s linear 240ms;
+}
+
+.live-desktop-host-profile-trigger:focus-within
+  .live-desktop-host-profile-popover {
+  transition:
+    opacity 150ms ease,
+    transform 170ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
+}
+
+.live-desktop-host-profile-popover .profile-bio {
+  min-height: 64px;
 }
 
 .live-desktop-head-avatar {

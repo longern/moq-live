@@ -70,6 +70,15 @@
   pointer-events: auto;
 }
 
+.live-mobile-overlay-hideable {
+  transition: opacity 160ms ease;
+}
+
+.live-mobile-page[data-overlays-hidden="true"] .live-mobile-overlay-hideable {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .live-mobile-head-left,
 .live-mobile-head-center,
 .live-mobile-head-right {
@@ -397,7 +406,7 @@
   width: 100%;
 }
 
-.live-mobile-page .chat-panel-live-split,
+.live-mobile-page[data-shell="compact"] .chat-panel-live-split,
 .live-mobile-page .chat-panel-live-drawer {
   flex: 1 1 auto;
   min-height: 0;
@@ -411,24 +420,24 @@
   box-shadow: none;
 }
 
-.live-mobile-page .chat-panel-live-split {
+.live-mobile-page[data-shell="compact"] .chat-panel-live-split {
   margin: 0;
   padding: 16px 0 12px;
 }
 
-.live-mobile-page .chat-panel-live-split:last-child {
+.live-mobile-page[data-shell="compact"] .chat-panel-live-split:last-child {
   padding: 16px 0 12px;
   border: 0;
 }
 
-.live-mobile-page .chat-panel-live-split .chat-panel-head,
+.live-mobile-page[data-shell="compact"] .chat-panel-live-split .chat-panel-head,
 .live-mobile-page .chat-panel-live-drawer .chat-panel-head {
   flex: 0 0 auto;
   margin: 0;
   padding-inline: 16px;
 }
 
-.live-mobile-page .chat-panel-live-split .chat-message-list,
+.live-mobile-page[data-shell="compact"] .chat-panel-live-split .chat-message-list,
 .live-mobile-page .chat-panel-live-drawer .chat-message-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -436,9 +445,9 @@
   padding: 0 16px 6px;
 }
 
-.live-mobile-page .chat-panel-live-split .chat-composer,
-.live-mobile-page .chat-panel-live-split .chat-composer-readonly,
-.live-mobile-page .chat-panel-live-split .inline-warning,
+.live-mobile-page[data-shell="compact"] .chat-panel-live-split .chat-composer,
+.live-mobile-page[data-shell="compact"] .chat-panel-live-split .chat-composer-readonly,
+.live-mobile-page[data-shell="compact"] .chat-panel-live-split .inline-warning,
 .live-mobile-page .chat-panel-live-drawer .chat-composer,
 .live-mobile-page .chat-panel-live-drawer .chat-composer-readonly,
 .live-mobile-page .chat-panel-live-drawer .inline-warning {

@@ -54,6 +54,7 @@ export function LiveMobilePage({
   const [cohostResponseBusy, setCohostResponseBusy] = useState(false);
   const [cameraNoticeVisible, setCameraNoticeVisible] = useState(false);
   const [cameraNoticeMessage, setCameraNoticeMessage] = useState("未检测到可用摄像头");
+  const [overlaysHidden, setOverlaysHidden] = useState(false);
   const cameraNoticeTimerRef = useRef(null);
   const {
     hidden,
@@ -180,6 +181,7 @@ export function LiveMobilePage({
   const showCameraControl = !voiceMode;
   const showMediaSettingsControl = immersiveShell && isPublishing;
   const showCohostControl = showMediaSettingsControl;
+  const canHideOverlays = immersiveShell && isPublishing;
   const audienceCountText = formatAudienceCount(chatOnlineCount);
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
   const hostDisplayName = authUser?.displayName || roomLabel;
@@ -218,6 +220,12 @@ export function LiveMobilePage({
       setCohostDrawerOpen(false);
     }
   }, [showMediaSettingsControl]);
+
+  useEffect(() => {
+    if (!canHideOverlays) {
+      setOverlaysHidden(false);
+    }
+  }, [canHideOverlays]);
 
   useEffect(() => {
     if (!cohostDrawerOpen) {
@@ -367,6 +375,28 @@ export function LiveMobilePage({
     setCohostDrawerOpen(false);
   }
 
+  function isPreviewSurfaceEvent(event) {
+    const target = event.target;
+    return target instanceof Element && Boolean(target.closest(".publisher-host"));
+  }
+
+  function handleStageClick(event) {
+    if (!canHideOverlays || !overlaysHidden || !isPreviewSurfaceEvent(event)) {
+      return;
+    }
+
+    setOverlaysHidden(false);
+  }
+
+  function handleStageContextMenu(event) {
+    if (!canHideOverlays || !isPreviewSurfaceEvent(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    setOverlaysHidden(true);
+  }
+
   async function submitCohostInvite(nextHandle = cohostHandle) {
     const handle = nextHandle.trim().replace(/^@+/, "");
     if (!handle || cohostBusy) {
@@ -442,6 +472,7 @@ export function LiveMobilePage({
       data-page="live"
       data-media={mediaMode}
       data-shell={shellMode}
+      data-overlays-hidden={overlaysHidden ? "true" : "false"}
       hidden={hidden}
     >
       <div className="live-mobile-shell">
@@ -458,7 +489,7 @@ export function LiveMobilePage({
             {showLiveHeader ? (
               <button
                 type="button"
-                className="live-mobile-room-chip live-mobile-room-chip-head"
+                className="live-mobile-room-chip live-mobile-room-chip-head live-mobile-overlay-hideable"
                 onClick={openHostProfile}
                 aria-label="查看主播信息"
               >
@@ -468,7 +499,7 @@ export function LiveMobilePage({
             ) : (
               <button
                 type="button"
-                className="live-mobile-host-avatar-button"
+                className="live-mobile-host-avatar-button live-mobile-overlay-hideable"
                 onClick={openHostProfile}
                 aria-label="查看主播信息"
               >
@@ -476,7 +507,7 @@ export function LiveMobilePage({
               </button>
             )}
           </div>
-          <div className="live-mobile-head-center">
+          <div className="live-mobile-head-center live-mobile-overlay-hideable">
             {showModeSwitch ? (
               <div className="live-mode-switch" role="group" aria-label="开播模式">
                 <button
@@ -498,7 +529,7 @@ export function LiveMobilePage({
               </div>
             ) : null}
           </div>
-          <div className="live-mobile-head-right">
+          <div className="live-mobile-head-right live-mobile-overlay-hideable">
             {showLiveHeader ? (
               <button
                 type="button"
@@ -532,7 +563,11 @@ export function LiveMobilePage({
             </button>
           </div>
         </div>
-        <div className="stage-frame live-stage-frame live-stage-frame-mobile">
+        <div
+          className="stage-frame live-stage-frame live-stage-frame-mobile"
+          onClick={handleStageClick}
+          onContextMenu={handleStageContextMenu}
+        >
           <LivePreviewStage
             previewVideoRef={previewVideoRef}
             previewActive={previewActive}
@@ -547,7 +582,7 @@ export function LiveMobilePage({
           {cameraNoticeVisible ? (
             <FloatingToast className="live-mobile-toast">{cameraNoticeMessage}</FloatingToast>
           ) : null}
-          <div className="live-mobile-bottom-stack">
+          <div className="live-mobile-bottom-stack live-mobile-overlay-hideable">
             {showPassiveChatPreview ? (
               <div className="live-mobile-chat-overlay">
                 <ChatPanel

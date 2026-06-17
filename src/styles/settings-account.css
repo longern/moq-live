@@ -358,20 +358,15 @@
 
 .desktop-settings-content .desktop-account-profile-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px 48px;
+  padding: 16px 32px;
+  gap: 32px;
 }
 
 .desktop-account-avatar-button {
   position: relative;
   flex: 0 0 auto;
-  width: 72px;
-  height: 72px;
-  min-width: 72px;
-  min-height: 72px;
   overflow: hidden;
-  padding: 0;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -419,19 +414,29 @@
   stroke-width: 2;
 }
 
+.desktop-account-profile-copy strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-account-edit-profile-container {
+  flex: 1 0 auto;
+  display: flex;
+  justify-content: end;
+}
+
 .desktop-account-edit-profile-button {
-  flex: 0 0 auto;
-  width: auto;
-  min-width: 0;
   min-height: 36px;
   padding: 0 16px;
   border: 1px solid rgba(153, 174, 193, 0.38);
-  border-radius: 8px;
   background: transparent;
   color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  box-shadow: none;
 }
 
 .desktop-account-edit-profile-button:hover,
@@ -464,14 +469,14 @@
 .desktop-settings-content
   .my-account-form.is-desktop-form
   .account-editable-row-main {
-  grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+  grid-template-columns: minmax(136px, max-content) minmax(0, 1fr);
   column-gap: 32px;
 }
 
 .desktop-settings-content .my-account-form.is-desktop-form .account-list-label {
   align-self: center;
   color: rgba(153, 174, 193, 0.9);
-  min-width: 120px;
+  min-width: 136px;
   font-size: inherit;
   line-height: 1.5;
   text-align: right;

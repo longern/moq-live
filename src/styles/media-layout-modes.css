@@ -8,27 +8,22 @@
 }
 
 .media-immersive .chat-panel-live-mobile .chat-message-list {
-  padding: 0 0 8px;
   -webkit-mask-image: linear-gradient(
     0deg,
     #000 0,
-    #000 calc(var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)),
+    #000
+      calc(var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)),
     rgba(0, 0, 0, 0.42) calc(var(--live-chat-list-max-height) - 12px),
     transparent var(--live-chat-list-max-height)
   );
   mask-image: linear-gradient(
     0deg,
     #000 0,
-    #000 calc(var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)),
+    #000
+      calc(var(--live-chat-list-max-height) - var(--live-chat-list-fade-size)),
     rgba(0, 0, 0, 0.42) calc(var(--live-chat-list-max-height) - 12px),
     transparent var(--live-chat-list-max-height)
   );
-}
-
-.media-immersive .chat-panel-live-mobile .chat-avatar {
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
 }
 
 .media-immersive .chat-panel-live-mobile .chat-message-line {

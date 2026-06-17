@@ -509,18 +509,23 @@ export function DesktopAccountDetailsContent({
               }
             }}
           >
-            <SettingsProfileAvatar authUser={authUser} imgWidth={72} imgHeight={72} />
+            <SettingsProfileAvatar authUser={authUser} imgWidth={96} imgHeight={96} />
             <span className="desktop-account-avatar-overlay" aria-hidden="true">
               <EditIcon />
             </span>
           </button>
-          <button
-            type="button"
-            className="desktop-account-edit-profile-button"
-            onClick={startProfileEditing}
-          >
-            {t("accountPanel.editProfile")}
-          </button>
+          <span className="desktop-account-profile-copy">
+            <strong>{authUser.displayName || t("common.notSet")}</strong>
+          </span>
+          <span className="desktop-account-edit-profile-container">
+            <button
+              type="button"
+              className="desktop-account-edit-profile-button"
+              onClick={startProfileEditing}
+            >
+              {t("accountPanel.editProfile")}
+            </button>
+          </span>
         </div>
       ) : null}
 

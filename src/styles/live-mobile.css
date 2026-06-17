@@ -337,7 +337,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   align-items: stretch;
   pointer-events: none;
 }
@@ -395,7 +395,7 @@
   align-items: stretch;
   min-height: 0;
   max-height: var(--live-chat-list-max-height);
-  padding: 0 2px 6px 0;
+  padding-bottom: 6px;
   border: 0;
   border-radius: 0;
   outline: 0;
@@ -406,9 +406,7 @@
   scrollbar-width: none;
 }
 
-.live-mobile-page.media-voice
-  .chat-panel-live-mobile
-  .chat-message-list {
+.live-mobile-page.media-voice .chat-panel-live-mobile .chat-message-list {
   -webkit-mask-image: linear-gradient(
     0deg,
     #000 0,
@@ -434,9 +432,9 @@
 }
 
 .chat-panel-live-mobile .chat-avatar {
-  width: 16px;
-  height: 16px;
-  margin-top: 1px;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
 }
 
 .chat-panel-live-mobile .chat-message-line {
@@ -617,37 +615,46 @@
 }
 
 .live-mobile-media-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  display: grid;
+  gap: 14px;
 }
 
 .live-mobile-media-toolbar-left {
-  display: inline-flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
 .live-media-icon-button {
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
-  min-height: 48px;
-  padding: 0;
-  display: inline-flex;
+  min-width: 0;
+  min-height: 76px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 7px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 8px;
   background: transparent;
-  color: var(--text);
+  color: rgba(235, 244, 251, 0.92);
   box-shadow: none;
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.2;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
 }
 
 .live-media-icon-button:hover,
 .live-media-icon-button:focus-visible {
   background: transparent;
   transform: none;
+}
+
+.live-media-icon-button:active {
+  background: rgba(235, 244, 251, 0.1);
 }
 
 .live-media-icon-button:focus-visible {
@@ -663,6 +670,14 @@
   color: #71879c;
 }
 
+.live-media-icon-button-symbol {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .live-media-icon-button svg {
   width: 20px;
   height: 20px;
@@ -671,6 +686,92 @@
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.live-media-icon-button-label {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.live-media-zoom-control {
+  display: grid;
+  gap: 10px;
+  color: rgba(235, 244, 251, 0.92);
+}
+
+.live-media-zoom-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.live-media-zoom-head span:last-child {
+  color: rgba(235, 244, 251, 0.62);
+  font-weight: 500;
+}
+
+.live-media-zoom-control input[type="range"] {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  accent-color: var(--primary);
+}
+
+.live-media-zoom-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(235, 244, 251, 0.2);
+}
+
+.live-media-zoom-control input[type="range"]::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(235, 244, 251, 0.94);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.live-media-zoom-control input[type="range"]::-moz-range-track {
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(235, 244, 251, 0.2);
+}
+
+.live-media-zoom-control input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(235, 244, 251, 0.94);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+.live-media-zoom-control input[type="range"]:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 4px;
+}
+
+.live-media-zoom-control.is-disabled {
+  color: rgba(235, 244, 251, 0.46);
+}
+
+.live-media-zoom-control.is-disabled input[type="range"] {
+  cursor: default;
+  opacity: 0.42;
 }
 
 .live-cohost-head {

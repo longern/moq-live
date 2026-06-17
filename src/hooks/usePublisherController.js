@@ -83,6 +83,7 @@ function getPublishQualityConfig(id) {
 function buildVideoConstraints(
   deviceId = "",
   qualityId = DEFAULT_PUBLISH_QUALITY_ID,
+  { cameraControls = false } = {},
 ) {
   const quality = getPublishQuality(qualityId);
   const constraints = {
@@ -93,6 +94,10 @@ function buildVideoConstraints(
 
   if (deviceId) {
     constraints.deviceId = { exact: deviceId };
+  }
+
+  if (cameraControls) {
+    constraints.zoom = true;
   }
 
   return constraints;
@@ -913,7 +918,9 @@ export function usePublisherController({
 
     const requestId = beginPreviewRequest({ stopActive: false });
     const constraints = {
-      video: buildVideoConstraints(cameraId, qualityId),
+      video: buildVideoConstraints(cameraId, qualityId, {
+        cameraControls: true,
+      }),
       audio: false,
     };
 
@@ -1064,7 +1071,9 @@ export function usePublisherController({
     try {
       const videoConstraints = !wantsCamera
         ? false
-        : buildVideoConstraints(cameraId, publishQualityIdRef.current);
+        : buildVideoConstraints(cameraId, publishQualityIdRef.current, {
+            cameraControls: true,
+          });
       const audioConstraints = !wantsMicrophone
         ? false
         : buildMicrophoneAudioConstraints(microphoneId);

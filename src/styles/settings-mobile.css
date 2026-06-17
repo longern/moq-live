@@ -54,11 +54,6 @@
     flex-direction: column;
   }
 
-  .my-profile-avatar {
-    width: 72px;
-    height: 72px;
-  }
-
   .my-profile-copy strong {
     font-size: 1.1rem;
   }
@@ -235,11 +230,6 @@
     padding: 8px 16px;
     min-height: 56px;
     align-content: center;
-  }
-
-  .account-list-avatar .my-profile-avatar {
-    width: 44px;
-    height: 44px;
   }
 
   .login-provider-button {

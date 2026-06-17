@@ -482,7 +482,7 @@ export function LiveDesktopPage({
 
     try {
       await navigator.clipboard.writeText(normalizedHandle);
-      showToast("主播号复制成功");
+      showToast("UID 复制成功");
     } catch {
       showToast("复制失败");
     }

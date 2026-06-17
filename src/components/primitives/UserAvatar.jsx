@@ -12,6 +12,18 @@ function getAvatarText(displayName, email, initialsLength) {
   return firstWord.slice(0, initialsLength).toUpperCase();
 }
 
+function getLoadingSpinnerStyle(imgWidth, imgHeight) {
+  if (typeof imgWidth !== "number" || typeof imgHeight !== "number") {
+    return undefined;
+  }
+
+  const size = Math.min(imgWidth, imgHeight) / 2;
+  return {
+    width: size,
+    height: size
+  };
+}
+
 export function UserAvatar({
   avatarUrl,
   displayName,
@@ -29,24 +41,40 @@ export function UserAvatar({
 }) {
   const { t } = useI18n();
   const initials = getAvatarText(displayName, email, initialsLength);
-  const modeClassName = avatarUrl
-    ? ""
-    : initials
-      ? monogramClassName
-      : placeholderClassName;
-  const nextClassName = [className, modeClassName].filter(Boolean).join(" ");
+  const shouldRenderImage = Boolean(avatarUrl) && !loading;
+
+  if (shouldRenderImage) {
+    return (
+      <span className={className} aria-hidden="true">
+        <img src={avatarUrl} alt={imgAlt || t("common.userAvatar")} width={imgWidth} height={imgHeight} />
+      </span>
+    );
+  }
+
+  const fallbackClassName = [
+    className,
+    loading || initials ? monogramClassName : placeholderClassName
+  ].filter(Boolean).join(" ");
+  const fallbackStyle = imgWidth || imgHeight
+    ? {
+      width: imgWidth,
+      height: imgHeight,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+    : undefined;
+  const fallbackContent = loading ? (
+    <LoadingSpinner className={loadingClassName} style={getLoadingSpinnerStyle(imgWidth, imgHeight)} ariaHidden />
+  ) : initials ? (
+    initials
+  ) : (
+    <CircleUserRound className={iconClassName} />
+  );
 
   return (
-    <span className={nextClassName} aria-hidden="true">
-      {loading ? (
-        <LoadingSpinner className={loadingClassName} ariaHidden />
-      ) : avatarUrl ? (
-        <img src={avatarUrl} alt={imgAlt || t("common.userAvatar")} width={imgWidth} height={imgHeight} />
-      ) : initials ? (
-        <span>{initials}</span>
-      ) : (
-        <CircleUserRound className={iconClassName} />
-      )}
+    <span className={className} aria-hidden="true">
+      <span className={fallbackClassName} style={fallbackStyle}>{fallbackContent}</span>
     </span>
   );
 }

@@ -13,7 +13,7 @@ export async function withTimeout(promise, ms) {
   }
 }
 
-export async function withTimeoutFallback(promise, ms, fallbackValue) {
+async function withTimeoutFallback(promise, ms, fallbackValue) {
   let timer = null;
   const timeout = new Promise((resolve) => {
     timer = setTimeout(() => resolve(fallbackValue), ms);
@@ -40,7 +40,7 @@ export function detachAll(ctx) {
   ctx.listeners.length = 0;
 }
 
-export function ensureContainedPlayerStyles(playerEl) {
+function ensureContainedPlayerStyles(playerEl) {
   const shadowRoot = playerEl?.shadowRoot;
   if (!shadowRoot) {
     return;
@@ -82,7 +82,7 @@ export function ensureContainedPlayerStyles(playerEl) {
   shadowRoot.append(style);
 }
 
-export function ensureInitialCanvasSize(playerEl) {
+function ensureInitialCanvasSize(playerEl) {
   const canvasEl = playerEl?.shadowRoot?.querySelector("canvas#canvas");
   if (!(canvasEl instanceof HTMLCanvasElement)) {
     return;
@@ -94,7 +94,7 @@ export function ensureInitialCanvasSize(playerEl) {
   }
 }
 
-export function syncContainedCanvasLayout(playerEl) {
+function syncContainedCanvasLayout(playerEl) {
   const shadowRoot = playerEl?.shadowRoot;
   const baseEl = shadowRoot?.querySelector("#base");
   const canvasEl = shadowRoot?.querySelector("canvas#canvas");

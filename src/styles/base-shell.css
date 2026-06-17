@@ -185,32 +185,34 @@ pre {
   height: 42px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.055);
-  transition: background-color 160ms ease;
+  background: transparent;
 }
 
 .topbar-watch-form:focus-within {
-  background: rgba(255, 255, 255, 0.075);
+  background: transparent;
+  box-shadow: none;
 }
 
 .topbar-watch-form input {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
   box-shadow: none;
   color: var(--text);
   font-size: 0.92rem;
   outline: 0;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .topbar-watch-form input:focus {
-  box-shadow: none;
   outline: 0;
 }
 

@@ -43,10 +43,6 @@
   overflow-wrap: anywhere;
 }
 
-.account-list-item-avatar {
-  align-items: center;
-}
-
 .account-list-item-button {
   cursor: pointer;
   transition: background-color 160ms ease;
@@ -63,25 +59,6 @@
 
 .account-list-item-button[aria-disabled="true"] {
   cursor: default;
-}
-
-.account-list-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.account-list-avatar .my-profile-avatar {
-  width: 48px;
-  height: 48px;
-}
-
-.account-list-avatar-editable {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
 }
 
 .account-list-chevron {
@@ -107,10 +84,67 @@
   display: none;
 }
 
+.mobile-account-avatar-row {
+  display: flex;
+  justify-content: center;
+  padding: 24px 8px;
+}
+
+.mobile-account-avatar-button {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+}
+
+.mobile-account-avatar-button:hover,
+.mobile-account-avatar-button:focus-visible {
+  transform: none;
+}
+
+.mobile-account-avatar-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 3px;
+}
+
+.mobile-account-avatar-button:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
 .account-editable-row {
   min-width: 0;
   display: block;
   padding: 16px 20px;
+}
+
+.account-editable-row-button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: var(--account-list-label-width) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--account-list-gap);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  box-shadow: none;
+}
+
+.account-editable-row-button:hover,
+.account-editable-row-button:focus-visible {
+  background: rgba(255, 255, 255, 0.05);
+  transform: none;
+}
+
+.account-editable-row-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: -2px;
 }
 
 .account-editable-row-main {
@@ -157,15 +191,10 @@
 .account-editable-collapse {
   display: grid;
   grid-template-rows: 0fr;
-  opacity: 0;
-  transition:
-    grid-template-rows 220ms cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 160ms ease;
 }
 
 .account-editable-collapse.is-open {
   grid-template-rows: 1fr;
-  opacity: 1;
 }
 
 .account-editable-collapse-inner {
@@ -183,40 +212,6 @@
   overflow-wrap: anywhere;
 }
 
-.account-icon-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.account-icon-button {
-  width: 32px;
-  min-width: 32px;
-  min-height: 32px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--muted);
-}
-
-.account-icon-button svg {
-  width: 18px;
-  height: 18px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.account-icon-button:disabled {
-  opacity: 0.4;
-}
-
 .my-account-form {
   display: flex;
   flex-direction: column;
@@ -230,16 +225,7 @@
   padding: 0 20px;
 }
 
-.my-account-actions {
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.my-plain-login-button,
-.my-plain-danger-button {
+.my-plain-login-button {
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
@@ -257,21 +243,14 @@
   color: var(--accent-2);
 }
 
-.my-plain-danger-button {
-  color: var(--danger);
-}
-
 .my-plain-login-button:hover:not(:disabled),
-.my-plain-login-button:focus-visible,
-.my-plain-danger-button:hover:not(:disabled),
-.my-plain-danger-button:focus-visible {
+.my-plain-login-button:focus-visible {
   transform: none;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.my-plain-login-button:disabled,
-.my-plain-danger-button:disabled {
+.my-plain-login-button:disabled {
   opacity: 0.64;
 }
 
@@ -377,6 +356,91 @@
   font-size: 0.875rem;
 }
 
+.desktop-settings-content .desktop-account-profile-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 48px;
+}
+
+.desktop-account-avatar-button {
+  position: relative;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  min-width: 72px;
+  min-height: 72px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+}
+
+.desktop-account-avatar-button:hover,
+.desktop-account-avatar-button:focus-visible {
+  transform: none;
+}
+
+.desktop-account-avatar-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 3px;
+}
+
+.desktop-account-avatar-button:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.desktop-account-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.desktop-account-avatar-button:hover .desktop-account-avatar-overlay,
+.desktop-account-avatar-button:focus-visible .desktop-account-avatar-overlay {
+  opacity: 1;
+}
+
+.desktop-account-avatar-overlay svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+.desktop-account-edit-profile-button {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid rgba(153, 174, 193, 0.38);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.desktop-account-edit-profile-button:hover,
+.desktop-account-edit-profile-button:focus-visible {
+  border-color: rgba(219, 229, 255, 0.62);
+  background: rgba(255, 255, 255, 0.06);
+  transform: none;
+}
+
 .desktop-settings-content .my-account-form.is-desktop-form .account-panel-list {
   border: 0;
 }
@@ -438,56 +502,6 @@
 
 .desktop-settings-content
   .my-account-form.is-desktop-form
-  .account-list-item-button {
-  cursor: default;
-}
-
-.desktop-settings-content
-  .my-account-form.is-desktop-form
-  .account-list-item-button:hover {
-  background: transparent;
-}
-
-.desktop-settings-content .my-account-form.is-desktop-form .account-list-avatar,
-.desktop-settings-content
-  .my-account-form.is-desktop-form
-  .account-list-avatar-editable {
-  justify-content: flex-start;
-  align-items: center;
-}
-
-.desktop-settings-content
-  .my-account-form.is-desktop-form
-  .account-list-chevron,
-.desktop-settings-content
-  .my-account-form.is-desktop-form
-  .account-icon-button {
-  width: 24px;
-  min-width: 24px;
-  height: 24px;
-  min-height: 24px;
-}
-
-.desktop-settings-content
-  .my-account-form.is-desktop-form
-  .account-list-chevron {
-  color: var(--muted);
-}
-
-.desktop-settings-content
-  .my-account-form.is-desktop-form
-  .account-list-chevron
-  svg,
-.desktop-settings-content
-  .my-account-form.is-desktop-form
-  .account-icon-button
-  svg {
-  width: 16px;
-  height: 16px;
-}
-
-.desktop-settings-content
-  .my-account-form.is-desktop-form
   .account-editable-value-editing {
   justify-content: flex-start;
 }
@@ -515,13 +529,47 @@
 
 .desktop-settings-content
   .my-account-form.is-desktop-form
-  .my-account-form-content {
-  padding: 0;
+  .desktop-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  margin-left: 152px;
 }
 
-.desktop-settings-content .my-account-form.is-desktop-form .my-account-actions {
-  justify-content: flex-start;
-  padding-left: 136px;
+.desktop-account-save-button,
+.desktop-account-cancel-button {
+  width: auto;
+  min-width: 72px;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+}
+
+.desktop-account-cancel-button {
+  border: 1px solid rgba(153, 174, 193, 0.38);
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+}
+
+.desktop-account-cancel-button:hover,
+.desktop-account-cancel-button:focus-visible {
+  border-color: rgba(219, 229, 255, 0.62);
+  background: rgba(255, 255, 255, 0.06);
+  transform: none;
+}
+
+.desktop-account-cancel-button:disabled {
+  opacity: 0.55;
+}
+
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .my-account-form-content {
+  padding: 0;
 }
 
 .account-profile-bio {

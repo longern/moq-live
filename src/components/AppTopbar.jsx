@@ -153,7 +153,7 @@ export function AppTopbar({
                     onStartMicrosoftLogin();
                   }}
                   disabled={authState.loading || !authState.available}
-                  title={!authState.available ? t("account.authApiDisconnected") : undefined}
+                  title={!authState.available ? t("account.authServiceUnavailable") : undefined}
                 >
                   {t("account.loginNow")}
                 </button>

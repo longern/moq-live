@@ -12,7 +12,7 @@ function interpolate(template, params = {}) {
   return String(template).replace(/\{(\w+)\}/g, (_, key) => String(params[key] ?? ""));
 }
 
-export function normalizeLocale(locale) {
+function normalizeLocale(locale) {
   const value = String(locale || "").trim().toLowerCase();
   if (!value) {
     return DEFAULT_LOCALE;
@@ -57,7 +57,7 @@ function resolveInitialLocalePreference() {
   return "system";
 }
 
-export function createTranslator(locale) {
+function createTranslator(locale) {
   const resolvedLocale = normalizeLocale(locale);
   const localeMessages = messages[resolvedLocale] || messages[DEFAULT_LOCALE];
   const fallbackMessages = messages[DEFAULT_LOCALE];

@@ -320,6 +320,7 @@ export function ChatPanel({
   showWelcome = true,
   composerTrailingAction = null,
   composerTrailingActionClassName = "",
+  showSendButton = true,
   onRetractMessage,
   onMuteMessage,
 }) {
@@ -775,15 +776,17 @@ export function ChatPanel({
                 }
               }}
             />
-            <button
-              type="button"
-              className="secondary"
-              onClick={onRequireLogin}
-              disabled={composerState.buttonDisabled}
-              data-disabled-reason={composerState.buttonDisabledReason}
-            >
-              {composerState.buttonLabel}
-            </button>
+            {showSendButton ? (
+              <button
+                type="button"
+                className="secondary"
+                onClick={onRequireLogin}
+                disabled={composerState.buttonDisabled}
+                data-disabled-reason={composerState.buttonDisabledReason}
+              >
+                {composerState.buttonLabel}
+              </button>
+            ) : null}
             {composerTrailingAction ? (
               <span className={`chat-composer-extra${composerTrailingActionClassName ? ` ${composerTrailingActionClassName}` : ""}`}>
                 {composerTrailingAction}
@@ -812,23 +815,25 @@ export function ChatPanel({
               onInput={onDraftChange}
               disabled={composerState.inputDisabled}
             />
-            <button
-              type="submit"
-              className="primary chat-send-button"
-              disabled={composerState.buttonDisabled}
-              data-disabled-reason={composerState.buttonDisabledReason}
-              aria-busy={showSendSpinner || undefined}
-            >
-              <span className={showSendSpinner ? "chat-send-button-label is-hidden" : "chat-send-button-label"}>
-                {composerState.buttonLabel}
-              </span>
-              {showSendSpinner ? (
-                <LoadingSpinner
-                  className="chat-send-button-spinner"
-                  label={t("chat.restoring")}
-                />
-              ) : null}
-            </button>
+            {showSendButton ? (
+              <button
+                type="submit"
+                className="primary chat-send-button"
+                disabled={composerState.buttonDisabled}
+                data-disabled-reason={composerState.buttonDisabledReason}
+                aria-busy={showSendSpinner || undefined}
+              >
+                <span className={showSendSpinner ? "chat-send-button-label is-hidden" : "chat-send-button-label"}>
+                  {composerState.buttonLabel}
+                </span>
+                {showSendSpinner ? (
+                  <LoadingSpinner
+                    className="chat-send-button-spinner"
+                    label={t("chat.restoring")}
+                  />
+                ) : null}
+              </button>
+            ) : null}
             {composerTrailingAction ? (
               <span className={`chat-composer-extra${composerTrailingActionClassName ? ` ${composerTrailingActionClassName}` : ""}`}>
                 {composerTrailingAction}

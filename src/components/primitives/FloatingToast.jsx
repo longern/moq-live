@@ -12,7 +12,7 @@ export function FloatingToast({ children, className = "", closing = false }) {
   );
 }
 
-export function FloatingToastPresence({ children, className = "", exitMs = TOAST_EXIT_MS }) {
+function FloatingToastPresence({ children, className = "", exitMs = TOAST_EXIT_MS }) {
   const [mounted, setMounted] = useState(Boolean(children));
   const [closing, setClosing] = useState(false);
   const [renderedChildren, setRenderedChildren] = useState(children);

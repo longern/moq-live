@@ -1,6 +1,6 @@
-export const PUSH_PERMISSION_REMINDER_KEY = "moq-live:push-permission-reminder-dismissed";
+const PUSH_PERMISSION_REMINDER_KEY = "moq-live:push-permission-reminder-dismissed";
 
-export function isWebPushSupported() {
+function isWebPushSupported() {
   return (
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&

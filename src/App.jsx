@@ -464,7 +464,7 @@ export function App() {
     : authState.user
       ? (authState.user.email || authState.user.displayName || t("account.signedIn"))
       : !authState.available
-        ? t("account.authApiDisconnected")
+        ? t("account.authServiceUnavailable")
         : t("common.anonymousUser");
   const showWatchPage = page === "watch" || (page === "live" && liveBackdropPage === "watch");
   const showSettingsPage = page === "settings" || (page === "live" && liveBackdropPage === "settings");

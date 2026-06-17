@@ -23,7 +23,7 @@ export function buildHostLocationLabel(province, t = null) {
   return normalizedProvince || t?.("profile.locationUnknown") || "位置未知";
 }
 
-export function formatHostGender(value, t = null) {
+function formatHostGender(value, t = null) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) {
     return "";
@@ -40,7 +40,7 @@ export function formatHostGender(value, t = null) {
   return "";
 }
 
-export function formatHostAge(birthDate, t = null) {
+function formatHostAge(birthDate, t = null) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birthDate || "").trim());
   if (!match) {
     return "";

@@ -307,7 +307,7 @@ export function LiveMobilePage({
 
     try {
       await navigator.clipboard.writeText(normalizedHandle);
-      showLiveMobileNotice("主播号复制成功");
+      showLiveMobileNotice("UID 复制成功");
     } catch {
       showLiveMobileNotice("复制失败");
     }
@@ -925,7 +925,7 @@ export function LiveMobilePage({
             <input
               value={cohostHandle}
               onChange={(event) => setCohostHandle(event.currentTarget.value)}
-              placeholder="输入主播号"
+              placeholder="输入 UID"
               autoComplete="off"
               inputMode="text"
             />

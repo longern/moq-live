@@ -38,7 +38,3 @@ export function useCompactViewport() {
 export function usePortraitViewport() {
   return useMediaQuery("(orientation: portrait)");
 }
-
-export function useTouchPortraitViewport() {
-  return useMediaQuery("(orientation: portrait) and (hover: none) and (pointer: coarse)");
-}

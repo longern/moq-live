@@ -5,7 +5,6 @@ import {
   Circle,
   Handshake,
   Image,
-  Link,
   MapPin,
   MessageCircle,
   Mic,
@@ -79,10 +78,6 @@ export function MenuChevronIcon() {
 
 export function ScreenShareIcon() {
   return <MonitorUp {...iconProps} />;
-}
-
-export function LinkIcon() {
-  return <Link {...iconProps} />;
 }
 
 export function ChatIcon() {

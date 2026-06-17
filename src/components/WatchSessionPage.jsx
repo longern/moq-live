@@ -44,7 +44,7 @@ import {
   getWatchStageLayout,
 } from "../lib/watchSession.js";
 import { getWatchStageView } from "../lib/watchStageView.js";
-import { usePortraitViewport } from "../hooks/useMediaQuery.js";
+import { useCompactViewport, usePortraitViewport } from "../hooks/useMediaQuery.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const WatchTestCanvas = import.meta.env.DEV
@@ -195,6 +195,7 @@ export function WatchSessionPage({
   const hostDistanceAutoKeyRef = useRef("");
   const { showToast } = useToast();
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const compactViewport = useCompactViewport();
   const portraitViewport = usePortraitViewport();
   const portraitMedia = isPortraitMedia(playerOrientation);
   const immersivePortrait = shouldUsePortraitImmersiveMode({
@@ -554,7 +555,7 @@ export function WatchSessionPage({
 
     try {
       await navigator.clipboard.writeText(normalizedHandle);
-      showToast("主播号复制成功");
+      showToast("UID 复制成功");
     } catch {
       showToast("复制失败");
     }
@@ -1224,6 +1225,7 @@ export function WatchSessionPage({
                   className="chat-panel-watch-overlay"
                   composerTrailingAction={renderMobileMoreButton()}
                   composerTrailingActionClassName="watch-composer-more-extra"
+                  showSendButton={false}
                 />
               </div>
             ) : null}
@@ -1381,8 +1383,9 @@ export function WatchSessionPage({
             readOnly={chatReadOnly}
             chatError={chatError}
             chatRecovering={chatRecovering}
-            composerTrailingAction={renderMobileMoreButton()}
+            composerTrailingAction={compactViewport ? renderMobileMoreButton() : null}
             composerTrailingActionClassName="watch-composer-more-extra"
+            showSendButton={!compactViewport}
           />
         </aside>
       </div>

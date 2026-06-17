@@ -29,7 +29,7 @@ const WHEP_UI_WATCHDOG_TIMEOUT_MS = 25_000;
 const WHEP_PAGE_RESTORE_CHECK_DELAY_MS = 700;
 const WHEP_PAGE_RESTORE_RESTART_COOLDOWN_MS = 5_000;
 
-export function getAppleOsUpgradeMessage(navigatorLike = globalThis.navigator) {
+function getAppleOsUpgradeMessage(navigatorLike = globalThis.navigator) {
   if (!navigatorLike || typeof navigatorLike !== "object") {
     return null;
   }

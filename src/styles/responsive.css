@@ -762,9 +762,8 @@
   }
 
   .chat-composer input,
-  .chat-composer button,
   .chat-composer-floating input,
-  .chat-composer-floating button {
+  .chat-send-button {
     min-height: 36px;
     height: 36px;
   }
@@ -776,8 +775,7 @@
     border-radius: 999px;
   }
 
-  .chat-composer button,
-  .chat-composer-floating button {
+  .chat-send-button {
     width: auto;
     padding: 0 14px;
   }
@@ -1090,16 +1088,6 @@
     padding: 0 14px;
   }
 
-  .chat-panel-watch-overlay .chat-composer-floating button {
-    width: auto;
-    min-width: 60px;
-    min-height: 36px;
-    height: 36px;
-    padding: 0 14px;
-    border-radius: 999px;
-    box-shadow: 0 12px 24px var(--primary-shadow);
-  }
-
   .chat-panel-watch-overlay .chat-floating-warning {
     margin: 0 0 2px;
     padding: 8px 10px;
@@ -1121,11 +1109,4 @@
     opacity: 0;
   }
 
-  .chat-composer-shell .chat-composer-more {
-    width: 36px;
-    min-width: 36px;
-    height: 36px;
-    min-height: 36px;
-    padding: 0;
-  }
 }

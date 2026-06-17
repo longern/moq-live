@@ -11,9 +11,9 @@ import {
 import { LoginDrawer } from "./LoginDrawer.jsx";
 import { MobilePanelPresence, useMobilePanelViewport } from "./MobilePanelPresence.jsx";
 import {
-  AccountDetailsContent,
   AccountDrawer,
   AccountEditDrawer,
+  DesktopAccountDetailsContent,
   SettingsProfileAvatar,
 } from "./settings/SettingsAccountPanels.jsx";
 import { SettingsFollowsDrawer } from "./settings/SettingsFollowsDrawer.jsx";
@@ -65,8 +65,8 @@ function SettingsIcon() {
   return <SlidersHorizontal />;
 }
 
-function SettingsPanelCard({ children }) {
-  return <div className="settings-panel-card-frame">{children}</div>;
+function SettingsPanelCard({ children, className = "" }) {
+  return <div className={`settings-panel-card-frame${className ? ` ${className}` : ""}`}>{children}</div>;
 }
 
 function getLanguageDisplayName(locale) {
@@ -268,7 +268,12 @@ function ProfileSummaryCard({
         disabled={authPending}
         aria-busy={authPending}
       >
-        <SettingsProfileAvatar authUser={authUser} />
+        <SettingsProfileAvatar
+          authUser={authUser}
+          imgWidth={72}
+          imgHeight={72}
+          loading={authPending}
+        />
         <span className="my-profile-copy">
           <strong>{profileName}</strong>
           {profileSubtitle ? <span>{profileSubtitle}</span> : null}
@@ -358,23 +363,15 @@ function WatchHistorySection({ historyItems, onClearWatchHistory, onOpenWatchHis
 }
 
 function AdvancedSettingsContent({
-  authApiStatus,
   buildLabel,
   logRef,
-  logText,
-  showAuthApiStatus = true
+  logText
 }) {
   const { t } = useI18n();
 
   return (
     <>
       <SectionBlock title={t("settings.diagnostics")}>
-        {showAuthApiStatus ? (
-          <div className="my-info-row">
-            <strong>{t("settings.authApi")}</strong>
-            <span>{authApiStatus}</span>
-          </div>
-        ) : null}
         <div className="my-info-row">
           <strong>{t("settings.build")}</strong>
           <span id="buildSubtitle">{buildLabel}</span>
@@ -390,11 +387,13 @@ function AdvancedSettingsContent({
 
 function SettingsDrawer({
   buildLabel,
+  canLogout,
   localePreference,
   logRef,
   logText,
   onClose,
   onLocalePreferenceChange,
+  onLogout,
   systemLocale,
   transitionClassName
 }) {
@@ -451,6 +450,24 @@ function SettingsDrawer({
                 />
               </ul>
             </SettingsPanelCard>
+            {canLogout ? (
+              <SettingsPanelCard className="settings-logout-card">
+                <ul className="live-menu-list settings-menu-list" aria-label={t("account.logout")}>
+                  <li className="live-menu-list-item">
+                    <button
+                      type="button"
+                      className="live-menu-item settings-logout-menu-item"
+                      onClick={() => {
+                        onClose();
+                        onLogout();
+                      }}
+                    >
+                      <span className="live-more-menu-label">{t("account.logout")}</span>
+                    </button>
+                  </li>
+                </ul>
+              </SettingsPanelCard>
+            ) : null}
           </div>
 
           <div className="settings-mobile-menu-screen settings-mobile-detail-screen">
@@ -489,7 +506,6 @@ function SettingsDrawer({
                       buildLabel={buildLabel}
                       logRef={logRef}
                       logText={logText}
-                      showAuthApiStatus={false}
                     />
                   </SettingsPanelCard>
                 )}
@@ -720,6 +736,7 @@ export function SettingsPage({
   const handleCooldownActive = Boolean(
     authUser?.nextHandleChangeAt && Date.parse(authUser.nextHandleChangeAt) > Date.now()
   );
+  const handleReadOnly = !handleIsDefault && handleCooldownActive;
   const profileHandleLabel = authUser?.handle ? `@${authUser.handle}` : "";
   const profileName = authPending
     ? t("account.loading")
@@ -733,7 +750,6 @@ export function SettingsPage({
   const profileFollowingCount = Math.max(0, Number(authUser?.followingCount || 0) + profileFollowingAdjustment);
   const visibleFollowsPanelType = followsPanelType || renderedFollowsPanelType;
   const activeFollowsState = visibleFollowsPanelType ? followsState[visibleFollowsPanelType] : createEmptyFollowsState();
-  const authApiStatus = authAvailable ? t("settings.connected") : t("settings.disconnected");
   const historyItems = useMemo(() => (watchHistoryItems ?? []).map((item) => ({
     ...item,
     displayTime: formatHistoryTime(item.watchedAt, locale)
@@ -1249,10 +1265,8 @@ export function SettingsPage({
                 {desktopSection === "account" ? (
                   <SectionBlock title={t("settings.accountInfo")}>
                     {authUser ? (
-                      <AccountDetailsContent
+                      <DesktopAccountDetailsContent
                         authUser={authUser}
-                        desktopLayout
-                        showLogout={false}
                         avatarError={avatarError}
                         avatarInputRef={avatarInputRef}
                         avatarSaving={avatarSaving}
@@ -1266,13 +1280,11 @@ export function SettingsPage({
                         displayNameInput={displayNameInput}
                         displayNameSaving={displayNameSaving}
                         displayNameStatus={displayNameStatus}
-                        displayNameUnchanged={displayNameUnchanged}
                         bioEditing={bioEditing}
                         bioError={bioError}
                         bioInput={bioInput}
                         bioSaving={bioSaving}
                         bioStatus={bioStatus}
-                        bioUnchanged={bioUnchanged}
                         handleCooldownActive={handleCooldownActive}
                         handleEditing={handleEditing}
                         handleError={handleError}
@@ -1280,9 +1292,6 @@ export function SettingsPage({
                         handleIsDefault={handleIsDefault}
                         handleSaving={handleSaving}
                         handleStatus={handleStatus}
-                        handleUnchanged={handleUnchanged}
-                        onClose={() => { }}
-                        onLogout={onLogout}
                         onOpenAvatarPicker={openAvatarPicker}
                         onSelectAvatar={(event) => {
                           void submitAvatarFile(event);
@@ -1329,7 +1338,6 @@ export function SettingsPage({
 
                 {desktopSection === "advanced" ? (
                   <AdvancedSettingsContent
-                    authApiStatus={authApiStatus}
                     buildLabel={buildLabel}
                     logRef={logRef}
                     logText={logText}
@@ -1369,11 +1377,13 @@ export function SettingsPage({
           {({ transitionClassName }) => (
             <SettingsDrawer
               buildLabel={buildLabel}
+              canLogout={Boolean(authUser)}
               localePreference={localePreference}
               logRef={logRef}
               logText={logText}
               onClose={closeSettingsPanel}
               onLocalePreferenceChange={setLocalePreference}
+              onLogout={onLogout}
               systemLocale={systemLocale}
               transitionClassName={transitionClassName}
             />
@@ -1388,51 +1398,20 @@ export function SettingsPage({
               avatarInputRef={avatarInputRef}
               avatarSaving={avatarSaving}
               avatarStatus={avatarStatus}
-              cancelDisplayNameEditing={cancelDisplayNameEditing}
-              cancelBioEditing={cancelBioEditing}
-              cancelHandleEditing={cancelHandleEditing}
-              displayNameCooldownActive={displayNameCooldownActive}
-              displayNameEditing={!isMobilePanelViewport && displayNameEditing}
               displayNameError={displayNameError}
-              displayNameInput={displayNameInput}
-              displayNameSaving={displayNameSaving}
               displayNameStatus={displayNameStatus}
-              displayNameUnchanged={displayNameUnchanged}
-              bioEditing={!isMobilePanelViewport && bioEditing}
               bioError={bioError}
-              bioInput={bioInput}
-              bioSaving={bioSaving}
               bioStatus={bioStatus}
-              bioUnchanged={bioUnchanged}
-              handleCooldownActive={handleCooldownActive}
-              handleEditing={!isMobilePanelViewport && handleEditing}
               handleError={handleError}
-              handleInput={handleInput}
-              handleIsDefault={handleIsDefault}
-              handleSaving={handleSaving}
               handleStatus={handleStatus}
-              handleUnchanged={handleUnchanged}
               onClose={closeAccountPanel}
-              onLogout={onLogout}
               onOpenAvatarPicker={openAvatarPicker}
               onSelectAvatar={(event) => {
                 void submitAvatarFile(event);
               }}
-              setDisplayNameError={setDisplayNameError}
-              setDisplayNameInput={setDisplayNameInput}
-              setDisplayNameStatus={setDisplayNameStatus}
-              setBioError={setBioError}
-              setBioInput={setBioInput}
-              setBioStatus={setBioStatus}
-              setHandleError={setHandleError}
-              setHandleInput={setHandleInput}
-              setHandleStatus={setHandleStatus}
               startDisplayNameEditing={startDisplayNameEditing}
               startBioEditing={startBioEditing}
               startHandleEditing={startHandleEditing}
-              submitDisplayName={submitDisplayName}
-              submitBio={submitBio}
-              submitHandle={submitHandle}
               transitionClassName={transitionClassName}
             />
           ) : null)}
@@ -1467,7 +1446,8 @@ export function SettingsPage({
                 void submitHandle();
               }}
               placeholder={t("accountPanel.handlePlaceholder")}
-              saveDisabled={handleSaving || !handleInput.trim() || handleUnchanged}
+              readOnly={handleReadOnly}
+              saveDisabled={handleSaving || handleReadOnly || !handleInput.trim() || handleUnchanged}
               saving={handleSaving}
               status={handleStatus}
               title={t("accountPanel.editPageTitleHandle")}
@@ -1497,6 +1477,7 @@ export function SettingsPage({
                 void submitDisplayName();
               }}
               placeholder={t("accountPanel.displayNamePlaceholder")}
+              readOnly={displayNameCooldownActive}
               saveDisabled={
                 displayNameSaving
                 || displayNameCooldownActive

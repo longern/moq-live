@@ -1,8 +1,6 @@
 import {
-  Check,
   ChevronRight,
   Pencil,
-  X,
 } from "lucide-react";
 import { ProfileBio } from "../ProfileInfoSummary.jsx";
 import { UserAvatar } from "../primitives/UserAvatar.jsx";
@@ -13,19 +11,16 @@ function ChevronIcon() {
   return <ChevronRight />;
 }
 
-function CheckIcon() {
-  return <Check />;
-}
-
-function CloseIcon() {
-  return <X />;
-}
-
 function EditIcon() {
   return <Pencil />;
 }
 
-export function SettingsProfileAvatar({ authUser }) {
+export function SettingsProfileAvatar({
+  authUser,
+  imgWidth,
+  imgHeight,
+  loading = false,
+}) {
   const { t } = useI18n();
 
   return (
@@ -35,6 +30,10 @@ export function SettingsProfileAvatar({ authUser }) {
       email={authUser?.email}
       className="my-profile-avatar"
       imgAlt={authUser?.displayName || t("common.userAvatar")}
+      imgWidth={imgWidth}
+      imgHeight={imgHeight}
+      loading={loading}
+      loadingClassName="auth-avatar-loading-spinner"
       monogramClassName="is-monogram"
       placeholderClassName="is-placeholder"
     />
@@ -42,30 +41,25 @@ export function SettingsProfileAvatar({ authUser }) {
 }
 
 function AccountEditableField({
-  cancelAriaLabel,
-  editAriaLabel,
   editing,
   inputValue,
   label,
   maxLength,
   multiline = false,
   note,
-  onCancelEditing,
   onInput,
-  onSave,
-  onStartEditing,
   placeholder,
-  saveAriaLabel,
-  saveDisabled,
+  readOnly = false,
   value,
   valueNode = null,
 }) {
+  const displayValue = valueNode || <strong>{value}</strong>;
+
   return (
     <div className={`account-editable-row${editing ? " is-editing" : ""}`}>
-      <div className="account-editable-row-main">
-        <span className="account-list-label">{label}</span>
-
-        {editing ? (
+      {editing ? (
+        <div className="account-editable-row-main">
+          <span className="account-list-label">{label}</span>
           <div className="account-editable-value account-editable-value-editing">
             {multiline ? (
               <textarea
@@ -73,6 +67,7 @@ function AccountEditableField({
                 maxLength={maxLength}
                 onInput={onInput}
                 placeholder={placeholder}
+                readOnly={readOnly}
                 rows={3}
               />
             ) : (
@@ -81,48 +76,74 @@ function AccountEditableField({
                 maxLength={maxLength}
                 onInput={onInput}
                 placeholder={placeholder}
+                readOnly={readOnly}
               />
             )}
-            <div className="account-icon-actions">
-              <button
-                type="button"
-                className="account-icon-button"
-                aria-label={saveAriaLabel}
-                disabled={saveDisabled}
-                onClick={onSave}
-              >
-                <CheckIcon />
-              </button>
-              <button
-                type="button"
-                className="account-icon-button"
-                aria-label={cancelAriaLabel}
-                onClick={onCancelEditing}
-              >
-                <CloseIcon />
-              </button>
-            </div>
           </div>
-        ) : (
+        </div>
+      ) : (
+        <div className="account-editable-row-main">
+          <span className="account-list-label">{label}</span>
           <div className="account-editable-value account-editable-value-inline">
-            {valueNode || <strong>{value}</strong>}
-            <button
-              type="button"
-              className="account-icon-button"
-              aria-label={editAriaLabel}
-              onClick={onStartEditing}
-            >
-              <EditIcon />
-            </button>
+            {displayValue}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className={`account-editable-collapse${editing ? " is-open" : ""}`} aria-hidden={!editing}>
         <div className="account-editable-collapse-inner">
           <p className="account-editable-note">{note}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MobileAccountNavigationRow({
+  ariaLabel,
+  label,
+  onClick,
+  value,
+  valueNode = null,
+}) {
+  return (
+    <button
+      type="button"
+      className="account-editable-row account-editable-row-button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+    >
+      <span className="account-list-label">{label}</span>
+      <div className="account-editable-value account-editable-value-inline">
+        {valueNode || <strong>{value}</strong>}
+        <span className="account-list-chevron" aria-hidden="true">
+          <ChevronIcon />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function AccountStatusMessages({
+  avatarError,
+  avatarStatus,
+  bioError,
+  bioStatus,
+  displayNameError,
+  displayNameStatus,
+  handleError,
+  handleStatus,
+}) {
+  return (
+    <div className="my-account-form-content">
+      {handleError ? <p className="inline-warning">{handleError}</p> : null}
+      {handleStatus ? <p className="status">{handleStatus}</p> : null}
+      {displayNameError ? <p className="inline-warning">{displayNameError}</p> : null}
+      {displayNameStatus ? <p className="status">{displayNameStatus}</p> : null}
+      {bioError ? <p className="inline-warning">{bioError}</p> : null}
+      {bioStatus ? <p className="status">{bioStatus}</p> : null}
+      {avatarError ? <p className="inline-warning">{avatarError}</p> : null}
+      {avatarStatus ? <p className="status">{avatarStatus}</p> : null}
     </div>
   );
 }
@@ -139,6 +160,7 @@ export function AccountEditDrawer({
   onInput,
   onSave,
   placeholder,
+  readOnly = false,
   saveDisabled,
   saving,
   status,
@@ -178,6 +200,7 @@ export function AccountEditDrawer({
               maxLength={maxLength}
               onInput={onInput}
               placeholder={placeholder}
+              readOnly={readOnly}
               rows={4}
               autoFocus
             />
@@ -187,6 +210,7 @@ export function AccountEditDrawer({
               maxLength={maxLength}
               onInput={onInput}
               placeholder={placeholder}
+              readOnly={readOnly}
               autoFocus
             />
           )}
@@ -210,49 +234,18 @@ export function AccountDrawer({
   avatarInputRef,
   avatarSaving,
   avatarStatus,
-  cancelDisplayNameEditing,
-  cancelBioEditing,
-  cancelHandleEditing,
-  displayNameCooldownActive,
-  displayNameEditing,
   displayNameError,
-  displayNameInput,
-  displayNameSaving,
   displayNameStatus,
-  displayNameUnchanged,
-  bioEditing,
   bioError,
-  bioInput,
-  bioSaving,
   bioStatus,
-  bioUnchanged,
-  handleCooldownActive,
-  handleEditing,
   handleError,
-  handleInput,
-  handleIsDefault,
-  handleSaving,
   handleStatus,
-  handleUnchanged,
   onClose,
-  onLogout,
   onOpenAvatarPicker,
   onSelectAvatar,
-  setDisplayNameError,
-  setDisplayNameInput,
-  setDisplayNameStatus,
-  setBioError,
-  setBioInput,
-  setBioStatus,
-  setHandleError,
-  setHandleInput,
-  setHandleStatus,
   startDisplayNameEditing,
   startBioEditing,
   startHandleEditing,
-  submitDisplayName,
-  submitBio,
-  submitHandle,
   transitionClassName,
 }) {
   const { t } = useI18n();
@@ -268,67 +261,121 @@ export function AccountDrawer({
       onClose={onClose}
       panelClassName="auth-panel auth-panel-account"
       panelLabel={t("accountPanel.accountPage")}
-      title={t("settings.account")}
+      title={t("accountPanel.profileTitle")}
       transitionClassName={transitionClassName}
     >
-      <AccountDetailsContent
+      <MobileAccountDetailsContent
         authUser={authUser}
         avatarError={avatarError}
         avatarInputRef={avatarInputRef}
         avatarSaving={avatarSaving}
         avatarStatus={avatarStatus}
-        cancelDisplayNameEditing={cancelDisplayNameEditing}
-        cancelBioEditing={cancelBioEditing}
-        cancelHandleEditing={cancelHandleEditing}
-        displayNameCooldownActive={displayNameCooldownActive}
-        displayNameEditing={displayNameEditing}
         displayNameError={displayNameError}
-        displayNameInput={displayNameInput}
-        displayNameSaving={displayNameSaving}
         displayNameStatus={displayNameStatus}
-        displayNameUnchanged={displayNameUnchanged}
-        bioEditing={bioEditing}
         bioError={bioError}
-        bioInput={bioInput}
-        bioSaving={bioSaving}
         bioStatus={bioStatus}
-        bioUnchanged={bioUnchanged}
-        handleCooldownActive={handleCooldownActive}
-        handleEditing={handleEditing}
         handleError={handleError}
-        handleInput={handleInput}
-        handleIsDefault={handleIsDefault}
-        handleSaving={handleSaving}
         handleStatus={handleStatus}
-        handleUnchanged={handleUnchanged}
-        onClose={onClose}
-        onLogout={onLogout}
         onOpenAvatarPicker={onOpenAvatarPicker}
         onSelectAvatar={onSelectAvatar}
-        setDisplayNameError={setDisplayNameError}
-        setDisplayNameInput={setDisplayNameInput}
-        setDisplayNameStatus={setDisplayNameStatus}
-        setBioError={setBioError}
-        setBioInput={setBioInput}
-        setBioStatus={setBioStatus}
-        setHandleError={setHandleError}
-        setHandleInput={setHandleInput}
-        setHandleStatus={setHandleStatus}
         startDisplayNameEditing={startDisplayNameEditing}
         startBioEditing={startBioEditing}
         startHandleEditing={startHandleEditing}
-        submitDisplayName={submitDisplayName}
-        submitBio={submitBio}
-        submitHandle={submitHandle}
       />
     </SettingsPanelShell>
   );
 }
 
-export function AccountDetailsContent({
+function MobileAccountDetailsContent({
   authUser,
-  desktopLayout = false,
-  showLogout = true,
+  avatarError,
+  avatarInputRef,
+  avatarSaving,
+  avatarStatus,
+  bioError,
+  bioStatus,
+  displayNameError,
+  displayNameStatus,
+  handleError,
+  handleStatus,
+  onOpenAvatarPicker,
+  onSelectAvatar,
+  startDisplayNameEditing,
+  startBioEditing,
+  startHandleEditing,
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="my-account-form">
+      <div className="mobile-account-avatar-row">
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/avif"
+          className="account-avatar-input"
+          onChange={onSelectAvatar}
+        />
+        <button
+          type="button"
+          className="mobile-account-avatar-button"
+          aria-label={t("accountPanel.uploadAvatar")}
+          disabled={avatarSaving}
+          onClick={() => {
+            if (!avatarSaving) {
+              onOpenAvatarPicker();
+            }
+          }}
+        >
+          <SettingsProfileAvatar authUser={authUser} imgWidth={96} imgHeight={96} />
+        </button>
+      </div>
+
+      <div className="account-panel-list">
+        <div className="account-list-item">
+          <span className="account-list-label">{t("accountPanel.email")}</span>
+          <span className="account-list-value">
+            <strong>{authUser.email || t("common.notBound")}</strong>
+          </span>
+        </div>
+
+        <MobileAccountNavigationRow
+          ariaLabel={t("accountPanel.editHandle")}
+          label={t("accountPanel.handle")}
+          onClick={startHandleEditing}
+          value={authUser.handle || t("common.notSet")}
+        />
+        <MobileAccountNavigationRow
+          ariaLabel={t("accountPanel.editDisplayName")}
+          label={t("accountPanel.displayName")}
+          onClick={startDisplayNameEditing}
+          value={authUser.displayName || t("common.notSet")}
+        />
+        <MobileAccountNavigationRow
+          ariaLabel={t("accountPanel.editBio")}
+          label={t("accountPanel.bio")}
+          onClick={startBioEditing}
+          value={authUser.bio || t("profile.noBio")}
+          valueNode={<ProfileBio className="profile-bio account-profile-bio" bio={authUser.bio} />}
+        />
+      </div>
+
+      <AccountStatusMessages
+        avatarError={avatarError}
+        avatarStatus={avatarStatus}
+        bioError={bioError}
+        bioStatus={bioStatus}
+        displayNameError={displayNameError}
+        displayNameStatus={displayNameStatus}
+        handleError={handleError}
+        handleStatus={handleStatus}
+      />
+    </div>
+  );
+}
+
+export function DesktopAccountDetailsContent({
+  authUser,
   avatarError,
   avatarInputRef,
   avatarSaving,
@@ -342,13 +389,11 @@ export function AccountDetailsContent({
   displayNameInput,
   displayNameSaving,
   displayNameStatus,
-  displayNameUnchanged,
   bioEditing,
   bioError,
   bioInput,
   bioSaving,
   bioStatus,
-  bioUnchanged,
   handleCooldownActive,
   handleEditing,
   handleError,
@@ -356,9 +401,6 @@ export function AccountDetailsContent({
   handleIsDefault,
   handleSaving,
   handleStatus,
-  handleUnchanged,
-  onClose,
-  onLogout,
   onOpenAvatarPicker,
   onSelectAvatar,
   setDisplayNameError,
@@ -386,52 +428,103 @@ export function AccountDetailsContent({
   const displayNameNote = displayNameCooldownActive
     ? t("accountPanel.displayNameCooldownNote", { time: new Date(authUser.nextDisplayNameChangeAt).toLocaleString(locale) })
     : t("accountPanel.displayNameNote");
+  const profileEditing = handleEditing || displayNameEditing || bioEditing;
+  const normalizedHandleInput = handleInput.trim().toLowerCase();
+  const normalizedCurrentHandle = (authUser.handle || "").toLowerCase();
+  const normalizedCurrentDisplayName = (authUser.displayName || "").trim().replace(/\s+/g, " ").toLocaleLowerCase(locale);
+  const normalizedDraftDisplayName = displayNameInput.trim().replace(/\s+/g, " ").toLocaleLowerCase(locale);
+  const normalizedCurrentBio = (authUser.bio || "").trim();
+  const normalizedDraftBio = bioInput.trim();
+  const handleReadOnly = !handleIsDefault && handleCooldownActive;
+  const displayNameReadOnly = displayNameCooldownActive;
+  const handleChanged = normalizedHandleInput !== normalizedCurrentHandle;
+  const displayNameChanged = normalizedDraftDisplayName !== normalizedCurrentDisplayName;
+  const bioChanged = normalizedDraftBio !== normalizedCurrentBio;
+  const editableHandleChanged = !handleReadOnly && handleChanged;
+  const editableDisplayNameChanged = !displayNameReadOnly && displayNameChanged;
+  const profileChanged = editableHandleChanged || editableDisplayNameChanged || bioChanged;
+  const profileSaving = handleSaving || displayNameSaving || bioSaving;
+  const profileSaveInvalid =
+    (editableHandleChanged && !normalizedHandleInput)
+    || (editableDisplayNameChanged && !displayNameInput.trim());
+  const profileSaveDisabled = profileSaving || profileSaveInvalid || !profileChanged;
 
-  function handleAvatarItemKeyDown(event) {
-    if (avatarSaving) {
+  function startProfileEditing() {
+    startHandleEditing();
+    startDisplayNameEditing();
+    startBioEditing();
+  }
+
+  function cancelProfileEditing() {
+    cancelHandleEditing();
+    cancelDisplayNameEditing();
+    cancelBioEditing();
+  }
+
+  async function submitProfile() {
+    if (profileSaveDisabled) {
       return;
     }
 
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onOpenAvatarPicker();
+    if (!editableHandleChanged) {
+      cancelHandleEditing();
+    }
+    if (!editableDisplayNameChanged) {
+      cancelDisplayNameEditing();
+    }
+    if (!bioChanged) {
+      cancelBioEditing();
+    }
+
+    if (editableHandleChanged) {
+      await submitHandle();
+    }
+    if (editableDisplayNameChanged) {
+      await submitDisplayName();
+    }
+    if (bioChanged) {
+      await submitBio();
     }
   }
 
   return (
-    <div className={`my-account-form${desktopLayout ? " is-desktop-form" : ""}`}>
-      <div className="account-panel-list">
-        <div
-          className="account-list-item account-list-item-avatar account-list-item-button"
-          role="button"
-          tabIndex={avatarSaving ? -1 : 0}
-          aria-disabled={avatarSaving}
-          aria-label={t("accountPanel.uploadAvatar")}
-          onClick={() => {
-            if (!avatarSaving) {
-              onOpenAvatarPicker();
-            }
-          }}
-          onKeyDown={handleAvatarItemKeyDown}
-        >
-          <span className="account-list-label">{t("accountPanel.avatar")}</span>
-          <div className="account-list-value account-list-avatar">
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/avif"
-              className="account-avatar-input"
-              onChange={onSelectAvatar}
-            />
-            <div className="account-list-avatar-editable">
-              <SettingsProfileAvatar authUser={authUser} />
-            </div>
-            <span className="account-list-chevron" aria-hidden="true">
-              {desktopLayout ? <EditIcon /> : <ChevronIcon />}
+    <div className="my-account-form is-desktop-form">
+      {!profileEditing ? (
+        <div className="desktop-account-profile-row">
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/avif"
+            className="account-avatar-input"
+            onChange={onSelectAvatar}
+          />
+          <button
+            type="button"
+            className="desktop-account-avatar-button"
+            aria-label={t("accountPanel.uploadAvatar")}
+            disabled={avatarSaving}
+            onClick={() => {
+              if (!avatarSaving) {
+                onOpenAvatarPicker();
+              }
+            }}
+          >
+            <SettingsProfileAvatar authUser={authUser} imgWidth={72} imgHeight={72} />
+            <span className="desktop-account-avatar-overlay" aria-hidden="true">
+              <EditIcon />
             </span>
-          </div>
+          </button>
+          <button
+            type="button"
+            className="desktop-account-edit-profile-button"
+            onClick={startProfileEditing}
+          >
+            {t("accountPanel.editProfile")}
+          </button>
         </div>
+      ) : null}
 
+      <div className="account-panel-list">
         <div className="account-list-item">
           <span className="account-list-label">{t("accountPanel.email")}</span>
           <span className="account-list-value">
@@ -440,8 +533,6 @@ export function AccountDetailsContent({
         </div>
 
         <AccountEditableField
-          cancelAriaLabel={t("accountPanel.cancelEditHandle")}
-          editAriaLabel={t("accountPanel.editHandle")}
           editing={handleEditing}
           inputValue={handleInput}
           label={t("accountPanel.handle")}
@@ -453,103 +544,83 @@ export function AccountDetailsContent({
               {t("accountPanel.handleRule")}
             </>
           )}
-          onCancelEditing={cancelHandleEditing}
           onInput={(event) => {
             setHandleInput(event.currentTarget.value.toLowerCase());
             setHandleError("");
             setHandleStatus("");
           }}
-          onSave={() => {
-            void submitHandle();
-          }}
-          onStartEditing={startHandleEditing}
           placeholder={t("accountPanel.handlePlaceholder")}
-          saveAriaLabel={t("accountPanel.saveHandle")}
-          saveDisabled={handleSaving || !handleInput.trim() || handleUnchanged}
+          readOnly={handleReadOnly}
           value={authUser.handle || t("common.notSet")}
         />
 
         <AccountEditableField
-          cancelAriaLabel={t("accountPanel.cancelEditDisplayName")}
-          editAriaLabel={t("accountPanel.editDisplayName")}
           editing={displayNameEditing}
           inputValue={displayNameInput}
           label={t("accountPanel.displayName")}
           maxLength={32}
           note={displayNameNote}
-          onCancelEditing={cancelDisplayNameEditing}
           onInput={(event) => {
             setDisplayNameInput(event.currentTarget.value);
             setDisplayNameError("");
             setDisplayNameStatus("");
           }}
-          onSave={() => {
-            void submitDisplayName();
-          }}
-          onStartEditing={startDisplayNameEditing}
           placeholder={t("accountPanel.displayNamePlaceholder")}
-          saveAriaLabel={t("accountPanel.saveDisplayName")}
-          saveDisabled={
-            displayNameSaving
-            || displayNameCooldownActive
-            || !displayNameInput.trim()
-            || displayNameUnchanged
-          }
+          readOnly={displayNameReadOnly}
           value={authUser.displayName || t("common.notSet")}
         />
 
         <AccountEditableField
-          cancelAriaLabel={t("accountPanel.cancelEditBio")}
-          editAriaLabel={t("accountPanel.editBio")}
           editing={bioEditing}
           inputValue={bioInput}
           label={t("accountPanel.bio")}
           maxLength={160}
           multiline
           note={t("accountPanel.bioNote")}
-          onCancelEditing={cancelBioEditing}
           onInput={(event) => {
             setBioInput(event.currentTarget.value);
             setBioError("");
             setBioStatus("");
           }}
-          onSave={() => {
-            void submitBio();
-          }}
-          onStartEditing={startBioEditing}
           placeholder={t("profile.noBio")}
-          saveAriaLabel={t("accountPanel.saveBio")}
-          saveDisabled={bioSaving || bioUnchanged}
           value={authUser.bio || t("profile.noBio")}
           valueNode={<ProfileBio className="profile-bio account-profile-bio" bio={authUser.bio} />}
         />
       </div>
 
-      <div className="my-account-form-content">
-        {handleError ? <p className="inline-warning">{handleError}</p> : null}
-        {handleStatus ? <p className="status">{handleStatus}</p> : null}
-        {displayNameError ? <p className="inline-warning">{displayNameError}</p> : null}
-        {displayNameStatus ? <p className="status">{displayNameStatus}</p> : null}
-        {bioError ? <p className="inline-warning">{bioError}</p> : null}
-        {bioStatus ? <p className="status">{bioStatus}</p> : null}
-        {avatarError ? <p className="inline-warning">{avatarError}</p> : null}
-        {avatarStatus ? <p className="status">{avatarStatus}</p> : null}
+      {profileEditing ? (
+        <div className="desktop-account-actions">
+          <button
+            type="button"
+            className="primary desktop-account-save-button"
+            disabled={profileSaveDisabled}
+            onClick={() => {
+              void submitProfile();
+            }}
+          >
+            {profileSaving ? t("common.saving") : t("common.save")}
+          </button>
+          <button
+            type="button"
+            className="desktop-account-cancel-button"
+            onClick={cancelProfileEditing}
+            disabled={profileSaving}
+          >
+            {t("common.cancel")}
+          </button>
+        </div>
+      ) : null}
 
-        {showLogout ? (
-          <div className="my-account-actions">
-            <button
-              type="button"
-              className="my-plain-danger-button"
-              onClick={() => {
-                onClose();
-                onLogout();
-              }}
-            >
-              {t("account.logout")}
-            </button>
-          </div>
-        ) : null}
-      </div>
+      <AccountStatusMessages
+        avatarError={avatarError}
+        avatarStatus={avatarStatus}
+        bioError={bioError}
+        bioStatus={bioStatus}
+        displayNameError={displayNameError}
+        displayNameStatus={displayNameStatus}
+        handleError={handleError}
+        handleStatus={handleStatus}
+      />
     </div>
   );
 }

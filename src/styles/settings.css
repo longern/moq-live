@@ -1,8 +1,8 @@
 .settings-layout {
   grid-template-columns: minmax(0, 1fr);
   max-width: 1120px;
-  padding: 18px 0;
   margin: 0 auto;
+  padding: 16px;
 }
 
 .my-page-shell {
@@ -10,7 +10,7 @@
   min-height: 100%;
   margin: 0 auto;
   display: block;
-  padding: 20px 0 36px;
+  padding-bottom: 20px;
 }
 
 .profile-page-layout {
@@ -99,8 +99,6 @@
 }
 
 .my-profile-avatar {
-  width: 72px;
-  height: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -111,8 +109,6 @@
 }
 
 .my-profile-avatar img {
-  width: 100%;
-  height: 100%;
   display: block;
   object-fit: cover;
   border-radius: 999px;
@@ -633,6 +629,23 @@
   justify-content: space-between;
 }
 
+.settings-logout-card {
+  margin-top: 14px;
+}
+
+.settings-logout-menu-item {
+  justify-content: center;
+  text-align: center;
+}
+
+.settings-logout-menu-item .live-more-menu-label,
+.settings-logout-menu-item:hover:not(:disabled) .live-more-menu-label,
+.settings-logout-menu-item:focus-visible .live-more-menu-label {
+  flex: 0 1 auto;
+  color: var(--danger);
+  text-align: center;
+}
+
 .settings-menu-icon svg {
   width: 22px;
   height: 22px;
@@ -709,8 +722,7 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: nowrap;
-  gap: 12px;
-  padding: 14px 18px 10px;
+  padding: 16px;
 }
 
 .my-section-title {

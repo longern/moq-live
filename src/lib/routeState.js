@@ -1,7 +1,7 @@
 const DEFAULT_RELAY_URL = "https://draft-14.cloudflare.mediaoverquic.com/";
 const RELAY_URL_STORAGE_KEY = "moq-live.relay-url";
 
-export function readStoredRelayUrl() {
+function readStoredRelayUrl() {
   try {
     const storedRelayUrl = window.localStorage.getItem(RELAY_URL_STORAGE_KEY);
     return storedRelayUrl === null ? DEFAULT_RELAY_URL : storedRelayUrl;
@@ -102,5 +102,3 @@ export function writeRoute(
 
   history[historyMode === "push" ? "pushState" : "replaceState"]({}, "", next);
 }
-
-export { DEFAULT_RELAY_URL };

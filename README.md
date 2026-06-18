@@ -1,15 +1,19 @@
 # moq-live
 
-`moq-live` is a lightweight live-streaming web app built around Media over QUIC. It provides a viewer surface, a broadcaster surface, account settings, and a Cloudflare Worker backend for auth, room state, chat, and media uploads.
+`moq-live` is a lightweight live-streaming web app built around Media over QUIC. It provides a viewer surface, a broadcaster surface, account settings, and a Cloudflare Worker backend for auth, room state, chat, social features, notifications, and media uploads.
 
 ## Features
 
-- Watch live rooms by handle, room id, direct MoQ namespace, or WHEP playback URL.
+- Watch live rooms by host handle, with direct MoQ namespace support for development and diagnostics.
 - Broadcast from camera, microphone, or screen share over MoQ or WHIP.
 - Use MoQ by default, with WebRTC WHIP/WHEP support for publish and playback fallback.
-- Chat with presence, recent-message history, and broadcaster room-state sync.
-- Sign in with Microsoft OAuth and manage display name, handle, avatar, room title, welcome text, and cover image.
-- Store users, sessions, rooms, follows, and media on Cloudflare D1, Durable Objects, and R2.
+- Chat with presence, recent-message history, message retract, viewer mute controls, and broadcaster room-state sync.
+- Follow hosts, browse following/follower lists, and opt into live-start notifications.
+- Invite cohosts, accept or reject cohost requests, and watch active cohost streams in a split layout.
+- Share live room links and generated room/screenshot images.
+- Share live location while broadcasting so viewers can see the host's province and distance when available.
+- Sign in with Microsoft OAuth and manage display name, handle, bio, gender, birth date, avatar, room title, welcome text, and cover image.
+- Store users, sessions, rooms, follows, push subscriptions, and media on Cloudflare D1, Durable Objects, and R2.
 
 ## Stack
 
@@ -17,7 +21,13 @@
 - `@moq/watch` / `@moq/publish` for MoQ playback and publishing
 - WHIP/WHEP client helpers for WebRTC publish and playback
 - Cloudflare Workers for API and static asset serving
-- D1 for relational data, Durable Objects for chat/room state, and R2 for uploaded media
+- D1 for relational data, Durable Objects for chat/live/cohost/location/moderation state, and R2 for uploaded media
+
+## Architecture Notes
+
+- Viewer flow: a watch target resolves from a host handle or `ns:` namespace, then room state from `ChatRoomDO` drives MoQ or WebRTC playback.
+- Broadcaster flow: authenticated users activate a room, start preview/publish, and sync live stream metadata through the room's Durable Object.
+- Social flow: follows are stored in D1, live notification preferences attach to follow rows, and Web Push subscriptions receive live-start notifications.
 
 ## Getting Started
 
@@ -52,6 +62,9 @@ Required secrets and variables:
 - `MICROSOFT_CLIENT_SECRET`
 - `AUTH_COOKIE_SECRET`
 - `AUTH_SESSION_TTL_DAYS` (optional, defaults to `30`)
+- `WEB_PUSH_PUBLIC_KEY` and `WEB_PUSH_PRIVATE_KEY` for live-start push notifications
+- `WEB_PUSH_SUBJECT` (optional, defaults to `mailto:admin@example.com`)
+- `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (optional, used to provision Cloudflare Stream WebRTC live inputs for rooms)
 
 Database migrations are in `migrations/`. Apply them to the D1 database before running the authenticated room and profile flows.
 

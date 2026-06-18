@@ -359,7 +359,7 @@
 .desktop-settings-content .desktop-account-profile-row {
   display: flex;
   align-items: center;
-  padding: 16px 32px;
+  padding: 16px 40px;
   gap: 32px;
 }
 

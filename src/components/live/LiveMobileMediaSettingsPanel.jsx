@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
+import { applyCameraZoom, getPreviewVideoTrack, normalizeCameraZoom, readCameraZoom } from "../../lib/cameraZoom.js";
 import { FlipCameraIcon, MicrophoneIcon } from "./liveIcons.jsx";
 
 function getCameraStatusLabel(t, cameraMode, cameraUnavailable) {
@@ -13,34 +14,6 @@ function getCameraStatusLabel(t, cameraMode, cameraUnavailable) {
   }
 
   return t("live.cameraFront");
-}
-
-function readCameraZoom(track) {
-  const settings = track?.getSettings?.() ?? {};
-  const capabilities = track?.getCapabilities?.() ?? {};
-  const zoomCapabilities = capabilities.zoom;
-  if (!("zoom" in settings) || !zoomCapabilities || typeof zoomCapabilities !== "object") {
-    return null;
-  }
-
-  const min = Number.isFinite(zoomCapabilities.min) ? zoomCapabilities.min : 1;
-  const max = Number.isFinite(zoomCapabilities.max) ? zoomCapabilities.max : min;
-  const step = Number.isFinite(zoomCapabilities.step) && zoomCapabilities.step > 0 ? zoomCapabilities.step : 0.1;
-  const rawValue = Number.isFinite(settings.zoom) ? settings.zoom : min;
-  const value = Math.min(max, Math.max(min, rawValue));
-
-  return {
-    supported: max > min,
-    value,
-    min,
-    max,
-    step,
-  };
-}
-
-function getPreviewVideoTrack(previewVideoRef) {
-  const stream = previewVideoRef?.current?.srcObject;
-  return stream?.getVideoTracks?.()[0] ?? null;
 }
 
 function LiveMediaIconButton({
@@ -87,21 +60,16 @@ function CameraZoomControl({ previewVideoRef, cameraEnabled, cameraMode }) {
       return;
     }
 
-    const normalizedValue = Math.min(max, Math.max(min, nextValue));
+    const normalizedValue = normalizeCameraZoom(nextValue, zoom);
+    if (!Number.isFinite(normalizedValue)) {
+      return;
+    }
     setZoom((current) => ({ ...current, value: normalizedValue }));
 
     const track = getPreviewVideoTrack(previewVideoRef);
-    const applyZoom = track?.applyConstraints?.({
-      advanced: [{ zoom: normalizedValue }],
-    });
-    if (!applyZoom) {
-      setZoom(readCameraZoom(track));
-      return;
-    }
-
-    void applyZoom
-      .then(() => {
-        setZoom(readCameraZoom(track));
+    void applyCameraZoom(track, normalizedValue)
+      .then((nextZoom) => {
+        setZoom(nextZoom ?? readCameraZoom(track));
       })
       .catch(() => {
         setZoom(readCameraZoom(track));

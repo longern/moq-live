@@ -74,6 +74,13 @@
   aspect-ratio: auto;
 }
 
+.watch-pip-controls-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: transparent;
+}
+
 .page-immersive .placeholder,
 .page-immersive .publisher-placeholder {
   padding: 0;

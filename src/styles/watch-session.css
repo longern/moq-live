@@ -700,6 +700,27 @@
   white-space: nowrap;
 }
 
+.profile-info-chip.is-gender {
+  width: calc(1em + 8px);
+  min-width: calc(1em + 8px);
+  justify-content: center;
+  overflow: visible;
+}
+
+.profile-info-chip.is-male {
+  color: #4f9df7;
+}
+
+.profile-info-chip.is-female {
+  color: #f26aa3;
+}
+
+.profile-info-chip-gender-icon {
+  width: 1em;
+  height: 1em;
+  stroke-width: 2.4;
+}
+
 .watch-host-profile-location:not(:disabled) {
   cursor: pointer;
 }

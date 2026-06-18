@@ -1339,7 +1339,9 @@ async function handleProfileUpdate(env, request) {
   const user = await updateUserProfile(db, session.user.id, {
     ...(Object.hasOwn(payload, "displayName") ? { displayName: payload.displayName } : {}),
     ...(Object.hasOwn(payload, "handle") ? { handle: payload.handle } : {}),
-    ...(Object.hasOwn(payload, "bio") ? { bio: payload.bio } : {})
+    ...(Object.hasOwn(payload, "bio") ? { bio: payload.bio } : {}),
+    ...(Object.hasOwn(payload, "gender") ? { gender: payload.gender } : {}),
+    ...(Object.hasOwn(payload, "birthDate") ? { birthDate: payload.birthDate } : {})
   });
   return json({
     ok: true,

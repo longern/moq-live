@@ -105,6 +105,14 @@ export function useAuthController({ log, onAuthenticated }) {
     return updateProfile({ bio });
   }
 
+  async function updateGender(gender) {
+    return updateProfile({ gender });
+  }
+
+  async function updateBirthDate(birthDate) {
+    return updateProfile({ birthDate });
+  }
+
   async function updateAvatar(file) {
     const formData = new FormData();
     formData.set("avatar", file);
@@ -190,6 +198,8 @@ export function useAuthController({ log, onAuthenticated }) {
     updateDisplayName,
     updateHandle,
     updateBio,
+    updateGender,
+    updateBirthDate,
     updateAvatar,
     removeAvatar
   };

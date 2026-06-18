@@ -168,6 +168,81 @@
   margin: 0;
 }
 
+.account-choice-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.account-field-drawer-panel {
+  gap: 14px;
+  padding: 4px 16px calc(18px + env(safe-area-inset-bottom));
+}
+
+.account-field-drawer-head {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.account-field-drawer-head > strong {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.account-field-drawer-save {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--primary-hover);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.account-field-drawer-save:hover:not(:disabled),
+.account-field-drawer-save:focus-visible {
+  background: var(--primary-ring-soft);
+  color: color-mix(in srgb, var(--primary) 72%, white);
+}
+
+.account-field-drawer-save:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.account-field-drawer-save:disabled {
+  color: var(--muted);
+  opacity: 0.72;
+}
+
+.account-field-drawer-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 0 4px;
+}
+
+.account-field-drawer-input > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.account-field-drawer-input input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit;
+}
+
 .account-edit-actions {
   display: flex;
   flex-direction: column;

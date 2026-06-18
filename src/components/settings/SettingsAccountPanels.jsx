@@ -15,6 +15,16 @@ function EditIcon() {
   return <Pencil />;
 }
 
+const GENDER_OPTIONS = ["male", "female", "other"];
+
+export function formatAccountGender(value, t) {
+  const gender = String(value || "").trim().toLowerCase();
+  if (!gender) {
+    return t("common.notSet");
+  }
+  return t(`profile.gender.${gender}`) || t("common.notSet");
+}
+
 export function SettingsProfileAvatar({
   authUser,
   imgWidth,
@@ -43,13 +53,16 @@ export function SettingsProfileAvatar({
 function AccountEditableField({
   editing,
   inputValue,
+  inputType = "text",
   label,
   maxLength,
   multiline = false,
   note,
   onInput,
+  onSelectChange,
   placeholder,
   readOnly = false,
+  selectOptions = null,
   value,
   valueNode = null,
 }) {
@@ -70,8 +83,17 @@ function AccountEditableField({
                 readOnly={readOnly}
                 rows={3}
               />
+            ) : selectOptions ? (
+              <select value={inputValue} onChange={onSelectChange} disabled={readOnly}>
+                {selectOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             ) : (
               <input
+                type={inputType}
                 value={inputValue}
                 maxLength={maxLength}
                 onInput={onInput}
@@ -90,11 +112,13 @@ function AccountEditableField({
         </div>
       )}
 
-      <div className={`account-editable-collapse${editing ? " is-open" : ""}`} aria-hidden={!editing}>
-        <div className="account-editable-collapse-inner">
-          <p className="account-editable-note">{note}</p>
+      {note ? (
+        <div className={`account-editable-collapse${editing ? " is-open" : ""}`} aria-hidden={!editing}>
+          <div className="account-editable-collapse-inner">
+            <p className="account-editable-note">{note}</p>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -127,6 +151,10 @@ function MobileAccountNavigationRow({
 function AccountStatusMessages({
   avatarError,
   avatarStatus,
+  birthDateError,
+  birthDateStatus,
+  genderError,
+  genderStatus,
   bioError,
   bioStatus,
   displayNameError,
@@ -140,6 +168,10 @@ function AccountStatusMessages({
       {handleStatus ? <p className="status">{handleStatus}</p> : null}
       {displayNameError ? <p className="inline-warning">{displayNameError}</p> : null}
       {displayNameStatus ? <p className="status">{displayNameStatus}</p> : null}
+      {genderError ? <p className="inline-warning">{genderError}</p> : null}
+      {genderStatus ? <p className="status">{genderStatus}</p> : null}
+      {birthDateError ? <p className="inline-warning">{birthDateError}</p> : null}
+      {birthDateStatus ? <p className="status">{birthDateStatus}</p> : null}
       {bioError ? <p className="inline-warning">{bioError}</p> : null}
       {bioStatus ? <p className="status">{bioStatus}</p> : null}
       {avatarError ? <p className="inline-warning">{avatarError}</p> : null}
@@ -152,6 +184,7 @@ export function AccountEditDrawer({
   closeLabel,
   error,
   inputValue,
+  inputType = "text",
   label,
   maxLength,
   multiline = false,
@@ -206,6 +239,7 @@ export function AccountEditDrawer({
             />
           ) : (
             <input
+              type={inputType}
               value={inputValue}
               maxLength={maxLength}
               onInput={onInput}
@@ -234,6 +268,10 @@ export function AccountDrawer({
   avatarInputRef,
   avatarSaving,
   avatarStatus,
+  birthDateError,
+  birthDateStatus,
+  genderError,
+  genderStatus,
   displayNameError,
   displayNameStatus,
   bioError,
@@ -244,6 +282,8 @@ export function AccountDrawer({
   onOpenAvatarPicker,
   onSelectAvatar,
   startDisplayNameEditing,
+  startGenderEditing,
+  startBirthDateEditing,
   startBioEditing,
   startHandleEditing,
   transitionClassName,
@@ -270,6 +310,10 @@ export function AccountDrawer({
         avatarInputRef={avatarInputRef}
         avatarSaving={avatarSaving}
         avatarStatus={avatarStatus}
+        birthDateError={birthDateError}
+        birthDateStatus={birthDateStatus}
+        genderError={genderError}
+        genderStatus={genderStatus}
         displayNameError={displayNameError}
         displayNameStatus={displayNameStatus}
         bioError={bioError}
@@ -279,6 +323,8 @@ export function AccountDrawer({
         onOpenAvatarPicker={onOpenAvatarPicker}
         onSelectAvatar={onSelectAvatar}
         startDisplayNameEditing={startDisplayNameEditing}
+        startGenderEditing={startGenderEditing}
+        startBirthDateEditing={startBirthDateEditing}
         startBioEditing={startBioEditing}
         startHandleEditing={startHandleEditing}
       />
@@ -292,6 +338,10 @@ function MobileAccountDetailsContent({
   avatarInputRef,
   avatarSaving,
   avatarStatus,
+  birthDateError,
+  birthDateStatus,
+  genderError,
+  genderStatus,
   bioError,
   bioStatus,
   displayNameError,
@@ -301,6 +351,8 @@ function MobileAccountDetailsContent({
   onOpenAvatarPicker,
   onSelectAvatar,
   startDisplayNameEditing,
+  startGenderEditing,
+  startBirthDateEditing,
   startBioEditing,
   startHandleEditing,
 }) {
@@ -352,6 +404,18 @@ function MobileAccountDetailsContent({
           value={authUser.displayName || t("common.notSet")}
         />
         <MobileAccountNavigationRow
+          ariaLabel={t("accountPanel.editGender")}
+          label={t("accountPanel.gender")}
+          onClick={startGenderEditing}
+          value={formatAccountGender(authUser.gender, t)}
+        />
+        <MobileAccountNavigationRow
+          ariaLabel={t("accountPanel.editBirthDate")}
+          label={t("accountPanel.birthDate")}
+          onClick={startBirthDateEditing}
+          value={authUser.birthDate || t("common.notSet")}
+        />
+        <MobileAccountNavigationRow
           ariaLabel={t("accountPanel.editBio")}
           label={t("accountPanel.bio")}
           onClick={startBioEditing}
@@ -380,7 +444,14 @@ export function DesktopAccountDetailsContent({
   avatarInputRef,
   avatarSaving,
   avatarStatus,
+  birthDateEditing,
+  birthDateError,
+  birthDateInput,
+  birthDateSaving,
+  birthDateStatus,
+  cancelBirthDateEditing,
   cancelDisplayNameEditing,
+  cancelGenderEditing,
   cancelBioEditing,
   cancelHandleEditing,
   displayNameCooldownActive,
@@ -389,6 +460,11 @@ export function DesktopAccountDetailsContent({
   displayNameInput,
   displayNameSaving,
   displayNameStatus,
+  genderEditing,
+  genderError,
+  genderInput,
+  genderSaving,
+  genderStatus,
   bioEditing,
   bioError,
   bioInput,
@@ -403,19 +479,29 @@ export function DesktopAccountDetailsContent({
   handleStatus,
   onOpenAvatarPicker,
   onSelectAvatar,
+  setBirthDateError,
+  setBirthDateInput,
+  setBirthDateStatus,
   setDisplayNameError,
   setDisplayNameInput,
   setDisplayNameStatus,
+  setGenderError,
+  setGenderInput,
+  setGenderStatus,
   setBioError,
   setBioInput,
   setBioStatus,
   setHandleError,
   setHandleInput,
   setHandleStatus,
+  startBirthDateEditing,
   startDisplayNameEditing,
+  startGenderEditing,
   startBioEditing,
   startHandleEditing,
+  submitBirthDate,
   submitDisplayName,
+  submitGender,
   submitBio,
   submitHandle,
 }) {
@@ -428,22 +514,27 @@ export function DesktopAccountDetailsContent({
   const displayNameNote = displayNameCooldownActive
     ? t("accountPanel.displayNameCooldownNote", { time: new Date(authUser.nextDisplayNameChangeAt).toLocaleString(locale) })
     : t("accountPanel.displayNameNote");
-  const profileEditing = handleEditing || displayNameEditing || bioEditing;
+  const profileEditing = handleEditing || displayNameEditing || genderEditing || birthDateEditing || bioEditing;
   const normalizedHandleInput = handleInput.trim().toLowerCase();
   const normalizedCurrentHandle = (authUser.handle || "").toLowerCase();
   const normalizedCurrentDisplayName = (authUser.displayName || "").trim().replace(/\s+/g, " ").toLocaleLowerCase(locale);
   const normalizedDraftDisplayName = displayNameInput.trim().replace(/\s+/g, " ").toLocaleLowerCase(locale);
+  const currentGender = authUser.gender || "";
+  const normalizedCurrentBirthDate = (authUser.birthDate || "").trim();
+  const normalizedDraftBirthDate = birthDateInput.trim();
   const normalizedCurrentBio = (authUser.bio || "").trim();
   const normalizedDraftBio = bioInput.trim();
   const handleReadOnly = !handleIsDefault && handleCooldownActive;
   const displayNameReadOnly = displayNameCooldownActive;
   const handleChanged = normalizedHandleInput !== normalizedCurrentHandle;
   const displayNameChanged = normalizedDraftDisplayName !== normalizedCurrentDisplayName;
+  const genderChanged = genderInput !== currentGender;
+  const birthDateChanged = normalizedDraftBirthDate !== normalizedCurrentBirthDate;
   const bioChanged = normalizedDraftBio !== normalizedCurrentBio;
   const editableHandleChanged = !handleReadOnly && handleChanged;
   const editableDisplayNameChanged = !displayNameReadOnly && displayNameChanged;
-  const profileChanged = editableHandleChanged || editableDisplayNameChanged || bioChanged;
-  const profileSaving = handleSaving || displayNameSaving || bioSaving;
+  const profileChanged = editableHandleChanged || editableDisplayNameChanged || genderChanged || birthDateChanged || bioChanged;
+  const profileSaving = handleSaving || displayNameSaving || genderSaving || birthDateSaving || bioSaving;
   const profileSaveInvalid =
     (editableHandleChanged && !normalizedHandleInput)
     || (editableDisplayNameChanged && !displayNameInput.trim());
@@ -452,12 +543,16 @@ export function DesktopAccountDetailsContent({
   function startProfileEditing() {
     startHandleEditing();
     startDisplayNameEditing();
+    startGenderEditing();
+    startBirthDateEditing();
     startBioEditing();
   }
 
   function cancelProfileEditing() {
     cancelHandleEditing();
     cancelDisplayNameEditing();
+    cancelGenderEditing();
+    cancelBirthDateEditing();
     cancelBioEditing();
   }
 
@@ -472,8 +567,14 @@ export function DesktopAccountDetailsContent({
     if (!editableDisplayNameChanged) {
       cancelDisplayNameEditing();
     }
+    if (!genderChanged) {
+      cancelGenderEditing();
+    }
     if (!bioChanged) {
       cancelBioEditing();
+    }
+    if (!birthDateChanged) {
+      cancelBirthDateEditing();
     }
 
     if (editableHandleChanged) {
@@ -481,6 +582,12 @@ export function DesktopAccountDetailsContent({
     }
     if (editableDisplayNameChanged) {
       await submitDisplayName();
+    }
+    if (genderChanged) {
+      await submitGender();
+    }
+    if (birthDateChanged) {
+      await submitBirthDate();
     }
     if (bioChanged) {
       await submitBio();
@@ -576,6 +683,37 @@ export function DesktopAccountDetailsContent({
         />
 
         <AccountEditableField
+          editing={genderEditing}
+          inputValue={genderInput}
+          label={t("accountPanel.gender")}
+          onSelectChange={(event) => {
+            setGenderInput(event.currentTarget.value);
+            setGenderError("");
+            setGenderStatus("");
+          }}
+          selectOptions={
+            GENDER_OPTIONS.map((gender) => ({
+              value: gender,
+              label: t(`profile.gender.${gender}`),
+            }))
+          }
+          value={formatAccountGender(authUser.gender, t)}
+        />
+
+        <AccountEditableField
+          editing={birthDateEditing}
+          inputType="date"
+          inputValue={birthDateInput}
+          label={t("accountPanel.birthDate")}
+          onInput={(event) => {
+            setBirthDateInput(event.currentTarget.value);
+            setBirthDateError("");
+            setBirthDateStatus("");
+          }}
+          value={authUser.birthDate || t("common.notSet")}
+        />
+
+        <AccountEditableField
           editing={bioEditing}
           inputValue={bioInput}
           label={t("accountPanel.bio")}
@@ -619,6 +757,10 @@ export function DesktopAccountDetailsContent({
       <AccountStatusMessages
         avatarError={avatarError}
         avatarStatus={avatarStatus}
+        birthDateError={birthDateError}
+        birthDateStatus={birthDateStatus}
+        genderError={genderError}
+        genderStatus={genderStatus}
         bioError={bioError}
         bioStatus={bioStatus}
         displayNameError={displayNameError}

@@ -182,6 +182,7 @@
 }
 
 .account-editable-value-editing input,
+.account-editable-value-editing select,
 .account-editable-value-editing textarea {
   flex: 0 1 240px;
   min-width: 0;
@@ -515,6 +516,10 @@
   .my-account-form.is-desktop-form
   .account-editable-value-editing
   input,
+.desktop-settings-content
+  .my-account-form.is-desktop-form
+  .account-editable-value-editing
+  select,
 .account-editable-value-editing textarea {
   flex: 0 1 260px;
 }
@@ -522,7 +527,7 @@
 .desktop-settings-content
   .my-account-form.is-desktop-form
   .account-editable-collapse-inner {
-  margin-left: 152px;
+  margin-left: 168px;
 }
 
 .desktop-settings-content
@@ -539,7 +544,7 @@
   align-items: center;
   gap: 12px;
   margin-top: 4px;
-  margin-left: 152px;
+  margin-left: 168px;
 }
 
 .desktop-account-save-button,

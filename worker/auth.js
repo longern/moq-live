@@ -21,6 +21,7 @@ const MAX_ROOM_TITLE_LENGTH = 80;
 const MAX_ROOM_WELCOME_MESSAGE_LENGTH = 160;
 const CLOUDFLARE_API_BASE_URL = "https://api.cloudflare.com/client/v4";
 const MAX_BIO_LENGTH = 160;
+const MAX_PROFILE_AGE = 130;
 const ROOM_COVER_TYPES = {
   "image/avif": "avif",
   "image/jpeg": "jpg",
@@ -577,8 +578,10 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
   const hasDisplayNameUpdate = Object.hasOwn(nextProfile, "displayName");
   const hasHandleUpdate = Object.hasOwn(nextProfile, "handle");
   const hasBioUpdate = Object.hasOwn(nextProfile, "bio");
+  const hasGenderUpdate = Object.hasOwn(nextProfile, "gender");
+  const hasBirthDateUpdate = Object.hasOwn(nextProfile, "birthDate");
 
-  if (!hasDisplayNameUpdate && !hasHandleUpdate && !hasBioUpdate) {
+  if (!hasDisplayNameUpdate && !hasHandleUpdate && !hasBioUpdate && !hasGenderUpdate && !hasBirthDateUpdate) {
     throw createHttpError(
       400,
       "No profile fields provided",
@@ -591,6 +594,8 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
   let nextHandle = currentUser.handle;
   let nextHandleChangedAt = currentUser.handle_changed_at;
   let nextBio = currentUser.bio || "";
+  let nextGender = currentUser.gender || "";
+  let nextBirthDate = currentUser.birth_date || "";
   let changed = false;
 
   if (hasDisplayNameUpdate) {
@@ -679,6 +684,22 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
     }
   }
 
+  if (hasBirthDateUpdate) {
+    const birthDate = sanitizeBirthDate(nextProfile.birthDate);
+    if ((currentUser.birth_date || "") !== birthDate) {
+      nextBirthDate = birthDate;
+      changed = true;
+    }
+  }
+
+  if (hasGenderUpdate) {
+    const gender = sanitizeGender(nextProfile.gender);
+    if ((currentUser.gender || "") !== gender) {
+      nextGender = gender;
+      changed = true;
+    }
+  }
+
   if (!changed) {
     return buildUserPayload(currentUser);
   }
@@ -687,7 +708,7 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
   await db
     .prepare(
       `UPDATE ${TABLES.users}
-     SET handle = ?, handle_changed_at = ?, display_name = ?, display_name_changed_at = ?, bio = ?, updated_at = ?
+     SET handle = ?, handle_changed_at = ?, display_name = ?, display_name_changed_at = ?, bio = ?, gender = ?, birth_date = ?, updated_at = ?
      WHERE id = ?`,
     )
     .bind(
@@ -696,6 +717,8 @@ export async function updateUserProfile(db, userId, nextProfile = {}) {
       nextDisplayName,
       nextDisplayNameChangedAt,
       nextBio,
+      nextGender,
+      nextBirthDate,
       now,
       userId,
     )
@@ -978,6 +1001,58 @@ function sanitizeBio(value) {
   }
 
   return bio;
+}
+
+function sanitizeGender(value) {
+  if (typeof value !== "string") {
+    throw createHttpError(400, "invalid_gender", "invalid_gender");
+  }
+
+  const gender = value.trim().toLowerCase();
+  if (!gender) {
+    return "";
+  }
+  if (!["male", "female", "other"].includes(gender)) {
+    throw createHttpError(400, "invalid_gender", "invalid_gender");
+  }
+  return gender;
+}
+
+function sanitizeBirthDate(value) {
+  if (typeof value !== "string") {
+    throw createHttpError(400, "invalid_birth_date", "invalid_birth_date");
+  }
+
+  const birthDate = value.trim();
+  if (!birthDate) {
+    return "";
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate);
+  if (!match) {
+    throw createHttpError(400, "invalid_birth_date", "invalid_birth_date");
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year
+    || date.getMonth() !== month - 1
+    || date.getDate() !== day
+  ) {
+    throw createHttpError(400, "invalid_birth_date", "invalid_birth_date");
+  }
+
+  const today = new Date();
+  const minYear = today.getFullYear() - MAX_PROFILE_AGE;
+  const minDate = new Date(minYear, today.getMonth(), today.getDate());
+  if (date > today || date < minDate) {
+    throw createHttpError(400, "invalid_birth_date", "invalid_birth_date");
+  }
+
+  return birthDate;
 }
 
 function sanitizeRoomTitle(value) {

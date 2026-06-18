@@ -5,6 +5,14 @@
   padding: 16px;
 }
 
+.settings-page-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: var(--z-toast);
+  transform: translateX(-50%);
+}
+
 .my-page-shell {
   width: 100%;
   min-height: 100%;

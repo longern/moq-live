@@ -29,7 +29,7 @@ import {
   getWatchStageLayout,
 } from "../lib/watchSession.js";
 import { getWatchStageView } from "../lib/watchStageView.js";
-import { useCompactViewport, usePortraitViewport } from "../hooks/useMediaQuery.js";
+import { useCompactViewport, useMediaQuery, usePortraitViewport } from "../hooks/useMediaQuery.js";
 import { useWatchHostDistance } from "../hooks/useWatchHostDistance.js";
 import { useWatchPictureInPicture } from "../hooks/useWatchPictureInPicture.js";
 import { useWatchShareActions } from "../hooks/useWatchShareActions.js";
@@ -140,11 +140,15 @@ export function WatchSessionPage({
   const { showToast } = useToast();
   const compactViewport = useCompactViewport();
   const portraitViewport = usePortraitViewport();
+  const shortLandscapeViewport = useMediaQuery("(max-width: 980px) and (orientation: landscape) and (max-height: 520px)");
   const portraitMedia = isPortraitMedia(playerOrientation);
   const immersivePortrait = shouldUsePortraitImmersiveMode({
     mediaOrientation: playerOrientation,
     portraitViewport,
   });
+  const fullscreenLandscapeMedia = Boolean(
+    fullscreenActive && !portraitMedia && (compactViewport || portraitViewport || shortLandscapeViewport)
+  );
   const audienceCountText = formatAudienceCount(chatOnlineCount);
   const hostFollowerCountText = formatAudienceCount(hostFollowerCount);
   const hostFollowingCountText = formatAudienceCount(hostFollowingCount);
@@ -152,9 +156,15 @@ export function WatchSessionPage({
   const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
   const showHostFollowButton = Boolean(hostUserId && authUser?.id !== hostUserId);
   const showCohostLayout = Boolean(cohostActive && (cohostPlayerSession || cohostPlayerBadge.state === "warm"));
-  const immersiveShell = immersivePortrait || (portraitViewport && showCohostLayout);
+  const landscapeImmersive = Boolean(shortLandscapeViewport && !portraitMedia && !showCohostLayout);
+  const immersiveShell = immersivePortrait || fullscreenLandscapeMedia || landscapeImmersive || (portraitViewport && showCohostLayout);
+  const longPressOpensMore = Boolean(portraitViewport && !portraitMedia && !fullscreenActive);
+  const manualHideControlsEnabled = !longPressOpensMore;
+  const showStagePictureInPictureControl = !(compactViewport && !portraitMedia);
   const stageControls = useWatchStageControls({
+    controlsHoldActive: longPressOpensMore && moreOpen,
     immersiveShell,
+    manualHideControlsEnabled,
     playerBadgeState: playerBadge.state,
     playerSession,
   });
@@ -172,14 +182,21 @@ export function WatchSessionPage({
     cohost: showCohostLayout,
     portrait: portraitMedia,
   });
-  const immersiveStage = stageLayout === "single-portrait" || stageLayout === "cohost";
+  const immersiveStage = stageLayout === "single-portrait" || stageLayout === "cohost" || landscapeImmersive || fullscreenLandscapeMedia;
   const stageClassName = [
     "stage-frame",
     "watch-stage-frame",
     controlsVisible ? "controls-visible" : "",
     immersiveStage ? "is-immersive-stage" : "",
+    landscapeImmersive ? "is-landscape-immersive-stage" : "",
+    fullscreenLandscapeMedia ? "is-fullscreen-landscape-media" : "",
     stageLayout === "single-portrait" ? "is-portrait" : "",
     stageLayout === "cohost" ? "is-cohost-stage" : "",
+  ].filter(Boolean).join(" ");
+  const watchLayoutClassName = [
+    "page-grid",
+    "watch-layout",
+    landscapeImmersive ? "media-layout media-landscape-immersive" : "",
   ].filter(Boolean).join(" ");
   const stageView = getWatchStageView({
     playerSession,
@@ -334,6 +351,26 @@ export function WatchSessionPage({
     setAudienceOpen(false);
   }
 
+  function handleWatchStageContextMenu(event) {
+    if (longPressOpensMore) {
+      event.preventDefault();
+      openMoreSheet();
+      return;
+    }
+
+    handleStageContextMenu(event);
+  }
+
+  function handleWatchStageLongPress() {
+    if (longPressOpensMore) {
+      revealControls();
+      openMoreSheet();
+      return true;
+    }
+
+    return handleStageLongPress();
+  }
+
   function renderMobileMoreButton(className = "watch-composer-more-mobile") {
     return (
       <button
@@ -349,6 +386,15 @@ export function WatchSessionPage({
         <MoreHorizontal aria-hidden="true" />
       </button>
     );
+  }
+
+  function handleMobileHudBack() {
+    if (fullscreenLandscapeMedia) {
+      onFullscreen?.();
+      return;
+    }
+
+    onStop?.();
   }
 
   function renderMobileHud(className = "", persistent = false) {
@@ -367,7 +413,7 @@ export function WatchSessionPage({
         onOpenAudienceSheet={openAudienceSheet}
         onOpenHostProfile={openHostProfile}
         onOpenMoreSheet={openMoreSheet}
-        onStop={onStop}
+        onStop={handleMobileHudBack}
         showMoreButton={false}
         visible={visible}
       />
@@ -399,14 +445,15 @@ export function WatchSessionPage({
       elementPipSupported={elementPipSupported}
       fullscreenActive={fullscreenActive}
       handleStageClick={handleStageClick}
-      handleStageContextMenu={handleStageContextMenu}
-      handleStageLongPress={handleStageLongPress}
+      handleStageContextMenu={handleWatchStageContextMenu}
+      handleStageLongPress={handleWatchStageLongPress}
       handleStagePointerLeave={handleStagePointerLeave}
       handleStagePointerMove={handleStagePointerMove}
       hostChipLabel={hostChipLabel}
       hostDisplayName={hostDisplayName}
       immersiveControlsHidden={immersiveControlsHidden}
       immersiveShell={immersiveShell}
+      longPressControlsEnabled={manualHideControlsEnabled || longPressOpensMore}
       mobileHudOverlay={renderMobileHud("stage-mobile-hud-overlay", true)}
       onChatDraftChange={onChatDraftChange}
       onChatRequireLogin={onChatRequireLogin}
@@ -426,10 +473,12 @@ export function WatchSessionPage({
       playerSession={playerSession}
       revealControls={revealControls}
       showCohostLayout={showCohostLayout}
+      showPictureInPictureControl={showStagePictureInPictureControl}
       showTapToUnmute={showTapToUnmute}
       stageClassName={stageClassName}
       stageRef={stageRef}
       stageView={stageView}
+      suppressStageControls={Boolean(pipWindow)}
       testPlayback={testPlayback}
       videoPipSupported={videoPipSupported}
       welcomeMessage={welcomeMessage}
@@ -444,7 +493,7 @@ export function WatchSessionPage({
       data-immersive={immersiveShell ? "true" : "false"}
       hidden={hidden}
     >
-      <div className="page-grid watch-layout">
+      <div className={watchLayoutClassName}>
         <section className="stage-column">
           {!immersiveShell ? renderMobileHud("stage-mobile-hud-top", true) : null}
           {watchStage}

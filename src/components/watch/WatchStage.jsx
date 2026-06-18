@@ -131,6 +131,7 @@ export function WatchPictureInPictureControlsLayer({
         playerPaused={playerPaused}
         playerSession={playerSession}
         revealControls={revealControls}
+        showFullscreenControl={false}
         videoPipSupported={videoPipSupported}
       />
     </div>
@@ -202,6 +203,7 @@ function WatchStageControls({
   playerPaused,
   playerSession,
   revealControls,
+  showPictureInPictureControl = true,
   showFullscreenControl = true,
   videoPipSupported,
 }) {
@@ -233,19 +235,21 @@ function WatchStageControls({
         >
           {playerMuted ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
         </button>
-        <button
-          type="button"
-          className="stage-control-button"
-          onClick={(event) => {
-            event.stopPropagation();
-            void onOpenPictureInPicture();
-            revealControls();
-          }}
-          disabled={!(elementPipSupported || videoPipSupported) || !playerSession}
-          aria-label={pictureInPictureActive ? "关闭小窗播放" : "小窗播放"}
-        >
-          <PictureInPicture2 aria-hidden="true" />
-        </button>
+        {showPictureInPictureControl ? (
+          <button
+            type="button"
+            className="stage-control-button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void onOpenPictureInPicture();
+              revealControls();
+            }}
+            disabled={!(elementPipSupported || videoPipSupported) || !playerSession}
+            aria-label={pictureInPictureActive ? "关闭小窗播放" : "小窗播放"}
+          >
+            <PictureInPicture2 aria-hidden="true" />
+          </button>
+        ) : null}
         {showFullscreenControl ? (
           <button
             type="button"
@@ -297,6 +301,7 @@ export function WatchStage({
   hostDisplayName,
   immersiveControlsHidden,
   immersiveShell,
+  longPressControlsEnabled = true,
   mobileHudOverlay,
   onChatDraftChange,
   onChatRequireLogin,
@@ -316,10 +321,12 @@ export function WatchStage({
   playerBadgeState,
   revealControls,
   showCohostLayout,
+  showPictureInPictureControl = true,
   showTapToUnmute,
   stageClassName,
   stageRef,
   stageView,
+  suppressStageControls = false,
   testPlayback,
   videoPipSupported,
   welcomeMessage,
@@ -331,6 +338,7 @@ export function WatchStage({
       longPressEnabled={Boolean(
         playerSession
           && playerBadgeState !== "error"
+          && longPressControlsEnabled
           && (immersiveShell || controlsVisible)
       )}
       longPressIgnoreSelector={STAGE_LONG_PRESS_IGNORE_SELECTOR}
@@ -339,6 +347,7 @@ export function WatchStage({
       onMouseLeave={handleStagePointerLeave}
       onClick={handleStageClick}
       onContextMenu={handleStageContextMenu}
+      touchTapFallbackEnabled
     >
       <div id="playerMount" className={showCohostLayout ? "watch-player-mount is-cohost" : "watch-player-mount"}>
         <WatchPrimaryPlayer
@@ -424,7 +433,7 @@ export function WatchStage({
           />
         </div>
       ) : null}
-      {stageView.showPlaybackControls && !immersiveShell ? (
+      {stageView.showPlaybackControls && !immersiveShell && !suppressStageControls ? (
         <WatchStageControls
           controlsVisible={controlsVisible}
           elementPipSupported={elementPipSupported}
@@ -435,12 +444,12 @@ export function WatchStage({
           onTogglePlayback={onTogglePlayback}
           pictureInPictureActive={pictureInPictureActive}
           playerMuted={playerMuted}
-        playerPaused={playerPaused}
-        playerSession={playerSession}
-        revealControls={revealControls}
-        showFullscreenControl={false}
-        videoPipSupported={videoPipSupported}
-      />
+          playerPaused={playerPaused}
+          playerSession={playerSession}
+          revealControls={revealControls}
+          showPictureInPictureControl={showPictureInPictureControl}
+          videoPipSupported={videoPipSupported}
+        />
       ) : null}
     </LongPressTarget>
   );

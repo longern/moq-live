@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 
 export function useWatchStageControls({
+  controlsHoldActive = false,
   immersiveShell,
+  manualHideControlsEnabled = true,
   playerBadgeState,
   playerSession,
 }) {
   const [controlsVisible, setControlsVisible] = useState(false);
   const [immersiveControlsHidden, setImmersiveControlsHidden] = useState(false);
   const hideTimerRef = useRef(null);
+  const controlsHoldActiveRef = useRef(false);
   const touchModeRef = useRef(false);
 
   function clearHideTimer() {
@@ -17,13 +20,19 @@ export function useWatchStageControls({
     }
   }
 
-  function hideControls() {
+  function hideControls({ force = false } = {}) {
     clearHideTimer();
+    if (controlsHoldActiveRef.current && !force) {
+      return;
+    }
     setControlsVisible(false);
   }
 
   function scheduleHide(delay = 1600) {
     clearHideTimer();
+    if (controlsHoldActiveRef.current) {
+      return;
+    }
     hideTimerRef.current = window.setTimeout(() => {
       setControlsVisible(false);
       hideTimerRef.current = null;
@@ -72,6 +81,10 @@ export function useWatchStageControls({
       return;
     }
 
+    if (!manualHideControlsEnabled) {
+      return;
+    }
+
     if (immersiveShell) {
       event.preventDefault();
       clearHideTimer();
@@ -94,6 +107,10 @@ export function useWatchStageControls({
       return false;
     }
 
+    if (!manualHideControlsEnabled) {
+      return false;
+    }
+
     if (immersiveShell) {
       clearHideTimer();
       setImmersiveControlsHidden(true);
@@ -113,14 +130,44 @@ export function useWatchStageControls({
   }, []);
 
   useEffect(() => {
+    const wasHoldActive = controlsHoldActiveRef.current;
+    controlsHoldActiveRef.current = controlsHoldActive;
+
+    if (controlsHoldActive) {
+      clearHideTimer();
+      if (playerSession && playerBadgeState !== "error") {
+        if (immersiveShell) {
+          setImmersiveControlsHidden(false);
+        } else {
+          setControlsVisible(true);
+        }
+      }
+      return undefined;
+    }
+
+    if (
+      wasHoldActive
+      && playerSession
+      && playerBadgeState !== "error"
+      && !immersiveShell
+      && touchModeRef.current
+      && controlsVisible
+    ) {
+      scheduleHide(2200);
+    }
+
+    return undefined;
+  }, [controlsHoldActive, controlsVisible, immersiveShell, playerBadgeState, playerSession]);
+
+  useEffect(() => {
     if (!playerSession || playerBadgeState === "error") {
-      hideControls();
+      hideControls({ force: true });
       setImmersiveControlsHidden(false);
       return undefined;
     }
 
     if (immersiveShell) {
-      hideControls();
+      hideControls({ force: true });
       setImmersiveControlsHidden(false);
       return undefined;
     }

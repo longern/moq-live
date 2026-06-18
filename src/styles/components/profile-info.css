@@ -1,0 +1,49 @@
+.profile-info-chips {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  color: rgba(235, 244, 251, 0.58);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.profile-info-chip {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 22px;
+  padding: 2px 4px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  background: rgba(235, 244, 251, 0.055);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-info-chip.is-gender {
+  width: calc(1em + 8px);
+  min-width: calc(1em + 8px);
+  justify-content: center;
+  overflow: visible;
+}
+
+.profile-info-chip.is-male {
+  color: #4f9df7;
+}
+
+.profile-info-chip.is-female {
+  color: #f26aa3;
+}
+
+.profile-info-chip-gender-icon {
+  width: 1em;
+  height: 1em;
+  stroke-width: 2.4;
+}

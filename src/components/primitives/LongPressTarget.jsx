@@ -12,6 +12,7 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
   longPressMoveTolerance = DEFAULT_MOVE_TOLERANCE,
   onClick,
   onLongPress,
+  touchTapFallbackEnabled = false,
   onTouchCancel,
   onTouchEnd,
   onTouchMove,
@@ -44,8 +45,13 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
   function handleTouchStart(event) {
     onTouchStart?.(event);
     clearLongPressTimer();
+    handledRef.current = false;
 
-    if (!longPressEnabled || shouldIgnoreLongPress(event) || event.touches.length !== 1) {
+    const canTrackTouch = (longPressEnabled || touchTapFallbackEnabled)
+      && !shouldIgnoreLongPress(event)
+      && event.touches.length === 1;
+
+    if (!canTrackTouch) {
       return;
     }
 
@@ -53,8 +59,13 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
     touchRef.current = {
       clientX: touch.clientX,
       clientY: touch.clientY,
+      tapFallbackEligible: touchTapFallbackEnabled,
     };
-    handledRef.current = false;
+
+    if (!longPressEnabled) {
+      return;
+    }
+
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
       const handled = onLongPress?.(event) !== false;
@@ -82,10 +93,20 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
 
   function handleTouchEnd(event) {
     onTouchEnd?.(event);
+    const touch = touchRef.current;
+    const shouldRunTapFallback = touch?.tapFallbackEligible && !handledRef.current;
     clearLongPressTimer();
     if (handledRef.current) {
       event.preventDefault();
       event.stopPropagation();
+      return;
+    }
+
+    if (shouldRunTapFallback) {
+      handledRef.current = true;
+      event.preventDefault();
+      event.stopPropagation();
+      onClick?.(event);
     }
   }
 

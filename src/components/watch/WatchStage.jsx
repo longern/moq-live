@@ -324,6 +324,7 @@ export function WatchStage({
   showPictureInPictureControl = true,
   showTapToUnmute,
   stageClassName,
+  fullscreenSideSheetHostRef,
   stageRef,
   stageView,
   suppressStageControls = false,
@@ -347,110 +348,116 @@ export function WatchStage({
       onMouseLeave={handleStagePointerLeave}
       onClick={handleStageClick}
       onContextMenu={handleStageContextMenu}
-      touchTapFallbackEnabled
     >
-      <div id="playerMount" className={showCohostLayout ? "watch-player-mount is-cohost" : "watch-player-mount"}>
-        <WatchPrimaryPlayer
-          hostDisplayName={hostDisplayName}
-          hostChipLabel={hostChipLabel}
-          playerMuted={playerMuted}
-          playerOrientation={playerOrientation}
-          playerRef={playerRef}
-          playerSession={playerSession}
-          showCohostLayout={showCohostLayout}
-          stageView={stageView}
-          testPlayback={testPlayback}
-        />
-        {showCohostLayout ? (
-          <WatchCohostPlayer
-            cohostActive={cohostActive}
-            cohostPlayerBadge={cohostPlayerBadge}
-            cohostPlayerMuted={cohostPlayerMuted}
-            cohostPlayerOrientation={cohostPlayerOrientation}
-            cohostPlayerRef={cohostPlayerRef}
-            cohostPlayerSession={cohostPlayerSession}
-            cohostPlayerStatus={cohostPlayerStatus}
-          />
-        ) : null}
-      </div>
-      {playerFreezeFrameUrl ? (
-        <img
-          className="stage-freeze-frame"
-          src={playerFreezeFrameUrl}
-          alt=""
-          aria-hidden="true"
-        />
-      ) : null}
-      {stageView.statusOverlayKind ? (
-        <div className={`stage-error${stageView.statusOverlayKind === "status" ? " stage-status-overlay" : ""}`}>
-          <p>{stageView.statusOverlayMessage}</p>
+      <div className="watch-fullscreen-media-layout">
+        <div className="watch-fullscreen-media-pane">
+          <div id="playerMount" className={showCohostLayout ? "watch-player-mount is-cohost" : "watch-player-mount"}>
+            <WatchPrimaryPlayer
+              hostDisplayName={hostDisplayName}
+              hostChipLabel={hostChipLabel}
+              playerMuted={playerMuted}
+              playerOrientation={playerOrientation}
+              playerRef={playerRef}
+              playerSession={playerSession}
+              showCohostLayout={showCohostLayout}
+              stageView={stageView}
+              testPlayback={testPlayback}
+            />
+            {showCohostLayout ? (
+              <WatchCohostPlayer
+                cohostActive={cohostActive}
+                cohostPlayerBadge={cohostPlayerBadge}
+                cohostPlayerMuted={cohostPlayerMuted}
+                cohostPlayerOrientation={cohostPlayerOrientation}
+                cohostPlayerRef={cohostPlayerRef}
+                cohostPlayerSession={cohostPlayerSession}
+                cohostPlayerStatus={cohostPlayerStatus}
+              />
+            ) : null}
+          </div>
+          {playerFreezeFrameUrl ? (
+            <img
+              className="stage-freeze-frame"
+              src={playerFreezeFrameUrl}
+              alt=""
+              aria-hidden="true"
+            />
+          ) : null}
+          {stageView.statusOverlayKind ? (
+            <div className={`stage-error${stageView.statusOverlayKind === "status" ? " stage-status-overlay" : ""}`}>
+              <p>{stageView.statusOverlayMessage}</p>
+            </div>
+          ) : null}
+          {showTapToUnmute && playerSession && playerBadgeState !== "error" ? (
+            <button
+              type="button"
+              className="stage-unmute-prompt"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDismissTapToUnmute();
+                if (!immersiveShell) {
+                  revealControls();
+                }
+              }}
+            >
+              点按以取消静音
+            </button>
+          ) : null}
+          {immersiveShell ? mobileHudOverlay : null}
+          {immersiveShell ? (
+            <div
+              className={`watch-portrait-chat-overlay${immersiveControlsHidden ? " is-hidden" : ""}`}
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+            >
+              <ChatPanel
+                roomLabel={chatRoomLabel}
+                welcomeMessage={welcomeMessage}
+                authAvailable={authAvailable}
+                authLoading={authLoading}
+                authUser={authUser}
+                messages={chatMessages}
+                draft={chatDraft}
+                onDraftChange={onChatDraftChange}
+                onSend={onChatSend}
+                onRequireLogin={onChatRequireLogin}
+                connectionState={chatConnectionState}
+                onlineCount={chatOnlineCount}
+                readOnly={chatReadOnly}
+                chatError={chatError}
+                chatRecovering={chatRecovering}
+                variant="floating"
+                className="chat-panel-watch-overlay"
+                composerTrailingAction={chatTrailingAction}
+                showSendButton={false}
+              />
+            </div>
+          ) : null}
+          {stageView.showPlaybackControls && !immersiveShell && !suppressStageControls ? (
+            <WatchStageControls
+              controlsVisible={controlsVisible}
+              elementPipSupported={elementPipSupported}
+              fullscreenActive={fullscreenActive}
+              onFullscreen={onFullscreen}
+              onOpenPictureInPicture={onOpenPictureInPicture}
+              onToggleMute={onToggleMute}
+              onTogglePlayback={onTogglePlayback}
+              pictureInPictureActive={pictureInPictureActive}
+              playerMuted={playerMuted}
+              playerPaused={playerPaused}
+              playerSession={playerSession}
+              revealControls={revealControls}
+              showPictureInPictureControl={showPictureInPictureControl}
+              videoPipSupported={videoPipSupported}
+            />
+          ) : null}
         </div>
-      ) : null}
-      {showTapToUnmute && playerSession && playerBadgeState !== "error" ? (
-        <button
-          type="button"
-          className="stage-unmute-prompt"
-          onClick={(event) => {
-            event.stopPropagation();
-            onDismissTapToUnmute();
-            if (!immersiveShell) {
-              revealControls();
-            }
-          }}
-        >
-          点按以取消静音
-        </button>
-      ) : null}
-      {immersiveShell ? mobileHudOverlay : null}
-      {immersiveShell ? (
         <div
-          className={`watch-portrait-chat-overlay${immersiveControlsHidden ? " is-hidden" : ""}`}
-          onClick={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <ChatPanel
-            roomLabel={chatRoomLabel}
-            welcomeMessage={welcomeMessage}
-            authAvailable={authAvailable}
-            authLoading={authLoading}
-            authUser={authUser}
-            messages={chatMessages}
-            draft={chatDraft}
-            onDraftChange={onChatDraftChange}
-            onSend={onChatSend}
-            onRequireLogin={onChatRequireLogin}
-            connectionState={chatConnectionState}
-            onlineCount={chatOnlineCount}
-            readOnly={chatReadOnly}
-            chatError={chatError}
-            chatRecovering={chatRecovering}
-            variant="floating"
-            className="chat-panel-watch-overlay"
-            composerTrailingAction={chatTrailingAction}
-            composerTrailingActionClassName="watch-composer-more-extra"
-            showSendButton={false}
-          />
-        </div>
-      ) : null}
-      {stageView.showPlaybackControls && !immersiveShell && !suppressStageControls ? (
-        <WatchStageControls
-          controlsVisible={controlsVisible}
-          elementPipSupported={elementPipSupported}
-          fullscreenActive={fullscreenActive}
-          onFullscreen={onFullscreen}
-          onOpenPictureInPicture={onOpenPictureInPicture}
-          onToggleMute={onToggleMute}
-          onTogglePlayback={onTogglePlayback}
-          pictureInPictureActive={pictureInPictureActive}
-          playerMuted={playerMuted}
-          playerPaused={playerPaused}
-          playerSession={playerSession}
-          revealControls={revealControls}
-          showPictureInPictureControl={showPictureInPictureControl}
-          videoPipSupported={videoPipSupported}
+          ref={fullscreenSideSheetHostRef}
+          className="watch-fullscreen-side-sheet-host"
         />
-      ) : null}
+      </div>
     </LongPressTarget>
   );
 }

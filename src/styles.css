@@ -11,11 +11,11 @@
 @import "./styles/components/watch/session.css";
 @import "./styles/components/profile-info.css";
 @import "./styles/components/live/share-sheet.css";
-@import "./styles/components/watch/sheets.css";
 @import "./styles/components/chat-panel.css";
 @import "./styles/components/mobile-panel-presence.css";
 @import "./styles/components/primitives/swipeable-drawer.css";
 @import "./styles/components/animated-dialog.css";
+@import "./styles/components/watch/sheets.css";
 @import "./styles/components/navigation/mobile.css";
 @import "./styles/components/push-permission.css";
 @import "./styles/components/registration-display-name.css";

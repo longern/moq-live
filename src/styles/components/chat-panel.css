@@ -645,6 +645,15 @@
   cursor: pointer;
 }
 
+.chat-composer input[type="search"] {
+  appearance: none;
+}
+
+.chat-composer input[type="search"]::-webkit-search-cancel-button,
+.chat-composer input[type="search"]::-webkit-search-decoration {
+  appearance: none;
+}
+
 pre {
   height: 300px;
   padding: 16px;

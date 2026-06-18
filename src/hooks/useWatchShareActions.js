@@ -4,6 +4,18 @@ import { buildWatchShareImage } from "../lib/shareImage.js";
 const IMAGE_SHARE_EXIT_MS = 180;
 const SHARE_MENU_EXIT_MS = 180;
 
+function getShortDownloadToken() {
+  const timePart = Date.now().toString(36).slice(-4);
+  const randomPart = Math.floor(Math.random() * 1296).toString(36).padStart(2, "0");
+  return `${timePart}${randomPart}`;
+}
+
+function getSafeFileNameBase(value, fallback = "直播间") {
+  return String(value || fallback)
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .trim() || fallback;
+}
+
 async function writeClipboardText(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -144,10 +156,8 @@ export function useWatchShareActions({
   }
 
   function getShareImageFileName() {
-    const name = (roomTitle || roomLabel || "直播间")
-      .replace(/[\\/:*?"<>|]+/g, "")
-      .trim();
-    return `${name || "直播间"}分享图.png`;
+    const roomName = getSafeFileNameBase(`${hostDisplayName || roomLabel || "主播"}的直播间`);
+    return `${roomName}-分享图-${getShortDownloadToken()}.png`;
   }
 
   async function shareWatchImage() {

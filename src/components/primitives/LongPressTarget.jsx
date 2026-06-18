@@ -11,8 +11,8 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
   longPressIgnoreSelector = "",
   longPressMoveTolerance = DEFAULT_MOVE_TOLERANCE,
   onClick,
+  onContextMenu,
   onLongPress,
-  touchTapFallbackEnabled = false,
   onTouchCancel,
   onTouchEnd,
   onTouchMove,
@@ -47,7 +47,7 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
     clearLongPressTimer();
     handledRef.current = false;
 
-    const canTrackTouch = (longPressEnabled || touchTapFallbackEnabled)
+    const canTrackTouch = longPressEnabled
       && !shouldIgnoreLongPress(event)
       && event.touches.length === 1;
 
@@ -59,12 +59,7 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
     touchRef.current = {
       clientX: touch.clientX,
       clientY: touch.clientY,
-      tapFallbackEligible: touchTapFallbackEnabled,
     };
-
-    if (!longPressEnabled) {
-      return;
-    }
 
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
@@ -93,20 +88,10 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
 
   function handleTouchEnd(event) {
     onTouchEnd?.(event);
-    const touch = touchRef.current;
-    const shouldRunTapFallback = touch?.tapFallbackEligible && !handledRef.current;
     clearLongPressTimer();
     if (handledRef.current) {
       event.preventDefault();
       event.stopPropagation();
-      return;
-    }
-
-    if (shouldRunTapFallback) {
-      handledRef.current = true;
-      event.preventDefault();
-      event.stopPropagation();
-      onClick?.(event);
     }
   }
 
@@ -125,12 +110,20 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
     onClick?.(event);
   }
 
+  function handleContextMenu(event) {
+    if (shouldIgnoreLongPress(event)) {
+      return;
+    }
+    onContextMenu?.(event);
+  }
+
   return (
     <Component
       {...props}
       ref={ref}
       className={rootClassName}
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}

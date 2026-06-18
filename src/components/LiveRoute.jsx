@@ -388,12 +388,10 @@ export function LiveRoute({
   setLiveRoomDetails,
   setLiveRoomValue,
   setRelayUrlValue,
-  selectPageWithGuard,
   authState,
   log,
   onRequireLogin,
   onReturnHome,
-  syntheticSessionRef,
   siteIconUrl = "",
   siteTitle = "",
   onRouteReady,
@@ -430,7 +428,6 @@ export function LiveRoute({
         throw createAppError("broadcast_control_read_only");
       }
     },
-    syntheticSessionRef,
     log,
   });
   const streamSettingsStorageKey = getStreamSettingsStorageKey(authState.user?.id);
@@ -570,7 +567,7 @@ export function LiveRoute({
   const liveShareTarget = authState.user?.handle?.trim() || (liveRoom ? `ns:${liveRoom}` : "");
   const liveWatchLink = buildWatchLink(relayUrl, liveShareTarget);
   const publishBadge = describePublishState(publisher.publishStatusKind, t);
-  const liveStreamActive = publisher.publisherIsPublishing || publisher.syntheticPublishing;
+  const liveStreamActive = publisher.publisherIsPublishing;
   const publishProtocol = normalizeStreamProtocol(publisher.publishProtocol);
   const webRtcPublishUrl = publisher.webRtcPublishUrl || "";
   const webRtcPlaybackUrl = publisher.webRtcPlaybackUrl || "";
@@ -1045,7 +1042,6 @@ export function LiveRoute({
         badge: publishBadge,
         isPublishing: publisher.publisherIsPublishing,
         isStarting: publisher.publisherIsStarting,
-        syntheticPublishing: publisher.syntheticPublishing,
       }}
       media={{
         cameraOptions: publisher.cameraOptions,
@@ -1140,30 +1136,10 @@ export function LiveRoute({
             log(`camera publish failed: ${message}`);
           });
         },
-        onStartPublish: () => {
-          void publisher.startCameraPublish().catch((error) => {
-            const message = getAppErrorMessage(error);
-            log(`camera publish failed: ${message}`);
-          });
-        },
-        onStopPublish: () => {
-          void publisher.stopCameraPublish();
-        },
         onShare: () => {
           void shareLiveRoom().catch((error) => {
             log(`share failed: ${getAppErrorMessage(error)}`);
           });
-        },
-        onStartSynthetic: () => {
-          selectPageWithGuard("live");
-          void publisher.startSyntheticPublish().catch((error) => {
-            const message = getAppErrorMessage(error);
-            log(`synthetic publish failed: ${message}`);
-          });
-        },
-        onStopSynthetic: () => {
-          selectPageWithGuard("live");
-          void publisher.stopSyntheticPublish();
         },
         onRequestClose: () => {
           void closeLivePage().catch((error) => {

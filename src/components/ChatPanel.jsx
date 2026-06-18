@@ -5,11 +5,14 @@ import { LoadingSpinner } from "./primitives/LoadingSpinner.jsx";
 import { SwipeableDrawer } from "./primitives/SwipeableDrawer.jsx";
 import { UserAvatar } from "./primitives/UserAvatar.jsx";
 import { useToast } from "./primitives/FloatingToast.jsx";
+import { useOverlayPortalTarget } from "../hooks/useOverlayPortalTarget.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const CHAT_MESSAGE_MENU_MARGIN = 8;
 const CHAT_MESSAGE_MENU_TOUCH_GAP = 10;
 const CHAT_MESSAGE_MENU_EXIT_MS = 120;
+const CHAT_COMPOSER_AUTOCOMPLETE = "off";
+const CHAT_COMPOSER_FIELD_NAME = "moq_draft_text";
 const CHAT_MUTE_OPTIONS = [
   { id: "10m", labelKey: "chat.muteOptions.tenMinutes", durationMs: 10 * 60_000 },
   { id: "1h", labelKey: "chat.muteOptions.oneHour", durationMs: 60 * 60_000 },
@@ -76,6 +79,10 @@ function isCoarsePointer() {
   return typeof window !== "undefined"
     && typeof window.matchMedia === "function"
     && window.matchMedia("(pointer: coarse)").matches;
+}
+
+function stopTouchPropagation(event) {
+  event.stopPropagation();
 }
 
 function getMeasuredContextMenuPosition(anchorLeft, anchorTop, menuNode, placement) {
@@ -166,6 +173,7 @@ function ChatMessageContextMenu({
   top,
 }) {
   const { t } = useI18n();
+  const overlayPortalTarget = useOverlayPortalTarget();
 
   if (!open) {
     return null;
@@ -234,7 +242,7 @@ function ChatMessageContextMenu({
     return menu;
   }
 
-  return createPortal(menu, document.body);
+  return createPortal(menu, overlayPortalTarget || document.body);
 }
 
 function ChatMessageMuteDialog({
@@ -246,6 +254,7 @@ function ChatMessageMuteDialog({
   open,
 }) {
   const { t } = useI18n();
+  const overlayPortalTarget = useOverlayPortalTarget();
 
   if (!open) {
     return null;
@@ -293,7 +302,7 @@ function ChatMessageMuteDialog({
     return dialog;
   }
 
-  return createPortal(dialog, document.body);
+  return createPortal(dialog, overlayPortalTarget || document.body);
 }
 
 export function ChatPanel({
@@ -319,7 +328,6 @@ export function ChatPanel({
   showComposer = true,
   showWelcome = true,
   composerTrailingAction = null,
-  composerTrailingActionClassName = "",
   showSendButton = true,
   onRetractMessage,
   onMuteMessage,
@@ -754,15 +762,21 @@ export function ChatPanel({
 
       {showComposer ? (
         composerState.mode === "guest" ? (
-          <div className={`chat-composer chat-composer-readonly chat-composer-shell${floating ? " chat-composer-floating" : ""}`}>
+          <div
+            className={`chat-composer chat-composer-readonly chat-composer-shell${floating ? " chat-composer-floating" : ""}`}
+            onTouchCancel={stopTouchPropagation}
+            onTouchEnd={stopTouchPropagation}
+            onTouchMove={stopTouchPropagation}
+            onTouchStart={stopTouchPropagation}
+          >
             <input
               id={`${composerInputId}-readonly`}
-              name="chat_message_readonly"
+              name={CHAT_COMPOSER_FIELD_NAME}
               type="text"
               value=""
               readOnly
               placeholder={composerState.inputPlaceholder}
-              autoComplete="off"
+              autoComplete={CHAT_COMPOSER_AUTOCOMPLETE}
               inputMode="text"
               onClick={() => {
                 if (authAvailable && !authLoading) {
@@ -787,29 +801,30 @@ export function ChatPanel({
                 {composerState.buttonLabel}
               </button>
             ) : null}
-            {composerTrailingAction ? (
-              <span className={`chat-composer-extra${composerTrailingActionClassName ? ` ${composerTrailingActionClassName}` : ""}`}>
-                {composerTrailingAction}
-              </span>
-            ) : null}
+            {composerTrailingAction}
           </div>
         ) : (
           <form
             className={`chat-composer chat-composer-shell${floating ? " chat-composer-floating" : ""}`}
             autoComplete="off"
+            onTouchCancel={stopTouchPropagation}
+            onTouchEnd={stopTouchPropagation}
+            onTouchMove={stopTouchPropagation}
+            onTouchStart={stopTouchPropagation}
             onSubmit={(event) => {
               event.preventDefault();
               onSend();
             }}
           >
+            {/* Search type keeps mobile Chrome from showing the autofill accessory bar here. */}
             <input
               id={composerInputId}
-              name="chat_message"
-              type="text"
+              name={CHAT_COMPOSER_FIELD_NAME}
+              type="search"
               value={draft}
               placeholder={composerState.inputPlaceholder}
               maxLength={280}
-              autoComplete="off"
+              autoComplete={CHAT_COMPOSER_AUTOCOMPLETE}
               inputMode="text"
               enterKeyHint="send"
               onInput={onDraftChange}
@@ -834,11 +849,7 @@ export function ChatPanel({
                 ) : null}
               </button>
             ) : null}
-            {composerTrailingAction ? (
-              <span className={`chat-composer-extra${composerTrailingActionClassName ? ` ${composerTrailingActionClassName}` : ""}`}>
-                {composerTrailingAction}
-              </span>
-            ) : null}
+            {composerTrailingAction}
           </form>
         )
       ) : null}

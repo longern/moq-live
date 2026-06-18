@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useOverlayPortalTarget } from "../../hooks/useOverlayPortalTarget.js";
 
 const TOAST_EXIT_MS = 200;
 const TOAST_VISIBLE_MS = 1800;
@@ -105,11 +107,19 @@ export function useToast() {
   return context;
 }
 
-export function ToastViewport({ className = "", message = "" }) {
+export function ToastViewport({ className = "", message = "", portal = true, portalTarget = null }) {
   const { toastMessage } = useToast();
-  return (
+  const overlayPortalTarget = useOverlayPortalTarget();
+  const toast = (
     <FloatingToastPresence className={className}>
       {message || toastMessage}
     </FloatingToastPresence>
   );
+
+  if (!portal) {
+    return toast;
+  }
+
+  const target = portalTarget || overlayPortalTarget;
+  return target ? createPortal(toast, target) : toast;
 }

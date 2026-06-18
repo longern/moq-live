@@ -11,6 +11,18 @@ import { buildLiveScreenshotShareImage, buildWatchShareImage } from "../lib/shar
 
 const IMAGE_SHARE_EXIT_MS = 180;
 
+function getShortDownloadToken() {
+  const timePart = Date.now().toString(36).slice(-4);
+  const randomPart = Math.floor(Math.random() * 1296).toString(36).padStart(2, "0");
+  return `${timePart}${randomPart}`;
+}
+
+function getSafeFileNameBase(value, fallback = "直播间") {
+  return String(value || fallback)
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .trim() || fallback;
+}
+
 export function LivePage({
   view = {},
   room = {},
@@ -42,7 +54,6 @@ export function LivePage({
     badge: publishBadge,
     isPublishing,
     isStarting = false,
-    syntheticPublishing,
   } = publish;
   const {
     cameraOptions,
@@ -111,8 +122,6 @@ export function LivePage({
     onCycleCamera,
     onToggleMicrophone,
     onTogglePublish,
-    onStartPublish,
-    onStopPublish,
     onShare,
     onStartScreenShare,
     onStopScreenShare,
@@ -123,8 +132,6 @@ export function LivePage({
     onCohostDisconnect,
     onCohostInviteRequest,
     onCohostInviteRespond,
-    onStartSynthetic,
-    onStopSynthetic,
     onChatDraftChange,
     onChatSend,
     onChatMessageMute,
@@ -235,11 +242,9 @@ export function LivePage({
   }
 
   function getShareImageFileName() {
-    const name = (roomDetails?.title || roomLabel || "直播间")
-      .replace(/[\\/:*?"<>|]+/g, "")
-      .trim();
+    const name = getSafeFileNameBase(`${roomLabel || "主播"}的直播间`);
     const suffix = shareImageKind === "screenshot" ? "截屏分享图" : "分享图";
-    return `${name || "直播间"}${suffix}.png`;
+    return `${name}-${suffix}-${getShortDownloadToken()}.png`;
   }
 
   async function shareLiveImage() {
@@ -598,7 +603,6 @@ export function LivePage({
       badge: publishBadge,
       isPublishing,
       isStarting,
-      syntheticPublishing,
     },
     media: {
       cameraOptions,
@@ -667,8 +671,6 @@ export function LivePage({
       onCycleCamera,
       onToggleMicrophone,
       onTogglePublish,
-      onStartPublish,
-      onStopPublish,
       onShare: shareLiveLink,
       onCopyShareLink: copyLiveLink,
       onOpenImageShare: openImageShareModal,
@@ -682,8 +684,6 @@ export function LivePage({
       onCohostDisconnect,
       onCohostInviteRequest: handleCohostInviteRequest,
       onCohostInviteRespond: handleCohostInviteRespond,
-      onStartSynthetic,
-      onStopSynthetic,
       onChatDraftChange,
       onChatSend,
       onChatMessageMute,

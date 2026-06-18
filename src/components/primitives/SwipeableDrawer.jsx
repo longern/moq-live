@@ -8,9 +8,11 @@ export function SwipeableDrawer({
   open,
   onClose,
   ariaLabel = "",
+  backdropClassName = "",
   className = "",
   panelClassName = "",
   portal = false,
+  portalTarget = null,
   viewport = false,
   children,
 }) {
@@ -178,22 +180,26 @@ export function SwipeableDrawer({
     "swipeable-drawer-panel",
     panelClassName,
   ].filter(Boolean).join(" ");
-  const backdropClassName = [
+  const resolvedBackdropClassName = [
     "swipeable-drawer-backdrop",
     visible ? "is-open" : "",
     viewport ? "is-viewport" : "",
+    backdropClassName,
   ].filter(Boolean).join(" ");
 
   const drawer = (
     <>
       <button
         type="button"
-        className={backdropClassName}
+        className={resolvedBackdropClassName}
         aria-label={resolvedAriaLabel}
         onClick={onClose}
       />
       <div
         className={drawerClassName}
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
         style={dragOffset ? { transform: `translateY(${dragOffset}px)` } : undefined}
       >
         <div
@@ -211,7 +217,7 @@ export function SwipeableDrawer({
   );
 
   if (portal && typeof document !== "undefined") {
-    return createPortal(drawer, document.body);
+    return createPortal(drawer, portalTarget || document.body);
   }
 
   return drawer;

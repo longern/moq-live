@@ -4,6 +4,30 @@ import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { ProfileBio, ProfileInfoChips } from "../ProfileInfoSummary.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 
+function getWatchSheetDrawerProps({
+  className,
+  panelClassName,
+  portalTarget,
+  presentation,
+}) {
+  const fullscreenSide = presentation === "fullscreen-side";
+  const fullscreenSidePending = fullscreenSide && !portalTarget;
+  return {
+    backdropClassName: fullscreenSide ? "watch-fullscreen-side-sheet-backdrop" : "",
+    className: [
+      className,
+      fullscreenSide ? "watch-fullscreen-side-sheet-drawer" : "",
+    ].filter(Boolean).join(" "),
+    panelClassName: [
+      panelClassName,
+      fullscreenSide ? "watch-fullscreen-side-sheet-panel" : "",
+    ].filter(Boolean).join(" "),
+    fullscreenSidePending,
+    portal: fullscreenSide,
+    portalTarget,
+  };
+}
+
 export function WatchMobileMoreSheet({
   open,
   onClose,
@@ -19,16 +43,26 @@ export function WatchMobileMoreSheet({
   onOpenImageShareModal,
   onCopyWatchLink,
   onOpenPictureInPicture,
+  portalTarget = null,
+  presentation = "drawer",
 }) {
   const { t } = useI18n();
+  const drawerProps = getWatchSheetDrawerProps({
+    className: "watch-mobile-more-drawer",
+    panelClassName: "watch-mobile-more-panel",
+    portalTarget,
+    presentation,
+  });
+  if (drawerProps.fullscreenSidePending) {
+    return null;
+  }
 
   return (
     <SwipeableDrawer
       open={open}
       onClose={onClose}
       ariaLabel={t("watchSheet.closeMore")}
-      className="watch-mobile-more-drawer"
-      panelClassName="watch-mobile-more-panel"
+      {...drawerProps}
     >
       <div className="watch-mobile-more-header">
         <UserAvatar
@@ -188,17 +222,27 @@ export function WatchHostProfileContent({
 export function WatchHostProfileSheet({
   open,
   onClose,
+  portalTarget = null,
+  presentation = "drawer",
   ...profileProps
 }) {
   const { t } = useI18n();
+  const drawerProps = getWatchSheetDrawerProps({
+    className: "watch-host-profile-drawer",
+    panelClassName: "watch-host-profile-panel",
+    portalTarget,
+    presentation,
+  });
+  if (drawerProps.fullscreenSidePending) {
+    return null;
+  }
 
   return (
     <SwipeableDrawer
       open={open}
       onClose={onClose}
       ariaLabel={t("profile.closeHostProfile")}
-      className="watch-host-profile-drawer"
-      panelClassName="watch-host-profile-panel"
+      {...drawerProps}
     >
       <WatchHostProfileContent {...profileProps} />
     </SwipeableDrawer>
@@ -210,16 +254,26 @@ export function WatchAudienceSheet({
   onClose,
   audienceCountText,
   loggedInViewers,
+  portalTarget = null,
+  presentation = "drawer",
 }) {
   const { t } = useI18n();
+  const drawerProps = getWatchSheetDrawerProps({
+    className: "watch-audience-drawer",
+    panelClassName: "watch-audience-panel",
+    portalTarget,
+    presentation,
+  });
+  if (drawerProps.fullscreenSidePending) {
+    return null;
+  }
 
   return (
     <SwipeableDrawer
       open={open}
       onClose={onClose}
       ariaLabel={t("watchSheet.closeAudience")}
-      className="watch-audience-drawer"
-      panelClassName="watch-audience-panel"
+      {...drawerProps}
     >
       <div className="watch-audience-head">
         <strong>{t("watchSheet.onlineUsers")}</strong>

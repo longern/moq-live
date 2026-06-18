@@ -1,4 +1,5 @@
 import { Copy, Download, Share, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { LoadingSpinner } from "../primitives/LoadingSpinner.jsx";
 
 export function WatchImageShareDialog({
@@ -14,11 +15,12 @@ export function WatchImageShareDialog({
   shareImageLoading = false,
   shareImageUrl = "",
   shareSupported = false,
+  portalTarget = null,
 }) {
   const dialogTitle = imageShareTitle || "图片分享";
   const imageAlt = shareImageAlt || `${roomLabel}直播间二维码分享图`;
 
-  return (
+  const dialog = (
     <div className={`watch-share-image-layer${imageShareClosing ? " is-closing" : ""}`}>
       <button
         type="button"
@@ -79,6 +81,8 @@ export function WatchImageShareDialog({
       </section>
     </div>
   );
+
+  return portalTarget ? createPortal(dialog, portalTarget) : dialog;
 }
 
 export function WatchDesktopSharePanel({

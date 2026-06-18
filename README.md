@@ -5,7 +5,7 @@
 ## Features
 
 - Watch live rooms by handle, room id, direct MoQ namespace, or WHEP playback URL.
-- Broadcast from camera, microphone, screen share, or synthetic test sources over MoQ or WHIP.
+- Broadcast from camera, microphone, or screen share over MoQ or WHIP.
 - Use MoQ by default, with WebRTC WHIP/WHEP support for publish and playback fallback.
 - Chat with presence, recent-message history, and broadcaster room-state sync.
 - Sign in with Microsoft OAuth and manage display name, handle, avatar, room title, welcome text, and cover image.

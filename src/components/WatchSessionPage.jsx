@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   MoreHorizontal,
@@ -31,6 +31,7 @@ import {
 import { getWatchStageView } from "../lib/watchStageView.js";
 import { useCompactViewport, useMediaQuery, usePortraitViewport } from "../hooks/useMediaQuery.js";
 import { useWatchHostDistance } from "../hooks/useWatchHostDistance.js";
+import { useOverlayPortalTarget } from "../hooks/useOverlayPortalTarget.js";
 import { useWatchPictureInPicture } from "../hooks/useWatchPictureInPicture.js";
 import { useWatchShareActions } from "../hooks/useWatchShareActions.js";
 import { useWatchStageControls } from "../hooks/useWatchStageControls.js";
@@ -137,6 +138,13 @@ export function WatchSessionPage({
   const [moreOpen, setMoreOpen] = useState(false);
   const [hostProfileOpen, setHostProfileOpen] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
+  const [fullscreenSideSheetHost, setFullscreenSideSheetHost] = useState(null);
+  const fullscreenSideSheetHostRef = useRef(null);
+  const overlayPortalTarget = useOverlayPortalTarget();
+  const setFullscreenSideSheetHostNode = useCallback((node) => {
+    fullscreenSideSheetHostRef.current = node;
+    setFullscreenSideSheetHost(node);
+  }, []);
   const { showToast } = useToast();
   const compactViewport = useCompactViewport();
   const portraitViewport = usePortraitViewport();
@@ -161,6 +169,11 @@ export function WatchSessionPage({
   const longPressOpensMore = Boolean(portraitViewport && !portraitMedia && !fullscreenActive);
   const manualHideControlsEnabled = !longPressOpensMore;
   const showStagePictureInPictureControl = !(compactViewport && !portraitMedia);
+  const fullscreenSheetOpen = Boolean(fullscreenLandscapeMedia && (moreOpen || hostProfileOpen || audienceOpen));
+  const fullscreenSheetPortalTarget = fullscreenLandscapeMedia
+    ? fullscreenSideSheetHost
+    : null;
+  const watchSheetPresentation = fullscreenLandscapeMedia ? "fullscreen-side" : "drawer";
   const stageControls = useWatchStageControls({
     controlsHoldActive: longPressOpensMore && moreOpen,
     immersiveShell,
@@ -190,6 +203,7 @@ export function WatchSessionPage({
     immersiveStage ? "is-immersive-stage" : "",
     landscapeImmersive ? "is-landscape-immersive-stage" : "",
     fullscreenLandscapeMedia ? "is-fullscreen-landscape-media" : "",
+    fullscreenSheetOpen ? "is-fullscreen-side-sheet-open" : "",
     stageLayout === "single-portrait" ? "is-portrait" : "",
     stageLayout === "cohost" ? "is-cohost-stage" : "",
   ].filter(Boolean).join(" ");
@@ -278,6 +292,8 @@ export function WatchSessionPage({
   });
 
   function openMoreSheet() {
+    setHostProfileOpen(false);
+    setAudienceOpen(false);
     setMoreOpen(true);
   }
 
@@ -287,6 +303,8 @@ export function WatchSessionPage({
 
   function openHostProfile(event) {
     event?.stopPropagation();
+    setMoreOpen(false);
+    setAudienceOpen(false);
     setHostProfileOpen(true);
   }
 
@@ -344,11 +362,43 @@ export function WatchSessionPage({
   }
 
   function openAudienceSheet() {
+    setMoreOpen(false);
+    setHostProfileOpen(false);
     setAudienceOpen(true);
   }
 
   function closeAudienceSheet() {
     setAudienceOpen(false);
+  }
+
+  function closeWatchSideSheets() {
+    setMoreOpen(false);
+    setHostProfileOpen(false);
+    setAudienceOpen(false);
+  }
+
+  function blurFocusedChatComposer() {
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLElement) || !stageRef?.current?.contains(activeElement)) {
+      return;
+    }
+    if (!activeElement.matches(".chat-composer input, .chat-composer textarea")) {
+      return;
+    }
+    activeElement.blur();
+  }
+
+  function handleWatchStageClick(event) {
+    blurFocusedChatComposer();
+
+    if (fullscreenSheetOpen) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeWatchSideSheets();
+      return;
+    }
+
+    handleStageClick(event);
   }
 
   function handleWatchStageContextMenu(event) {
@@ -371,7 +421,7 @@ export function WatchSessionPage({
     return handleStageLongPress();
   }
 
-  function renderMobileMoreButton(className = "watch-composer-more-mobile") {
+  function renderMobileMoreButton(className = "chat-composer-extra watch-composer-more-extra watch-composer-more-mobile") {
     return (
       <button
         type="button"
@@ -444,7 +494,7 @@ export function WatchSessionPage({
       controlsVisible={controlsVisible}
       elementPipSupported={elementPipSupported}
       fullscreenActive={fullscreenActive}
-      handleStageClick={handleStageClick}
+      handleStageClick={handleWatchStageClick}
       handleStageContextMenu={handleWatchStageContextMenu}
       handleStageLongPress={handleWatchStageLongPress}
       handleStagePointerLeave={handleStagePointerLeave}
@@ -476,6 +526,7 @@ export function WatchSessionPage({
       showPictureInPictureControl={showStagePictureInPictureControl}
       showTapToUnmute={showTapToUnmute}
       stageClassName={stageClassName}
+      fullscreenSideSheetHostRef={setFullscreenSideSheetHostNode}
       stageRef={stageRef}
       stageView={stageView}
       suppressStageControls={Boolean(pipWindow)}
@@ -549,7 +600,6 @@ export function WatchSessionPage({
             chatError={chatError}
             chatRecovering={chatRecovering}
             composerTrailingAction={compactViewport ? renderMobileMoreButton() : null}
-            composerTrailingActionClassName="watch-composer-more-extra"
             showSendButton={!compactViewport}
           />
         </aside>
@@ -557,6 +607,8 @@ export function WatchSessionPage({
       <WatchMobileMoreSheet
         open={moreOpen}
         onClose={closeMoreSheet}
+        portalTarget={fullscreenSheetPortalTarget}
+        presentation={watchSheetPresentation}
         hostAvatarUrl={hostAvatarUrl}
         hostChipLabel={hostChipLabel}
         watchLink={watchLink}
@@ -573,6 +625,8 @@ export function WatchSessionPage({
       <WatchHostProfileSheet
         open={hostProfileOpen}
         onClose={closeHostProfile}
+        portalTarget={fullscreenSheetPortalTarget}
+        presentation={watchSheetPresentation}
         hostAvatarUrl={hostAvatarUrl}
         hostChipLabel={hostChipLabel}
         hostDisplayName={hostDisplayName}
@@ -588,7 +642,16 @@ export function WatchSessionPage({
         hostFollowingCountText={hostFollowingCountText}
         followButton={renderHostProfileActions()}
       />
-      {hidden ? null : <ToastViewport className="watch-session-toast" />}
+      {fullscreenSheetOpen && overlayPortalTarget ? createPortal(
+        <button
+          type="button"
+          className="watch-fullscreen-side-sheet-overlay"
+          aria-label="关闭面板"
+          onClick={closeWatchSideSheets}
+        />,
+        overlayPortalTarget
+      ) : null}
+      {hidden ? null : <ToastViewport className="watch-session-toast" portalTarget={overlayPortalTarget} />}
       {imageShareMounted ? (
         <WatchImageShareDialog
           imageShareClosing={imageShareClosing}
@@ -601,11 +664,14 @@ export function WatchSessionPage({
           shareImageLoading={shareImageLoading}
           shareImageUrl={shareImageUrl}
           shareSupported={shareSupported}
+          portalTarget={overlayPortalTarget}
         />
       ) : null}
       <WatchAudienceSheet
         open={audienceOpen}
         onClose={closeAudienceSheet}
+        portalTarget={fullscreenSheetPortalTarget}
+        presentation={watchSheetPresentation}
         audienceCountText={audienceCountText}
         loggedInViewers={loggedInViewers}
       />

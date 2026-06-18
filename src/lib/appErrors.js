@@ -60,9 +60,6 @@ const APP_ERROR_MESSAGES = {
     screen_share_not_supported: "当前浏览器不支持屏幕共享",
     screen_share_unavailable: "未获取到可共享的屏幕画面",
     share_not_supported: "当前浏览器不支持系统分享",
-    synthetic_audio_source_unsupported: "当前浏览器不支持基于帧生成的合成音频源",
-    synthetic_canvas_context_unavailable: "无法创建 canvas 上下文",
-    synthetic_video_track_unavailable: "无法创建合成视频轨",
     unauthorized: "请先登录",
     user_not_found: "用户不存在",
     video_track_unavailable: "无法获取新摄像头画面"
@@ -128,9 +125,6 @@ const APP_ERROR_MESSAGES = {
     screen_share_not_supported: "This browser does not support screen sharing.",
     screen_share_unavailable: "No shareable screen source was selected.",
     share_not_supported: "This browser does not support system sharing.",
-    synthetic_audio_source_unsupported: "This browser does not support frame-generated synthetic audio.",
-    synthetic_canvas_context_unavailable: "Unable to create canvas context.",
-    synthetic_video_track_unavailable: "Unable to create synthetic video track.",
     unauthorized: "Please sign in first.",
     user_not_found: "User not found.",
     video_track_unavailable: "Unable to get a new camera frame."

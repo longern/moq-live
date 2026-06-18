@@ -7,10 +7,6 @@ import {
 import { createAppError, getAppErrorMessage } from "../lib/appErrors.js";
 import { getPublishBlockError } from "../lib/roomPolicy.js";
 import {
-  createSyntheticMedia,
-  sampleCanvasMarkerSignature,
-} from "../lib/syntheticMedia.js";
-import {
   DEFAULT_STREAM_PROTOCOL,
   STREAM_PROTOCOL_WEBRTC,
   STREAM_PROTOCOL_OPTIONS,
@@ -54,7 +50,6 @@ const PUBLISH_QUALITY_OPTIONS = [
 const DEFAULT_PUBLISH_QUALITY_ID = "hd";
 const PREVIEW_SOURCE_CAMERA = "camera";
 const PREVIEW_SOURCE_SCREEN = "screen";
-const PREVIEW_SOURCE_SYNTHETIC = "synthetic";
 const DEFAULT_PREVIEW_SOURCE = PREVIEW_SOURCE_CAMERA;
 const PUBLISH_CONNECT_TIMEOUT_MS = 10_000;
 const MICROPHONE_PUBLISH_GAIN = 1.6;
@@ -223,7 +218,6 @@ export function usePublisherController({
   webRtcPlaybackUrlRef,
   generateRoomId,
   assertCanPublish,
-  syntheticSessionRef: externalSyntheticSessionRef,
   log,
 }) {
   const [publishStatus, setPublishStatus] = useState("等待推流。");
@@ -247,7 +241,6 @@ export function usePublisherController({
   const [previewActive, setPreviewActive] = useState(false);
   const [previewHasVideo, setPreviewHasVideo] = useState(false);
   const [previewPending, setPreviewPending] = useState(false);
-  const [syntheticPublishing, setSyntheticPublishing] = useState(false);
   const [previewSourceType, setPreviewSourceType] = useState(
     DEFAULT_PREVIEW_SOURCE,
   );
@@ -256,9 +249,6 @@ export function usePublisherController({
   );
 
   const previewVideoRef = useRef(null);
-  const internalSyntheticSessionRef = useRef(null);
-  const syntheticSessionRef =
-    externalSyntheticSessionRef ?? internalSyntheticSessionRef;
   const livePublisherRef = useRef(null);
   const pendingPublisherRef = useRef(null);
   const liveSessionManagerRef = useRef(createMediaSessionManager());
@@ -327,10 +317,6 @@ export function usePublisherController({
     applyPublishQualityToSession(liveSession, normalizedQualityId);
     applyPublishQualityToSession(
       pendingPublisherRef.current,
-      normalizedQualityId,
-    );
-    applyPublishQualityToSession(
-      syntheticSessionRef.current?.publisher,
       normalizedQualityId,
     );
 
@@ -742,10 +728,7 @@ export function usePublisherController({
       clearPreviewState({ resetSource });
       return;
     }
-    if (
-      resetSource &&
-      previewSourceTypeRef.current !== PREVIEW_SOURCE_SYNTHETIC
-    ) {
+    if (resetSource) {
       previewSourceTypeRef.current = DEFAULT_PREVIEW_SOURCE;
       setPreviewSourceType(DEFAULT_PREVIEW_SOURCE);
     }
@@ -1044,22 +1027,6 @@ export function usePublisherController({
     return microphoneTrack;
   }
 
-  function shouldUsePortraitSyntheticPreview() {
-    if (!window.matchMedia("(max-width: 600px)").matches) {
-      return false;
-    }
-
-    if (previewSourceTypeRef.current !== PREVIEW_SOURCE_CAMERA) {
-      return false;
-    }
-
-    const { width, height } = getStreamVideoDimensions(
-      getLiveMediaStream(),
-      previewVideoRef.current,
-    );
-    return width > 0 && height > width;
-  }
-
   async function startCameraPreview() {
     const requestId = beginPreviewRequest();
     const wantsCamera = cameraEnabledRef.current;
@@ -1314,17 +1281,6 @@ export function usePublisherController({
 
   async function startLivePreview() {
     if (publisherIsPublishingRef.current) {
-      return;
-    }
-
-    if (
-      previewSourceTypeRef.current === PREVIEW_SOURCE_SYNTHETIC &&
-      syntheticSessionRef.current?.syntheticMedia?.mediaStream
-    ) {
-      updatePreviewState(
-        syntheticSessionRef.current.syntheticMedia.mediaStream,
-        PREVIEW_SOURCE_SYNTHETIC,
-      );
       return;
     }
 
@@ -1585,139 +1541,13 @@ export function usePublisherController({
     }
   }
 
-  async function startSyntheticPublish() {
-    if (syntheticSessionRef.current) {
-      return syntheticSessionRef.current.namespace;
-    }
-
-    const namespace = ensureRoomId(true);
-    assertPublishAllowed(namespace);
-    await assertBroadcastControl(namespace);
-    const nextRelayUrl = new URL(relayUrlRef.current).toString();
-    if (!namespace) {
-      throw createAppError("namespace_required");
-    }
-
-    updatePublishStatus("preparing", "正在启动合成推流。");
-
-    const usePortraitSyntheticPreview = shouldUsePortraitSyntheticPreview();
-    const shouldPreviewSynthetic =
-      usePortraitSyntheticPreview ||
-      !getLiveMediaStream()?.getVideoTracks?.().length;
-    const syntheticMedia = createSyntheticMedia(namespace, {
-      orientation: usePortraitSyntheticPreview ? "portrait" : "landscape",
-    });
-    const syntheticVideoTrack = syntheticMedia.mediaStream.getVideoTracks()[0];
-    const syntheticAudioTrack =
-      syntheticMedia.mediaStream.getAudioTracks()[0] ?? null;
-    const syntheticSettings = syntheticVideoTrack?.getSettings?.() ?? {};
-    const syntheticWidth =
-      Math.floor((syntheticSettings.width || VIDEO_TARGET_WIDTH) / 2) * 2;
-    const syntheticHeight =
-      Math.floor((syntheticSettings.height || VIDEO_TARGET_HEIGHT) / 2) * 2;
-    const publishVideoTrack =
-      syntheticVideoTrack?.clone?.() ?? syntheticVideoTrack;
-    const publishAudioTrack =
-      syntheticAudioTrack?.clone?.() ?? syntheticAudioTrack;
-    const publisher = createPublishSession({
-      relayUrl: nextRelayUrl,
-      namespace,
-      videoTrack: publishVideoTrack,
-      audioTrack: publishAudioTrack,
-      maxPixels: syntheticWidth * syntheticHeight,
-      qualityId: publishQualityIdRef.current,
-      audioMuted: false,
-    });
-    publisher.cleanupPublishTracks = () => {
-      for (const track of publisher.publishTracks) {
-        try {
-          track.stop();
-        } catch {
-          // Ignore cleanup failures while stopping synthetic publish tracks.
-        }
-      }
-    };
-
-    try {
-      await waitForSignalValue(
-        publisher.connection.status,
-        (status) => status === "connected",
-        PUBLISH_CONNECT_TIMEOUT_MS,
-        "publish_connect_timeout",
-      );
-    } catch (error) {
-      closePublishSession(publisher);
-      await syntheticMedia.stop();
-      throw error;
-    }
-
-    syntheticSessionRef.current = { namespace, publisher, syntheticMedia };
-    setSyntheticPublishing(true);
-    if (shouldPreviewSynthetic) {
-      stopLivePreview();
-      updatePreviewState(syntheticMedia.mediaStream, PREVIEW_SOURCE_SYNTHETIC);
-      updatePublishStatus(
-        "live",
-        `合成推流已启动：${namespace}（预览已切换为${usePortraitSyntheticPreview ? "竖屏" : "横屏"}合成源）`,
-      );
-    } else {
-      updatePublishStatus("live", `合成推流已启动：${namespace}`);
-    }
-    log(
-      `synthetic publish started: url=${nextRelayUrl} namespace=${namespace} orientation=${syntheticMedia.orientation}`,
-    );
-    return namespace;
-  }
-
-  async function stopSyntheticPublish() {
-    const current = syntheticSessionRef.current;
-    const wasPreviewingSynthetic =
-      previewSourceTypeRef.current === PREVIEW_SOURCE_SYNTHETIC &&
-      previewMediaStreamRef.current === current?.syntheticMedia?.mediaStream;
-    syntheticSessionRef.current = null;
-    setSyntheticPublishing(false);
-
-    if (!current) {
-      updatePublishStatus("idle", "等待推流。");
-      return;
-    }
-
-    updatePublishStatus("preparing", "正在停止合成推流。");
-    try {
-      closePublishSession(current.publisher);
-    } catch (error) {
-      log(
-        `synthetic stop warning: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    await current.syntheticMedia.stop();
-    updatePublishStatus("idle", "合成推流已停止。");
-    log(`synthetic publish stopped: namespace=${current.namespace}`);
-
-    if (wasPreviewingSynthetic) {
-      clearPreviewState({ resetSource: true });
-      if (pageRef.current === "live" && !publisherIsPublishingRef.current) {
-        await startLivePreview();
-      }
-    }
-  }
-
   async function cleanupLiveResources() {
-    await stopSyntheticPublish();
     await stopCameraPublish();
     stopLivePreview({ resetSource: true });
   }
 
   useEffect(() => {
     if (page === "live" && !publisherIsPublishing) {
-      if (
-        previewSourceTypeRef.current === PREVIEW_SOURCE_SYNTHETIC &&
-        syntheticSessionRef.current
-      ) {
-        return;
-      }
-
       const currentStream = getLiveMediaStream();
       const shouldRestartPreview =
         !hasUsableMediaStream(currentStream) ||
@@ -1816,8 +1646,7 @@ export function usePublisherController({
 
       if (
         !publisherIsPublishingRef.current &&
-        previewSourceTypeRef.current !== PREVIEW_SOURCE_SCREEN &&
-        previewSourceTypeRef.current !== PREVIEW_SOURCE_SYNTHETIC
+        previewSourceTypeRef.current !== PREVIEW_SOURCE_SCREEN
       ) {
         stopLivePreview();
       }
@@ -1831,7 +1660,6 @@ export function usePublisherController({
 
   useEffect(
     () => () => {
-      void stopSyntheticPublish();
       void stopCameraPublish();
       stopLivePreview({ resetSource: true });
     },
@@ -1862,9 +1690,7 @@ export function usePublisherController({
     screenShareSupported,
     screenShareActive:
       previewSourceType === PREVIEW_SOURCE_SCREEN && previewActive,
-    syntheticPublishing,
     previewVideoRef,
-    syntheticSessionRef,
     setSelectedCameraId,
     setSelectedMicrophoneId,
     setPublishQualityId,
@@ -1878,15 +1704,6 @@ export function usePublisherController({
     stopCameraPublish,
     startScreenShare,
     stopScreenShare,
-    startSyntheticPublish,
-    stopSyntheticPublish,
     cleanupLiveResources,
-    getSyntheticSignatures: () => ({
-      source: sampleCanvasMarkerSignature(
-        syntheticSessionRef.current?.syntheticMedia?.canvas ?? null,
-      ),
-      expectedPalette:
-        syntheticSessionRef.current?.syntheticMedia?.markerPalette ?? null,
-    }),
   };
 }

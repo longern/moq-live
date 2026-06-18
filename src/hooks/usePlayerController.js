@@ -1,9 +1,4 @@
 import { useEffect } from "react";
-import {
-  compareSignatures,
-  sampleCanvasMarkerSignature,
-  sampleImageMarkerSignature,
-} from "../lib/syntheticMedia.js";
 import { usePlayerAutoplayPrompt } from "./player/usePlayerAutoplayPrompt.js";
 import { usePlayerLayout } from "./player/usePlayerLayout.js";
 import { isPlayerAudioSupported } from "./player/playerControllerUtils.js";
@@ -17,7 +12,6 @@ export function usePlayerController({
   webRtcUrlRef,
   setLogText,
   log,
-  syntheticSessionRef,
   layoutScopeKey = "",
 }) {
   const audioPlaybackSupported = isPlayerAudioSupported();
@@ -95,14 +89,6 @@ export function usePlayerController({
     await autoplayPrompt.dismissTapToUnmute();
   }
 
-  async function compareSyntheticPlaybackFromDataUrl(dataUrl) {
-    const source = sampleCanvasMarkerSignature(
-      syntheticSessionRef.current?.syntheticMedia?.canvas ?? null,
-    );
-    const player = await sampleImageMarkerSignature(dataUrl);
-    return compareSignatures(source, player);
-  }
-
   useEffect(() => {
     if (!initialAutorun) {
       return;
@@ -132,6 +118,5 @@ export function usePlayerController({
     togglePlayerMute,
     dismissTapToUnmute,
     fullscreenPlayer: session.fullscreenPlayer,
-    compareSyntheticPlaybackFromDataUrl,
   };
 }

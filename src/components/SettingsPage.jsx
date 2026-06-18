@@ -69,7 +69,6 @@ export function SettingsPage({
   onOpenWatchHistoryItem,
   onClearWatchHistory,
   onRefreshAuth,
-  loginPanelRequestKey = 0,
   logText,
   logRef
 }) {
@@ -133,15 +132,6 @@ export function SettingsPage({
 
     setLoginPanelOpen(false);
   }, [authUser?.id]);
-
-  useEffect(() => {
-    if (!loginPanelRequestKey || authPending || authUser) {
-      return;
-    }
-
-    setAccountPanelOpen(false);
-    setLoginPanelOpen(true);
-  }, [authPending, authUser, loginPanelRequestKey]);
 
   const profileHandleLabel = authUser?.handle ? `@${authUser.handle}` : "";
   const profileName = authPending

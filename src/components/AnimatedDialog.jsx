@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useOverlayPortalTarget } from "../hooks/useOverlayPortalTarget.js";
 
 const DEFAULT_EXIT_MS = 180;
 
@@ -12,9 +13,11 @@ export function AnimatedDialog({
   exitMs = DEFAULT_EXIT_MS,
   onClose,
   open,
+  portalTarget = null,
 }) {
   const [mounted, setMounted] = useState(open);
   const [closing, setClosing] = useState(false);
+  const overlayPortalTarget = useOverlayPortalTarget();
 
   useEffect(() => {
     if (open) {
@@ -71,5 +74,5 @@ export function AnimatedDialog({
     </div>
   );
 
-  return createPortal(dialog, document.body);
+  return createPortal(dialog, portalTarget || overlayPortalTarget || document.body);
 }

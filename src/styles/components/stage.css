@@ -81,6 +81,11 @@
   background: transparent;
 }
 
+.watch-fullscreen-media-layout,
+.watch-fullscreen-media-pane {
+  display: contents;
+}
+
 .page-immersive .placeholder,
 .page-immersive .publisher-placeholder {
   padding: 0;

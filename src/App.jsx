@@ -71,7 +71,6 @@ export function App() {
   const siteTitle = __APP_TITLE__;
   const [logText, setLogText] = useState("");
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
-  const [settingsLoginPanelRequestKey, setSettingsLoginPanelRequestKey] = useState(0);
   const [watchHistoryItems, setWatchHistoryItems] = useState(() => readWatchHistory());
   const [authMenuOpen, setAuthMenuOpen] = useState(false);
   const [liveRouteReady, setLiveRouteReady] = useState(false);
@@ -91,8 +90,6 @@ export function App() {
   const handledWatchPlaybackRef = useRef({ roomId: "", startedAt: "", protocol: "" });
   const handledCohostPlaybackRef = useRef({ roomId: "", startedAt: "", protocol: "" });
   const watchLiveSeenRef = useRef({ roomId: "", hasBeenLive: false });
-  const pendingProtectedPageRef = useRef(null);
-  const syntheticSessionRef = useRef(null);
   const previousRouteRef = useRef({
     page: new URLSearchParams(window.location.search).get("p") === "l"
       ? "live"
@@ -261,7 +258,6 @@ export function App() {
     webRtcUrlRef: watchPlaybackWebRtcUrlRef,
     setLogText,
     log,
-    syntheticSessionRef,
     layoutScopeKey: watchPlayerLayoutScopeKey,
   });
   const cohostPlayer = usePlayerController({
@@ -272,7 +268,6 @@ export function App() {
     webRtcUrlRef: cohostPlaybackWebRtcUrlRef,
     setLogText,
     log,
-    syntheticSessionRef,
     layoutScopeKey: `${watchPlayerLayoutScopeKey}:cohost`,
   });
   const watchChatEnabled = page === "watch" && !watchingTestChannel && Boolean(watchChatRoom) && !authState.loading;
@@ -452,7 +447,6 @@ export function App() {
   });
   const watchRoomShellActive = page === "watch" && watchJoined;
   const mobileWatchJoinedClass = watchRoomShellActive ? " app-container-watch-joined" : "";
-  const requireLoginForLive = false;
   const avatarLabel = getAvatarLabel(authState, t);
   const avatarStateClass = authState.loading
     ? " is-loading"
@@ -497,21 +491,12 @@ export function App() {
     selectPage(nextPage, options);
   }
 
-  function openSettingsLogin(options) {
-    setAuthMenuOpen(false);
-    pendingProtectedPageRef.current = null;
-    selectPagePreservingLiveBackdrop("settings", options);
-    setSettingsLoginPanelRequestKey((current) => current + 1);
-  }
-
-
   function returnToWatchHomeNow() {
     if (liveRouteCloseTimerRef.current) {
       clearTimeout(liveRouteCloseTimerRef.current);
       liveRouteCloseTimerRef.current = null;
     }
     setLiveRouteClosing(false);
-    pendingProtectedPageRef.current = null;
     autorunRef.current = false;
     setLoginPromptOpen(false);
     closeAuthMenu();
@@ -527,7 +512,6 @@ export function App() {
       liveRouteCloseTimerRef.current = null;
     }
     setLiveRouteClosing(false);
-    pendingProtectedPageRef.current = null;
     autorunRef.current = false;
     setLoginPromptOpen(false);
     closeAuthMenu();
@@ -593,23 +577,6 @@ export function App() {
   }
 
   function selectPageWithGuard(nextPage, options) {
-    if (!requireLoginForLive || nextPage !== "live") {
-      pendingProtectedPageRef.current = null;
-      selectPagePreservingLiveBackdrop(nextPage, options);
-      return;
-    }
-
-    if (authState.loading) {
-      pendingProtectedPageRef.current = { nextPage, options };
-      return;
-    }
-
-    if (!authState.user) {
-      openSettingsLogin(options);
-      return;
-    }
-
-    pendingProtectedPageRef.current = null;
     selectPagePreservingLiveBackdrop(nextPage, options);
   }
 
@@ -1135,24 +1102,6 @@ export function App() {
   ]);
 
   useEffect(() => {
-    if (!requireLoginForLive || authState.loading || !pendingProtectedPageRef.current) {
-      return;
-    }
-
-    const pendingPage = pendingProtectedPageRef.current;
-    pendingProtectedPageRef.current = null;
-    selectPageWithGuard(pendingPage.nextPage, pendingPage.options);
-  }, [authState.loading, authState.user, requireLoginForLive]);
-
-  useEffect(() => {
-    if (!requireLoginForLive || authState.loading || authState.user || page !== "live") {
-      return;
-    }
-
-    openSettingsLogin({ updateAutorun: false });
-  }, [authState.loading, authState.user, page, requireLoginForLive]);
-
-  useEffect(() => {
     const currentSession = player.playerSession;
     const desiredWatchPlayback = getDesiredWatchPlaybackTarget({
       page,
@@ -1332,8 +1281,7 @@ export function App() {
         namespace: pageRef.current === "live" ? liveRoomRef.current : watchRoomRef.current,
         watchNamespace: watchRoomRef.current,
         liveNamespace: liveRoomRef.current
-      }),
-      compareScreenshotSignature: async (dataUrl) => player.compareSyntheticPlaybackFromDataUrl(dataUrl)
+      })
     };
 
     return () => {
@@ -1517,7 +1465,6 @@ export function App() {
                     setLiveRoomDetails={setLiveRoomDetails}
                     setLiveRoomValue={setLiveRoomValue}
                     setRelayUrlValue={setRelayUrlValue}
-                    selectPageWithGuard={selectPageWithGuard}
                     authState={authState}
                     log={log}
                     siteIconUrl={siteIconUrl}
@@ -1526,7 +1473,6 @@ export function App() {
                       setLoginPromptOpen(true);
                     }}
                     onReturnHome={closeLiveRoute}
-                    syntheticSessionRef={syntheticSessionRef}
                     onRouteReady={() => {
                       setLiveRouteReady(true);
                     }}
@@ -1561,7 +1507,6 @@ export function App() {
               setWatchHistoryItems(clearWatchHistory());
             }}
             onRefreshAuth={refreshAuthState}
-            loginPanelRequestKey={settingsLoginPanelRequestKey}
             logText={logText}
             logRef={logRef}
           />

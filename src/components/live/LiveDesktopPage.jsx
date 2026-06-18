@@ -307,7 +307,6 @@ export function LiveDesktopPage({
     badge: publishBadge,
     isPublishing,
     isStarting = false,
-    syntheticPublishing,
   } = publish;
   const {
     cameraOptions,

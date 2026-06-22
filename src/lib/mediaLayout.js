@@ -1,5 +1,5 @@
 export const DEFAULT_MEDIA_ORIENTATION = "landscape";
-const MEDIA_ORIENTATION_PORTRAIT = "portrait";
+export const MEDIA_ORIENTATION_PORTRAIT = "portrait";
 
 export function getMediaOrientation({ width, height }) {
   return height > width ? MEDIA_ORIENTATION_PORTRAIT : DEFAULT_MEDIA_ORIENTATION;

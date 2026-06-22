@@ -9,6 +9,7 @@ function resolveLiveMobileShellMode({
   previewActive,
   previewHasVideo,
   previewOrientation,
+  previewOrientationFallback,
   previewSourceType,
 }) {
   const canUseImmersiveShell =
@@ -20,16 +21,16 @@ function resolveLiveMobileShellMode({
     return "compact";
   }
 
-  if (previewActive && previewHasVideo) {
-    return shouldUsePortraitImmersiveMode({
-      mediaOrientation: previewOrientation,
-      portraitViewport,
-    })
-      ? "immersive"
-      : "compact";
-  }
+  const effectivePreviewOrientation = previewActive && previewHasVideo
+    ? previewOrientation
+    : previewOrientationFallback;
 
-  return "immersive";
+  return shouldUsePortraitImmersiveMode({
+    mediaOrientation: effectivePreviewOrientation,
+    portraitViewport,
+  })
+    ? "immersive"
+    : "compact";
 }
 
 export function useLiveMobileShellMode({
@@ -38,6 +39,7 @@ export function useLiveMobileShellMode({
   previewActive,
   previewHasVideo,
   previewOrientation,
+  previewOrientationFallback,
   previewSourceType,
 }) {
   const [shellMode, setShellMode] = useState(() => resolveLiveMobileShellMode({
@@ -46,6 +48,7 @@ export function useLiveMobileShellMode({
     previewActive,
     previewHasVideo,
     previewOrientation,
+    previewOrientationFallback,
     previewSourceType,
   }));
 
@@ -56,6 +59,7 @@ export function useLiveMobileShellMode({
       previewActive,
       previewHasVideo,
       previewOrientation,
+      previewOrientationFallback,
       previewSourceType,
     }));
   }, [
@@ -64,6 +68,7 @@ export function useLiveMobileShellMode({
     previewActive,
     previewHasVideo,
     previewOrientation,
+    previewOrientationFallback,
     previewSourceType,
   ]);
 

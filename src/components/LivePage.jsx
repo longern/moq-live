@@ -9,10 +9,20 @@ import { useToast } from "./primitives/FloatingToast.jsx";
 import { WatchImageShareDialog } from "./watch/WatchSharePanels.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 import { resizeRoomCoverFile } from "../lib/imageResize.js";
+import { DEFAULT_MEDIA_ORIENTATION, MEDIA_ORIENTATION_PORTRAIT } from "../lib/mediaLayout.js";
 import { buildShareImageFileName } from "../lib/shareDownload.js";
 import { buildLiveScreenshotShareImage, buildWatchShareImage } from "../lib/shareImage.js";
 
 const IMAGE_SHARE_EXIT_MS = 180;
+const PREVIEW_SOURCE_CAMERA = "camera";
+
+function guessCameraPreviewOrientation({ portraitViewport, previewSourceType }) {
+  if (portraitViewport && previewSourceType === PREVIEW_SOURCE_CAMERA) {
+    return MEDIA_ORIENTATION_PORTRAIT;
+  }
+
+  return DEFAULT_MEDIA_ORIENTATION;
+}
 
 export function LivePage({
   view = {},
@@ -138,9 +148,14 @@ export function LivePage({
   const landscapeSplitViewport = useMediaQuery(
     "(min-width: 601px) and (max-width: 980px) and (orientation: landscape)",
   );
+  const previewOrientationFallback = guessCameraPreviewOrientation({
+    portraitViewport,
+    previewSourceType,
+  });
   const previewOrientation = useMediaOrientation({
     mediaRef: previewVideoRef,
     active: previewActive && previewHasVideo,
+    fallback: previewOrientationFallback,
     includeTrackSettings: false,
     includeClientSize: false,
     resetOnInactive: false,
@@ -170,6 +185,7 @@ export function LivePage({
     previewActive,
     previewHasVideo,
     previewOrientation,
+    previewOrientationFallback,
     previewSourceType,
   });
   const mediaClass = `media-${mediaMode}`;

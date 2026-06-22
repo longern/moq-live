@@ -424,10 +424,16 @@ export async function buildLiveScreenshotShareImage({
 
   await wait(delayMs);
 
-  const sourceWidth = videoElement.videoWidth;
-  const sourceHeight = videoElement.videoHeight;
+  const sourceWidth = videoElement instanceof HTMLCanvasElement
+    ? videoElement.width
+    : videoElement.videoWidth;
+  const sourceHeight = videoElement instanceof HTMLCanvasElement
+    ? videoElement.height
+    : videoElement.videoHeight;
+  const videoReady = videoElement instanceof HTMLCanvasElement
+    || videoElement.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
 
-  if (!sourceWidth || !sourceHeight || videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+  if (!sourceWidth || !sourceHeight || !videoReady) {
     throw new Error("live_screenshot_video_not_ready");
   }
 

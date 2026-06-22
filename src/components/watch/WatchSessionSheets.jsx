@@ -1,4 +1,4 @@
-import { Copy, PictureInPicture2, QrCode, Share } from "lucide-react";
+import { Camera, Copy, PictureInPicture2, QrCode, Share } from "lucide-react";
 import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
 import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { ProfileBio, ProfileInfoChips } from "../ProfileInfoSummary.jsx";
@@ -41,6 +41,7 @@ export function WatchMobileMoreSheet({
   pictureInPictureActive,
   onShareWatchLink,
   onOpenImageShareModal,
+  onOpenScreenshotShareModal,
   onCopyWatchLink,
   onOpenPictureInPicture,
   portalTarget = null,
@@ -103,6 +104,18 @@ export function WatchMobileMoreSheet({
             <QrCode aria-hidden="true" />
           </span>
           <span>{t("watchSheet.imageShare")}</span>
+        </button>
+        <button
+          type="button"
+          className="watch-mobile-more-action"
+          onClick={onOpenScreenshotShareModal}
+          disabled={!watchLink || !playerSession}
+          aria-label={t("watchSheet.screenshotShare")}
+        >
+          <span className="watch-mobile-more-action-icon">
+            <Camera aria-hidden="true" />
+          </span>
+          <span>{t("watchSheet.screenshotShare")}</span>
         </button>
         <button
           type="button"
@@ -222,8 +235,10 @@ export function WatchHostProfileContent({
 export function WatchHostProfileSheet({
   open,
   onClose,
+  portal = false,
   portalTarget = null,
   presentation = "drawer",
+  viewport = false,
   ...profileProps
 }) {
   const { t } = useI18n();
@@ -243,6 +258,8 @@ export function WatchHostProfileSheet({
       onClose={onClose}
       ariaLabel={t("profile.closeHostProfile")}
       {...drawerProps}
+      portal={portal || drawerProps.portal}
+      viewport={viewport}
     >
       <WatchHostProfileContent {...profileProps} />
     </SwipeableDrawer>

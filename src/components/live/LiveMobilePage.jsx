@@ -563,6 +563,7 @@ export function LiveMobilePage({
                   authAvailable={authAvailable}
                   authLoading={authLoading}
                   authUser={authUser}
+                  hostUserId={authUser?.id}
                   messages={chatMessages}
                   draft={chatDraft}
                   onDraftChange={onChatDraftChange}
@@ -692,6 +693,7 @@ export function LiveMobilePage({
             authAvailable={authAvailable}
             authLoading={authLoading}
             authUser={authUser}
+            hostUserId={authUser?.id}
             messages={chatMessages}
             draft={chatDraft}
             onDraftChange={onChatDraftChange}
@@ -723,6 +725,7 @@ export function LiveMobilePage({
               authAvailable={authAvailable}
               authLoading={authLoading}
               authUser={authUser}
+              hostUserId={authUser?.id}
               messages={chatMessages}
               draft={chatDraft}
               onDraftChange={onChatDraftChange}

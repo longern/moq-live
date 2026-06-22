@@ -9,6 +9,7 @@ const DURABLE_OBJECT_FREE_TIER_WRITE_LIMIT_MESSAGE =
   "Exceeded allowed rows written in Durable Objects free tier.";
 const STREAM_PROTOCOL_MOQ = "moq";
 const STREAM_PROTOCOL_WEBRTC = "webrtc";
+const DEFAULT_STREAM_PROTOCOL = STREAM_PROTOCOL_WEBRTC;
 const COHOST_INVITE_TTL_MS = 60_000;
 const BIG_DATA_CLOUD_REVERSE_GEOCODE_URL =
   "https://api-bdc.net/data/reverse-geocode";
@@ -1292,7 +1293,7 @@ function getDefaultRoomState() {
   return {
     stream: {
       isLive: false,
-      protocol: STREAM_PROTOCOL_MOQ,
+      protocol: DEFAULT_STREAM_PROTOCOL,
       startedAt: null,
     },
     roomMeta: {
@@ -1300,7 +1301,7 @@ function getDefaultRoomState() {
       stream: {
         relayUrl: "",
         namespace: "",
-        protocol: STREAM_PROTOCOL_MOQ,
+        protocol: DEFAULT_STREAM_PROTOCOL,
         webRtcUrl: "",
       },
     },
@@ -1779,9 +1780,9 @@ function sanitizeNamespace(value) {
 }
 
 function sanitizeStreamProtocol(value) {
-  return value === STREAM_PROTOCOL_WEBRTC
-    ? STREAM_PROTOCOL_WEBRTC
-    : STREAM_PROTOCOL_MOQ;
+  return value === STREAM_PROTOCOL_MOQ
+    ? STREAM_PROTOCOL_MOQ
+    : STREAM_PROTOCOL_WEBRTC;
 }
 
 function sanitizeCoordinate(value, min, max) {
@@ -1952,8 +1953,8 @@ function areRoomMetaEqual(left, right) {
       String(right?.stream?.relayUrl ?? "") &&
     String(left?.stream?.namespace ?? "") ===
       String(right?.stream?.namespace ?? "") &&
-    String(left?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) ===
-      String(right?.stream?.protocol ?? STREAM_PROTOCOL_MOQ) &&
+    String(left?.stream?.protocol ?? DEFAULT_STREAM_PROTOCOL) ===
+      String(right?.stream?.protocol ?? DEFAULT_STREAM_PROTOCOL) &&
     String(left?.stream?.webRtcUrl ?? "") ===
       String(right?.stream?.webRtcUrl ?? "")
   );

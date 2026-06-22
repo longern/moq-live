@@ -4,7 +4,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { ChatPanel } from "./ChatPanel.jsx";
-import { ToastViewport, useToast } from "./primitives/FloatingToast.jsx";
+import { useToast } from "./primitives/FloatingToast.jsx";
 import { StatusPill } from "./primitives/StatusPill.jsx";
 import {
   WatchAudienceSheet,
@@ -165,10 +165,13 @@ export function WatchSessionPage({
   const showHostFollowButton = Boolean(hostUserId && authUser?.id !== hostUserId);
   const showCohostLayout = Boolean(cohostActive && (cohostPlayerSession || cohostPlayerBadge.state === "warm"));
   const landscapeImmersive = Boolean(shortLandscapeViewport && !portraitMedia && !showCohostLayout);
+  const landscapePortraitSplit = Boolean(shortLandscapeViewport && portraitMedia && !showCohostLayout);
   const immersiveShell = immersivePortrait || fullscreenLandscapeMedia || landscapeImmersive || (portraitViewport && showCohostLayout);
   const longPressOpensMore = Boolean(portraitViewport && !portraitMedia && !fullscreenActive);
   const manualHideControlsEnabled = !longPressOpensMore;
   const showStagePictureInPictureControl = !(compactViewport && !portraitMedia);
+  const showStageReturnControl = Boolean(!portraitViewport && !immersiveShell);
+  const showStageFullscreenControl = !(fullscreenActive && showStageReturnControl);
   const fullscreenSheetOpen = Boolean(fullscreenLandscapeMedia && (moreOpen || hostProfileOpen || audienceOpen));
   const fullscreenSheetPortalTarget = fullscreenLandscapeMedia
     ? fullscreenSideSheetHost
@@ -211,6 +214,7 @@ export function WatchSessionPage({
     "page-grid",
     "watch-layout",
     landscapeImmersive ? "media-layout media-landscape-immersive" : "",
+    landscapePortraitSplit ? "media-layout media-landscape-portrait-split" : "",
   ].filter(Boolean).join(" ");
   const stageView = getWatchStageView({
     playerSession,
@@ -256,10 +260,12 @@ export function WatchSessionPage({
     imageShareMounted,
     imageShareReady,
     openImageShareModal,
+    openScreenshotShareModal,
     openShareMenu,
     saveWatchImage,
     shareButtonRef,
     shareImageLoading,
+    shareImageKind,
     shareImageUrl,
     shareMenuMounted,
     shareMenuPosition,
@@ -271,6 +277,7 @@ export function WatchSessionPage({
     hostAvatarUrl,
     hostDisplayName,
     onCloseMoreSheet: closeMoreSheet,
+    playerRef,
     roomCoverUrl,
     roomLabel,
     roomTitle,
@@ -447,6 +454,15 @@ export function WatchSessionPage({
     onStop?.();
   }
 
+  function handleStageReturn() {
+    if (fullscreenActive) {
+      onFullscreen?.();
+      return;
+    }
+
+    onStop?.();
+  }
+
   function renderMobileHud(className = "", persistent = false) {
     const visible = immersiveShell
       ? !immersiveControlsHidden || playerBadge.state === "error"
@@ -501,6 +517,7 @@ export function WatchSessionPage({
       handleStagePointerMove={handleStagePointerMove}
       hostChipLabel={hostChipLabel}
       hostDisplayName={hostDisplayName}
+      hostUserId={hostUserId}
       immersiveControlsHidden={immersiveControlsHidden}
       immersiveShell={immersiveShell}
       longPressControlsEnabled={manualHideControlsEnabled || longPressOpensMore}
@@ -511,6 +528,7 @@ export function WatchSessionPage({
       onDismissTapToUnmute={onDismissTapToUnmute}
       onFullscreen={onFullscreen}
       onOpenPictureInPicture={openPictureInPicture}
+      onReturnToList={handleStageReturn}
       onToggleMute={onToggleMute}
       onTogglePlayback={onTogglePlayback}
       pictureInPictureActive={pictureInPictureActive}
@@ -523,7 +541,9 @@ export function WatchSessionPage({
       playerSession={playerSession}
       revealControls={revealControls}
       showCohostLayout={showCohostLayout}
+      showFullscreenControl={showStageFullscreenControl}
       showPictureInPictureControl={showStagePictureInPictureControl}
+      showReturnControl={showStageReturnControl}
       showTapToUnmute={showTapToUnmute}
       stageClassName={stageClassName}
       fullscreenSideSheetHostRef={setFullscreenSideSheetHostNode}
@@ -546,7 +566,7 @@ export function WatchSessionPage({
     >
       <div className={watchLayoutClassName}>
         <section className="stage-column">
-          {!immersiveShell ? renderMobileHud("stage-mobile-hud-top", true) : null}
+          {!immersiveShell && !landscapePortraitSplit ? renderMobileHud("stage-mobile-hud-top", true) : null}
           {watchStage}
           <WatchRoomInfoStrip
             copyHostHandle={copyHostHandle}
@@ -586,6 +606,7 @@ export function WatchSessionPage({
           <ChatPanel
             roomLabel={chatRoomLabel}
             welcomeMessage={welcomeMessage}
+            hostUserId={hostUserId}
             authAvailable={authAvailable}
             authLoading={authLoading}
             authUser={authUser}
@@ -619,6 +640,7 @@ export function WatchSessionPage({
         pictureInPictureActive={pictureInPictureActive}
         onShareWatchLink={shareWatchLink}
         onOpenImageShareModal={openImageShareModal}
+        onOpenScreenshotShareModal={openScreenshotShareModal}
         onCopyWatchLink={copyWatchLink}
         onOpenPictureInPicture={openPictureInPicture}
       />
@@ -651,16 +673,17 @@ export function WatchSessionPage({
         />,
         overlayPortalTarget
       ) : null}
-      {hidden ? null : <ToastViewport className="watch-session-toast" portalTarget={overlayPortalTarget} />}
       {imageShareMounted ? (
         <WatchImageShareDialog
           imageShareClosing={imageShareClosing}
           imageShareReady={imageShareReady}
+          imageShareTitle={shareImageKind === "screenshot" ? t("watchSheet.screenshotShare") : t("watchSheet.imageShare")}
           onClose={closeImageShareModal}
           onCopyImage={copyWatchImage}
           onSaveImage={saveWatchImage}
           onShareImage={shareWatchImage}
           roomLabel={roomLabel}
+          shareImageAlt={shareImageKind === "screenshot" ? `${roomLabel}直播间截屏分享图` : undefined}
           shareImageLoading={shareImageLoading}
           shareImageUrl={shareImageUrl}
           shareSupported={shareSupported}

@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatedDialog } from "../AnimatedDialog.jsx";
 import { LoadingSpinner } from "../primitives/LoadingSpinner.jsx";
 import { UserAvatar } from "../primitives/UserAvatar.jsx";
+import { WatchHostProfileSheet } from "../watch/WatchSessionSheets.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
+import { formatAudienceCount } from "../../lib/audience.js";
+import { createApiError, getAppErrorMessage } from "../../lib/appErrors.js";
+import { buildHostProfileInfoItems } from "../../lib/watchSession.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 function PaginationControls({
@@ -35,9 +39,9 @@ function PaginationControls({
 
 function FollowListItem({
   item,
+  onOpenUserProfile,
   onOpenUserRoom,
   onRequestUnfollow,
-  openable,
   showFollowingAction,
   unfollowDisabled,
 }) {
@@ -53,11 +57,16 @@ function FollowListItem({
         <button
           type="button"
           className="follow-list-open-button"
-          disabled={!openable || !watchTarget}
+          disabled={!watchTarget}
           onClick={() => {
-            if (openable && watchTarget) {
-              onOpenUserRoom(watchTarget);
+            if (!watchTarget) {
+              return;
             }
+            if (showFollowingAction) {
+              onOpenUserRoom(watchTarget);
+              return;
+            }
+            onOpenUserProfile(user);
           }}
         >
           <UserAvatar
@@ -169,6 +178,66 @@ export function SettingsFollowsDrawer({
   const { t } = useI18n();
   const initialLoading = loading && !items.length;
   const showFollowingAction = type === "following";
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
+  const [profileError, setProfileError] = useState("");
+  const profileRequestIdRef = useRef(0);
+  const profileUserName = profileUser?.displayName || profileUser?.handle || profileUser?.email || t("common.anonymousUser");
+  const profileUserHandle = profileUser?.handle || "";
+  const profileInfoItems = profileUser
+    ? buildHostProfileInfoItems({
+      gender: profileUser.gender || "",
+      birthDate: profileUser.birthDate || "",
+      province: profileUser.locationProvince || "",
+      t,
+    })
+    : [];
+
+  useEffect(() => () => {
+    profileRequestIdRef.current += 1;
+  }, []);
+
+  async function openUserProfile(user) {
+    if (!user?.id) {
+      return;
+    }
+    const requestId = profileRequestIdRef.current + 1;
+    profileRequestIdRef.current = requestId;
+    setProfileUser(user);
+    setProfileOpen(true);
+    setProfileError("");
+
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(user.id)}/profile`, {
+        credentials: "same-origin",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw createApiError(payload, "follows_list_failed", { status: response.status });
+      }
+      if (profileRequestIdRef.current !== requestId) {
+        return;
+      }
+      setProfileUser((current) => (
+        current?.id === user.id && payload.user
+          ? { ...current, ...payload.user }
+          : current
+      ));
+    } catch (fetchError) {
+      if (profileRequestIdRef.current === requestId) {
+        setProfileError(getAppErrorMessage(fetchError));
+      }
+    }
+  }
+
+  async function copyUserHandle(handleValue) {
+    const normalizedHandle = String(handleValue || "").trim();
+    if (!normalizedHandle || typeof navigator === "undefined" || !navigator.clipboard) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(normalizedHandle).catch(() => {});
+  }
 
   return (
     <SettingsPanelShell
@@ -202,9 +271,9 @@ export function SettingsFollowsDrawer({
               <FollowListItem
                 key={`${item.user?.id || ""}-${item.createdAt}`}
                 item={item}
+                onOpenUserProfile={openUserProfile}
                 onOpenUserRoom={onOpenUserRoom}
                 onRequestUnfollow={onRequestUnfollow}
-                openable={showFollowingAction}
                 showFollowingAction={showFollowingAction}
                 unfollowDisabled={unfollowBusy}
               />
@@ -226,6 +295,31 @@ export function SettingsFollowsDrawer({
         onConfirm={onConfirmUnfollow}
         open={Boolean(pendingUnfollowUser)}
         user={pendingUnfollowUser}
+      />
+      <WatchHostProfileSheet
+        open={profileOpen}
+        onClose={() => {
+          profileRequestIdRef.current += 1;
+          setProfileOpen(false);
+          setProfileError("");
+        }}
+        portal
+        viewport
+        hostAvatarUrl={profileUser?.avatarUrl || ""}
+        hostChipLabel={profileUserName}
+        hostDisplayName={profileUser?.displayName || profileUserName}
+        hostBio={profileUser?.bio || ""}
+        hostProfileInfoItems={profileInfoItems}
+        hostLocationClickable={false}
+        hostLocationPending={false}
+        onHostHandleCopy={copyUserHandle}
+        hostHandle={profileUserHandle}
+        roomLabel={profileUserName}
+        hostFollowerCountText={formatAudienceCount(profileUser?.followerCount || 0)}
+        hostFollowingCountText={formatAudienceCount(profileUser?.followingCount || 0)}
+        followButton={(
+          profileError ? <p className="inline-warning">{profileError}</p> : null
+        )}
       />
     </SettingsPanelShell>
   );

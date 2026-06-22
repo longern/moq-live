@@ -173,6 +173,7 @@ export const enMessages = {
     moreActions: "More watch actions",
     shareWatchLink: "Share",
     imageShare: "Image share",
+    screenshotShare: "Screenshot share",
     copyWatchLink: "Copy link",
     pipOpen: "Picture in picture",
     pipClose: "Close picture in picture",

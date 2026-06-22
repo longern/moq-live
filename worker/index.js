@@ -89,6 +89,9 @@ export default {
       if (/^\/api\/users\/[^/]+\/follow$/.test(url.pathname) && ["GET", "POST", "PATCH", "DELETE"].includes(request.method)) {
         return await handleUserFollow(env, request, ctx);
       }
+      if (/^\/api\/users\/[^/]+\/profile$/.test(url.pathname) && request.method === "GET") {
+        return await handleUserProfile(env, request);
+      }
       if (url.pathname === "/api/push/public-key" && request.method === "GET") {
         return await handlePushPublicKey(env);
       }
@@ -465,6 +468,54 @@ async function handleMyFollows(env, request) {
   });
 }
 
+async function handleUserProfile(env, request) {
+  const db = getDb(env);
+  const session = await getSessionUser(db, request);
+  if (!session?.user?.id) {
+    return json({ ok: false, error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  }
+
+  const targetUserId = decodeURIComponent(new URL(request.url).pathname.split("/")[3] ?? "").trim();
+  if (!targetUserId) {
+    return json({ ok: false, error: "Missing target user", code: "missing_target_user" }, { status: 400 });
+  }
+
+  const row = await db.prepare(
+    `SELECT
+      id AS user_id,
+      handle AS user_handle,
+      display_name AS user_display_name,
+      primary_email AS user_email,
+      avatar_url AS user_avatar_url,
+      gender AS user_gender,
+      birth_date AS user_birth_date,
+      bio AS user_bio,
+      last_location_province AS user_last_location_province,
+      last_location_updated_at AS user_last_location_updated_at,
+      follower_count AS user_follower_count,
+      following_count AS user_following_count
+     FROM moq_users
+     WHERE id = ?
+     LIMIT 1`
+  ).bind(targetUserId).first();
+
+  if (!row?.user_id) {
+    return json({ ok: false, error: "User not found", code: "user_not_found" }, { status: 404 });
+  }
+
+  return json({
+    ok: true,
+    user: {
+      ...buildFollowUserPayload(row, request),
+      gender: row.user_gender || "",
+      birthDate: row.user_birth_date || "",
+      bio: row.user_bio || "",
+      locationProvince: row.user_last_location_province || "",
+      lastLocationUpdatedAt: row.user_last_location_updated_at || "",
+    },
+  });
+}
+
 async function handleRoomResolve(env, request) {
   const db = getDb(env);
   const url = new URL(request.url);
@@ -755,7 +806,7 @@ function buildCohostRoomPayload(row, request) {
 
 function buildCohostActive({ id, acceptedAt, peerRoom, peerState, request }) {
   const stream = peerState?.roomMeta?.stream || {};
-  const protocol = stream.protocol === "webrtc" ? "webrtc" : "moq";
+  const protocol = stream.protocol === "moq" ? "moq" : "webrtc";
   const activeStream = {
     relayUrl: stream.relayUrl || "",
     namespace: stream.namespace || "",

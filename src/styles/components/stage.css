@@ -252,6 +252,59 @@ publisher-moq {
   gap: 4px;
 }
 
+.stage-return-button {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  z-index: 4;
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(3, 8, 14, 0.38);
+  color: var(--text);
+  box-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.stage-frame.controls-visible .stage-return-button,
+.stage-return-button.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.stage-return-button:hover,
+.stage-return-button:focus-visible {
+  background: rgba(10, 18, 28, 0.58);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.stage-return-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.stage-return-button svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .stage-unmute-prompt {
   position: absolute;
   left: 50%;

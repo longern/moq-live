@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import {
+  ChevronLeft,
   Maximize,
   Minimize,
   Pause,
@@ -27,6 +28,7 @@ const STAGE_LONG_PRESS_IGNORE_SELECTOR = [
   "[role=\"button\"]",
   ".chat-panel-block",
   ".stage-controls",
+  ".stage-return-button",
   ".stage-mobile-hud",
   ".stage-unmute-prompt",
 ].join(",");
@@ -299,6 +301,7 @@ export function WatchStage({
   handleStagePointerMove,
   hostChipLabel,
   hostDisplayName,
+  hostUserId,
   immersiveControlsHidden,
   immersiveShell,
   longPressControlsEnabled = true,
@@ -309,6 +312,7 @@ export function WatchStage({
   onDismissTapToUnmute,
   onFullscreen,
   onOpenPictureInPicture,
+  onReturnToList,
   onToggleMute,
   onTogglePlayback,
   pictureInPictureActive,
@@ -321,7 +325,9 @@ export function WatchStage({
   playerBadgeState,
   revealControls,
   showCohostLayout,
+  showFullscreenControl = true,
   showPictureInPictureControl = true,
+  showReturnControl = false,
   showTapToUnmute,
   stageClassName,
   fullscreenSideSheetHostRef,
@@ -332,6 +338,8 @@ export function WatchStage({
   videoPipSupported,
   welcomeMessage,
 }) {
+  const returnControlVisible = controlsVisible || playerBadgeState === "error";
+
   return (
     <LongPressTarget
       ref={stageRef}
@@ -388,6 +396,19 @@ export function WatchStage({
               <p>{stageView.statusOverlayMessage}</p>
             </div>
           ) : null}
+          {showReturnControl && onReturnToList ? (
+            <button
+              type="button"
+              className={`stage-return-button${returnControlVisible ? " is-visible" : ""}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onReturnToList();
+              }}
+              aria-label="返回直播列表"
+            >
+              <ChevronLeft aria-hidden="true" />
+            </button>
+          ) : null}
           {showTapToUnmute && playerSession && playerBadgeState !== "error" ? (
             <button
               type="button"
@@ -414,6 +435,7 @@ export function WatchStage({
               <ChatPanel
                 roomLabel={chatRoomLabel}
                 welcomeMessage={welcomeMessage}
+                hostUserId={hostUserId}
                 authAvailable={authAvailable}
                 authLoading={authLoading}
                 authUser={authUser}
@@ -448,6 +470,7 @@ export function WatchStage({
               playerPaused={playerPaused}
               playerSession={playerSession}
               revealControls={revealControls}
+              showFullscreenControl={showFullscreenControl}
               showPictureInPictureControl={showPictureInPictureControl}
               videoPipSupported={videoPipSupported}
             />

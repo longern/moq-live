@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Ban, Copy, RotateCcw, X } from "lucide-react";
 import { LoadingSpinner } from "./primitives/LoadingSpinner.jsx";
@@ -13,6 +13,7 @@ const CHAT_MESSAGE_MENU_TOUCH_GAP = 10;
 const CHAT_MESSAGE_MENU_EXIT_MS = 120;
 const CHAT_COMPOSER_AUTOCOMPLETE = "off";
 const CHAT_COMPOSER_FIELD_NAME = "moq_draft_text";
+const CHAT_PANEL_MAX_VISIBLE_MESSAGES = 80;
 const CHAT_MUTE_OPTIONS = [
   { id: "10m", labelKey: "chat.muteOptions.tenMinutes", durationMs: 10 * 60_000 },
   { id: "1h", labelKey: "chat.muteOptions.oneHour", durationMs: 60 * 60_000 },
@@ -83,6 +84,27 @@ function isCoarsePointer() {
 
 function stopTouchPropagation(event) {
   event.stopPropagation();
+}
+
+function compareChatMessageOrder(left, right) {
+  const leftSentAt = String(left?.sentAt || "");
+  const rightSentAt = String(right?.sentAt || "");
+  if (leftSentAt && rightSentAt && leftSentAt !== rightSentAt) {
+    return leftSentAt.localeCompare(rightSentAt);
+  }
+
+  return String(left?.id || "").localeCompare(String(right?.id || ""));
+}
+
+function isMessageAfterAnchor(message, anchor) {
+  if (!anchor) {
+    return false;
+  }
+  if (!anchor.id && !anchor.sentAt) {
+    return true;
+  }
+
+  return compareChatMessageOrder(message, anchor) > 0;
 }
 
 function getMeasuredContextMenuPosition(anchorLeft, anchorTop, menuNode, placement) {
@@ -324,6 +346,7 @@ export function ChatPanel({
   variant = "default",
   className = "",
   title = "",
+  hostUserId = "",
   welcomeMessage = "",
   showComposer = true,
   showWelcome = true,
@@ -364,6 +387,7 @@ export function ChatPanel({
     message: null,
   });
   const [muteRetractMessage, setMuteRetractMessage] = useState(true);
+  const [welcomeAnchor, setWelcomeAnchor] = useState(null);
 
   function clearContextMenuCloseTimer() {
     if (contextMenuCloseTimerRef.current) {
@@ -371,13 +395,6 @@ export function ChatPanel({
       contextMenuCloseTimerRef.current = null;
     }
   }
-
-  useEffect(() => {
-    if (!listRef.current) {
-      return;
-    }
-    listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [messages]);
 
   useEffect(() => {
     if (!contextMenu.open) {
@@ -643,14 +660,72 @@ export function ChatPanel({
     floating ? "chat-panel-floating" : "control-block",
     className
   ].filter(Boolean).join(" ");
-  const showWelcomeMessage =
-    showWelcome && connectionState === "connected" && messages.length === 0;
   const configuredWelcomeText = String(welcomeMessage || "").trim();
   const welcomeText = configuredWelcomeText || (roomLabel
     ? t("chat.welcome", { room: roomLabel })
     : t("chat.welcome"));
+  const normalizedHostUserId = String(hostUserId || "").trim();
+  const showWelcomeMessage = showWelcome && connectionState === "connected";
+  const displayedMessages = useMemo(() => {
+    if (!showWelcomeMessage || !welcomeAnchor) {
+      return messages.slice(-CHAT_PANEL_MAX_VISIBLE_MESSAGES);
+    }
+
+    const welcomeEntry = {
+      id: `welcome-${welcomeAnchor.id || welcomeAnchor.sentAt || "entry"}`,
+      type: "system",
+      text: welcomeText,
+    };
+    const entries = [];
+    let welcomeInserted = false;
+
+    for (const message of messages) {
+      if (!welcomeInserted && isMessageAfterAnchor(message, welcomeAnchor)) {
+        entries.push(welcomeEntry);
+        welcomeInserted = true;
+      }
+      entries.push(message);
+    }
+
+    if (!welcomeInserted) {
+      entries.push(welcomeEntry);
+    }
+
+    return entries.slice(-CHAT_PANEL_MAX_VISIBLE_MESSAGES);
+  }, [messages, showWelcomeMessage, welcomeAnchor, welcomeText]);
   const showSendSpinner =
     composerState.mode === "member" && chatRecovering;
+
+  useEffect(() => {
+    if (!showWelcomeMessage) {
+      return;
+    }
+
+    setWelcomeAnchor((current) => {
+      if (current) {
+        return current;
+      }
+
+      const lastMessage = messages[messages.length - 1];
+      return {
+        id: String(lastMessage?.id || ""),
+        sentAt: String(lastMessage?.sentAt || ""),
+      };
+    });
+  }, [messages, showWelcomeMessage]);
+
+  useEffect(() => {
+    if (connectionState === "idle" && messages.length === 0) {
+      setWelcomeAnchor(null);
+    }
+  }, [connectionState, messages.length]);
+
+  useEffect(() => {
+    if (!listRef.current) {
+      return;
+    }
+    listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [displayedMessages]);
 
   return (
     <section className={panelClassName}>
@@ -665,51 +740,64 @@ export function ChatPanel({
       ) : null}
 
       <div ref={listRef} className="chat-message-list" aria-live="polite">
-        {messages.length ? messages.map((message) => (
-          <article
-            key={message.id}
-            className="chat-message-card"
-          >
-            <div
-              className="chat-message-hit-area"
-              onPointerDown={rememberMessagePointer}
-              onContextMenu={(event) => openMessageMenu(event, message)}
-              onClick={(event) => {
-                if (isCoarsePointer()) {
-                  openMessageMenu(event, message, { placement: "above-point" });
-                }
-              }}
+        {displayedMessages.length ? displayedMessages.map((message) => (
+          message.type === "system" ? (
+            <article
+              key={message.id}
+              className="chat-message-card chat-message-card-system chat-message-card-system-no-avatar"
             >
-              <UserAvatar
-                avatarUrl={message.user?.avatarUrl}
-                displayName={message.user?.displayName}
-                email={message.user?.email}
-                className="chat-avatar"
-                imgAlt={message.user?.displayName || t("common.userAvatar")}
-                placeholderClassName="is-placeholder"
-              />
-              <div className="chat-message-body">
-                <p className="chat-message-line">
-                  <span className="chat-message-author">
-                    {message.user?.displayName || message.user?.email || t("chat.anonymousUser")}
-                  </span>
-                  <span className="chat-message-text">{message.text}</span>
-                </p>
+              <div className="chat-message-hit-area chat-message-hit-area-system">
+                <div className="chat-message-body chat-message-body-system">
+                  <p className="chat-message-line chat-message-line-system">
+                    <span className="chat-message-author">{t("chat.system")}</span>
+                    <span className="chat-message-text">{message.text}</span>
+                  </p>
+                </div>
               </div>
-            </div>
-          </article>
-        )) : null}
+            </article>
+          ) : (
+            (() => {
+              const hostMessage = Boolean(
+                normalizedHostUserId && message.user?.id === normalizedHostUserId
+              );
 
-        {showWelcomeMessage ? (
-          <article className="chat-message-card chat-message-card-system chat-message-card-system-no-avatar">
-            <div className="chat-message-body chat-message-body-system">
-              <p className="chat-message-line chat-message-line-system">
-                <span className="chat-message-author">{t("chat.system")}</span>
-                <span className="chat-message-text">{welcomeText}</span>
-              </p>
-            </div>
-          </article>
-        ) : null}
+              return (
+                <article
+                  key={message.id}
+                  className="chat-message-card"
+                >
+                  <div
+                    className="chat-message-hit-area"
+                    onPointerDown={rememberMessagePointer}
+                    onContextMenu={(event) => openMessageMenu(event, message)}
+                    onClick={(event) => {
+                      if (isCoarsePointer()) {
+                        openMessageMenu(event, message, { placement: "above-point" });
+                      }
+                    }}
+                  >
+                    <UserAvatar
+                      avatarUrl={message.user?.avatarUrl}
+                      displayName={message.user?.displayName}
+                      email={message.user?.email}
+                      className="chat-avatar"
+                      imgAlt={message.user?.displayName || t("common.userAvatar")}
+                      placeholderClassName="is-placeholder"
+                    />
+                    <div className="chat-message-body">
+                      <p className="chat-message-line">
+                        <span className={`chat-message-author${hostMessage ? " chat-message-author-host" : ""}`}>
+                          {message.user?.displayName || message.user?.email || t("chat.anonymousUser")}
+                        </span>
+                        <span className="chat-message-text">{message.text}</span>
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              );
+            })()
+          )
+        )) : null}
       </div>
       <ChatMessageContextMenu
         canMute={Boolean(

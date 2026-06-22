@@ -1,20 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { buildWatchShareImage } from "../lib/shareImage.js";
+import { buildShareImageFileName } from "../lib/shareDownload.js";
+import { buildLiveScreenshotShareImage, buildWatchShareImage } from "../lib/shareImage.js";
+import { useImageShareActions } from "./useImageShareActions.js";
 
 const IMAGE_SHARE_EXIT_MS = 180;
 const SHARE_MENU_EXIT_MS = 180;
-
-function getShortDownloadToken() {
-  const timePart = Date.now().toString(36).slice(-4);
-  const randomPart = Math.floor(Math.random() * 1296).toString(36).padStart(2, "0");
-  return `${timePart}${randomPart}`;
-}
-
-function getSafeFileNameBase(value, fallback = "直播间") {
-  return String(value || fallback)
-    .replace(/[\\/:*?"<>|]+/g, "")
-    .trim() || fallback;
-}
 
 async function writeClipboardText(text) {
   try {
@@ -29,6 +19,7 @@ export function useWatchShareActions({
   hostAvatarUrl,
   hostDisplayName,
   onCloseMoreSheet,
+  playerRef,
   roomCoverUrl,
   roomLabel,
   roomTitle,
@@ -39,6 +30,7 @@ export function useWatchShareActions({
 }) {
   const [imageShareMounted, setImageShareMounted] = useState(false);
   const [imageShareClosing, setImageShareClosing] = useState(false);
+  const [shareImageKind, setShareImageKind] = useState("poster");
   const [shareImageUrl, setShareImageUrl] = useState("");
   const [shareImageLoading, setShareImageLoading] = useState(false);
   const [shareMenuMounted, setShareMenuMounted] = useState(false);
@@ -146,84 +138,25 @@ export function useWatchShareActions({
     }
   }
 
-  async function getShareImageBlob() {
-    if (!shareImageUrl) {
-      return null;
-    }
-
-    const response = await fetch(shareImageUrl);
-    return response.blob();
-  }
-
   function getShareImageFileName() {
-    const roomName = getSafeFileNameBase(`${hostDisplayName || roomLabel || "主播"}的直播间`);
-    return `${roomName}-分享图-${getShortDownloadToken()}.png`;
+    return buildShareImageFileName({
+      subject: `${hostDisplayName || roomLabel || "主播"}的直播间`,
+      suffix: shareImageKind === "screenshot" ? "截屏分享图" : "分享图",
+    });
   }
 
-  async function shareWatchImage() {
-    if (!shareImageUrl) {
-      return;
-    }
-
-    try {
-      const blob = await getShareImageBlob();
-      if (!blob) {
-        return;
-      }
-      const file = new File([blob], getShareImageFileName(), { type: "image/png" });
-      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: roomTitle || roomLabel,
-          text: `${hostDisplayName || roomLabel}的直播间`,
-        });
-        return;
-      }
-      await shareWatchLink();
-    } catch (error) {
-      if (!(error instanceof Error && error.name === "AbortError")) {
-        console.error("watch room share image failed", error);
-        showToast("分享失败");
-      }
-    }
-  }
-
-  async function copyWatchImage() {
-    if (!shareImageUrl || typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-      showToast("复制失败");
-      return;
-    }
-
-    try {
-      const blob = await getShareImageBlob();
-      if (!blob) {
-        showToast("复制失败");
-        return;
-      }
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "image/png": blob,
-        }),
-      ]);
-      showToast("复制成功");
-    } catch (error) {
-      console.error("watch room share image copy failed", error);
-      showToast("复制失败");
-    }
-  }
-
-  function saveWatchImage() {
-    if (!shareImageUrl) {
-      return;
-    }
-
-    const link = document.createElement("a");
-    link.href = shareImageUrl;
-    link.download = getShareImageFileName();
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }
+  const {
+    copyImage: copyWatchImage,
+    saveImage: saveWatchImage,
+    shareImage: shareWatchImage,
+  } = useImageShareActions({
+    getFileName: getShareImageFileName,
+    getShareText: () => `${hostDisplayName || roomLabel}的直播间`,
+    getShareTitle: () => roomTitle || roomLabel,
+    logLabel: "watch room share image",
+    onFallbackShare: shareWatchLink,
+    shareImageUrl,
+  });
 
   function closeImageShareModal() {
     if (imageCloseTimerRef.current) {
@@ -252,6 +185,7 @@ export function useWatchShareActions({
     }
     setImageShareMounted(true);
     setImageShareClosing(false);
+    setShareImageKind("poster");
     setShareImageUrl("");
     setShareImageLoading(true);
 
@@ -269,6 +203,44 @@ export function useWatchShareActions({
       setShareImageUrl(imageUrl);
     } catch (error) {
       console.error("watch room share image failed", error);
+      setImageShareMounted(false);
+      showToast("生成失败");
+    } finally {
+      setShareImageLoading(false);
+    }
+  }
+
+  async function openScreenshotShareModal() {
+    if (!watchLink) {
+      closeShareMenu();
+      onCloseMoreSheet?.();
+      return;
+    }
+
+    closeShareMenu();
+    onCloseMoreSheet?.();
+    if (imageCloseTimerRef.current) {
+      clearTimeout(imageCloseTimerRef.current);
+      imageCloseTimerRef.current = null;
+    }
+    setImageShareMounted(true);
+    setImageShareClosing(false);
+    setShareImageKind("screenshot");
+    setShareImageUrl("");
+    setShareImageLoading(true);
+
+    try {
+      const imageUrl = await buildLiveScreenshotShareImage({
+        watchLink,
+        videoElement: playerRef?.current,
+        hostAvatarUrl,
+        siteIconUrl,
+        siteTitle,
+        delayMs: 0,
+      });
+      setShareImageUrl(imageUrl);
+    } catch (error) {
+      console.error("watch room screenshot share image failed", error);
       setImageShareMounted(false);
       showToast("生成失败");
     } finally {
@@ -309,10 +281,12 @@ export function useWatchShareActions({
     imageShareMounted,
     imageShareReady,
     openImageShareModal,
+    openScreenshotShareModal,
     openShareMenu,
     saveWatchImage,
     shareButtonRef,
     shareImageLoading,
+    shareImageKind,
     shareImageUrl,
     shareMenuMounted,
     shareMenuPosition,

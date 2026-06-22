@@ -1,6 +1,6 @@
 export const STREAM_PROTOCOL_MOQ = "moq";
 export const STREAM_PROTOCOL_WEBRTC = "webrtc";
-export const DEFAULT_STREAM_PROTOCOL = STREAM_PROTOCOL_MOQ;
+export const DEFAULT_STREAM_PROTOCOL = STREAM_PROTOCOL_WEBRTC;
 
 export const STREAM_PROTOCOL_OPTIONS = [
   {
@@ -14,5 +14,5 @@ export const STREAM_PROTOCOL_OPTIONS = [
 ];
 
 export function normalizeStreamProtocol(value) {
-  return value === STREAM_PROTOCOL_WEBRTC ? STREAM_PROTOCOL_WEBRTC : STREAM_PROTOCOL_MOQ;
+  return value === STREAM_PROTOCOL_MOQ ? STREAM_PROTOCOL_MOQ : STREAM_PROTOCOL_WEBRTC;
 }

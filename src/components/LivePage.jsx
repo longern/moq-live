@@ -1,27 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useMediaOrientation } from "../hooks/useMediaOrientation.js";
 import { useCompactViewport, useMediaQuery, usePortraitViewport } from "../hooks/useMediaQuery.js";
+import { useImageShareActions } from "../hooks/useImageShareActions.js";
 import { useLiveMobileShellMode } from "../hooks/useLiveMobileShellMode.js";
 import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
-import { ToastViewport, useToast } from "./primitives/FloatingToast.jsx";
+import { useToast } from "./primitives/FloatingToast.jsx";
 import { WatchImageShareDialog } from "./watch/WatchSharePanels.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
+import { resizeRoomCoverFile } from "../lib/imageResize.js";
+import { buildShareImageFileName } from "../lib/shareDownload.js";
 import { buildLiveScreenshotShareImage, buildWatchShareImage } from "../lib/shareImage.js";
 
 const IMAGE_SHARE_EXIT_MS = 180;
-
-function getShortDownloadToken() {
-  const timePart = Date.now().toString(36).slice(-4);
-  const randomPart = Math.floor(Math.random() * 1296).toString(36).padStart(2, "0");
-  return `${timePart}${randomPart}`;
-}
-
-function getSafeFileNameBase(value, fallback = "直播间") {
-  return String(value || fallback)
-    .replace(/[\\/:*?"<>|]+/g, "")
-    .trim() || fallback;
-}
 
 export function LivePage({
   view = {},
@@ -168,7 +159,7 @@ export function LivePage({
   const imageShareCloseTimerRef = useRef(null);
   const shareImageRequestIdRef = useRef(0);
   const lastCohostResponseIdRef = useRef("");
-  const { clearToast, showToast } = useToast();
+  const { showToast } = useToast();
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mediaMode = cameraEnabled ? "video" : "voice";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
@@ -232,85 +223,25 @@ export function LivePage({
     }
   }
 
-  async function getShareImageBlob() {
-    if (!shareImageUrl) {
-      return null;
-    }
-
-    const response = await fetch(shareImageUrl);
-    return response.blob();
-  }
-
   function getShareImageFileName() {
-    const name = getSafeFileNameBase(`${roomLabel || "主播"}的直播间`);
-    const suffix = shareImageKind === "screenshot" ? "截屏分享图" : "分享图";
-    return `${name}-${suffix}-${getShortDownloadToken()}.png`;
+    return buildShareImageFileName({
+      subject: `${roomLabel || "主播"}的直播间`,
+      suffix: shareImageKind === "screenshot" ? "截屏分享图" : "分享图",
+    });
   }
 
-  async function shareLiveImage() {
-    if (!shareImageUrl) {
-      return;
-    }
-
-    try {
-      const blob = await getShareImageBlob();
-      if (!blob) {
-        return;
-      }
-      const file = new File([blob], getShareImageFileName(), { type: "image/png" });
-      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: roomDetails?.title || roomLabel,
-          text: `${roomLabel || "主播"}的直播间`,
-        });
-        return;
-      }
-      await shareLiveLink();
-    } catch (error) {
-      if (!(error instanceof Error && error.name === "AbortError")) {
-        console.error("live room share image failed", error);
-        showToast("分享失败");
-      }
-    }
-  }
-
-  async function copyLiveImage() {
-    if (!shareImageUrl || typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-      showToast("复制失败");
-      return;
-    }
-
-    try {
-      const blob = await getShareImageBlob();
-      if (!blob) {
-        showToast("复制失败");
-        return;
-      }
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "image/png": blob,
-        }),
-      ]);
-      showToast("复制成功");
-    } catch (error) {
-      console.error("live room share image copy failed", error);
-      showToast("复制失败");
-    }
-  }
-
-  function saveLiveImage() {
-    if (!shareImageUrl) {
-      return;
-    }
-
-    const link = document.createElement("a");
-    link.href = shareImageUrl;
-    link.download = getShareImageFileName();
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }
+  const {
+    copyImage: copyLiveImage,
+    saveImage: saveLiveImage,
+    shareImage: shareLiveImage,
+  } = useImageShareActions({
+    getFileName: getShareImageFileName,
+    getShareText: () => `${roomLabel || "主播"}的直播间`,
+    getShareTitle: () => roomDetails?.title || roomLabel,
+    logLabel: "live room share image",
+    onFallbackShare: shareLiveLink,
+    shareImageUrl,
+  });
 
   function closeImageShareModal() {
     shareImageRequestIdRef.current += 1;
@@ -480,8 +411,9 @@ export function LivePage({
     setRoomCoverStatus("");
 
     try {
+      const coverFile = await resizeRoomCoverFile(file);
       const formData = new FormData();
-      formData.set("cover", file);
+      formData.set("cover", coverFile);
       const response = await fetch("/api/me/room/cover", {
         method: "POST",
         credentials: "same-origin",
@@ -696,7 +628,11 @@ export function LivePage({
       onOpenCoverPicker: openRoomCoverPicker,
       onSaveRoomTitle: handleRoomTitleSave,
       onSaveRoomWelcomeMessage: handleRoomWelcomeMessageSave,
-      onRoomInfoBlocked: clearToast,
+      onRoomInfoBlocked: () => {
+        if (roomInfoBlockedReason) {
+          showToast(roomInfoBlockedReason);
+        }
+      },
     },
   };
 
@@ -707,7 +643,6 @@ export function LivePage({
           {...pageProps}
           view={{ ...pageProps.view, layoutClassName: mobileLayoutClass, shellMode: mobileShellMode }}
         />
-        {hidden ? null : <ToastViewport className="live-page-toast live-page-toast-mobile" message={roomInfoBlockedReason} />}
         {imageShareMounted ? (
           <WatchImageShareDialog
             imageShareClosing={imageShareClosing}
@@ -731,7 +666,6 @@ export function LivePage({
   return (
     <>
       <LiveDesktopPage {...pageProps} view={{ ...pageProps.view, layoutClassName: desktopLayoutClass }} />
-      {hidden ? null : <ToastViewport className="live-page-toast live-page-toast-desktop" message={roomInfoBlockedReason} />}
       {imageShareMounted ? (
         <WatchImageShareDialog
           imageShareClosing={imageShareClosing}

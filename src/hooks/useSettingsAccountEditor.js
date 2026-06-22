@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getAppErrorMessage } from "../lib/appErrors.js";
-import { resizeAvatarFile } from "../lib/avatarResize.js";
+import { resizeAvatarFile } from "../lib/imageResize.js";
 
 export function useSettingsAccountEditor({
   authUser,

@@ -21,7 +21,7 @@ import {
 } from "./settings/SettingsPageSections.jsx";
 import { SettingsFollowsDrawer } from "./settings/SettingsFollowsDrawer.jsx";
 import { SwipeableDrawer } from "./primitives/SwipeableDrawer.jsx";
-import { ToastViewport, useToast } from "./primitives/FloatingToast.jsx";
+import { useToast } from "./primitives/FloatingToast.jsx";
 import {
   readRouteSettingsPanelType,
   writeSettingsPanelRoute,
@@ -600,8 +600,6 @@ export function SettingsPage({
             />
           )}
         </MobilePanelPresence>
-
-        {hidden ? null : <ToastViewport className="settings-page-toast" />}
       </div>
     </section>
   );

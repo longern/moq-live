@@ -183,6 +183,7 @@ export const zhCNMessages = {
     moreActions: "更多观看操作",
     shareWatchLink: "分享",
     imageShare: "图片分享",
+    screenshotShare: "截屏分享",
     copyWatchLink: "复制链接",
     pipOpen: "小窗播放",
     pipClose: "关闭小窗播放",

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { generateRoomId, getInitialViewState, writeStoredRelayUrl } from "../lib/routeState.js";
 
-export function useRouteController() {
+export function useRouteController({ onBeforePopState, onAfterPopState } = {}) {
   const initial = useRef(getInitialViewState()).current;
 
   const [page, setPage] = useState(initial.page);
@@ -14,6 +14,7 @@ export function useRouteController() {
   const relayUrlRef = useRef(initial.relayUrl);
   const watchRoomRef = useRef(initial.watchRoom);
   const liveRoomRef = useRef(initial.liveRoom);
+  const pendingPopStateRef = useRef(0);
 
   pageRef.current = page;
   relayUrlRef.current = relayUrl;
@@ -57,15 +58,42 @@ export function useRouteController() {
   useEffect(() => {
     const handlePopState = () => {
       const next = getInitialViewState();
-      autorunRef.current = next.autorun;
-      pageRef.current = next.page;
-      relayUrlRef.current = next.relayUrl;
-      watchRoomRef.current = next.watchRoom;
-      liveRoomRef.current = next.liveRoom;
-      setPage(next.page);
-      setRelayUrl(next.relayUrl);
-      setWatchRoom(next.watchRoom);
-      setLiveRoom(next.liveRoom);
+      const applyPopState = () => {
+        autorunRef.current = next.autorun;
+        pageRef.current = next.page;
+        relayUrlRef.current = next.relayUrl;
+        watchRoomRef.current = next.watchRoom;
+        liveRoomRef.current = next.liveRoom;
+        setPage(next.page);
+        setRelayUrl(next.relayUrl);
+        setWatchRoom(next.watchRoom);
+        setLiveRoom(next.liveRoom);
+        onAfterPopState?.({ next });
+      };
+      const delayMs = Number(onBeforePopState?.({
+        current: {
+          page: pageRef.current,
+          relayUrl: relayUrlRef.current,
+          watchRoom: watchRoomRef.current,
+          liveRoom: liveRoomRef.current,
+        },
+        next,
+      }) || 0);
+
+      if (delayMs > 0) {
+        const popStateId = pendingPopStateRef.current + 1;
+        pendingPopStateRef.current = popStateId;
+        window.setTimeout(() => {
+          if (pendingPopStateRef.current !== popStateId) {
+            return;
+          }
+          applyPopState();
+        }, delayMs);
+        return;
+      }
+
+      pendingPopStateRef.current += 1;
+      applyPopState();
     };
 
     window.addEventListener("popstate", handlePopState);

@@ -10,6 +10,7 @@ import { AppWatchPageSection } from "./components/AppWatchPageSection.jsx";
 import { LiveActivationGate } from "./components/live/LiveActivationGate.jsx";
 import { LiveActivationLoading } from "./components/live/LiveActivationLoading.jsx";
 import { LiveRouteActivationContent, LiveRouteFrame } from "./components/LiveRouteShell.jsx";
+import { ToastViewport } from "./components/primitives/FloatingToast.jsx";
 import { useAuthController } from "./hooks/useAuthController.js";
 import { usePushPermissionPromptController } from "./hooks/usePushPermissionPromptController.js";
 import { useRegistrationDisplayNamePrompt } from "./hooks/useRegistrationDisplayNamePrompt.js";
@@ -66,6 +67,16 @@ const LiveRoute = lazy(loadLiveRoute);
 
 const LIVE_ROUTE_FRAME_EXIT_MS = 280;
 
+function getAppToastClassName({ liveRouteActive, liveShellMode, settingsVisible }) {
+  if (liveRouteActive) {
+    return `live-page-toast live-page-toast-${liveShellMode === "mobile" ? "mobile" : "desktop"}`;
+  }
+  if (settingsVisible) {
+    return "settings-page-toast";
+  }
+  return "watch-session-toast";
+}
+
 export function App() {
   const { locale, t } = useI18n();
   const siteTitle = __APP_TITLE__;
@@ -87,6 +98,8 @@ export function App() {
   const authMenuRef = useRef(null);
   const authMenuCloseTimerRef = useRef(null);
   const liveRouteCloseTimerRef = useRef(null);
+  const liveRouteHistoryPushedRef = useRef(false);
+  const suppressNextLivePopAnimationRef = useRef(false);
   const handledWatchPlaybackRef = useRef({ roomId: "", startedAt: "", protocol: "" });
   const handledCohostPlaybackRef = useRef({ roomId: "", startedAt: "", protocol: "" });
   const watchLiveSeenRef = useRef({ roomId: "", hasBeenLive: false });
@@ -167,6 +180,30 @@ export function App() {
     };
   }, []);
 
+  function handleBeforeRoutePopState({ current, next }) {
+    if (current.page !== "live" || next.page === "live") {
+      return 0;
+    }
+
+    if (suppressNextLivePopAnimationRef.current) {
+      suppressNextLivePopAnimationRef.current = false;
+      return 0;
+    }
+
+    if (liveRouteCloseTimerRef.current) {
+      clearTimeout(liveRouteCloseTimerRef.current);
+      liveRouteCloseTimerRef.current = null;
+    }
+    setLiveRouteClosing(true);
+
+    return LIVE_ROUTE_FRAME_EXIT_MS;
+  }
+
+  function handleAfterRoutePopState({ next }) {
+    setLiveRouteClosing(false);
+    setWatchRouteCommitted(Boolean(next.watchRoom));
+  }
+
   const {
     initialAutorun,
     page,
@@ -182,7 +219,10 @@ export function App() {
     setLiveRoomValue,
     setRelayUrlValue,
     selectPage
-  } = useRouteController();
+  } = useRouteController({
+    onBeforePopState: handleBeforeRoutePopState,
+    onAfterPopState: handleAfterRoutePopState,
+  });
 
   const {
     authState,
@@ -546,6 +586,13 @@ export function App() {
     setLiveRouteClosing(true);
     liveRouteCloseTimerRef.current = window.setTimeout(() => {
       liveRouteCloseTimerRef.current = null;
+      if (liveRouteHistoryPushedRef.current && window.history.length > 1) {
+        liveRouteHistoryPushedRef.current = false;
+        suppressNextLivePopAnimationRef.current = true;
+        setLiveRouteClosing(false);
+        window.history.back();
+        return;
+      }
       closeLiveRouteNow();
     }, LIVE_ROUTE_FRAME_EXIT_MS);
   }
@@ -773,28 +820,18 @@ export function App() {
   }, [authState.user]);
 
   useEffect(() => {
-    const handlePopState = () => {
-      const routeRoom = new URLSearchParams(window.location.search).get("r")?.trim() ?? "";
-      setWatchRouteCommitted(Boolean(routeRoom));
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, []);
-
-  useEffect(() => {
     const routeWatchRoom = page === "watch" && watchRouteCommitted ? watchRoom.trim() : "";
     const previousRoute = previousRouteRef.current;
-    const historyMode = page === "watch"
+    const shouldPushLiveRoute = page === "live" && previousRoute.page !== "live";
+    const shouldPushWatchRoute = page === "watch"
       && watchRouteCommitted
       && Boolean(routeWatchRoom)
       && (
         previousRoute.page !== "watch"
         || !previousRoute.watchRouteCommitted
         || !previousRoute.watchRoom
-      )
+      );
+    const historyMode = shouldPushLiveRoute || shouldPushWatchRoute
       ? "push"
       : "replace";
 
@@ -806,6 +843,12 @@ export function App() {
       },
       { historyMode }
     );
+
+    if (shouldPushLiveRoute) {
+      liveRouteHistoryPushedRef.current = true;
+    } else if (page !== "live") {
+      liveRouteHistoryPushedRef.current = false;
+    }
 
     previousRouteRef.current = {
       page,
@@ -1350,7 +1393,12 @@ export function App() {
     ? <LiveActivationLoading />
     : null;
   const liveActivationShellContent = liveActivationContent || liveRouteLoadingContent;
-  const liveRouteFrameActive = page === "live" && (Boolean(liveActivationShellContent) || liveRouteCanRender);
+  const liveRouteFrameActive = (page === "live" || liveRouteClosing) && (Boolean(liveActivationShellContent) || liveRouteCanRender);
+  const appToastClassName = getAppToastClassName({
+    liveRouteActive: liveRouteFrameActive,
+    liveShellMode: liveRouteShellMode,
+    settingsVisible: showSettingsPage,
+  });
 
   return (
     <>
@@ -1453,7 +1501,7 @@ export function App() {
               {liveRouteCanRender ? (
                 <Suspense fallback={null}>
                   <LiveRoute
-                    hidden={page !== "live"}
+                    hidden={page !== "live" && !liveRouteClosing}
                     page={page}
                     pageRef={pageRef}
                     relayUrl={relayUrl}
@@ -1520,6 +1568,7 @@ export function App() {
           onPreloadLive={preloadLiveRoute}
         />
       )}
+      <ToastViewport className={appToastClassName} />
       {pushPrompt.open ? (
         <PushPermissionPrompt
           busy={pushPrompt.busy}

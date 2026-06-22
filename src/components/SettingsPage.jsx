@@ -340,6 +340,7 @@ export function SettingsPage({
             <SettingsDrawer
               buildLabel={buildLabel}
               canLogout={Boolean(authUser)}
+              canOpenAdmin={Boolean(authUser?.isSuperAdmin)}
               localePreference={localePreference}
               logRef={logRef}
               logText={logText}

@@ -5,6 +5,7 @@ import {
   CircleHelp,
   History,
   Languages,
+  ShieldCheck,
   SlidersHorizontal,
   UserRound,
 } from "lucide-react";
@@ -46,25 +47,43 @@ function getWatchHistoryHref(item) {
 }
 
 function SettingsMenuItem({
+  href,
   icon: Icon,
   label,
   onClick,
   ariaLabel = label,
 }) {
+  const content = (
+    <>
+      <span className="live-more-menu-icon settings-menu-icon" aria-hidden="true">
+        <Icon />
+      </span>
+      <span className="live-more-menu-label">{label}</span>
+      <ChevronIcon />
+    </>
+  );
+
   return (
     <li className="live-menu-list-item">
-      <button
-        type="button"
-        className="live-menu-item live-more-menu-item settings-menu-item"
-        aria-label={ariaLabel}
-        onClick={onClick}
-      >
-        <span className="live-more-menu-icon settings-menu-icon" aria-hidden="true">
-          <Icon />
-        </span>
-        <span className="live-more-menu-label">{label}</span>
-        <ChevronIcon />
-      </button>
+      {href ? (
+        <a
+          className="live-menu-item live-more-menu-item settings-menu-item"
+          href={href}
+          aria-label={ariaLabel}
+          onClick={onClick}
+        >
+          {content}
+        </a>
+      ) : (
+        <button
+          type="button"
+          className="live-menu-item live-more-menu-item settings-menu-item"
+          aria-label={ariaLabel}
+          onClick={onClick}
+        >
+          {content}
+        </button>
+      )}
     </li>
   );
 }
@@ -250,6 +269,7 @@ export function AdvancedSettingsContent({
 export function SettingsDrawer({
   buildLabel,
   canLogout,
+  canOpenAdmin,
   localePreference,
   logRef,
   logText,
@@ -312,6 +332,17 @@ export function SettingsDrawer({
                 />
               </ul>
             </SettingsPanelCard>
+            {canOpenAdmin ? (
+              <SettingsPanelCard>
+                <ul className="live-menu-list settings-menu-list" aria-label={t("account.admin")}>
+                  <SettingsMenuItem
+                    href="/admin/"
+                    icon={ShieldCheck}
+                    label={t("account.admin")}
+                  />
+                </ul>
+              </SettingsPanelCard>
+            ) : null}
             {canLogout ? (
               <SettingsPanelCard className="settings-logout-card">
                 <ul className="live-menu-list settings-menu-list" aria-label={t("account.logout")}>

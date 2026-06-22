@@ -80,6 +80,7 @@ export const zhCNMessages = {
     settingsButtonAria: "打开设置",
     login: "登录",
     personalCenter: "个人中心",
+    admin: "管理后台",
     logout: "退出登录",
     loginNow: "立即登录",
   },

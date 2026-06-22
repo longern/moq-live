@@ -3,6 +3,7 @@ import { ArrowRight, Image } from "lucide-react";
 import { LoadingSpinner } from "./primitives/LoadingSpinner.jsx";
 import { UserAvatar } from "./primitives/UserAvatar.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
+import { buildWatchLink } from "../lib/routeState.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 
 function RoomCoverPlaceholder() {
@@ -35,7 +36,7 @@ function getRoomOpenTarget(room) {
 
 function getRoomHref(room) {
   const target = getRoomOpenTarget(room);
-  return target ? `?r=${encodeURIComponent(target)}` : "?";
+  return buildWatchLink("", target) || "?";
 }
 
 function WatchRoomCard({ room, onOpenRoom }) {

@@ -131,6 +131,15 @@ export function AppTopbar({
                   >
                     {t("account.personalCenter")}
                   </button>
+                  {authState.user.isSuperAdmin ? (
+                    <a
+                      className="auth-menu-item"
+                      role="menuitem"
+                      href="/admin/"
+                    >
+                      {t("account.admin")}
+                    </a>
+                  ) : null}
                   <button
                     type="button"
                     className="auth-menu-item"

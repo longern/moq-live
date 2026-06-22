@@ -55,6 +55,14 @@ const PUBLISH_CONNECT_TIMEOUT_MS = 10_000;
 const MICROPHONE_PUBLISH_GAIN = 1.6;
 const MUSIC_AUDIO_TRACKS = new WeakSet();
 const MICROPHONE_AUDIO_TRACKS = new WeakSet();
+const DEFAULT_WEBRTC_PUBLISH_PROXY_URL = "/api/me/room/webrtc/whip";
+
+function buildDefaultWebRtcPlaybackProxyUrl({ roomId }) {
+  const normalizedRoomId = String(roomId || "").trim();
+  return normalizedRoomId
+    ? `/api/rooms/${encodeURIComponent(normalizedRoomId)}/webrtc/whep`
+    : "";
+}
 
 function getPublishQuality(id) {
   return (
@@ -216,6 +224,7 @@ export function usePublisherController({
   roomRef,
   webRtcPublishUrlRef,
   webRtcPlaybackUrlRef,
+  webRtcPlaybackRoomIdRef,
   generateRoomId,
   assertCanPublish,
   log,
@@ -1402,14 +1411,12 @@ export function usePublisherController({
         const nextWebRtcPublishUrl = (
           webRtcPublishUrlRef?.current ||
           webRtcPublishUrlValueRef.current ||
-          ""
+          DEFAULT_WEBRTC_PUBLISH_PROXY_URL
         ).trim();
-        if (!nextWebRtcPublishUrl) {
-          throw createAppError("webrtc_publish_url_missing");
-        }
         const nextWebRtcPlaybackUrl = (
           webRtcPlaybackUrlRef?.current ||
           webRtcPlaybackUrlValueRef.current ||
+          buildDefaultWebRtcPlaybackProxyUrl({ roomId: webRtcPlaybackRoomIdRef?.current }) ||
           ""
         ).trim();
         if (!nextWebRtcPlaybackUrl) {

@@ -67,6 +67,14 @@
     gap: 12px;
   }
 
+  .settings-mobile-detail-screen {
+    gap: 12px;
+  }
+
+  .settings-mobile-menu-screen > .settings-panel-card-frame + .settings-panel-card-frame {
+    margin-top: 12px;
+  }
+
   .settings-panel-body {
     padding-right: 0;
   }

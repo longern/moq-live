@@ -73,6 +73,7 @@ export const enMessages = {
     settingsButtonAria: "Open settings",
     login: "Sign in",
     personalCenter: "Profile",
+    admin: "Admin Console",
     logout: "Sign out",
     loginNow: "Sign in now",
   },

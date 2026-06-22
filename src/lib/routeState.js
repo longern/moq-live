@@ -1,5 +1,6 @@
 const DEFAULT_RELAY_URL = "https://draft-14.cloudflare.mediaoverquic.com/";
 const RELAY_URL_STORAGE_KEY = "moq-live.relay-url";
+const HANDLE_PATH_PATTERN = /^(?!\d+$)[a-z0-9](?:[a-z0-9_]{4,22}[a-z0-9])?$/;
 
 function readStoredRelayUrl() {
   try {
@@ -29,10 +30,26 @@ export function generateRoomId() {
   return `puptv-${suffix}`;
 }
 
+function getRouteHandleFromPathname(pathname = window.location.pathname) {
+  const normalizedPath = String(pathname || "").replace(/\/+$/, "");
+  const match = /^\/([^/]+)$/.exec(normalizedPath);
+  if (!match) {
+    return "";
+  }
+
+  let handle = "";
+  try {
+    handle = decodeURIComponent(match[1] || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+  return HANDLE_PATH_PATTERN.test(handle) ? handle : "";
+}
+
 export function getInitialViewState() {
   const params = new URLSearchParams(window.location.search);
   const requestedPage = params.get("p");
-  const routeRoom = params.get("r") ?? "";
+  const routeRoom = getInitialWatchRouteRoom();
   let page =
     requestedPage === "l" || requestedPage === "s" ? requestedPage : "w";
   let watchRoom = "";
@@ -57,12 +74,22 @@ export function getInitialViewState() {
   };
 }
 
+export function getInitialWatchRouteRoom() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("r") ?? getRouteHandleFromPathname();
+}
+
 export function buildWatchLink(relayUrl, room) {
   if (!room) {
     return "";
   }
 
-  return `${window.location.origin}${window.location.pathname}?r=${encodeURIComponent(room)}`;
+  const normalizedRoom = String(room).trim();
+  if (HANDLE_PATH_PATTERN.test(normalizedRoom)) {
+    return `${window.location.origin}/${encodeURIComponent(normalizedRoom)}`;
+  }
+
+  return `${window.location.origin}/?r=${encodeURIComponent(normalizedRoom)}`;
 }
 
 export function getRelayHostValue(relayUrl) {
@@ -86,11 +113,21 @@ export function writeRoute(
 
   if (page === "watch") {
     if (watchRoom) {
-      next.searchParams.set("r", watchRoom);
+      const normalizedWatchRoom = String(watchRoom).trim();
+      if (HANDLE_PATH_PATTERN.test(normalizedWatchRoom)) {
+        next.pathname = `/${encodeURIComponent(normalizedWatchRoom)}`;
+      } else {
+        next.pathname = "/";
+        next.searchParams.set("r", normalizedWatchRoom);
+      }
+    } else {
+      next.pathname = "/";
     }
   } else if (page === "live") {
+    next.pathname = "/";
     next.searchParams.set("p", "l");
   } else if (page === "settings") {
+    next.pathname = "/";
     next.searchParams.set("p", "s");
   }
 

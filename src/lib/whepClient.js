@@ -1,8 +1,11 @@
+const WEBRTC_PROXY_RESOURCE_RENEW_INTERVAL_MS = 30 * 60 * 1000;
+
 export async function createWhepPlaybackSession({ url, videoElement, signal }) {
-  const endpoint = new URL(url).toString();
+  const endpoint = new URL(url, window.location.href).toString();
   const peerConnection = new RTCPeerConnection();
   const remoteStream = new MediaStream();
   let resourceUrl = "";
+  let renewIntervalId = null;
   let closed = false;
 
   const close = async () => {
@@ -17,6 +20,10 @@ export async function createWhepPlaybackSession({ url, videoElement, signal }) {
       videoElement.srcObject = null;
     }
     peerConnection.close();
+    if (renewIntervalId) {
+      window.clearInterval(renewIntervalId);
+      renewIntervalId = null;
+    }
     if (resourceUrl) {
       await fetch(resourceUrl, { method: "DELETE" }).catch(() => {});
     }
@@ -68,6 +75,7 @@ export async function createWhepPlaybackSession({ url, videoElement, signal }) {
     resourceUrl = response.headers.get("location") || "";
     if (resourceUrl) {
       resourceUrl = new URL(resourceUrl, endpoint).toString();
+      renewIntervalId = startWebRtcProxyResourceRenewal(resourceUrl);
     }
 
     await peerConnection.setRemoteDescription({
@@ -84,6 +92,19 @@ export async function createWhepPlaybackSession({ url, videoElement, signal }) {
     await close();
     throw error;
   }
+}
+
+function startWebRtcProxyResourceRenewal(resourceUrl) {
+  if (!resourceUrl.startsWith(window.location.origin)) {
+    return null;
+  }
+
+  return window.setInterval(() => {
+    void fetch(resourceUrl, {
+      method: "PATCH",
+      credentials: "same-origin",
+    }).catch(() => {});
+  }, WEBRTC_PROXY_RESOURCE_RENEW_INTERVAL_MS);
 }
 
 function waitForIceGatheringComplete(peerConnection, signal) {

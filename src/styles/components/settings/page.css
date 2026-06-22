@@ -617,7 +617,7 @@
 .settings-mobile-detail-screen {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .settings-mobile-menu-shell .live-more-menu-title {
@@ -626,6 +626,10 @@
 
 .settings-panel-card-frame {
   padding-inline: 16px;
+}
+
+.settings-mobile-menu-screen > .settings-panel-card-frame + .settings-panel-card-frame {
+  margin-top: 16px;
 }
 
 .settings-menu-list,
@@ -638,7 +642,7 @@
 }
 
 .settings-logout-card {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .settings-logout-menu-item {

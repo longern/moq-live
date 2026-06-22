@@ -150,6 +150,7 @@ export function AppWatchPageSection({ context }) {
       }}
       actions={{
         onStop: () => {
+          chat.disconnect?.();
           autorunRef.current = false;
           setWatchRouteCommitted(false);
           setWatchRoomValue("");

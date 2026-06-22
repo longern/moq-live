@@ -1,4 +1,5 @@
 const WEBRTC_AUDIO_MAX_BITRATE = 192_000;
+const WEBRTC_PROXY_RESOURCE_RENEW_INTERVAL_MS = 30 * 60 * 1000;
 
 export async function createWhipPublishSession({
   url,
@@ -6,9 +7,10 @@ export async function createWhipPublishSession({
   audioMaxBitrate = WEBRTC_AUDIO_MAX_BITRATE,
   videoMaxBitrate,
 }) {
-  const endpoint = new URL(url).toString();
+  const endpoint = new URL(url, window.location.href).toString();
   const peerConnection = new RTCPeerConnection();
   let resourceUrl = "";
+  let renewIntervalId = null;
   let videoSender = null;
   let currentVideoMaxBitrate = videoMaxBitrate;
 
@@ -43,6 +45,7 @@ export async function createWhipPublishSession({
   resourceUrl = response.headers.get("location") || "";
   if (resourceUrl) {
     resourceUrl = new URL(resourceUrl, endpoint).toString();
+    renewIntervalId = startWebRtcProxyResourceRenewal(resourceUrl);
   }
 
   await peerConnection.setRemoteDescription({
@@ -68,11 +71,28 @@ export async function createWhipPublishSession({
     },
     close() {
       peerConnection.close();
+      if (renewIntervalId) {
+        window.clearInterval(renewIntervalId);
+        renewIntervalId = null;
+      }
       if (resourceUrl) {
         void fetch(resourceUrl, { method: "DELETE" }).catch(() => {});
       }
     },
   };
+}
+
+function startWebRtcProxyResourceRenewal(resourceUrl) {
+  if (!resourceUrl.startsWith(window.location.origin)) {
+    return null;
+  }
+
+  return window.setInterval(() => {
+    void fetch(resourceUrl, {
+      method: "PATCH",
+      credentials: "same-origin",
+    }).catch(() => {});
+  }, WEBRTC_PROXY_RESOURCE_RENEW_INTERVAL_MS);
 }
 
 async function setSenderBitrate(sender, maxBitrate, mediaKind) {

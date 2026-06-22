@@ -11,6 +11,7 @@ const STREAM_PROTOCOL_MOQ = "moq";
 const STREAM_PROTOCOL_WEBRTC = "webrtc";
 const DEFAULT_STREAM_PROTOCOL = STREAM_PROTOCOL_WEBRTC;
 const COHOST_INVITE_TTL_MS = 60_000;
+const WEBRTC_PROXY_SESSION_STORAGE_PREFIX = "webrtcProxySession:";
 const BIG_DATA_CLOUD_REVERSE_GEOCODE_URL =
   "https://api-bdc.net/data/reverse-geocode";
 const BIG_DATA_CLOUD_FREE_REVERSE_GEOCODE_URL =
@@ -69,6 +70,20 @@ export class ChatRoomDO {
 
     if (request.method === "POST" && url.pathname.endsWith("/cohost/active")) {
       return await this.handleCohostActiveUpdate(request);
+    }
+
+    if (
+      request.method === "POST" &&
+      url.pathname.endsWith("/webrtc/proxy-sessions")
+    ) {
+      return await this.handleWebRtcProxySessionRegister(request);
+    }
+
+    if (
+      ["GET", "PATCH", "DELETE"].includes(request.method) &&
+      /\/webrtc\/proxy-sessions\/[^/]+$/.test(url.pathname)
+    ) {
+      return await this.handleWebRtcProxySessionResource(request);
     }
 
     if (
@@ -230,6 +245,13 @@ export class ChatRoomDO {
       return;
     }
 
+    if (payload?.type === "presence.leave") {
+      this.refreshBroadcastControlState({ excludeSocket: ws });
+      this.broadcastPresence({ excludeSocket: ws });
+      ws.close(1000, "presence_leave");
+      return;
+    }
+
     this.sendError(ws, "unsupported_event", {
       eventType: typeof payload?.type === "string" ? payload.type : "",
     });
@@ -238,7 +260,7 @@ export class ChatRoomDO {
   async webSocketClose(ws, code, reason) {
     ws.close(code, reason);
     this.refreshBroadcastControlState({ excludeSocket: ws });
-    this.broadcastPresence();
+    this.broadcastPresence({ excludeSocket: ws });
   }
 
   async webSocketError(ws) {
@@ -248,20 +270,31 @@ export class ChatRoomDO {
       return;
     } finally {
       this.refreshBroadcastControlState({ excludeSocket: ws });
-      this.broadcastPresence();
+      this.broadcastPresence({ excludeSocket: ws });
     }
+  }
+
+  getActiveSockets({ excludeSocket = null } = {}) {
+    return this.ctx.getWebSockets().filter((socket) => {
+      if (socket === excludeSocket) {
+        return false;
+      }
+      return typeof socket.readyState !== "number" || socket.readyState === 1;
+    });
+  }
+
+  getActiveSessions(options = {}) {
+    return this.getActiveSockets(options)
+      .map((socket) => ({
+        socket,
+        session: normalizeAttachment(socket.deserializeAttachment()),
+      }))
+      .filter(({ session }) => Boolean(session));
   }
 
   refreshBroadcastControlState({ excludeSocket = null } = {}) {
     const broadcasterGroups = new Map();
-    for (const socket of this.ctx.getWebSockets()) {
-      if (socket === excludeSocket) {
-        continue;
-      }
-      if (typeof socket.readyState === "number" && socket.readyState !== 1) {
-        continue;
-      }
-      const session = normalizeAttachment(socket.deserializeAttachment());
+    for (const { socket, session } of this.getActiveSessions({ excludeSocket })) {
       if (
         !session?.isRoomOwner ||
         session.role !== "broadcaster" ||
@@ -307,20 +340,19 @@ export class ChatRoomDO {
     }
   }
 
-  broadcastPresence() {
+  broadcastPresence(options = {}) {
     this.broadcast({
       type: "presence.snapshot",
-      ...this.getPresenceSnapshot(),
-    });
+      ...this.getPresenceSnapshot(options),
+    }, options);
   }
 
-  getPresenceSnapshot() {
+  getPresenceSnapshot(options = {}) {
     const loggedInViewersById = new Map();
     let anonymousViewerCount = 0;
 
-    for (const socket of this.ctx.getWebSockets()) {
-      const session = normalizeAttachment(socket.deserializeAttachment());
-      if (!session || session.role === "broadcaster") {
+    for (const { session } of this.getActiveSessions(options)) {
+      if (session.role === "broadcaster") {
         continue;
       }
 
@@ -352,8 +384,7 @@ export class ChatRoomDO {
   }
 
   hasActiveBroadcastController(userId) {
-    for (const socket of this.ctx.getWebSockets()) {
-      const session = normalizeAttachment(socket.deserializeAttachment());
+    for (const { session } of this.getActiveSessions()) {
       if (
         session?.role === "broadcaster" &&
         session.canControlBroadcast &&
@@ -365,9 +396,9 @@ export class ChatRoomDO {
     return false;
   }
 
-  broadcast(payload) {
+  broadcast(payload, options = {}) {
     const serialized = JSON.stringify(payload);
-    for (const socket of this.ctx.getWebSockets()) {
+    for (const socket of this.getActiveSockets(options)) {
       try {
         socket.send(serialized);
       } catch {
@@ -704,8 +735,7 @@ export class ChatRoomDO {
 
   sendModerationEvent(payload) {
     const targetUserId = String(payload?.mute?.userId || payload?.userId || "");
-    for (const socket of this.ctx.getWebSockets()) {
-      const session = normalizeAttachment(socket.deserializeAttachment());
+    for (const { socket, session } of this.getActiveSessions()) {
       const isController =
         session?.isRoomOwner &&
         session.role === "broadcaster" &&
@@ -1123,8 +1153,7 @@ export class ChatRoomDO {
     }
 
     let delivered = 0;
-    for (const socket of this.ctx.getWebSockets()) {
-      const session = normalizeAttachment(socket.deserializeAttachment());
+    for (const { socket, session } of this.getActiveSessions()) {
       if (
         !session?.isRoomOwner ||
         session.role !== "broadcaster" ||
@@ -1188,6 +1217,87 @@ export class ChatRoomDO {
       active,
     });
     return json({ ok: true });
+  }
+
+  async handleWebRtcProxySessionRegister(request) {
+    const payload = await request.json().catch(() => ({}));
+    const session = normalizeWebRtcProxySession(payload.session);
+    if (!session) {
+      return json({
+        ok: false,
+        error: "Invalid WebRTC proxy session",
+        code: "invalid_webrtc_proxy_session",
+      }, { status: 400 });
+    }
+
+    await this.ctx.storage.put(
+      getWebRtcProxySessionStorageKey(session.id),
+      session,
+    );
+    return json({ ok: true, session: getPublicWebRtcProxySession(session) });
+  }
+
+  async handleWebRtcProxySessionResource(request) {
+    const url = new URL(request.url);
+    const sessionId = decodeURIComponent(url.pathname.split("/").pop() || "");
+    if (!isValidWebRtcProxySessionId(sessionId)) {
+      return json({
+        ok: false,
+        error: "Invalid WebRTC proxy session",
+        code: "invalid_webrtc_proxy_session",
+      }, { status: 400 });
+    }
+
+    const storageKey = getWebRtcProxySessionStorageKey(sessionId);
+    const session = normalizeWebRtcProxySession(
+      await this.ctx.storage.get(storageKey),
+    );
+    if (!session) {
+      return json({
+        ok: false,
+        error: "WebRTC proxy session not found",
+        code: "webrtc_proxy_session_not_found",
+      }, { status: 404 });
+    }
+
+    if (session.expiresAt <= Date.now()) {
+      await this.ctx.storage.delete(storageKey);
+      return json({
+        ok: false,
+        error: "WebRTC proxy session expired",
+        code: "webrtc_proxy_session_expired",
+      }, { status: 410 });
+    }
+
+    if (request.method === "PATCH") {
+      const payload = await request.json().catch(() => ({}));
+      const nextExpiresAt = Number(payload.expiresAt || 0);
+      if (!Number.isFinite(nextExpiresAt) || nextExpiresAt <= Date.now()) {
+        return json({
+          ok: false,
+          error: "Invalid WebRTC proxy session renewal",
+          code: "invalid_webrtc_proxy_session_renewal",
+        }, { status: 400 });
+      }
+      const nextSession = {
+        ...session,
+        expiresAt: nextExpiresAt,
+      };
+      await this.ctx.storage.put(storageKey, nextSession);
+      return json({
+        ok: true,
+        session: getPublicWebRtcProxySession(nextSession),
+      });
+    }
+
+    if (request.method === "DELETE") {
+      await this.ctx.storage.delete(storageKey);
+    }
+
+    return json({
+      ok: true,
+      session: getPublicWebRtcProxySession(session),
+    });
   }
 
   async clearPeerCohostActive(active) {
@@ -1713,6 +1823,49 @@ function normalizeCohostActive(value) {
     peer,
     stream,
   };
+}
+
+function normalizeWebRtcProxySession(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = String(value.id || "").trim();
+  const kind = String(value.kind || "").trim().toLowerCase();
+  const targetUrl = sanitizeUrl(value.targetUrl);
+  const expiresAt = Number(value.expiresAt || 0);
+  if (
+    !isValidWebRtcProxySessionId(id) ||
+    !["whip", "whep"].includes(kind) ||
+    !targetUrl ||
+    !Number.isFinite(expiresAt)
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    kind,
+    targetUrl,
+    expiresAt,
+  };
+}
+
+function getPublicWebRtcProxySession(session) {
+  return {
+    id: session.id,
+    kind: session.kind,
+    targetUrl: session.targetUrl,
+    expiresAt: session.expiresAt,
+  };
+}
+
+function getWebRtcProxySessionStorageKey(sessionId) {
+  return `${WEBRTC_PROXY_SESSION_STORAGE_PREFIX}${sessionId}`;
+}
+
+function isValidWebRtcProxySessionId(value) {
+  return /^[a-z0-9_-]{3,160}$/i.test(String(value || ""));
 }
 
 function parseUserHeader(headerValue) {

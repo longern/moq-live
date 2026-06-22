@@ -309,12 +309,33 @@ export function useChatController({
     setRecoveringFromPageLifecycle(Boolean(nextRecovering));
   }
 
+  function closeChatSocket(socket, reason = "client_leave") {
+    if (!socket) {
+      return;
+    }
+
+    intentionalCloseRef.current = true;
+    if (socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.send(JSON.stringify({ type: "presence.leave" }));
+      } catch {
+        // The close frame below still gives the server a chance to observe leave.
+      }
+    }
+
+    try {
+      socket.close(1000, reason);
+    } catch {
+      // Ignore close failures on already broken sockets.
+    }
+  }
+
   useEffect(() => {
     clearReconnectTimers();
 
     if (!enabled || !room) {
       if (socketRef.current) {
-        socketRef.current.close();
+        closeChatSocket(socketRef.current);
         socketRef.current = null;
       }
       setMessages([]);
@@ -672,12 +693,10 @@ export function useChatController({
       clearReconnectTimers();
       clearBroadcastControlRequests();
       if (socketRef.current) {
-        intentionalCloseRef.current = true;
-        socketRef.current.close();
+        closeChatSocket(socketRef.current);
         socketRef.current = null;
       } else if (socket) {
-        intentionalCloseRef.current = true;
-        socket.close();
+        closeChatSocket(socket);
       }
     };
   }, [authKey, enabled, role, room]);
@@ -814,6 +833,17 @@ export function useChatController({
     return true;
   }
 
+  function disconnect() {
+    const socket = socketRef.current;
+    if (!socket) {
+      return false;
+    }
+
+    closeChatSocket(socket);
+    socketRef.current = null;
+    return true;
+  }
+
   function dismissCohostInvite(inviteId) {
     setCohostInvite((current) => (
       !inviteId || current?.id === inviteId ? null : current
@@ -850,6 +880,7 @@ export function useChatController({
     releaseBroadcastControl,
     setCohostInviteAllowed,
     clearCohostActive,
+    disconnect,
     dismissCohostInvite
   };
 }

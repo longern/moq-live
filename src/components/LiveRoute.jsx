@@ -218,6 +218,17 @@ function writeStoredStreamSettings(
   }
 }
 
+function buildDefaultWebRtcPlaybackProxyUrl({ roomId }) {
+  const normalizedRoomId = String(roomId || "").trim();
+  if (!normalizedRoomId || typeof window === "undefined") {
+    return "";
+  }
+  return new URL(
+    `/api/rooms/${encodeURIComponent(normalizedRoomId)}/webrtc/whep`,
+    window.location.href,
+  ).toString();
+}
+
 function splitCameraOptions(cameraOptions) {
   const front = [];
   const rear = [];
@@ -263,7 +274,7 @@ function getCameraMode(cameraOptions, selectedCameraId, cameraEnabled) {
 }
 
 function useLiveRoomChatSync({
-  liveRoom,
+  liveNamespace,
   liveRoomDetails,
   liveChat,
   liveStreamActive,
@@ -278,7 +289,7 @@ function useLiveRoomChatSync({
   sendChatEventRef.current = liveChat.sendEvent;
 
   useEffect(() => {
-    if (!liveRoom) {
+    if (!liveNamespace) {
       announcedLiveStateRef.current = { room: "", isLive: null };
       return;
     }
@@ -289,14 +300,14 @@ function useLiveRoomChatSync({
 
     if (liveChat.streamState.isLive === liveStreamActive) {
       announcedLiveStateRef.current = {
-        room: liveRoom,
+        room: liveNamespace,
         isLive: liveStreamActive,
       };
       return;
     }
 
     const current = announcedLiveStateRef.current;
-    if (current.room === liveRoom && current.isLive === liveStreamActive) {
+    if (current.room === liveNamespace && current.isLive === liveStreamActive) {
       return;
     }
 
@@ -312,7 +323,7 @@ function useLiveRoomChatSync({
 
     if (sent) {
       announcedLiveStateRef.current = {
-        room: liveRoom,
+        room: liveNamespace,
         isLive: liveStreamActive,
       };
     }
@@ -320,13 +331,13 @@ function useLiveRoomChatSync({
     liveChat.connectionState,
     liveChat.roomStateReady,
     liveChat.streamState.isLive,
-    liveRoom,
+    liveNamespace,
     liveStreamActive,
     publishProtocol,
   ]);
 
   useEffect(() => {
-    if (!liveRoom || liveChat.connectionState !== "connected" || !liveChat.roomStateReady) {
+    if (!liveNamespace || liveChat.connectionState !== "connected" || !liveChat.roomStateReady) {
       return;
     }
     if (!canControlBroadcast) {
@@ -335,7 +346,7 @@ function useLiveRoomChatSync({
 
     const nextStream = {
       relayUrl,
-      namespace: liveRoom,
+      namespace: liveNamespace,
       protocol: publishProtocol,
       webRtcUrl,
     };
@@ -370,7 +381,7 @@ function useLiveRoomChatSync({
     relayUrl,
     publishProtocol,
     webRtcUrl,
-    liveRoom,
+    liveNamespace,
     liveRoomDetails?.title,
   ]);
 }
@@ -412,7 +423,8 @@ export function LiveRoute({
   });
   const webRtcPublishUrlRef = useRef("");
   const webRtcPlaybackUrlRef = useRef("");
-  const appliedWebRtcDefaultsRef = useRef({ publishUrl: "", playbackUrl: "" });
+  const webRtcPlaybackRoomIdRef = useRef("");
+  webRtcPlaybackRoomIdRef.current = liveChatRoomId || "";
 
   const publisher = usePublisherController({
     page,
@@ -421,6 +433,7 @@ export function LiveRoute({
     roomRef: liveRoomRef,
     webRtcPublishUrlRef,
     webRtcPlaybackUrlRef,
+    webRtcPlaybackRoomIdRef,
     generateRoomId: () => setLiveRoomValue(generateRoomId()),
     assertCanPublish: async () => {
       const canControlBroadcast = await liveChat.requestBroadcastControl();
@@ -493,32 +506,6 @@ export function LiveRoute({
   });
 
   useEffect(() => {
-    const nextPublishUrl = liveRoomDetails?.webRtcPublishUrl || "";
-    const nextPlaybackUrl = liveRoomDetails?.webRtcPlaybackUrl || "";
-    if (
-      nextPublishUrl &&
-      nextPublishUrl !== appliedWebRtcDefaultsRef.current.publishUrl &&
-      !publisher.webRtcPublishUrl
-    ) {
-      appliedWebRtcDefaultsRef.current.publishUrl = nextPublishUrl;
-      publisher.setWebRtcPublishUrl(nextPublishUrl);
-    }
-    if (
-      nextPlaybackUrl &&
-      nextPlaybackUrl !== appliedWebRtcDefaultsRef.current.playbackUrl &&
-      !publisher.webRtcPlaybackUrl
-    ) {
-      appliedWebRtcDefaultsRef.current.playbackUrl = nextPlaybackUrl;
-      publisher.setWebRtcPlaybackUrl(nextPlaybackUrl);
-    }
-  }, [
-    liveRoomDetails?.webRtcPlaybackUrl,
-    liveRoomDetails?.webRtcPublishUrl,
-    publisher.webRtcPlaybackUrl,
-    publisher.webRtcPublishUrl,
-  ]);
-
-  useEffect(() => {
     const storedSettings = readStoredStreamSettings(streamSettingsStorageKey);
     if (!storedSettings) {
       return;
@@ -571,9 +558,12 @@ export function LiveRoute({
   const publishProtocol = normalizeStreamProtocol(publisher.publishProtocol);
   const webRtcPublishUrl = publisher.webRtcPublishUrl || "";
   const webRtcPlaybackUrl = publisher.webRtcPlaybackUrl || "";
+  const liveNamespace = liveRoom;
+  const liveRoomId = liveChatRoomId;
+  const defaultWebRtcPlaybackUrl = buildDefaultWebRtcPlaybackProxyUrl({ roomId: liveRoomId });
   webRtcPublishUrlRef.current = webRtcPublishUrl.trim();
-  webRtcPlaybackUrlRef.current = webRtcPlaybackUrl.trim();
-  const webRtcUrl = webRtcPlaybackUrl.trim();
+  webRtcPlaybackUrlRef.current = webRtcPlaybackUrl.trim() || defaultWebRtcPlaybackUrl;
+  const webRtcUrl = webRtcPlaybackUrl.trim() || defaultWebRtcPlaybackUrl;
   const publishPolicyBlocked = isPublishBlocked(liveRoom);
   const publishControlBlocked =
     liveChatEnabled &&
@@ -591,7 +581,7 @@ export function LiveRoute({
   );
 
   useLiveRoomChatSync({
-    liveRoom,
+    liveNamespace,
     liveRoomDetails,
     liveChat,
     liveStreamActive,

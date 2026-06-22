@@ -19,7 +19,7 @@ import { useLiveRoomActivation } from "./hooks/useLiveRoomActivation.js";
 import { useCompactViewport, usePortraitViewport } from "./hooks/useMediaQuery.js";
 import { usePlayerController } from "./hooks/usePlayerController.js";
 import { useRouteController } from "./hooks/useRouteController.js";
-import { buildWatchLink, getRelayHostValue, writeRoute } from "./lib/routeState.js";
+import { buildWatchLink, getInitialWatchRouteRoom, getRelayHostValue, writeRoute } from "./lib/routeState.js";
 import {
   createInitialWatchFollowState,
   createInitialWatchRoomResolution,
@@ -93,7 +93,7 @@ export function App() {
     const initialPage = new URLSearchParams(window.location.search).get("p");
     return initialPage === "s" ? "settings" : "watch";
   });
-  const [watchRouteCommitted, setWatchRouteCommitted] = useState(() => Boolean(new URLSearchParams(window.location.search).get("r")?.trim()));
+  const [watchRouteCommitted, setWatchRouteCommitted] = useState(() => Boolean(getInitialWatchRouteRoom().trim()));
   const logRef = useRef(null);
   const authMenuRef = useRef(null);
   const authMenuCloseTimerRef = useRef(null);
@@ -109,8 +109,8 @@ export function App() {
       : new URLSearchParams(window.location.search).get("p") === "s"
         ? "settings"
         : "watch",
-    watchRoom: new URLSearchParams(window.location.search).get("r")?.trim() ?? "",
-    watchRouteCommitted: Boolean(new URLSearchParams(window.location.search).get("r")?.trim())
+    watchRoom: getInitialWatchRouteRoom().trim(),
+    watchRouteCommitted: Boolean(getInitialWatchRouteRoom().trim())
   });
 
   function log(message) {
@@ -277,6 +277,7 @@ export function App() {
   const directWatchNamespace = getNamespaceWatchValue(normalizedWatchInput);
   const watchHandle = watchingNamespace || watchingTestChannel ? "" : getHandleWatchValue(normalizedWatchInput);
   const resolvedWatchRoomId = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.roomId;
+  const watchSessionActive = page === "watch" && watchRouteCommitted && Boolean(normalizedWatchInput);
   const watchChatRoom = watchingTestChannel
     ? ""
     : watchingNamespace
@@ -310,7 +311,11 @@ export function App() {
     log,
     layoutScopeKey: `${watchPlayerLayoutScopeKey}:cohost`,
   });
-  const watchChatEnabled = page === "watch" && !watchingTestChannel && Boolean(watchChatRoom) && !authState.loading;
+  const watchChatEnabled =
+    watchSessionActive &&
+    !watchingTestChannel &&
+    Boolean(watchChatRoom) &&
+    !authState.loading;
 
   const chat = useChatController({
     room: watchChatRoom,
@@ -350,7 +355,7 @@ export function App() {
   const cohostPlaybackReady = resolvedCohostProtocol === STREAM_PROTOCOL_MOQ
     ? Boolean(resolvedCohostRelayUrl && resolvedCohostNamespace)
     : Boolean(resolvedCohostWebRtcUrl);
-  const watchJoined = page === "watch" && watchRouteCommitted && Boolean(normalizedWatchInput);
+  const watchJoined = watchSessionActive;
   const watchStageLoading = !watchingTestChannel
     && (
       watchingNamespace

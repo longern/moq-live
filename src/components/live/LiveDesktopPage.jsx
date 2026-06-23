@@ -657,6 +657,7 @@ export function LiveDesktopPage({
               previewHasVideo={previewHasVideo}
               previewPending={previewPending}
               mediaMode={mediaMode}
+              cameraEnabled={cameraEnabled}
               mirrorPreview={mirrorPreview}
             />
           </div>

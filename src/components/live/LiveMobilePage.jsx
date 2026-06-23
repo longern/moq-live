@@ -37,6 +37,7 @@ export function LiveMobilePage({
   media = {},
   settings = {},
   cohost = {},
+  audienceCall = {},
   chat = {},
   auth = {},
   actions = {},
@@ -116,6 +117,11 @@ export function LiveMobilePage({
     recentHosts: cohostRecentHosts = [],
   } = cohost;
   const {
+    enabled: audienceCallEnabled = false,
+    requests: audienceCallRequests = [],
+    active: audienceCallActive = [],
+  } = audienceCall;
+  const {
     messages: chatMessages,
     draft: chatDraft,
     connectionState: chatConnectionState,
@@ -134,6 +140,7 @@ export function LiveMobilePage({
   } = auth;
   const {
     onCycleCamera,
+    onToggleCamera,
     onToggleMicrophone,
     onPublishQualityChange,
     onPublishProtocolChange,
@@ -160,6 +167,8 @@ export function LiveMobilePage({
     onCohostDisconnect,
     onCohostInviteRequest,
     onCohostInviteRespond,
+    onAudienceCallEnabledChange,
+    onAudienceCallRequestRespond,
     onRoomInfoBlocked,
     onPickCover,
     onOpenCoverPicker,
@@ -548,6 +557,7 @@ export function LiveMobilePage({
             previewHasVideo={previewHasVideo}
             previewPending={previewPending}
             mediaMode={mediaMode}
+            cameraEnabled={cameraEnabled}
             mirrorPreview={mirrorPreview}
           />
           {publishBlockedReason ? (
@@ -782,6 +792,7 @@ export function LiveMobilePage({
           microphoneEnabled={microphoneEnabled}
           previewVideoRef={previewVideoRef}
           onCycleCamera={onCycleCamera}
+          onToggleCamera={onToggleCamera}
           onToggleMicrophone={onToggleMicrophone}
           onUnavailableCamera={() => showLiveMobileNotice(t("live.unavailableCamera"))}
         />
@@ -793,10 +804,15 @@ export function LiveMobilePage({
           invitesAllowed={cohostInvitesAllowed}
           invite={cohostInvite}
           recentHosts={cohostRecentHosts}
+          audienceCallEnabled={audienceCallEnabled}
+          audienceCallRequests={audienceCallRequests}
+          audienceCallActive={audienceCallActive}
           onDisconnect={onCohostDisconnect}
           onInvitesAllowedChange={onCohostInvitesAllowedChange}
           onInviteRequest={onCohostInviteRequest}
           onInviteRespond={onCohostInviteRespond}
+          onAudienceCallEnabledChange={onAudienceCallEnabledChange}
+          onAudienceCallRequestRespond={onAudienceCallRequestRespond}
         />
 
         <SwipeableDrawer

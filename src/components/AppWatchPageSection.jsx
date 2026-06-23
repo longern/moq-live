@@ -144,6 +144,8 @@ export function AppWatchPageSection({ context }) {
         connectionState: chat.connectionState,
         onlineCount: chat.onlineCount,
         loggedInViewers: chat.loggedInViewers,
+        audienceCallEnabled: chat.audienceCallEnabled,
+        audienceCallRealtimeSession: chat.audienceCallRealtimeSession,
         readOnly: chat.readOnly,
         error: chat.chatError,
         recovering: chat.recoveringFromPageLifecycle,
@@ -188,6 +190,12 @@ export function AppWatchPageSection({ context }) {
         },
         onChatRequireLogin: () => {
           setLoginPromptOpen(true);
+        },
+        onAudienceCallRequest: () => {
+          return chat.requestAudienceCall?.() ?? false;
+        },
+        onAudienceCallDisconnect: () => {
+          return chat.leaveAudienceCall?.() ?? false;
         },
       }}
     />

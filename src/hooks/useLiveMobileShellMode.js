@@ -4,29 +4,22 @@ import { shouldUsePortraitImmersiveMode } from "../lib/mediaLayout.js";
 const PREVIEW_SOURCE_CAMERA = "camera";
 
 function resolveLiveMobileShellMode({
-  cameraEnabled,
+  mediaMode,
   portraitViewport,
-  previewActive,
-  previewHasVideo,
   previewOrientation,
-  previewOrientationFallback,
   previewSourceType,
 }) {
   const canUseImmersiveShell =
+    mediaMode === "video" &&
     portraitViewport &&
-    cameraEnabled &&
     previewSourceType === PREVIEW_SOURCE_CAMERA;
 
   if (!canUseImmersiveShell) {
     return "compact";
   }
 
-  const effectivePreviewOrientation = previewActive && previewHasVideo
-    ? previewOrientation
-    : previewOrientationFallback;
-
   return shouldUsePortraitImmersiveMode({
-    mediaOrientation: effectivePreviewOrientation,
+    mediaOrientation: previewOrientation,
     portraitViewport,
   })
     ? "immersive"
@@ -34,41 +27,29 @@ function resolveLiveMobileShellMode({
 }
 
 export function useLiveMobileShellMode({
-  cameraEnabled,
+  mediaMode = "video",
   portraitViewport,
-  previewActive,
-  previewHasVideo,
   previewOrientation,
-  previewOrientationFallback,
   previewSourceType,
 }) {
   const [shellMode, setShellMode] = useState(() => resolveLiveMobileShellMode({
-    cameraEnabled,
+    mediaMode,
     portraitViewport,
-    previewActive,
-    previewHasVideo,
     previewOrientation,
-    previewOrientationFallback,
     previewSourceType,
   }));
 
   useEffect(() => {
     setShellMode(resolveLiveMobileShellMode({
-      cameraEnabled,
+      mediaMode,
       portraitViewport,
-      previewActive,
-      previewHasVideo,
       previewOrientation,
-      previewOrientationFallback,
       previewSourceType,
     }));
   }, [
-    cameraEnabled,
+    mediaMode,
     portraitViewport,
-    previewActive,
-    previewHasVideo,
     previewOrientation,
-    previewOrientationFallback,
     previewSourceType,
   ]);
 

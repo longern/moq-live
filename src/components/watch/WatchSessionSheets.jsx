@@ -1,4 +1,4 @@
-import { Camera, Copy, PictureInPicture2, QrCode, Share } from "lucide-react";
+import { Camera, Copy, PhoneCall, PhoneOff, PictureInPicture2, QrCode, Share } from "lucide-react";
 import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
 import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { ProfileBio, ProfileInfoChips } from "../ProfileInfoSummary.jsx";
@@ -39,10 +39,14 @@ export function WatchMobileMoreSheet({
   videoPipSupported,
   playerSession,
   pictureInPictureActive,
+  audienceCallEnabled = false,
+  audienceCallConnected = false,
   onShareWatchLink,
   onOpenImageShareModal,
   onOpenScreenshotShareModal,
   onCopyWatchLink,
+  onAudienceCallRequest,
+  onAudienceCallDisconnect,
   onOpenPictureInPicture,
   portalTarget = null,
   presentation = "drawer",
@@ -131,6 +135,24 @@ export function WatchMobileMoreSheet({
             <Copy aria-hidden="true" />
           </span>
           <span>{t("watchSheet.copyWatchLink")}</span>
+        </button>
+        <button
+          type="button"
+          className="watch-mobile-more-action"
+          onClick={audienceCallConnected ? onAudienceCallDisconnect : onAudienceCallRequest}
+          disabled={!audienceCallEnabled}
+          aria-label={audienceCallConnected
+            ? t("watchSheet.audienceCallDisconnect")
+            : t("watchSheet.audienceCall")}
+        >
+          <span className="watch-mobile-more-action-icon">
+            {audienceCallConnected
+              ? <PhoneOff aria-hidden="true" />
+              : <PhoneCall aria-hidden="true" />}
+          </span>
+          <span>{audienceCallConnected
+            ? t("watchSheet.audienceCallDisconnect")
+            : t("watchSheet.audienceCall")}</span>
         </button>
         <button
           type="button"

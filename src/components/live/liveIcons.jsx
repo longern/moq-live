@@ -19,6 +19,7 @@ import {
   Type,
   Users,
   Video,
+  VideoOff,
   Volume2,
   X,
 } from "lucide-react";
@@ -62,6 +63,10 @@ export function QualityIcon() {
 
 export function AudioVideoSettingsIcon() {
   return <Video {...iconProps} />;
+}
+
+export function CameraIcon({ enabled }) {
+  return enabled ? <Video {...iconProps} /> : <VideoOff {...iconProps} />;
 }
 
 export function CoverIcon() {

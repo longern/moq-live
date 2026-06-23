@@ -18,6 +18,7 @@ export function LivePreviewStage({
   previewHasVideo,
   previewPending = false,
   mediaMode = "video",
+  cameraEnabled = true,
   mirrorPreview = false
 }) {
   const hostRef = useRef(null);
@@ -27,6 +28,7 @@ export function LivePreviewStage({
   const pendingZoomRef = useRef(null);
   const pendingTrackRef = useRef(null);
   const showPending = mediaMode === "video" && previewPending && !previewHasVideo;
+  const showCameraOffBlackout = mediaMode === "video" && !cameraEnabled;
   const placeholderText = !previewActive
     ? (mediaMode === "voice" ? "语音直播" : "打开摄像头预览")
     : mediaMode === "voice"
@@ -166,7 +168,7 @@ export function LivePreviewStage({
       />
       {!previewActive || !previewHasVideo ? (
         <div className="publisher-placeholder">
-          {showPending ? (
+          {showCameraOffBlackout ? null : showPending ? (
             <LoadingSpinner className="publisher-preview-spinner" label="正在打开摄像头" />
           ) : (
             <p>{placeholderText}</p>

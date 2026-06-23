@@ -414,16 +414,21 @@ export function LiveRoute({
   }, [onRouteReady]);
 
   const liveChatEnabled = Boolean(authState.user?.id) && page === "live";
+  const publisherControllerRef = useRef(null);
   const liveChat = useChatController({
     room: liveChatRoomId,
     enabled: liveChatEnabled && Boolean(liveChatRoomId),
     authKey: authState.user?.id ?? "anonymous",
     role: "broadcaster",
+    onAudienceCallRemoteStream: (remoteId, remoteStream) => {
+      publisherControllerRef.current?.setAudienceCallRemoteStream(remoteId, remoteStream);
+    },
     log,
   });
   const webRtcPublishUrlRef = useRef("");
   const webRtcPlaybackUrlRef = useRef("");
   const webRtcPlaybackRoomIdRef = useRef("");
+  const [liveMode, setLiveMode] = useState("video");
   webRtcPlaybackRoomIdRef.current = liveChatRoomId || "";
 
   const publisher = usePublisherController({
@@ -443,6 +448,7 @@ export function LiveRoute({
     },
     log,
   });
+  publisherControllerRef.current = publisher;
   const streamSettingsStorageKey = getStreamSettingsStorageKey(authState.user?.id);
   const commentSpeechStorageKey = getCommentSpeechStorageKey(authState.user?.id);
   const locationSharingStorageKey = getLocationSharingStorageKey(authState.user?.id);
@@ -691,30 +697,7 @@ export function LiveRoute({
     }
   }
 
-  async function changeCamera(cameraId) {
-    if (publisher.publisherIsPublishing) {
-      try {
-        const switched = await publisher.switchPublishCamera(cameraId);
-        if (switched) {
-          publisher.setSelectedCameraId(cameraId);
-          publisher.setCameraEnabled(true);
-          writeStoredStreamSettings(streamSettingsStorageKey, {
-            protocol: publisher.publishProtocol,
-            qualityId: publisher.publishQualityId,
-            cameraId,
-            publishUrl: publisher.webRtcPublishUrl,
-            playbackUrl: publisher.webRtcPlaybackUrl,
-          });
-        }
-      } catch (error) {
-        const message = getAppErrorMessage(error);
-        log(`camera switch failed: ${message}`);
-      }
-      return;
-    }
-
-    publisher.setSelectedCameraId(cameraId);
-    publisher.setCameraEnabled(true);
+  function persistCameraSelection(cameraId) {
     writeStoredStreamSettings(streamSettingsStorageKey, {
       protocol: publisher.publishProtocol,
       qualityId: publisher.publishQualityId,
@@ -724,27 +707,72 @@ export function LiveRoute({
     });
   }
 
-  function enableVideoMode() {
+  function selectCameraDevice(cameraId) {
+    publisher.setSelectedCameraId(cameraId);
+    persistCameraSelection(cameraId);
+  }
+
+  function getPreferredCameraOption() {
     const { front, rear } = splitCameraOptions(publisher.cameraOptions);
-    const nextCamera = publisher.selectedCameraId
+    return publisher.selectedCameraId
       ? publisher.cameraOptions.find((option) => option.value === publisher.selectedCameraId)
       : front ?? rear;
+  }
 
-    if (!publisher.cameraEnabled && nextCamera) {
-      void changeCamera(nextCamera.value);
-      return;
+  function enableCamera() {
+    setLiveMode("video");
+    const nextCamera = getPreferredCameraOption();
+
+    if (nextCamera && nextCamera.value !== publisher.selectedCameraId) {
+      selectCameraDevice(nextCamera.value);
     }
 
     publisher.setCameraEnabled(true);
   }
 
+  async function changeCameraDevice(cameraId) {
+    setLiveMode("video");
+
+    if (publisher.publisherIsPublishing && publisher.cameraEnabled) {
+      try {
+        const switched = await publisher.switchPublishCamera(cameraId);
+        if (switched) {
+          selectCameraDevice(cameraId);
+          publisher.setCameraEnabled(true);
+        }
+      } catch (error) {
+        const message = getAppErrorMessage(error);
+        log(`camera switch failed: ${message}`);
+      }
+      return;
+    }
+
+    selectCameraDevice(cameraId);
+    publisher.setCameraEnabled(true);
+  }
+
+  function selectVideoMode() {
+    setLiveMode("video");
+    enableCamera();
+  }
+
   function selectLiveMode(mode) {
     if (mode === "voice") {
+      setLiveMode("voice");
       publisher.setCameraEnabled(false);
       return;
     }
 
-    enableVideoMode();
+    selectVideoMode();
+  }
+
+  function toggleCameraEnabled() {
+    if (publisher.cameraEnabled) {
+      publisher.setCameraEnabled(false, { blackout: true });
+      return;
+    }
+
+    enableCamera();
   }
 
   function cycleCameraMode() {
@@ -760,17 +788,17 @@ export function LiveRoute({
     }
 
     if (currentMode === "front" && rear) {
-      void changeCamera(rear.value);
+      void changeCameraDevice(rear.value);
       return;
     }
 
     if (publisher.publisherIsPublishing && currentMode === "rear" && front) {
-      void changeCamera(front.value);
+      void changeCameraDevice(front.value);
       return;
     }
 
     if (currentMode === "rear" && front) {
-      void changeCamera(front.value);
+      void changeCameraDevice(front.value);
     }
   }
 
@@ -1000,6 +1028,34 @@ export function LiveRoute({
     return payload;
   }
 
+  async function respondToAudienceCallRequest(request, accepted) {
+    const requestId = String(request?.id || "").trim();
+    if (!requestId) {
+      return false;
+    }
+
+    let realtime = null;
+    if (accepted) {
+      const activeAudienceCalls = Array.isArray(liveChat.audienceCallActive)
+        ? liveChat.audienceCallActive
+        : [];
+      if (
+        activeAudienceCalls.length >= 5 &&
+        !activeAudienceCalls.some((item) => item.user?.id === request.user?.id)
+      ) {
+        return false;
+      }
+      const hostSession = await liveChat.startAudienceCallRealtimeSession("host");
+      realtime = {
+        hostSessionId: hostSession.sessionId,
+        hostTrackPullToken: hostSession.trackPullToken,
+        expiresAt: hostSession.expiresAt,
+      };
+    }
+
+    return liveChat.respondAudienceCallRequest(requestId, accepted, realtime);
+  }
+
   async function closeLivePage() {
     await publisher.cleanupLiveResources();
     if (liveChat.canControlBroadcast) {
@@ -1045,6 +1101,7 @@ export function LiveRoute({
         relayUrl,
         webRtcPublishUrl: publisher.webRtcPublishUrl,
         webRtcPlaybackUrl: publisher.webRtcPlaybackUrl,
+        mediaMode: liveMode,
         cameraEnabled: publisher.cameraEnabled,
         microphoneEnabled: publisher.microphoneEnabled,
         cameraMode,
@@ -1071,6 +1128,11 @@ export function LiveRoute({
         active: liveChat.cohostActive,
         recentHosts: cohostRecentHosts,
       }}
+      audienceCall={{
+        enabled: liveChat.audienceCallEnabled,
+        requests: liveChat.audienceCallRequests,
+        active: liveChat.audienceCallActive,
+      }}
       chat={{
         messages: liveChat.messages,
         draft: liveChat.draft,
@@ -1091,7 +1153,7 @@ export function LiveRoute({
       }}
       actions={{
         onCameraChange: (event) => {
-          void changeCamera(event.currentTarget.value);
+          void changeCameraDevice(event.currentTarget.value);
         },
         onMicrophoneChange: (event) => {
           publisher.setSelectedMicrophoneId(event.currentTarget.value);
@@ -1113,6 +1175,7 @@ export function LiveRoute({
         onWebRtcPublishUrlChange: changeWebRtcPublishUrl,
         onWebRtcPlaybackUrlChange: changeWebRtcPlaybackUrl,
         onCycleCamera: cycleCameraMode,
+        onToggleCamera: toggleCameraEnabled,
         onToggleMicrophone: () => {
           publisher.setMicrophoneEnabled(!publisher.microphoneEnabled);
         },
@@ -1164,6 +1227,10 @@ export function LiveRoute({
         },
         onCohostInviteRequest: requestCohostInvite,
         onCohostInviteRespond: (invite, accepted) => respondToCohostInvite(invite, accepted),
+        onAudienceCallEnabledChange: (nextEnabled) => {
+          liveChat.setAudienceCallEnabled(nextEnabled);
+        },
+        onAudienceCallRequestRespond: (request, accepted) => respondToAudienceCallRequest(request, accepted),
         onChatDraftChange: (event) => {
           liveChat.setDraft(event.currentTarget.value);
         },

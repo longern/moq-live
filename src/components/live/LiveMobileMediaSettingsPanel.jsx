@@ -2,19 +2,7 @@ import { useEffect, useState } from "react";
 import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { applyCameraZoom, getPreviewVideoTrack, normalizeCameraZoom, readCameraZoom } from "../../lib/cameraZoom.js";
-import { FlipCameraIcon, MicrophoneIcon } from "./liveIcons.jsx";
-
-function getCameraStatusLabel(t, cameraMode, cameraUnavailable) {
-  if (cameraUnavailable) {
-    return t("live.cameraUnavailable");
-  }
-
-  if (cameraMode === "rear") {
-    return t("live.cameraRear");
-  }
-
-  return t("live.cameraFront");
-}
+import { CameraIcon, FlipCameraIcon, MicrophoneIcon } from "./liveIcons.jsx";
 
 function LiveMediaIconButton({
   className = "",
@@ -22,6 +10,7 @@ function LiveMediaIconButton({
   label,
   ariaLabel,
   ariaDisabled,
+  disabled = false,
   onClick,
 }) {
   return (
@@ -31,6 +20,7 @@ function LiveMediaIconButton({
       onClick={onClick}
       aria-label={ariaLabel}
       aria-disabled={ariaDisabled}
+      disabled={disabled}
     >
       <span className="live-media-icon-button-symbol">
         {icon}
@@ -105,16 +95,33 @@ export function LiveMobileMediaSettingsPanel({
   microphoneEnabled,
   previewVideoRef,
   onCycleCamera,
+  onToggleCamera,
   onToggleMicrophone,
   onUnavailableCamera,
 }) {
   const { t } = useI18n();
-  const cameraLabel = getCameraStatusLabel(t, cameraMode, cameraUnavailable);
+  const cameraLabel = cameraUnavailable
+    ? t("live.cameraUnavailable")
+    : cameraEnabled
+      ? t("live.cameraOn")
+      : t("live.cameraOff");
   const microphoneLabel = microphoneEnabled ? t("live.microphoneOn") : t("live.microphoneOff");
 
-  function handleCameraAction() {
+  function handleToggleCamera() {
     if (cameraUnavailable) {
       onUnavailableCamera?.();
+      return;
+    }
+
+    onToggleCamera?.();
+  }
+
+  function handleFlipCamera() {
+    if (cameraUnavailable) {
+      onUnavailableCamera?.();
+      return;
+    }
+    if (!cameraEnabled) {
       return;
     }
 
@@ -136,11 +143,20 @@ export function LiveMobileMediaSettingsPanel({
         <div className="live-mobile-media-toolbar-left" role="group" aria-label={t("live.mediaQuickControls")}>
           <LiveMediaIconButton
             className={cameraUnavailable ? "is-unavailable" : ""}
-            onClick={handleCameraAction}
-            aria-label={cameraUnavailable ? t("live.unavailableCamera") : t("live.flipCameraAria", { mode: cameraMode })}
+            onClick={handleToggleCamera}
+            aria-label={cameraUnavailable ? t("live.unavailableCamera") : (cameraEnabled ? t("live.closeCamera") : t("live.openCamera"))}
             aria-disabled={cameraUnavailable ? "true" : undefined}
-            icon={<FlipCameraIcon />}
+            icon={<CameraIcon enabled={cameraEnabled} />}
             label={cameraLabel}
+          />
+          <LiveMediaIconButton
+            className={cameraUnavailable || !cameraEnabled ? "is-unavailable" : ""}
+            onClick={handleFlipCamera}
+            aria-label={cameraUnavailable ? t("live.unavailableCamera") : t("live.flipCamera")}
+            aria-disabled={cameraUnavailable || !cameraEnabled ? "true" : undefined}
+            disabled={cameraUnavailable || !cameraEnabled}
+            icon={<FlipCameraIcon />}
+            label={t("live.flipCamera")}
           />
           <LiveMediaIconButton
             className={microphoneEnabled ? "" : "is-muted"}

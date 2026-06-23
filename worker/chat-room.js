@@ -11,6 +11,9 @@ const STREAM_PROTOCOL_MOQ = "moq";
 const STREAM_PROTOCOL_WEBRTC = "webrtc";
 const DEFAULT_STREAM_PROTOCOL = STREAM_PROTOCOL_WEBRTC;
 const COHOST_INVITE_TTL_MS = 60_000;
+const AUDIENCE_CALL_REQUEST_TTL_MS = 10 * 60_000;
+const MAX_AUDIENCE_CALL_REQUESTS = 50;
+const MAX_AUDIENCE_CALL_ACTIVE = 5;
 const WEBRTC_PROXY_SESSION_STORAGE_PREFIX = "webrtcProxySession:";
 const BIG_DATA_CLOUD_REVERSE_GEOCODE_URL =
   "https://api-bdc.net/data/reverse-geocode";
@@ -54,6 +57,7 @@ export class ChatRoomDO {
         roomMeta: this.roomState.roomMeta,
         location: getPublicRoomLocation(this.roomState.location),
         cohost: this.roomState.cohost,
+        audienceCall: getPublicAudienceCallState(this.roomState.audienceCall),
       });
     }
 
@@ -141,6 +145,10 @@ export class ChatRoomDO {
       roomMeta: this.roomState.roomMeta,
       location: getPublicRoomLocation(this.roomState.location),
       cohost: this.roomState.cohost,
+      audienceCall: getPublicAudienceCallState(
+        this.roomState.audienceCall,
+        canControlBroadcast,
+      ),
       moderation: getPublicModerationState(
         this.roomState.moderation,
         Date.now(),
@@ -232,6 +240,31 @@ export class ChatRoomDO {
 
     if (payload?.type === "cohost.active.clear") {
       await this.handleCohostActiveClear(ws, session);
+      return;
+    }
+
+    if (payload?.type === "audience_call.set_enabled") {
+      await this.handleAudienceCallEnabledUpdate(ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "audience_call.request") {
+      await this.handleAudienceCallRequest(ws, session);
+      return;
+    }
+
+    if (payload?.type === "audience_call.respond") {
+      await this.handleAudienceCallRespond(ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "audience_call.viewer_ready") {
+      this.handleAudienceCallViewerReady(ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "audience_call.viewer_leave") {
+      this.handleAudienceCallViewerLeave(ws, session);
       return;
     }
 
@@ -780,6 +813,7 @@ export class ChatRoomDO {
         invitesAllowed: true,
         active: null,
       },
+      audienceCall: getDefaultAudienceCallState(),
     };
     const persisted = await this.persistStorageOrNotify(
       ws,
@@ -807,6 +841,10 @@ export class ChatRoomDO {
       type: "cohost.active.changed",
       active: nextRoomState.cohost.active,
     });
+    this.broadcast({
+      type: "audience_call.changed",
+      audienceCall: getPublicAudienceCallState(nextRoomState.audienceCall),
+    });
   }
 
   async handleStreamStopped(ws, session) {
@@ -829,6 +867,7 @@ export class ChatRoomDO {
         ...this.roomState.cohost,
         active: null,
       },
+      audienceCall: getDefaultAudienceCallState(),
       moderation: clearStreamScopedMutes(this.roomState.moderation),
     };
     const persisted = await this.persistStorageOrNotify(
@@ -852,6 +891,10 @@ export class ChatRoomDO {
     this.broadcast({
       type: "cohost.active.changed",
       active: null,
+    });
+    this.broadcast({
+      type: "audience_call.changed",
+      audienceCall: getPublicAudienceCallState(nextRoomState.audienceCall),
     });
     await this.clearPeerCohostActive(previousActive);
   }
@@ -1118,6 +1161,325 @@ export class ChatRoomDO {
       active: null,
     });
     await this.clearPeerCohostActive(previousActive);
+  }
+
+  async handleAudienceCallEnabledUpdate(ws, session, payload) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
+      this.sendError(ws, "forbidden_audience_call_update");
+      return;
+    }
+
+    const nextAudienceCall = {
+      enabled: payload.enabled === true,
+      requests: payload.enabled === true ? this.roomState.audienceCall.requests : [],
+      active: payload.enabled === true ? this.roomState.audienceCall.active : [],
+    };
+    if (
+      this.roomState.audienceCall.enabled === nextAudienceCall.enabled &&
+      this.roomState.audienceCall.requests.length === nextAudienceCall.requests.length
+    ) {
+      return;
+    }
+
+    const nextRoomState = {
+      ...this.roomState,
+      audienceCall: nextAudienceCall,
+    };
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
+    if (!persisted) {
+      return;
+    }
+    this.roomState = nextRoomState;
+    this.broadcast({
+      type: "audience_call.changed",
+      audienceCall: getPublicAudienceCallState(nextAudienceCall),
+    });
+    this.broadcastToBroadcastControllers({
+      type: "audience_call.requests.changed",
+      requests: nextAudienceCall.requests,
+    });
+  }
+
+  async handleAudienceCallRequest(ws, session) {
+    if (session.role === "broadcaster") {
+      this.sendError(ws, "audience_call_request_forbidden");
+      return;
+    }
+    if (!this.roomState.stream.isLive || !this.roomState.audienceCall.enabled) {
+      this.sendError(ws, "audience_call_unavailable");
+      return;
+    }
+    if (!session.user?.id) {
+      this.sendError(ws, "audience_call_login_required");
+      return;
+    }
+
+    const now = Date.now();
+    const requestedAt = new Date(now).toISOString();
+    const user = {
+      id: String(session.user.id || "").trim(),
+      displayName: sanitizeDisplayName(
+        session.user.displayName || session.user.email || "已登录用户",
+      ),
+      avatarUrl: sanitizeUrl(session.user.avatarUrl),
+    };
+    if (!user.id) {
+      this.sendError(ws, "audience_call_login_required");
+      return;
+    }
+
+    const existingRequests = pruneAudienceCallRequests(
+      this.roomState.audienceCall.requests,
+      now,
+    ).filter((request) => request.user.id !== user.id);
+    const nextRequests = [
+      {
+        id: `audience-call-${now.toString(36)}-${crypto.randomUUID()}`,
+        requestedAt,
+        user,
+      },
+      ...existingRequests,
+    ].slice(0, MAX_AUDIENCE_CALL_REQUESTS);
+    const nextAudienceCall = {
+      ...this.roomState.audienceCall,
+      requests: nextRequests,
+    };
+    const nextRoomState = {
+      ...this.roomState,
+      audienceCall: nextAudienceCall,
+    };
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
+    if (!persisted) {
+      return;
+    }
+
+    this.roomState = nextRoomState;
+    this.send(ws, {
+      type: "audience_call.request.sent",
+      request: nextRequests[0],
+    });
+    this.broadcastToBroadcastControllers({
+      type: "audience_call.requests.changed",
+      requests: nextRequests,
+    });
+  }
+
+  async handleAudienceCallRespond(ws, session, payload) {
+    if (!session.isRoomOwner || !session.canControlBroadcast) {
+      this.sendError(ws, "forbidden_audience_call_response");
+      return;
+    }
+
+    const requestId = String(payload.requestId || "").trim();
+    const accepted = payload.accepted === true;
+    const currentRequests = pruneAudienceCallRequests(
+      this.roomState.audienceCall.requests,
+      Date.now(),
+    );
+    const request = currentRequests.find((item) => item.id === requestId);
+    if (!request) {
+      this.sendError(ws, "audience_call_request_not_found");
+      return;
+    }
+    const currentActive = normalizeAudienceCallActiveList(
+      this.roomState.audienceCall.active,
+    );
+    if (
+      accepted &&
+      currentActive.length >= MAX_AUDIENCE_CALL_ACTIVE &&
+      !currentActive.some((item) => item.user.id === request.user.id)
+    ) {
+      this.sendError(ws, "audience_call_active_limit_reached");
+      return;
+    }
+
+    const nextAudienceCall = {
+      ...this.roomState.audienceCall,
+      requests: currentRequests.filter((item) => item.id !== requestId),
+      active: currentActive,
+    };
+    const nextRoomState = {
+      ...this.roomState,
+      audienceCall: nextAudienceCall,
+    };
+    const persisted = await this.persistStorageOrNotify(
+      ws,
+      "roomState",
+      nextRoomState,
+    );
+    if (!persisted) {
+      return;
+    }
+
+    this.roomState = nextRoomState;
+    const response = {
+      requestId,
+      accepted,
+      respondedAt: new Date().toISOString(),
+      request,
+      realtime: accepted && payload.realtime && typeof payload.realtime === "object"
+        ? {
+            hostSessionId: String(payload.realtime.hostSessionId || "").trim(),
+            hostTrackPullToken: String(payload.realtime.hostTrackPullToken || "").trim(),
+            expiresAt: Number(payload.realtime.expiresAt || 0) || 0,
+          }
+        : null,
+    };
+    this.broadcastToBroadcastControllers({
+      type: "audience_call.requests.changed",
+      requests: nextAudienceCall.requests,
+    });
+    this.send(ws, {
+      type: "audience_call.request.responded",
+      response,
+    });
+    this.sendToAudienceCallRequester(request.user.id, {
+      type: accepted ? "audience_call.accepted" : "audience_call.rejected",
+      response,
+    });
+  }
+
+  sendToAudienceCallRequester(userId, payload) {
+    const targetUserId = String(userId || "").trim();
+    if (!targetUserId) {
+      return;
+    }
+
+    for (const { socket, session } of this.getActiveSessions()) {
+      if (session?.user?.id === targetUserId && session.role !== "broadcaster") {
+        this.send(socket, payload);
+      }
+    }
+  }
+
+  handleAudienceCallViewerReady(ws, session, payload) {
+    if (session.role === "broadcaster" || !session.user?.id) {
+      this.sendError(ws, "audience_call_viewer_ready_forbidden");
+      return;
+    }
+    if (!this.roomState.stream.isLive || !this.roomState.audienceCall.enabled) {
+      this.sendError(ws, "audience_call_unavailable");
+      return;
+    }
+
+    const viewer = {
+      userId: String(session.user.id || "").trim(),
+      displayName: sanitizeDisplayName(
+        session.user.displayName || session.user.email || "已登录用户",
+      ),
+      avatarUrl: sanitizeUrl(session.user.avatarUrl),
+      sessionId: String(payload.viewer?.sessionId || "").trim(),
+      trackPullToken: String(payload.viewer?.trackPullToken || "").trim(),
+      trackName: String(payload.viewer?.trackName || "").trim(),
+      readyAt: new Date().toISOString(),
+    };
+    if (!viewer.sessionId || !viewer.trackPullToken || !viewer.trackName) {
+      this.sendError(ws, "invalid_audience_call_viewer_ready");
+      return;
+    }
+
+    const currentActive = normalizeAudienceCallActiveList(
+      this.roomState.audienceCall.active,
+    );
+    const isExistingActiveViewer = currentActive.some(
+      (item) => item.user.id === viewer.userId,
+    );
+    if (
+      currentActive.length >= MAX_AUDIENCE_CALL_ACTIVE &&
+      !isExistingActiveViewer
+    ) {
+      this.sendError(ws, "audience_call_active_limit_reached");
+      return;
+    }
+
+    const remainingActive = currentActive.filter(
+      (item) => item.user.id !== viewer.userId,
+    );
+    const nextActive = [
+      {
+        id: `audience-active-${Date.now().toString(36)}-${crypto.randomUUID()}`,
+        readyAt: viewer.readyAt,
+        sessionId: viewer.sessionId,
+        trackName: viewer.trackName,
+        user: {
+          id: viewer.userId,
+          displayName: viewer.displayName,
+          avatarUrl: viewer.avatarUrl,
+        },
+      },
+      ...remainingActive,
+    ].slice(0, MAX_AUDIENCE_CALL_ACTIVE);
+    const nextAudienceCall = {
+      ...this.roomState.audienceCall,
+      active: nextActive,
+    };
+    const nextRoomState = {
+      ...this.roomState,
+      audienceCall: nextAudienceCall,
+    };
+    this.roomState = nextRoomState;
+    void this.ctx.storage.put("roomState", nextRoomState);
+
+    this.broadcastToBroadcastControllers({
+      type: "audience_call.viewer.ready",
+      viewer,
+    });
+    this.broadcastToBroadcastControllers({
+      type: "audience_call.active.changed",
+      active: nextActive,
+    });
+  }
+
+  handleAudienceCallViewerLeave(ws, session) {
+    if (session.role === "broadcaster" || !session.user?.id) {
+      this.sendError(ws, "audience_call_viewer_leave_forbidden");
+      return;
+    }
+
+    const userId = String(session.user.id || "").trim();
+    const currentActive = normalizeAudienceCallActiveList(
+      this.roomState.audienceCall.active,
+    );
+    const nextActive = currentActive.filter((item) => item.user.id !== userId);
+    if (nextActive.length === currentActive.length) {
+      return;
+    }
+
+    const nextAudienceCall = {
+      ...this.roomState.audienceCall,
+      active: nextActive,
+    };
+    const nextRoomState = {
+      ...this.roomState,
+      audienceCall: nextAudienceCall,
+    };
+    this.roomState = nextRoomState;
+    void this.ctx.storage.put("roomState", nextRoomState);
+
+    this.broadcastToBroadcastControllers({
+      type: "audience_call.active.changed",
+      active: nextActive,
+    });
+  }
+
+  broadcastToBroadcastControllers(payload) {
+    for (const { socket, session } of this.getActiveSessions()) {
+      if (
+        session?.isRoomOwner &&
+        session.role === "broadcaster" &&
+        session.canControlBroadcast
+      ) {
+        this.send(socket, payload);
+      }
+    }
   }
 
   async handleCohostInviteRequest(request) {
@@ -1417,6 +1779,7 @@ function getDefaultRoomState() {
     },
     location: getDefaultRoomLocation(),
     cohost: getDefaultCohostState(),
+    audienceCall: getDefaultAudienceCallState(),
     moderation: getDefaultModerationState(),
   };
 }
@@ -1439,6 +1802,7 @@ function normalizeRoomState(roomState) {
     },
     location: normalizeRoomLocation(roomState?.location),
     cohost: normalizeCohostState(roomState?.cohost),
+    audienceCall: normalizeAudienceCallState(roomState?.audienceCall),
     moderation: normalizeModerationState(
       roomState?.moderation,
       Date.now(),
@@ -1580,6 +1944,111 @@ function normalizeCohostState(cohost) {
   return {
     invitesAllowed: cohost?.invitesAllowed === false ? false : true,
     active: normalizeCohostActive(cohost?.active),
+  };
+}
+
+function getDefaultAudienceCallState() {
+  return {
+    enabled: false,
+    requests: [],
+    active: [],
+  };
+}
+
+function normalizeAudienceCallState(audienceCall) {
+  const enabled = audienceCall?.enabled === true;
+  return {
+    enabled,
+    requests: enabled
+      ? pruneAudienceCallRequests(audienceCall?.requests, Date.now())
+      : [],
+    active: enabled ? normalizeAudienceCallActiveList(audienceCall?.active) : [],
+  };
+}
+
+function getPublicAudienceCallState(audienceCall, includeRequests = false) {
+  const state = normalizeAudienceCallState(audienceCall);
+  return {
+    enabled: state.enabled,
+    requests: includeRequests ? state.requests : [],
+    active: includeRequests ? state.active : [],
+  };
+}
+
+function normalizeAudienceCallActiveList(active) {
+  if (!Array.isArray(active)) {
+    return [];
+  }
+
+  return active
+    .map(normalizeAudienceCallActive)
+    .filter(Boolean)
+    .slice(0, MAX_AUDIENCE_CALL_ACTIVE);
+}
+
+function normalizeAudienceCallActive(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = sanitizeInviteId(value.id);
+  const userId = String(value.user?.id ?? "").trim().slice(0, 128);
+  const sessionId = String(value.sessionId || "").trim();
+  if (!id || !userId || !sessionId) {
+    return null;
+  }
+
+  return {
+    id,
+    readyAt: sanitizeIsoTimestamp(value.readyAt) ?? new Date().toISOString(),
+    sessionId,
+    trackName: String(value.trackName || "").trim(),
+    user: {
+      id: userId,
+      displayName: sanitizeDisplayName(value.user?.displayName) || "已登录用户",
+      avatarUrl: sanitizeUrl(value.user?.avatarUrl),
+    },
+  };
+}
+
+function pruneAudienceCallRequests(requests, now = Date.now()) {
+  if (!Array.isArray(requests)) {
+    return [];
+  }
+
+  return requests
+    .map(normalizeAudienceCallRequest)
+    .filter((request) => {
+      if (!request) {
+        return false;
+      }
+      const requestedAt = Date.parse(request.requestedAt);
+      return Number.isFinite(requestedAt) && now - requestedAt <= AUDIENCE_CALL_REQUEST_TTL_MS;
+    })
+    .sort((left, right) => Date.parse(right.requestedAt) - Date.parse(left.requestedAt))
+    .slice(0, MAX_AUDIENCE_CALL_REQUESTS);
+}
+
+function normalizeAudienceCallRequest(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = sanitizeInviteId(value.id);
+  const userId = String(value.user?.id ?? "").trim().slice(0, 128);
+  if (!id || !userId) {
+    return null;
+  }
+
+  return {
+    id,
+    requestedAt:
+      sanitizeIsoTimestamp(value.requestedAt) ?? new Date().toISOString(),
+    user: {
+      id: userId,
+      displayName: sanitizeDisplayName(value.user?.displayName) || "已登录用户",
+      avatarUrl: sanitizeUrl(value.user?.avatarUrl),
+    },
   };
 }
 

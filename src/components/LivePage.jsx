@@ -32,6 +32,7 @@ export function LivePage({
   media = {},
   settings = {},
   cohost = {},
+  audienceCall = {},
   chat = {},
   auth = {},
   actions = {},
@@ -68,6 +69,7 @@ export function LivePage({
     relayUrl,
     webRtcPublishUrl,
     webRtcPlaybackUrl,
+    mediaMode = cameraEnabled ? "video" : "voice",
     cameraEnabled,
     microphoneEnabled,
     cameraMode,
@@ -95,6 +97,11 @@ export function LivePage({
     recentHosts: cohostRecentHosts = [],
   } = cohost;
   const {
+    enabled: audienceCallEnabled = false,
+    requests: audienceCallRequests = [],
+    active: audienceCallActive = [],
+  } = audienceCall;
+  const {
     messages: chatMessages,
     draft: chatDraft,
     connectionState: chatConnectionState,
@@ -121,6 +128,7 @@ export function LivePage({
     onWebRtcPublishUrlChange,
     onWebRtcPlaybackUrlChange,
     onCycleCamera,
+    onToggleCamera,
     onToggleMicrophone,
     onTogglePublish,
     onShare,
@@ -133,6 +141,8 @@ export function LivePage({
     onCohostDisconnect,
     onCohostInviteRequest,
     onCohostInviteRespond,
+    onAudienceCallEnabledChange,
+    onAudienceCallRequestRespond,
     onChatDraftChange,
     onChatSend,
     onChatMessageMute,
@@ -176,16 +186,12 @@ export function LivePage({
   const lastCohostResponseIdRef = useRef("");
   const { showToast } = useToast();
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
-  const mediaMode = cameraEnabled ? "video" : "voice";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
   const useMobileShell = compactViewport || portraitViewport;
   const mobileShellMode = useLiveMobileShellMode({
-    cameraEnabled,
+    mediaMode,
     portraitViewport,
-    previewActive,
-    previewHasVideo,
     previewOrientation,
-    previewOrientationFallback,
     previewSourceType,
   });
   const mediaClass = `media-${mediaMode}`;
@@ -591,6 +597,11 @@ export function LivePage({
       active: cohostActive,
       recentHosts: cohostRecentHosts,
     },
+    audienceCall: {
+      enabled: audienceCallEnabled,
+      requests: audienceCallRequests,
+      active: audienceCallActive,
+    },
     chat: {
       messages: chatMessages,
       draft: chatDraft,
@@ -617,6 +628,7 @@ export function LivePage({
       onWebRtcPublishUrlChange,
       onWebRtcPlaybackUrlChange,
       onCycleCamera,
+      onToggleCamera,
       onToggleMicrophone,
       onTogglePublish,
       onShare: shareLiveLink,
@@ -632,6 +644,8 @@ export function LivePage({
       onCohostDisconnect,
       onCohostInviteRequest: handleCohostInviteRequest,
       onCohostInviteRespond: handleCohostInviteRespond,
+      onAudienceCallEnabledChange,
+      onAudienceCallRequestRespond,
       onChatDraftChange,
       onChatSend,
       onChatMessageMute,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEFAULT_MEDIA_ORIENTATION,
   getMediaElementSize,
@@ -15,10 +15,14 @@ export function useMediaOrientation({
   resetOnInactive = true,
 }) {
   const [orientation, setOrientation] = useState(fallback);
+  const hasMeasuredOrientationRef = useRef(false);
 
   useEffect(() => {
     if (!active) {
       if (resetOnInactive) {
+        hasMeasuredOrientationRef.current = false;
+        setOrientation(fallback);
+      } else if (!hasMeasuredOrientationRef.current) {
         setOrientation(fallback);
       }
       return undefined;
@@ -34,7 +38,10 @@ export function useMediaOrientation({
         includeClientSize,
       });
       if (hasRenderableMediaSize(mediaSize)) {
+        hasMeasuredOrientationRef.current = true;
         setOrientation(getMediaOrientation(mediaSize));
+      } else if (!hasMeasuredOrientationRef.current) {
+        setOrientation(fallback);
       }
     };
 

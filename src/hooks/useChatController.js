@@ -5,6 +5,12 @@ import {
   DEFAULT_STREAM_PROTOCOL,
   normalizeStreamProtocol,
 } from "../lib/streamProtocol.js";
+import {
+  createAudienceCallRealtimeSession,
+  createMicrophoneAudioTrack,
+  publishAudienceAudioTrack,
+  pullAudienceAudioTrack,
+} from "../lib/audienceCallRealtime.js";
 
 const RECONNECT_DELAYS_MS = [
   1_000,
@@ -19,6 +25,7 @@ const CONNECTION_WINDOW_MS = 5 * 60_000;
 const MAX_CONNECTIONS_PER_WINDOW = 20;
 const BROADCAST_CONTROL_CHECK_TIMEOUT_MS = 4_000;
 const PAGE_RESTORE_SILENT_RECONNECT_WINDOW_MS = 4_000;
+const MAX_AUDIENCE_CALL_ACTIVE = 5;
 
 function upsertMessages(currentMessages, incomingMessages) {
   const deduped = new Map(currentMessages.map((message) => [message.id, message]));
@@ -68,6 +75,14 @@ function getDefaultCohostState() {
   };
 }
 
+function getDefaultAudienceCallState() {
+  return {
+    enabled: false,
+    requests: [],
+    active: []
+  };
+}
+
 function normalizeRoomLocation(value) {
   if (!value || typeof value !== "object") {
     return getDefaultRoomLocation();
@@ -93,6 +108,64 @@ function normalizeLoggedInViewers(value) {
     }))
     .filter((viewer) => viewer.id)
     .slice(0, 100);
+}
+
+function normalizeAudienceCallRequest(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = String(value.id ?? "").trim();
+  const userId = String(value.user?.id ?? "").trim();
+  if (!id || !userId) {
+    return null;
+  }
+
+  return {
+    id,
+    requestedAt: String(value.requestedAt ?? "").trim(),
+    user: {
+      id: userId,
+      displayName: String(value.user?.displayName ?? "").trim(),
+      avatarUrl: String(value.user?.avatarUrl ?? "").trim()
+    }
+  };
+}
+
+function normalizeAudienceCallActive(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = String(value.id ?? "").trim();
+  const userId = String(value.user?.id ?? "").trim();
+  if (!id || !userId) {
+    return null;
+  }
+
+  return {
+    id,
+    readyAt: String(value.readyAt ?? "").trim(),
+    sessionId: String(value.sessionId ?? "").trim(),
+    trackName: String(value.trackName ?? "").trim(),
+    user: {
+      id: userId,
+      displayName: String(value.user?.displayName ?? "").trim(),
+      avatarUrl: String(value.user?.avatarUrl ?? "").trim()
+    }
+  };
+}
+
+function normalizeAudienceCallState(value) {
+  return {
+    enabled: value?.enabled === true,
+    requests: Array.isArray(value?.requests)
+      ? value.requests.map(normalizeAudienceCallRequest).filter(Boolean)
+      : [],
+    active: Array.isArray(value?.active)
+      ? value.active.map(normalizeAudienceCallActive).filter(Boolean)
+      : []
+  };
 }
 
 function normalizeCohostInvite(value) {
@@ -212,6 +285,7 @@ export function useChatController({
   enabled,
   authKey,
   role = "viewer",
+  onAudienceCallRemoteStream,
   log
 }) {
   const [messages, setMessages] = useState([]);
@@ -230,6 +304,16 @@ export function useChatController({
   const [cohostInvite, setCohostInvite] = useState(null);
   const [cohostInviteResponse, setCohostInviteResponse] = useState(null);
   const [cohostActive, setCohostActive] = useState(null);
+  const [audienceCallEnabled, setAudienceCallEnabledState] = useState(
+    () => getDefaultAudienceCallState().enabled
+  );
+  const [audienceCallRequests, setAudienceCallRequests] = useState(
+    () => getDefaultAudienceCallState().requests
+  );
+  const [audienceCallActive, setAudienceCallActive] = useState(
+    () => getDefaultAudienceCallState().active
+  );
+  const [audienceCallRealtimeSession, setAudienceCallRealtimeSession] = useState(null);
   const [mutedUsers, setMutedUsers] = useState([]);
   const [chatModerationEvent, setChatModerationEvent] = useState(null);
   const [recoveringFromPageLifecycle, setRecoveringFromPageLifecycle] = useState(false);
@@ -244,6 +328,9 @@ export function useChatController({
   const pageHiddenRef = useRef(typeof document !== "undefined" ? document.hidden : false);
   const lastPageVisibleAtRef = useRef(pageHiddenRef.current ? 0 : Date.now());
   const recoveringFromPageLifecycleRef = useRef(false);
+  const audienceCallRealtimeSessionRef = useRef(null);
+  const audienceCallRealtimePublishRef = useRef(null);
+  const audienceCallRealtimePullsRef = useRef(new Map());
   const logRef = useRef(log);
 
   logRef.current = log;
@@ -434,6 +521,10 @@ export function useChatController({
               : getDefaultCohostState().invitesAllowed
           );
           setCohostActive(normalizeCohostActive(payload.cohost?.active));
+          const audienceCall = normalizeAudienceCallState(payload.audienceCall);
+          setAudienceCallEnabledState(audienceCall.enabled);
+          setAudienceCallRequests(audienceCall.requests);
+          setAudienceCallActive(audienceCall.active);
           setMutedUsers(normalizeModerationState(payload.moderation).mutedUsers);
           const chatMute = normalizeChatMute(payload.chatMute);
           if (chatMute && role !== "broadcaster") {
@@ -488,6 +579,78 @@ export function useChatController({
 
         if (payload.type === "cohost.active.changed") {
           setCohostActive(normalizeCohostActive(payload.active));
+          return;
+        }
+
+        if (payload.type === "audience_call.changed") {
+          const audienceCall = normalizeAudienceCallState(payload.audienceCall);
+          setAudienceCallEnabledState(audienceCall.enabled);
+          setAudienceCallActive(audienceCall.active);
+          if (!audienceCall.enabled) {
+            closeAudienceCallRealtimeSession();
+            setAudienceCallRequests([]);
+            setAudienceCallActive([]);
+          }
+          return;
+        }
+
+        if (payload.type === "audience_call.requests.changed") {
+          setAudienceCallRequests(
+            Array.isArray(payload.requests)
+              ? payload.requests.map(normalizeAudienceCallRequest).filter(Boolean)
+              : []
+          );
+          return;
+        }
+
+        if (payload.type === "audience_call.request.responded") {
+          const requestId = String(payload.response?.requestId || "").trim();
+          if (requestId) {
+            setAudienceCallRequests((current) => current.filter((request) => request.id !== requestId));
+          }
+          return;
+        }
+
+        if (payload.type === "audience_call.accepted") {
+          void startAudienceCallViewerSession({
+            remote: payload.response?.realtime || null,
+          }).catch((error) => {
+            logRef.current?.(`audience call viewer realtime failed: ${error instanceof Error ? error.message : String(error)}`);
+          });
+          return;
+        }
+
+        if (payload.type === "audience_call.rejected") {
+          closeAudienceCallRealtimeSession();
+          return;
+        }
+
+        if (payload.type === "audience_call.viewer.ready") {
+          void pullAudienceCallViewerAudio(payload.viewer).catch((error) => {
+            logRef.current?.(`audience call host pull failed: ${error instanceof Error ? error.message : String(error)}`);
+          });
+          return;
+        }
+
+        if (payload.type === "audience_call.active.changed") {
+          const active = Array.isArray(payload.active)
+              ? payload.active.map(normalizeAudienceCallActive).filter(Boolean)
+              : [];
+          setAudienceCallActive(active);
+          if (role === "broadcaster") {
+            const activeRemoteIds = new Set(
+              active
+                .map((item) => String(item.user?.id || item.sessionId || "").trim())
+                .filter(Boolean),
+            );
+            for (const [remoteId, pulled] of audienceCallRealtimePullsRef.current) {
+              if (!activeRemoteIds.has(remoteId)) {
+                pulled?.close?.();
+                onAudienceCallRemoteStream?.(remoteId, null);
+                audienceCallRealtimePullsRef.current.delete(remoteId);
+              }
+            }
+          }
           return;
         }
 
@@ -833,12 +996,160 @@ export function useChatController({
     return true;
   }
 
+  function setAudienceCallEnabled(nextEnabled) {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    const enabled = Boolean(nextEnabled);
+    if (!enabled) {
+      closeAudienceCallRealtimeSession();
+    }
+    socket.send(JSON.stringify({
+      type: "audience_call.set_enabled",
+      enabled
+    }));
+    setAudienceCallEnabledState(enabled);
+    if (!enabled) {
+      setAudienceCallRequests([]);
+      setAudienceCallActive([]);
+    }
+    return true;
+  }
+
+  function requestAudienceCall() {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    socket.send(JSON.stringify({
+      type: "audience_call.request"
+    }));
+    return true;
+  }
+
+  async function startAudienceCallRealtimeSession(sessionRole = role, extra = {}) {
+    const normalizedRole = sessionRole === "host" ? "host" : "viewer";
+    if (!room) {
+      throw createAppError("room_required");
+    }
+
+    closeAudienceCallRealtimeSession();
+    const payload = await createAudienceCallRealtimeSession({
+      roomId: room,
+      role: normalizedRole,
+    });
+    const session = {
+      ...payload,
+      remote: extra.remote || null,
+    };
+    audienceCallRealtimeSessionRef.current = session;
+    setAudienceCallRealtimeSession(session);
+    return session;
+  }
+
+  async function startAudienceCallViewerSession({ remote = null } = {}) {
+    const session = await startAudienceCallRealtimeSession("viewer", { remote });
+    const audioTrack = await createMicrophoneAudioTrack();
+    if (!audioTrack) {
+      throw createAppError("microphone_unavailable");
+    }
+
+    const published = await publishAudienceAudioTrack({ session, audioTrack });
+    audienceCallRealtimePublishRef.current = published;
+
+    const socket = socketRef.current;
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "audience_call.viewer_ready",
+        viewer: {
+          sessionId: session.sessionId,
+          trackPullToken: session.trackPullToken,
+          trackName: published.trackName,
+          remote,
+        },
+      }));
+    }
+    return session;
+  }
+
+  async function pullAudienceCallViewerAudio(viewer) {
+    if (role !== "broadcaster") {
+      return null;
+    }
+
+    const session = audienceCallRealtimeSessionRef.current;
+    const remote = {
+      id: String(viewer?.userId || viewer?.sessionId || "").trim(),
+      sessionId: String(viewer?.sessionId || "").trim(),
+      trackPullToken: String(viewer?.trackPullToken || "").trim(),
+      trackName: String(viewer?.trackName || "").trim(),
+    };
+    if (!session?.sessionId || !remote.id || !remote.sessionId || !remote.trackPullToken) {
+      return null;
+    }
+    if (
+      audienceCallRealtimePullsRef.current.size >= MAX_AUDIENCE_CALL_ACTIVE &&
+      !audienceCallRealtimePullsRef.current.has(remote.id)
+    ) {
+      return null;
+    }
+
+    audienceCallRealtimePullsRef.current.get(remote.id)?.close?.();
+    const pulled = await pullAudienceAudioTrack({ session, remote });
+    audienceCallRealtimePullsRef.current.set(remote.id, pulled);
+    onAudienceCallRemoteStream?.(remote.id, pulled.remoteStream);
+    return pulled;
+  }
+
+  function closeAudienceCallRealtimeSession() {
+    audienceCallRealtimePublishRef.current?.close?.();
+    audienceCallRealtimePublishRef.current = null;
+    for (const [remoteId, pulled] of audienceCallRealtimePullsRef.current) {
+      pulled?.close?.();
+      onAudienceCallRemoteStream?.(remoteId, null);
+    }
+    audienceCallRealtimePullsRef.current.clear();
+    audienceCallRealtimeSessionRef.current = null;
+    setAudienceCallRealtimeSession(null);
+  }
+
+  function leaveAudienceCall() {
+    const socket = socketRef.current;
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "audience_call.viewer_leave",
+      }));
+    }
+    closeAudienceCallRealtimeSession();
+    return true;
+  }
+
+  function respondAudienceCallRequest(requestId, accepted, realtime = null) {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    socket.send(JSON.stringify({
+      type: "audience_call.respond",
+      requestId,
+      accepted: Boolean(accepted),
+      realtime,
+    }));
+    setAudienceCallRequests((current) => current.filter((request) => request.id !== requestId));
+    return true;
+  }
+
   function disconnect() {
     const socket = socketRef.current;
     if (!socket) {
       return false;
     }
 
+    closeAudienceCallRealtimeSession();
     closeChatSocket(socket);
     socketRef.current = null;
     return true;
@@ -868,6 +1179,10 @@ export function useChatController({
     cohostInvite,
     cohostInviteResponse,
     cohostActive,
+    audienceCallEnabled,
+    audienceCallRequests,
+    audienceCallActive,
+    audienceCallRealtimeSession,
     mutedUsers,
     chatModerationEvent,
     recoveringFromPageLifecycle,
@@ -880,6 +1195,11 @@ export function useChatController({
     releaseBroadcastControl,
     setCohostInviteAllowed,
     clearCohostActive,
+    setAudienceCallEnabled,
+    requestAudienceCall,
+    leaveAudienceCall,
+    startAudienceCallRealtimeSession,
+    respondAudienceCallRequest,
     disconnect,
     dismissCohostInvite
   };

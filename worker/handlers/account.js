@@ -1,5 +1,6 @@
 import {
   createUserRoom,
+  getConfiguredAuthProviders,
   getDb,
   getMicrosoftLoginUrl,
   getUserRoom,
@@ -18,12 +19,15 @@ import {
 export async function handleMe(env, request) {
   const db = getDb(env);
   const session = await getSessionUser(db, request);
+  const authProviders = getConfiguredAuthProviders(env, request);
+  const loginUrl = authProviders[0]?.startUrl ?? getMicrosoftLoginUrl(request);
 
   if (!session) {
     return json({
       ok: true,
       authenticated: false,
-      loginUrl: getMicrosoftLoginUrl(request),
+      loginUrl,
+      authProviders,
       user: null,
     });
   }
@@ -31,7 +35,8 @@ export async function handleMe(env, request) {
   return json({
     ok: true,
     authenticated: true,
-    loginUrl: getMicrosoftLoginUrl(request),
+    loginUrl,
+    authProviders,
     user: withSuperAdminFlag(env, session.user),
   });
 }

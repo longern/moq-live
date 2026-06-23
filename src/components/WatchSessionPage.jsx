@@ -119,6 +119,8 @@ export function WatchSessionPage({
     connectionState: chatConnectionState,
     onlineCount: chatOnlineCount,
     loggedInViewers: chatLoggedInViewers = [],
+    audienceCallEnabled = false,
+    audienceCallRealtimeSession = null,
     readOnly: chatReadOnly,
     error: chatError,
     recovering: chatRecovering = false,
@@ -134,6 +136,8 @@ export function WatchSessionPage({
     onChatDraftChange,
     onChatSend,
     onChatRequireLogin,
+    onAudienceCallRequest,
+    onAudienceCallDisconnect,
   } = actions;
   const [moreOpen, setMoreOpen] = useState(false);
   const [hostProfileOpen, setHostProfileOpen] = useState(false);
@@ -306,6 +310,31 @@ export function WatchSessionPage({
 
   function closeMoreSheet() {
     setMoreOpen(false);
+  }
+
+  function requestAudienceCall() {
+    if (!audienceCallEnabled) {
+      return;
+    }
+    if (!authUser?.id) {
+      onChatRequireLogin?.();
+      closeMoreSheet();
+      return;
+    }
+
+    const sent = onAudienceCallRequest?.();
+    if (sent) {
+      showToast("已发送连线申请");
+      closeMoreSheet();
+    }
+  }
+
+  function disconnectAudienceCall() {
+    const disconnected = onAudienceCallDisconnect?.();
+    if (disconnected) {
+      showToast(t("watchSheet.audienceCallDisconnected"));
+      closeMoreSheet();
+    }
   }
 
   function openHostProfile(event) {
@@ -638,10 +667,14 @@ export function WatchSessionPage({
         videoPipSupported={videoPipSupported}
         playerSession={playerSession}
         pictureInPictureActive={pictureInPictureActive}
+        audienceCallEnabled={audienceCallEnabled}
+        audienceCallConnected={Boolean(audienceCallRealtimeSession)}
         onShareWatchLink={shareWatchLink}
         onOpenImageShareModal={openImageShareModal}
         onOpenScreenshotShareModal={openScreenshotShareModal}
         onCopyWatchLink={copyWatchLink}
+        onAudienceCallRequest={requestAudienceCall}
+        onAudienceCallDisconnect={disconnectAudienceCall}
         onOpenPictureInPicture={openPictureInPicture}
       />
       <WatchHostProfileSheet

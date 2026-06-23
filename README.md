@@ -66,6 +66,10 @@ Required secrets and variables:
 - `WEB_PUSH_SUBJECT` (optional, defaults to `mailto:admin@example.com`)
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (optional, used to provision Cloudflare Stream WebRTC live inputs for rooms)
 
+`GET /api/me` includes `authProviders`, the OAuth providers that are implemented
+and fully configured in the current Worker environment. It does not expose
+client secrets.
+
 Database migrations are in `migrations/`. Apply them to the D1 database before running the authenticated room and profile flows.
 
 ## Build

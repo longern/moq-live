@@ -577,9 +577,12 @@ export function LiveRoute({
     liveChat.roomStateReady &&
     !liveChat.canControlBroadcast;
   const publishBlocked = publishPolicyBlocked || publishControlBlocked;
+  const publishControlBlockedReason = publishControlBlocked
+    ? getAppErrorMessage({ code: "broadcast_control_read_only" })
+    : "";
   const publishBlockedReason = publishPolicyBlocked
     ? getPublishBlockReason(liveRoom)
-    : "";
+    : publishControlBlockedReason;
   const cameraMode = getCameraMode(
     publisher.cameraOptions,
     publisher.selectedCameraId,
@@ -1072,9 +1075,7 @@ export function LiveRoute({
         details: liveRoomDetails,
         label: liveRoomLabel,
         avatarUrl: liveRoomAvatarUrl,
-        infoBlockedReason: publishControlBlocked
-          ? getAppErrorMessage({ code: "broadcast_control_read_only" })
-          : "",
+        infoBlockedReason: publishControlBlockedReason,
         siteIconUrl,
         siteTitle,
       }}

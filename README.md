@@ -60,6 +60,8 @@ Required secrets and variables:
 
 - `MICROSOFT_CLIENT_ID`
 - `MICROSOFT_CLIENT_SECRET`
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (optional, enables Google sign-in)
+- `TWITTER_CLIENT_ID` and `TWITTER_CLIENT_SECRET` (optional, enables Twitter/X sign-in)
 - `AUTH_COOKIE_SECRET`
 - `AUTH_SESSION_TTL_DAYS` (optional, defaults to `30`)
 - `WEB_PUSH_PUBLIC_KEY` and `WEB_PUSH_PRIVATE_KEY` for live-start push notifications
@@ -69,6 +71,12 @@ Required secrets and variables:
 `GET /api/me` includes `authProviders`, the OAuth providers that are implemented
 and fully configured in the current Worker environment. It does not expose
 client secrets.
+
+OAuth callback paths:
+
+- `/api/auth/microsoft/callback`
+- `/api/auth/google/callback`
+- `/api/auth/twitter/callback`
 
 Database migrations are in `migrations/`. Apply them to the D1 database before running the authenticated room and profile flows.
 

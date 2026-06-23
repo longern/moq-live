@@ -5,7 +5,8 @@ export function useAuthController({ log, onAuthenticated }) {
   const [authState, setAuthState] = useState({
     loading: true,
     available: true,
-    user: null
+    user: null,
+    authProviders: []
   });
   const [registrationPrompt, setRegistrationPrompt] = useState(null);
   const onAuthenticatedRef = useRef(onAuthenticated);
@@ -21,10 +22,14 @@ export function useAuthController({ log, onAuthenticated }) {
         throw createAppError("auth_endpoint_failed", { status: response.status });
       }
       const payload = await response.json();
+      const authProviders = Array.isArray(payload.authProviders)
+        ? payload.authProviders
+        : [];
       const nextState = {
         loading: false,
         available: true,
-        user: payload.user ?? null
+        user: payload.user ?? null,
+        authProviders
       };
       setAuthState(nextState);
       if (nextState.user) {
@@ -34,15 +39,17 @@ export function useAuthController({ log, onAuthenticated }) {
       setAuthState({
         loading: false,
         available: false,
-        user: null
+        user: null,
+        authProviders: []
       });
       log(`auth unavailable: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  function startMicrosoftLogin() {
+  function startLogin(provider = null) {
     const redirectTo = `${window.location.pathname}${window.location.search}`;
-    window.location.href = `/api/auth/microsoft/start?redirect_to=${encodeURIComponent(redirectTo)}`;
+    const providerId = String(provider?.id || provider || "microsoft").trim() || "microsoft";
+    window.location.href = `/api/auth/${providerId}/start?redirect_to=${encodeURIComponent(redirectTo)}`;
   }
 
   async function updateProfile(patch) {
@@ -193,7 +200,7 @@ export function useAuthController({ log, onAuthenticated }) {
     registrationPrompt,
     dismissRegistrationPrompt: () => setRegistrationPrompt(null),
     refreshAuthState,
-    startMicrosoftLogin,
+    startLogin,
     logout,
     updateDisplayName,
     updateHandle,

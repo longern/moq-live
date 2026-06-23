@@ -43,6 +43,7 @@ export function usePushPermissionPromptController({ t }) {
     close,
     enable,
     setDismissChecked,
+    setError,
     setOpen,
   };
 }

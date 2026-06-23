@@ -93,6 +93,10 @@ export function createApiRoutes(handlers) {
     { method: "DELETE", path: "/api/me/avatar", handler: (env, request) => handlers.handleMyAvatarDelete(env, request) },
     { method: "GET", path: "/api/auth/microsoft/start", handler: (env, request) => handlers.handleMicrosoftStart(env, request) },
     { method: "GET", path: "/api/auth/microsoft/callback", handler: (env, request) => handlers.handleMicrosoftCallback(env, request) },
+    { method: "GET", path: "/api/auth/google/start", handler: (env, request) => handlers.handleOAuthStart(env, request, "google") },
+    { method: "GET", path: "/api/auth/google/callback", handler: (env, request) => handlers.handleOAuthCallback(env, request, "google") },
+    { method: "GET", path: "/api/auth/twitter/start", handler: (env, request) => handlers.handleOAuthStart(env, request, "twitter") },
+    { method: "GET", path: "/api/auth/twitter/callback", handler: (env, request) => handlers.handleOAuthCallback(env, request, "twitter") },
     {
       methods: ["GET", "POST"],
       path: "/api/auth/logout",

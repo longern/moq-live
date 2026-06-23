@@ -5,6 +5,12 @@ SUPER_ADMIN_USER_IDS=comma-separated-user-ids
 MICROSOFT_CLIENT_ID=your-microsoft-client-id
 MICROSOFT_CLIENT_SECRET=your-microsoft-client-secret
 
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+TWITTER_CLIENT_ID=your-twitter-client-id
+TWITTER_CLIENT_SECRET=your-twitter-client-secret
+
 CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
 CLOUDFLARE_API_TOKEN=your-cloudflare-api-token
 CLOUDFLARE_REALTIME_APP_ID=your-cloudflare-realtime-app-id

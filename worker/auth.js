@@ -1,16 +1,10 @@
 const textEncoder = new TextEncoder();
 
 const SESSION_COOKIE_NAME = "moq_session";
-const MICROSOFT_OAUTH_COOKIE_NAME = "moq_oauth_microsoft";
-const DEFAULT_SESSION_TTL_DAYS = 30;
-const MICROSOFT_OPENID_CONFIG_URL =
-  "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration";
 const NICKNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const HANDLE_CHANGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 const MIN_NICKNAME_LENGTH = 2;
 const MAX_NICKNAME_LENGTH = 32;
-const MIN_HANDLE_LENGTH = 6;
-const MAX_HANDLE_LENGTH = 24;
 const DEFAULT_HANDLE_PREFIX = "pid_";
 const DEFAULT_HANDLE_SUFFIX_LENGTH = 8;
 const HANDLE_PATTERN = /^(?!\d+$)[a-z0-9](?:[a-z0-9_]{4,22}[a-z0-9])?$/;
@@ -35,9 +29,6 @@ const TABLES = {
   userIdentities: "moq_user_identities",
   sessions: "moq_sessions",
 };
-
-let openIdConfigCache = null;
-let jwksCache = null;
 
 export function json(data, init = {}) {
   const headers = new Headers(init.headers);
@@ -72,34 +63,6 @@ export function getDb(env) {
     throw new Error("Missing D1 binding. Set APP_DB.");
   }
   return db;
-}
-
-export function getAuthConfig(env) {
-  const clientId = env.MICROSOFT_CLIENT_ID;
-  const clientSecret = env.MICROSOFT_CLIENT_SECRET;
-  const cookieSecret = env.AUTH_COOKIE_SECRET;
-
-  if (!clientId || !clientSecret || !cookieSecret) {
-    throw new Error(
-      "Missing auth configuration. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and AUTH_COOKIE_SECRET.",
-    );
-  }
-
-  return {
-    clientId,
-    clientSecret,
-    cookieSecret,
-    sessionTtlDays:
-      Number.parseInt(
-        env.AUTH_SESSION_TTL_DAYS ?? `${DEFAULT_SESSION_TTL_DAYS}`,
-        10,
-      ) || DEFAULT_SESSION_TTL_DAYS,
-  };
-}
-
-export function getMicrosoftCallbackUrl(request) {
-  const url = new URL(request.url);
-  return `${url.origin}/api/auth/microsoft/callback`;
 }
 
 export function getMicrosoftLoginUrl(request) {
@@ -176,44 +139,11 @@ export function getSessionCookieName() {
   return SESSION_COOKIE_NAME;
 }
 
-export function getMicrosoftOAuthCookieName() {
-  return MICROSOFT_OAUTH_COOKIE_NAME;
-}
-
 export function appendAuthError(redirectTo, errorCode) {
   const base = sanitizeRedirectTo(redirectTo);
   const url = new URL(base, "https://moq.local");
   url.searchParams.set("auth_error", errorCode);
   return `${url.pathname}${url.search}${url.hash}`;
-}
-
-export async function createMicrosoftOAuthState(secret, redirectTo) {
-  const payload = {
-    state: randomToken(18),
-    nonce: randomToken(18),
-    codeVerifier: randomToken(48),
-    redirectTo: sanitizeRedirectTo(redirectTo),
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  };
-
-  return {
-    payload,
-    cookieValue: await signPayload(payload, secret),
-  };
-}
-
-export async function readMicrosoftOAuthState(cookieValue, secret) {
-  if (!cookieValue) {
-    return null;
-  }
-  const payload = await verifySignedPayload(cookieValue, secret);
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
-  if (typeof payload.expiresAt !== "number" || payload.expiresAt < Date.now()) {
-    return null;
-  }
-  return payload;
 }
 
 export async function createSession(db, userId, metadata, sessionTtlDays) {
@@ -330,127 +260,18 @@ export async function getSessionUser(db, request) {
   };
 }
 
-export async function exchangeMicrosoftCode(request, env, code, codeVerifier) {
-  const authConfig = getAuthConfig(env);
-  const openIdConfig = await getMicrosoftOpenIdConfig();
-  const form = new URLSearchParams();
-  form.set("client_id", authConfig.clientId);
-  form.set("client_secret", authConfig.clientSecret);
-  form.set("grant_type", "authorization_code");
-  form.set("code", code);
-  form.set("redirect_uri", getMicrosoftCallbackUrl(request));
-  form.set("code_verifier", codeVerifier);
-
-  const response = await fetch(openIdConfig.token_endpoint, {
-    method: "POST",
-    headers: {
-      "content-type": "application/x-www-form-urlencoded",
-    },
-    body: form.toString(),
-  });
-
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(
-      payload.error_description ||
-        payload.error ||
-        "Microsoft token exchange failed",
-    );
+export async function upsertOAuthUser(db, identity) {
+  const provider = String(identity.provider || "").trim();
+  const subject = String(identity.subject || "").trim();
+  if (!provider || !subject) {
+    throw new Error("OAuth identity missing provider or subject");
   }
 
-  if (!payload.id_token) {
-    throw new Error("Microsoft token response did not include id_token");
-  }
-
-  return payload;
-}
-
-export async function verifyMicrosoftIdToken(idToken, env, expectedNonce) {
-  const authConfig = getAuthConfig(env);
-  const [rawHeader, rawPayload, rawSignature] = idToken.split(".");
-  if (!rawHeader || !rawPayload || !rawSignature) {
-    throw new Error("Invalid id_token format");
-  }
-
-  const header = decodeJsonSegment(rawHeader);
-  const payload = decodeJsonSegment(rawPayload);
-  const signature = base64UrlToUint8Array(rawSignature);
-  const signedContent = textEncoder.encode(`${rawHeader}.${rawPayload}`);
-
-  if (header.alg !== "RS256") {
-    throw new Error(`Unsupported Microsoft token alg: ${header.alg}`);
-  }
-
-  const jwk = await getMicrosoftJwk(header.kid);
-  if (!jwk) {
-    throw new Error("Unable to find matching Microsoft signing key");
-  }
-
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    {
-      name: "RSASSA-PKCS1-v1_5",
-      hash: "SHA-256",
-    },
-    false,
-    ["verify"],
-  );
-
-  const verified = await crypto.subtle.verify(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    signature,
-    signedContent,
-  );
-
-  if (!verified) {
-    throw new Error("Microsoft id_token signature verification failed");
-  }
-
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  if (typeof payload.exp !== "number" || payload.exp <= nowSeconds) {
-    throw new Error("Microsoft id_token is expired");
-  }
-  if (typeof payload.nbf === "number" && payload.nbf > nowSeconds + 60) {
-    throw new Error("Microsoft id_token is not yet valid");
-  }
-
-  const audience = payload.aud;
-  const audienceMatches = Array.isArray(audience)
-    ? audience.includes(authConfig.clientId)
-    : audience === authConfig.clientId;
-  if (!audienceMatches) {
-    throw new Error("Microsoft id_token audience mismatch");
-  }
-
-  if (payload.nonce !== expectedNonce) {
-    throw new Error("Microsoft id_token nonce mismatch");
-  }
-
-  if (!isValidMicrosoftIssuer(payload.iss)) {
-    throw new Error("Microsoft id_token issuer mismatch");
-  }
-
-  if (typeof payload.sub !== "string" || !payload.sub) {
-    throw new Error("Microsoft id_token missing subject");
-  }
-
-  return payload;
-}
-
-export async function upsertMicrosoftUser(db, claims) {
   const now = new Date().toISOString();
-  const displayName =
-    claims.name || claims.preferred_username || claims.email || claims.sub;
-  const email = claims.email || claims.preferred_username || null;
-  const profile = JSON.stringify({
-    sub: claims.sub,
-    oid: claims.oid ?? null,
-    tid: claims.tid ?? null,
-    preferred_username: claims.preferred_username ?? null,
-    email,
-  });
+  const displayName = String(identity.displayName || identity.email || subject).trim();
+  const email = identity.email || null;
+  const avatarUrl = identity.avatarUrl || null;
+  const profile = JSON.stringify(identity.rawProfile ?? {});
 
   const existingIdentity = await db
     .prepare(
@@ -459,7 +280,7 @@ export async function upsertMicrosoftUser(db, claims) {
      WHERE provider = ? AND provider_subject = ?
      LIMIT 1`,
     )
-    .bind("microsoft", claims.sub)
+    .bind(provider, subject)
     .first();
 
   if (existingIdentity) {
@@ -478,13 +299,13 @@ export async function upsertMicrosoftUser(db, claims) {
          WHERE provider = ? AND provider_subject = ?`,
         )
         .bind(
-          claims.tid ?? null,
-          claims.oid ?? null,
+          identity.tenantId ?? null,
+          identity.providerOid ?? null,
           email,
           profile,
           now,
-          "microsoft",
-          claims.sub,
+          provider,
+          subject,
         ),
     ]);
 
@@ -516,9 +337,9 @@ export async function upsertMicrosoftUser(db, claims) {
             created_at,
             updated_at,
             last_login_at
-          ) VALUES (?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?)`,
           )
-          .bind(userId, handle, displayName, email, now, now, now),
+          .bind(userId, handle, displayName, avatarUrl, email, now, now, now),
         db
           .prepare(
             `INSERT INTO ${TABLES.userIdentities} (
@@ -537,10 +358,10 @@ export async function upsertMicrosoftUser(db, claims) {
           .bind(
             identityId,
             userId,
-            "microsoft",
-            claims.sub,
-            claims.tid ?? null,
-            claims.oid ?? null,
+            provider,
+            subject,
+            identity.tenantId ?? null,
+            identity.providerOid ?? null,
             email,
             profile,
             now,
@@ -1591,75 +1412,6 @@ async function sha256Hex(input) {
     .join("");
 }
 
-async function sha256Base64Url(input) {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    textEncoder.encode(input),
-  );
-  return uint8ArrayToBase64Url(new Uint8Array(digest));
-}
-
-async function signPayload(payload, secret) {
-  const body = uint8ArrayToBase64Url(
-    textEncoder.encode(JSON.stringify(payload)),
-  );
-  const signature = await hmacSha256Base64Url(secret, body);
-  return `${body}.${signature}`;
-}
-
-async function verifySignedPayload(value, secret) {
-  const separatorIndex = value.lastIndexOf(".");
-  if (separatorIndex < 0) {
-    return null;
-  }
-  const body = value.slice(0, separatorIndex);
-  const signature = value.slice(separatorIndex + 1);
-  const expectedSignature = await hmacSha256Base64Url(secret, body);
-  if (signature !== expectedSignature) {
-    return null;
-  }
-  try {
-    return JSON.parse(new TextDecoder().decode(base64UrlToUint8Array(body)));
-  } catch {
-    return null;
-  }
-}
-
-async function hmacSha256Base64Url(secret, message) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    textEncoder.encode(secret),
-    {
-      name: "HMAC",
-      hash: "SHA-256",
-    },
-    false,
-    ["sign"],
-  );
-
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    textEncoder.encode(message),
-  );
-  return uint8ArrayToBase64Url(new Uint8Array(signature));
-}
-
-function decodeJsonSegment(segment) {
-  return JSON.parse(new TextDecoder().decode(base64UrlToUint8Array(segment)));
-}
-
-function base64UrlToUint8Array(value) {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = `${base64}${"=".repeat((4 - (base64.length % 4)) % 4)}`;
-  const binary = atob(padded);
-  const output = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    output[index] = binary.charCodeAt(index);
-  }
-  return output;
-}
-
 function uint8ArrayToBase64Url(value) {
   let binary = "";
   for (const item of value) {
@@ -1669,86 +1421,4 @@ function uint8ArrayToBase64Url(value) {
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
-}
-
-async function getMicrosoftOpenIdConfig() {
-  if (openIdConfigCache && openIdConfigCache.expiresAt > Date.now()) {
-    return openIdConfigCache.value;
-  }
-
-  const response = await fetch(MICROSOFT_OPENID_CONFIG_URL, {
-    headers: {
-      accept: "application/json",
-    },
-  });
-  if (!response.ok) {
-    throw new Error("Failed to load Microsoft OpenID configuration");
-  }
-
-  const value = await response.json();
-  openIdConfigCache = {
-    value,
-    expiresAt: Date.now() + 60 * 60 * 1000,
-  };
-  return value;
-}
-
-async function getMicrosoftJwk(keyId) {
-  if (!jwksCache || jwksCache.expiresAt <= Date.now()) {
-    const openIdConfig = await getMicrosoftOpenIdConfig();
-    const response = await fetch(openIdConfig.jwks_uri, {
-      headers: {
-        accept: "application/json",
-      },
-    });
-    if (!response.ok) {
-      throw new Error("Failed to load Microsoft signing keys");
-    }
-    const payload = await response.json();
-    jwksCache = {
-      keys: payload.keys ?? [],
-      expiresAt: Date.now() + 60 * 60 * 1000,
-    };
-  }
-
-  return jwksCache.keys.find((entry) => entry.kid === keyId) ?? null;
-}
-
-function isValidMicrosoftIssuer(issuer) {
-  if (typeof issuer !== "string") {
-    return false;
-  }
-
-  try {
-    const url = new URL(issuer);
-    return (
-      url.hostname === "login.microsoftonline.com" &&
-      url.pathname.endsWith("/v2.0")
-    );
-  } catch {
-    return false;
-  }
-}
-
-export async function buildMicrosoftAuthorizationUrl(
-  request,
-  env,
-  statePayload,
-) {
-  const authConfig = getAuthConfig(env);
-  const openIdConfig = await getMicrosoftOpenIdConfig();
-  const url = new URL(openIdConfig.authorization_endpoint);
-  url.searchParams.set("client_id", authConfig.clientId);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("redirect_uri", getMicrosoftCallbackUrl(request));
-  url.searchParams.set("response_mode", "query");
-  url.searchParams.set("scope", "openid profile email");
-  url.searchParams.set("state", statePayload.state);
-  url.searchParams.set("nonce", statePayload.nonce);
-  url.searchParams.set(
-    "code_challenge",
-    await sha256Base64Url(statePayload.codeVerifier),
-  );
-  url.searchParams.set("code_challenge_method", "S256");
-  return url.toString();
 }

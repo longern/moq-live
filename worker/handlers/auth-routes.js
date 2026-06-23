@@ -1,27 +1,30 @@
 import {
   appendAuthError,
-  buildMicrosoftAuthorizationUrl,
   buildSessionCookie,
   createDeleteCookie,
-  createMicrosoftOAuthState,
   createSession,
-  exchangeMicrosoftCode,
-  getAuthConfig,
   getDb,
-  getMicrosoftOAuthCookieName,
   getSessionCookieName,
   getSessionUser,
   json,
   parseCookies,
-  readMicrosoftOAuthState,
   redirect,
   revokeSession,
   sanitizeRedirectTo,
   shouldUseSecureCookies,
   updateUserProfile,
-  upsertMicrosoftUser,
-  verifyMicrosoftIdToken,
+  upsertOAuthUser,
 } from "../auth.js";
+import {
+  buildOAuthAuthorizationUrl,
+  createOAuthState,
+  exchangeOAuthCode,
+  getAuthProviderDefinition,
+  getOAuthCookieName,
+  getOAuthProviderConfig,
+  readOAuthState,
+  resolveOAuthUserProfile,
+} from "../oauth-providers.js";
 import {
   slugifyError,
   withSuperAdminFlag
@@ -62,24 +65,26 @@ export async function handleProfileUpdate(env, request) {
   });
 }
 
-export async function handleMicrosoftStart(env, request) {
-  const authConfig = getAuthConfig(env);
+export async function handleOAuthStart(env, request, providerId) {
+  const authConfig = getOAuthProviderConfig(env, providerId);
   const redirectTo = sanitizeRedirectTo(
     new URL(request.url).searchParams.get("redirect_to") || "/",
   );
-  const { payload, cookieValue } = await createMicrosoftOAuthState(
+  const { payload, cookieValue } = await createOAuthState(
     authConfig.cookieSecret,
     redirectTo,
   );
-  const authorizationUrl = await buildMicrosoftAuthorizationUrl(
+  const authorizationUrl = await buildOAuthAuthorizationUrl(
     request,
     env,
+    providerId,
     payload,
   );
 
   return redirect(authorizationUrl, {
     headers: {
       "set-cookie": buildOAuthCookie(
+        providerId,
         cookieValue,
         shouldUseSecureCookies(request),
       ),
@@ -87,13 +92,21 @@ export async function handleMicrosoftStart(env, request) {
   });
 }
 
-export async function handleMicrosoftCallback(env, request) {
-  const authConfig = getAuthConfig(env);
+export async function handleOAuthCallback(env, request, providerId) {
+  const provider = getAuthProviderDefinition(providerId);
+  if (!provider) {
+    return json(
+      { ok: false, error: "Unsupported auth provider", code: "unsupported_auth_provider" },
+      { status: 404 },
+    );
+  }
+
+  const authConfig = getOAuthProviderConfig(env, providerId);
   const db = getDb(env);
   const url = new URL(request.url);
   const cookies = parseCookies(request);
-  const oauthState = await readMicrosoftOAuthState(
-    cookies[getMicrosoftOAuthCookieName()],
+  const oauthState = await readOAuthState(
+    cookies[getOAuthCookieName(providerId)],
     authConfig.cookieSecret,
   );
 
@@ -102,7 +115,7 @@ export async function handleMicrosoftCallback(env, request) {
   if (error) {
     const redirectTo = oauthState?.redirectTo ?? "/";
     return redirect(appendAuthError(redirectTo, error), {
-      headers: buildCallbackCookieHeaders(request, null, null),
+      headers: buildCallbackCookieHeaders(request, providerId, null, null),
     });
   }
 
@@ -116,23 +129,25 @@ export async function handleMicrosoftCallback(env, request) {
   ) {
     const redirectTo = oauthState?.redirectTo ?? "/";
     return redirect(appendAuthError(redirectTo, "state_mismatch"), {
-      headers: buildCallbackCookieHeaders(request, null, null),
+      headers: buildCallbackCookieHeaders(request, providerId, null, null),
     });
   }
 
   try {
-    const tokenPayload = await exchangeMicrosoftCode(
+    const tokenPayload = await exchangeOAuthCode(
       request,
       env,
+      providerId,
       code,
       oauthState.codeVerifier,
     );
-    const claims = await verifyMicrosoftIdToken(
-      tokenPayload.id_token,
+    const identity = await resolveOAuthUserProfile(
+      tokenPayload,
       env,
+      providerId,
       oauthState.nonce,
     );
-    const authUser = await upsertMicrosoftUser(db, claims);
+    const authUser = await upsertOAuthUser(db, identity);
     const session = await createSession(
       db,
       authUser.userId,
@@ -157,6 +172,7 @@ export async function handleMicrosoftCallback(env, request) {
       {
         headers: buildCallbackCookieHeaders(
           request,
+          providerId,
           session.token,
           session.expiresAt,
         ),
@@ -168,9 +184,17 @@ export async function handleMicrosoftCallback(env, request) {
       errorDescription ||
       (callbackError instanceof Error ? callbackError.message : "login_failed");
     return redirect(appendAuthError(redirectTo, slugifyError(errorCode)), {
-      headers: buildCallbackCookieHeaders(request, null, null),
+      headers: buildCallbackCookieHeaders(request, providerId, null, null),
     });
   }
+}
+
+export function handleMicrosoftStart(env, request) {
+  return handleOAuthStart(env, request, "microsoft");
+}
+
+export function handleMicrosoftCallback(env, request) {
+  return handleOAuthCallback(env, request, "microsoft");
 }
 
 export async function handleLogout(env, request) {
@@ -193,9 +217,9 @@ export async function handleLogout(env, request) {
   );
 }
 
-function buildOAuthCookie(cookieValue, secure) {
+function buildOAuthCookie(providerId, cookieValue, secure) {
   return [
-    `${getMicrosoftOAuthCookieName()}=${cookieValue}`,
+    `${getOAuthCookieName(providerId)}=${cookieValue}`,
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",
@@ -205,12 +229,12 @@ function buildOAuthCookie(cookieValue, secure) {
     .join("; ");
 }
 
-function buildCallbackCookieHeaders(request, sessionToken, sessionExpiresAt) {
+function buildCallbackCookieHeaders(request, providerId, sessionToken, sessionExpiresAt) {
   const secure = shouldUseSecureCookies(request);
   const headers = new Headers();
   headers.append(
     "set-cookie",
-    createDeleteCookie(getMicrosoftOAuthCookieName(), secure),
+    createDeleteCookie(getOAuthCookieName(providerId), secure),
   );
   if (sessionToken && sessionExpiresAt) {
     headers.append(

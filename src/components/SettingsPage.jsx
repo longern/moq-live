@@ -55,8 +55,9 @@ export function SettingsPage({
   buildLabel,
   authAvailable,
   authLoading,
+  authProviders = [],
   authUser,
-  onMicrosoftLogin,
+  onLogin,
   onLogout,
   onUpdateDisplayName,
   onUpdateHandle,
@@ -593,10 +594,11 @@ export function SettingsPage({
             <LoginDrawer
               authAvailable={authAvailable}
               authLoading={authLoading}
+              authProviders={authProviders}
               onClose={() => {
                 setLoginPanelOpen(false);
               }}
-              onMicrosoftLogin={onMicrosoftLogin}
+              onLogin={onLogin}
               transitionClassName={transitionClassName}
             />
           )}

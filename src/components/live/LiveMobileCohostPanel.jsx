@@ -192,7 +192,7 @@ export function LiveMobileCohostPanel({
                           placeholderClassName="is-placeholder"
                           iconClassName="live-cohost-avatar-icon"
                         />
-                        <span>{name}</span>
+                        <span className="live-audience-call-name">{name}</span>
                         <div className="live-audience-call-row-actions">
                           <button
                             type="button"
@@ -321,7 +321,7 @@ export function LiveMobileCohostPanel({
                           placeholderClassName="is-placeholder"
                           iconClassName="live-cohost-avatar-icon"
                         />
-                        <span>{name}</span>
+                        <span className="live-cohost-recent-name">{name}</span>
                       </button>
                     );
                   })}

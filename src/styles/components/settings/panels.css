@@ -30,6 +30,8 @@
 
 .panel-page-head {
   display: grid;
+  min-height: 48px;
+  padding: 0 8px;
   grid-template-columns: 40px minmax(0, 1fr) 40px;
   align-items: center;
   gap: 12px;
@@ -90,6 +92,7 @@
   border: 0;
   border-radius: 0;
   background: rgba(4, 11, 17, 0.6);
+  cursor: default;
 }
 
 .auth-panel {
@@ -249,10 +252,6 @@
   margin-top: 6px;
 }
 
-.login-panel-head {
-  padding: 18px 22px 4px;
-}
-
 .login-panel-close {
   width: 40px;
   min-width: 40px;
@@ -280,27 +279,22 @@
 }
 
 .login-panel-body {
-  min-height: 0;
+  min-height: 196px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 24px;
+  gap: 16px;
   padding: 0 20px 32px;
 }
 
 .login-panel-copy {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  padding: 16px 0;
   text-align: center;
 }
 
 .login-panel-copy h2 {
   margin: 0;
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  line-height: 1.2;
-  letter-spacing: -0.03em;
+  font-size: 1.5rem;
 }
 
 .login-panel-copy p {
@@ -312,7 +306,7 @@
 
 .login-provider-button {
   width: 100%;
-  min-height: 56px;
+  min-height: 40px;
   padding: 0 18px;
   display: inline-flex;
   align-items: center;

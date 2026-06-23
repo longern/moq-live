@@ -19,7 +19,7 @@ export function AppTopbar({
   onPreloadLive,
   onReturnHome,
   onSelectPage,
-  onStartMicrosoftLogin,
+  onStartLogin,
   onTopbarWatchRoomChange,
   page,
   siteIconUrl,
@@ -159,7 +159,7 @@ export function AppTopbar({
                   role="menuitem"
                   onClick={() => {
                     onAuthMenuClose();
-                    onStartMicrosoftLogin();
+                    onStartLogin();
                   }}
                   disabled={authState.loading || !authState.available}
                   title={!authState.available ? t("account.authServiceUnavailable") : undefined}

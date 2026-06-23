@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Camera, Copy, QrCode, Share } from "lucide-react";
 import { ChatPanel } from "../ChatPanel.jsx";
-import { useToast } from "../primitives/FloatingToast.jsx";
+import { FloatingToast, useToast } from "../primitives/FloatingToast.jsx";
 import { StatusPill } from "../primitives/StatusPill.jsx";
 import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { WatchHostProfileContent } from "../watch/WatchSessionSheets.jsx";
@@ -671,7 +671,9 @@ export function LiveDesktopPage({
               />
             ) : null}
             {publishBlockedReason ? (
-              <p className="inline-warning live-desktop-warning">{publishBlockedReason}</p>
+              <FloatingToast className="live-lock-toast live-desktop-lock-toast">
+                {publishBlockedReason}
+              </FloatingToast>
             ) : null}
             <div className="live-desktop-dock">
               <LiveDesktopPanel className={activePanelClassName}>{activePanel}</LiveDesktopPanel>

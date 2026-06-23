@@ -92,6 +92,7 @@ export const enMessages = {
     noHistory: "No watch history yet",
     loginHint: "Sign in to manage your avatar, handle, and display name.",
     continueLogin: "Continue to sign in",
+    continueProviderLogin: ({ provider } = {}) => `Continue with ${provider || "provider"}`,
     loginAccount: "Sign in to your account",
     loginPage: "Sign-in page",
     closeLoginPage: "Close sign-in page",

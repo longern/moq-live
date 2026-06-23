@@ -30,13 +30,13 @@ import {
   getWatchPlayerLayoutScopeKey,
   isNamespaceWatchTarget,
   playerSessionMatchesWatchTarget,
-  shouldUseWatchPlayerShell,
   watchPlaybackRecordMatches,
+  shouldUseWatchPlayerShell,
 } from "./lib/appViewState.js";
 import { clearWatchHistory, persistWatchHistoryEntry, readWatchHistory } from "./lib/watchHistory.js";
-import { describePlayerState, RETAINED_PLAYER_LAYOUT_STATES } from "./lib/status.js";
+import { describePlayerState } from "./lib/status.js";
 import { getWatchTestChannel } from "./lib/watchTestChannels.js";
-import { createApiError } from "./lib/appErrors.js";
+import { createApiError, getAppErrorMessage } from "./lib/appErrors.js";
 import { useI18n } from "./i18n/I18nProvider.jsx";
 import {
   shouldPromptForPushPermission,
@@ -44,7 +44,6 @@ import {
 import {
   DEFAULT_STREAM_PROTOCOL,
   STREAM_PROTOCOL_MOQ,
-  STREAM_PROTOCOL_WEBRTC,
   normalizeStreamProtocol,
 } from "./lib/streamProtocol.js";
 
@@ -229,7 +228,7 @@ export function App() {
     registrationPrompt,
     dismissRegistrationPrompt,
     refreshAuthState,
-    startMicrosoftLogin,
+    startLogin,
     logout,
     updateDisplayName,
     updateHandle,
@@ -342,7 +341,6 @@ export function App() {
     ? ""
     : chat.roomMeta.stream.webRtcUrl || "";
   const watchUsesMoqPlayback = resolvedWatchProtocol === STREAM_PROTOCOL_MOQ;
-  const watchUsesWebRtcPlayback = resolvedWatchProtocol === STREAM_PROTOCOL_WEBRTC;
   const resolvedWatchPlaybackReady = watchUsesMoqPlayback
     ? Boolean(resolvedWatchRelayUrl && resolvedWatchNamespace)
     : Boolean(resolvedWatchWebRtcUrl);
@@ -490,8 +488,7 @@ export function App() {
     playerStatusKind: effectivePlayerStatusKind,
     playerOrientation: effectivePlayerOrientation,
   });
-  const watchRoomShellActive = page === "watch" && watchJoined;
-  const mobileWatchJoinedClass = watchRoomShellActive ? " app-container-watch-joined" : "";
+  const mobileWatchJoinedClass = watchPlayerShellActive ? " app-container-watch-joined" : "";
   const avatarLabel = getAvatarLabel(authState, t);
   const avatarStateClass = authState.loading
     ? " is-loading"
@@ -709,7 +706,7 @@ export function App() {
       });
       if (!currentlyFollowing && payload.following && shouldPromptForPushPermission()) {
         pushPrompt.setDismissChecked(false);
-        setPushPromptError("");
+        pushPrompt.setError("");
         pushPrompt.setOpen(true);
       }
     } catch (error) {
@@ -785,7 +782,7 @@ export function App() {
       });
       if (nextNotifyLiveStarted && payload.following && payload.notifyLiveStarted && shouldPromptForPushPermission()) {
         pushPrompt.setDismissChecked(false);
-        setPushPromptError("");
+        pushPrompt.setError("");
         pushPrompt.setOpen(true);
       }
     } catch (error) {
@@ -1431,7 +1428,9 @@ export function App() {
           onPreloadLive={preloadLiveRoute}
           onReturnHome={returnToWatchHome}
           onSelectPage={(nextPage) => selectPageWithGuard(nextPage)}
-          onStartMicrosoftLogin={startMicrosoftLogin}
+          onStartLogin={() => {
+            setLoginPromptOpen(true);
+          }}
           onTopbarWatchRoomChange={setTopbarWatchRoom}
           page={page}
           siteIconUrl={siteIconUrl}
@@ -1541,7 +1540,11 @@ export function App() {
             authAvailable={authState.available}
             authLoading={authState.loading}
             authUser={authState.user}
-            onMicrosoftLogin={startMicrosoftLogin}
+            authProviders={authState.authProviders}
+            onLogin={(provider) => {
+              setLoginPromptOpen(false);
+              startLogin(provider);
+            }}
             onLogout={() => {
               void logout();
             }}
@@ -1566,7 +1569,7 @@ export function App() {
         </main>
       </div>
 
-      {watchRoomShellActive ? null : (
+      {watchPlayerShellActive ? null : (
         <MobileNavigation
           currentPage={page}
           onSelect={(nextPage) => selectPageWithGuard(nextPage)}
@@ -1601,10 +1604,11 @@ export function App() {
           <LoginDrawer
             authAvailable={authState.available}
             authLoading={authState.loading}
+            authProviders={authState.authProviders}
             onClose={() => {
               setLoginPromptOpen(false);
             }}
-            onMicrosoftLogin={startMicrosoftLogin}
+            onLogin={startLogin}
             transitionClassName={transitionClassName}
           />
         )}

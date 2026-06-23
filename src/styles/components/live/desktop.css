@@ -375,23 +375,18 @@
   justify-self: end;
 }
 
-.live-desktop-warning {
+.live-lock-toast {
+  width: fit-content;
+  max-width: min(360px, calc(100% - 32px));
+}
+
+.live-desktop-lock-toast {
   position: absolute;
   left: 50%;
   top: 50%;
-  z-index: 4;
-  margin: 0;
-  width: fit-content;
+  z-index: var(--z-toast);
   max-width: calc(100% - 36px);
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.64);
-  color: rgba(244, 248, 252, 0.92);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(12px);
   transform: translate(-50%, -50%);
-  text-align: center;
 }
 
 .live-page-toast {

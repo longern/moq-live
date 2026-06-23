@@ -561,7 +561,9 @@ export function LiveMobilePage({
             mirrorPreview={mirrorPreview}
           />
           {publishBlockedReason ? (
-            <div className="live-mobile-warning">{publishBlockedReason}</div>
+            <FloatingToast className="live-lock-toast live-mobile-lock-toast">
+              {publishBlockedReason}
+            </FloatingToast>
           ) : null}
           {cameraNoticeVisible ? (
             <FloatingToast className="live-mobile-toast">{cameraNoticeMessage}</FloatingToast>

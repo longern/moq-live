@@ -99,6 +99,7 @@ export const zhCNMessages = {
     noHistory: "暂无观看历史",
     loginHint: "登录后可以管理头像、UID 和显示名。",
     continueLogin: "继续登录",
+    continueProviderLogin: ({ provider } = {}) => `使用 ${provider || "第三方账号"} 登录`,
     loginAccount: "登录账号",
     loginPage: "登录页面",
     closeLoginPage: "关闭登录页面",

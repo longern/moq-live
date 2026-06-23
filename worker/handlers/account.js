@@ -1,6 +1,5 @@
 import {
   createUserRoom,
-  getConfiguredAuthProviders,
   getDb,
   getMicrosoftLoginUrl,
   getUserRoom,
@@ -12,6 +11,9 @@ import {
   updateUserRoomCover,
   updateUserRoomSettings,
 } from "../auth.js";
+import {
+  getConfiguredAuthProviders,
+} from "../oauth-providers.js";
 import {
   withSuperAdminFlag
 } from "./shared.js";

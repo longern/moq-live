@@ -37,6 +37,9 @@
     var(--live-audience-row-height) * 3 + var(--live-audience-row-gap) * 2
   );
   --live-audience-list-max-height: clamp(196px, 44svh, 420px);
+}
+
+.media-immersive .live-mobile-audience-panel > .swipeable-drawer-panel-content {
   gap: 12px;
   padding: 16px 0;
 }
@@ -98,7 +101,6 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  backdrop-filter: none;
   box-shadow: none;
 }
 
@@ -218,7 +220,6 @@
     border: 0;
     border-radius: 0;
     background: transparent;
-    backdrop-filter: none;
   }
 
   .watch-layout.media-landscape-portrait-split
@@ -400,19 +401,21 @@
 
   .watch-layout.media-landscape-immersive .watch-mobile-host-chip {
     max-width: min(56vw, 360px);
-    padding: 4px 12px 4px 5px;
+    height: 32px;
+    padding: 0 10px 0 0;
     gap: 8px;
   }
 
   .watch-layout.media-landscape-immersive
     .watch-mobile-host-chip:has(.watch-host-follow-button) {
     max-width: min(68vw, 420px);
+    padding-right: 2px;
   }
 
   .watch-layout.media-landscape-immersive .watch-mobile-host-avatar {
-    width: 24px;
-    height: 24px;
-    min-width: 24px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -420,7 +423,7 @@
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
     color: var(--text);
-    font-size: 0.68rem;
+    font-size: 0.78rem;
     font-weight: 600;
   }
 
@@ -432,14 +435,15 @@
   }
 
   .watch-layout.media-landscape-immersive .watch-mobile-host-avatar-icon {
-    width: 15px;
-    height: 15px;
+    width: 19px;
+    height: 19px;
     stroke: currentColor;
     fill: none;
     stroke-width: 1.9;
   }
 
   .watch-layout.media-landscape-immersive .watch-host-follow-button-mobile {
+    margin: 2px;
     min-height: 24px;
     padding: 0 8px;
     font-size: 0.72rem;

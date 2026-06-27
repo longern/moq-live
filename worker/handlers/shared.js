@@ -88,11 +88,17 @@ export function buildCohostRoomPayload(row, request) {
 export function buildCohostActive({ id, acceptedAt, peerRoom, peerState, request }) {
   const stream = peerState?.roomMeta?.stream || {};
   const protocol = stream.protocol === "moq" ? "moq" : "webrtc";
+  const defaultWebRtcUrl = peerRoom.room_id
+    ? new URL(
+        `/api/rooms/${encodeURIComponent(peerRoom.room_id)}/webrtc/whep`,
+        request.url,
+      ).toString()
+    : "";
   const activeStream = {
     relayUrl: stream.relayUrl || "",
-    namespace: stream.namespace || "",
+    namespace: stream.namespace || peerRoom.room_id || "",
     protocol,
-    webRtcUrl: stream.webRtcUrl || "",
+    webRtcUrl: stream.webRtcUrl || defaultWebRtcUrl,
   };
   const moqReady =
     protocol === "moq" && activeStream.relayUrl && activeStream.namespace;

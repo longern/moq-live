@@ -369,7 +369,6 @@ pre {
   border-radius: 14px;
   background: rgba(9, 16, 24, 0.96);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(18px);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;

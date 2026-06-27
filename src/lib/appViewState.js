@@ -51,24 +51,25 @@ export function getWatchPlayerLayoutScopeKey({
 }
 
 export function shouldUseWatchPlayerShell({
+  optimisticShellActive = false,
   page,
   watchJoined,
   playerSession,
   playerStatusKind,
-  playerOrientation,
 }) {
   if (page !== "watch" || !watchJoined) {
     return false;
+  }
+
+  if (optimisticShellActive) {
+    return true;
   }
 
   if (playerSession) {
     return true;
   }
 
-  return (
-    playerOrientation === "portrait" &&
-    RETAINED_PLAYER_LAYOUT_STATES.has(playerStatusKind)
-  );
+  return RETAINED_PLAYER_LAYOUT_STATES.has(playerStatusKind);
 }
 
 export function getDesiredWatchPlaybackTarget({

@@ -7,6 +7,8 @@ import {
   Languages,
   ShieldCheck,
   SlidersHorizontal,
+  UserCheck,
+  UsersRound,
   UserRound,
 } from "lucide-react";
 import { formatAudienceCount } from "../../lib/audience.js";
@@ -421,6 +423,16 @@ export function DesktopSettingsSidebar({
       id: "account",
       icon: UserRound,
       title: t("settings.accountInfo")
+    },
+    {
+      id: "following",
+      icon: UserCheck,
+      title: t("settings.myFollowing")
+    },
+    {
+      id: "followers",
+      icon: UsersRound,
+      title: t("settings.myFollowers")
     },
     {
       id: "history",

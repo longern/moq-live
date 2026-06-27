@@ -63,6 +63,7 @@ export async function handleStreamStarted(room, ws, session, payload) {
     return;
   }
   room.roomState = nextRoomState;
+  room.audienceCallSpeakingUserIds = [];
   await writeRoomLastStartedAt(room, session.room, nextStream.startedAt);
   room.broadcast({
     type: "stream.started",
@@ -119,6 +120,7 @@ export async function handleStreamStopped(room, ws, session) {
     return;
   }
   room.roomState = nextRoomState;
+  room.audienceCallSpeakingUserIds = [];
   await writeUserLastLocation(room, session.user?.id, previousLocation);
   room.broadcast({
     type: "stream.stopped",

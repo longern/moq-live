@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { LoadingSpinner } from "../primitives/LoadingSpinner.jsx";
 import { applyCameraZoom, getPreviewVideoTrack, normalizeCameraZoom, readCameraZoom } from "../../lib/cameraZoom.js";
+import { STREAM_PROTOCOL_WEBRTC } from "../../lib/streamProtocol.js";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 function getTouchDistance(touches) {
   if (touches.length < 2) {
@@ -19,8 +21,14 @@ export function LivePreviewStage({
   previewPending = false,
   mediaMode = "video",
   cameraEnabled = true,
-  mirrorPreview = false
+  mirrorPreview = false,
+  cohostActive = null,
+  cohostPlayerSession = null,
+  cohostPlayerMuted = true,
+  cohostPlayerRef,
+  cohostPlayerStatus = "",
 }) {
+  const { t } = useI18n();
   const hostRef = useRef(null);
   const pinchRef = useRef(null);
   const applyFrameRef = useRef(0);
@@ -30,10 +38,14 @@ export function LivePreviewStage({
   const showPending = mediaMode === "video" && previewPending && !previewHasVideo;
   const showCameraOffBlackout = mediaMode === "video" && !cameraEnabled;
   const placeholderText = !previewActive
-    ? (mediaMode === "voice" ? "语音直播" : "打开摄像头预览")
+    ? (mediaMode === "voice" ? t("live.voiceLive") : t("live.openCameraPreview"))
     : mediaMode === "voice"
-      ? "语音直播"
-      : "未检测到摄像头";
+      ? t("live.voiceLive")
+      : t("live.noCameraDetected");
+  const cohostPeerLabel =
+    cohostActive?.peer?.displayName
+    || cohostActive?.peer?.handle
+    || t("common.user");
 
   useEffect(() => {
     const host = hostRef.current;
@@ -169,10 +181,42 @@ export function LivePreviewStage({
       {!previewActive || !previewHasVideo ? (
         <div className="publisher-placeholder">
           {showCameraOffBlackout ? null : showPending ? (
-            <LoadingSpinner className="publisher-preview-spinner" label="正在打开摄像头" />
+            <LoadingSpinner className="publisher-preview-spinner" label={t("live.openingCamera")} />
           ) : (
             <p>{placeholderText}</p>
           )}
+        </div>
+      ) : null}
+      {cohostActive ? (
+        <div className="publisher-cohost-preview">
+          <div className="publisher-cohost-media">
+            {cohostPlayerSession ? (
+              cohostPlayerSession.protocol === STREAM_PROTOCOL_WEBRTC ? (
+                <video
+                  ref={cohostPlayerRef}
+                  className="publisher-cohost-video"
+                  autoPlay
+                  playsInline
+                  muted={cohostPlayerMuted}
+                  aria-label={`${cohostPeerLabel} ${t("live.cohostVideo")}`}
+                />
+              ) : (
+                <canvas
+                  ref={cohostPlayerRef}
+                  className="publisher-cohost-video"
+                  width="1280"
+                  height="720"
+                  aria-label={`${cohostPeerLabel} ${t("live.cohostVideo")}`}
+                />
+              )
+            ) : (
+              <div className="publisher-cohost-placeholder">
+                <LoadingSpinner className="publisher-preview-spinner" />
+                <span>{cohostPlayerStatus || t("live.cohostLoading")}</span>
+              </div>
+            )}
+            <span className="publisher-cohost-label">{cohostPeerLabel}</span>
+          </div>
         </div>
       ) : null}
     </div>

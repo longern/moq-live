@@ -15,7 +15,6 @@
     padding: 0 0 env(safe-area-inset-bottom);
     border-top: 1px solid var(--line);
     background: rgba(7, 14, 22, 0.96);
-    backdrop-filter: blur(22px);
   }
 
   .mobile-nav .nav-button {

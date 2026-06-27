@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { STREAM_PROTOCOL_MOQ, STREAM_PROTOCOL_WEBRTC } from "../../lib/streamProtocol.js";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
 import { MenuChevronIcon } from "./liveIcons.jsx";
 
@@ -20,6 +21,7 @@ export function LiveQualityMenu({
   onWebRtcPlaybackUrlChange,
   onAfterSelect,
 }) {
+  const { t } = useI18n();
   const [protocolEditorOpen, setProtocolEditorOpen] = useState(false);
   const showMoqRelayUrl = publishProtocol === STREAM_PROTOCOL_MOQ;
   const showWebRtcUrls = publishProtocol === STREAM_PROTOCOL_WEBRTC;
@@ -38,11 +40,11 @@ export function LiveQualityMenu({
       <div className="live-quality-menu-track">
         <div className="live-quality-menu-screen">
           <div className="live-quality-panel-head">
-            <span className="live-quality-panel-title">推流设置</span>
+            <span className="live-quality-panel-title">{t("live.publishSettings")}</span>
           </div>
           <div className="live-quality-section">
-            <div className="live-quality-section-title">画质</div>
-            <LiveMenuList className="live-quality-list" ariaLabel="直播画质">
+            <div className="live-quality-section-title">{t("live.streamQuality")}</div>
+            <LiveMenuList className="live-quality-list" ariaLabel={t("live.streamQualityAria")}>
               {publishQualityOptions.map((option) => (
                 <LiveMenuItem
                   key={option.id}
@@ -63,14 +65,14 @@ export function LiveQualityMenu({
             </LiveMenuList>
           </div>
           <div className="live-quality-section">
-            <div className="live-quality-section-title">推流协议</div>
+            <div className="live-quality-section-title">{t("live.streamProtocol")}</div>
             <LiveMenuList className="live-quality-list">
               <LiveMenuItem
                 className="live-quality-protocol-entry"
                 onClick={() => setProtocolEditorOpen(true)}
-                aria-label="推流协议"
+                aria-label={t("live.streamProtocol")}
               >
-                <span className="live-quality-option-label">推流协议</span>
+                <span className="live-quality-option-label">{t("live.streamProtocol")}</span>
                 <MenuChevronIcon />
               </LiveMenuItem>
             </LiveMenuList>
@@ -83,13 +85,13 @@ export function LiveQualityMenu({
               type="button"
               className="live-more-editor-back"
               onClick={() => setProtocolEditorOpen(false)}
-              aria-label="返回推流设置"
+              aria-label={t("live.backToPublishSettings")}
             >
               <MenuChevronIcon />
             </button>
-            <strong>推流协议</strong>
+            <strong>{t("live.streamProtocol")}</strong>
           </div>
-          <LiveMenuList className="live-quality-list" ariaLabel="推流协议">
+          <LiveMenuList className="live-quality-list" ariaLabel={t("live.streamProtocol")}>
             {publishProtocolOptions.map((option) => (
               <LiveMenuItem
                 key={option.id}
@@ -110,7 +112,7 @@ export function LiveQualityMenu({
           {showMoqRelayUrl ? (
             <div className="live-quality-url-fields">
               <label className="live-more-title-field live-quality-url-field">
-                <span>中继端点</span>
+                <span>{t("live.relayEndpoint")}</span>
                 <input
                   type="url"
                   value={relayUrl}

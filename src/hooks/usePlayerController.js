@@ -116,6 +116,7 @@ export function usePlayerController({
     stopPlayer,
     togglePlayerPlayback,
     togglePlayerMute,
+    setPlayerMute: session.setPlayerMute,
     dismissTapToUnmute,
     fullscreenPlayer: session.fullscreenPlayer,
   };

@@ -1,4 +1,5 @@
 export * from "./account.js";
+export * from "./admin.js";
 export * from "./rooms.js";
 export * from "./cohost.js";
 export * from "./realtime-webrtc.js";

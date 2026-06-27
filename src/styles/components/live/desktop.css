@@ -80,8 +80,14 @@
 }
 
 .live-desktop-page .live-stage-frame {
+  position: relative;
   height: 100%;
   min-height: 0;
+}
+
+.live-desktop-page .live-audience-call-overlay {
+  right: 18px;
+  bottom: 18px;
 }
 
 .live-desktop-page .live-chat-column {
@@ -447,7 +453,6 @@
       transparent 34%
     );
   box-shadow: 0 22px 56px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(18px);
   pointer-events: auto;
 }
 
@@ -831,8 +836,12 @@
 }
 
 .live-more-menu-shell {
-  overflow: hidden;
   width: 100%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .live-more-menu-track {
@@ -851,18 +860,52 @@
   min-width: 0;
 }
 
+.live-desktop-panel.live-more-menu-panel,
+.swipeable-drawer-panel.live-more-menu-panel {
+  --live-more-panel-bg: #081019;
+  --live-more-panel-gutter: 16px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.live-more-menu-panel > .swipeable-drawer-panel-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.live-more-menu-panel .live-more-menu-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.live-more-menu-panel .live-more-menu-screen {
+  padding: 0 0 18px;
+}
+
 .live-more-editor-screen {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-left: 1px;
 }
 
 .live-more-menu-title {
-  margin: 0 0 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 6px var(--live-more-panel-gutter, 16px) 12px;
+  background: var(--live-more-panel-bg, #081019);
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.35;
+}
+
+.live-more-menu-panel .live-more-menu-list,
+.live-more-menu-panel .live-more-cover-form,
+.live-more-menu-panel .live-more-title-form,
+.live-more-menu-panel .live-more-management {
+  margin-inline: var(--live-more-panel-gutter, 16px);
 }
 
 .live-more-menu-item {
@@ -910,10 +953,16 @@
 }
 
 .live-more-editor-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   min-height: 36px;
+  margin: 0;
+  padding: 6px var(--live-more-panel-gutter, 16px);
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr) 36px;
   align-items: center;
+  background: var(--live-more-panel-bg, #081019);
 }
 
 .live-more-editor-head strong {
@@ -1190,7 +1239,6 @@
   border-radius: 20px;
   background: rgba(4, 11, 17, 0.74);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(16px);
   pointer-events: auto;
 }
 

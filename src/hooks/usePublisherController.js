@@ -21,7 +21,7 @@ const VIDEO_TARGET_BITRATE = 3_000_000;
 const PUBLISH_QUALITY_OPTIONS = [
   {
     id: "smooth",
-    label: "流畅",
+    labelKey: "live.qualitySmooth",
     detail: "360p · 1.0 Mbps",
     width: 640,
     height: 360,
@@ -30,7 +30,7 @@ const PUBLISH_QUALITY_OPTIONS = [
   },
   {
     id: "hd",
-    label: "高清",
+    labelKey: "live.qualityHd",
     detail: "720p · 3.0 Mbps",
     width: VIDEO_TARGET_WIDTH,
     height: VIDEO_TARGET_HEIGHT,
@@ -39,7 +39,7 @@ const PUBLISH_QUALITY_OPTIONS = [
   },
   {
     id: "fullhd",
-    label: "超清",
+    labelKey: "live.qualityFullHd",
     detail: "1080p · 6.0 Mbps",
     width: 1920,
     height: 1080,
@@ -53,6 +53,9 @@ const PREVIEW_SOURCE_SCREEN = "screen";
 const DEFAULT_PREVIEW_SOURCE = PREVIEW_SOURCE_CAMERA;
 const PUBLISH_CONNECT_TIMEOUT_MS = 10_000;
 const MICROPHONE_PUBLISH_GAIN = 1.6;
+const AUDIENCE_CALL_SPEAKING_CHECK_INTERVAL_MS = 90;
+const AUDIENCE_CALL_SPEAKING_ON_THRESHOLD = 0.035;
+const AUDIENCE_CALL_SPEAKING_OFF_THRESHOLD = 0.02;
 const MUSIC_AUDIO_TRACKS = new WeakSet();
 const MICROPHONE_AUDIO_TRACKS = new WeakSet();
 const BLACK_VIDEO_TRACKS = new WeakSet();
@@ -261,6 +264,8 @@ export function usePublisherController({
   const [previewSourceType, setPreviewSourceType] = useState(
     DEFAULT_PREVIEW_SOURCE,
   );
+  const [audienceCallSpeakingUserIds, setAudienceCallSpeakingUserIds] =
+    useState([]);
   const [screenShareSupported] = useState(() =>
     Boolean(navigator.mediaDevices?.getDisplayMedia),
   );
@@ -291,7 +296,15 @@ export function usePublisherController({
   const cameraBlackoutActiveRef = useRef(false);
   const lastCameraVideoSizeRef = useRef(null);
   const audienceCallRemoteStreamsRef = useRef(new Map());
+  const audienceCallRemoteMutedRef = useRef(new Set());
+  const audienceCallSpeakingUserIdsRef = useRef(new Set());
   const publishAudioMixerRef = useRef(null);
+  const audienceCallHostSourceAudioTrackRef = useRef(null);
+  const audienceCallHostAudioRef = useRef({
+    track: null,
+    sourceTrack: null,
+    followsMicrophone: false,
+  });
 
   publisherIsPublishingRef.current = publisherIsPublishing;
   publisherIsStartingRef.current = publisherIsStarting;
@@ -308,6 +321,35 @@ export function usePublisherController({
   function updatePublishStatus(kind, message) {
     setPublishStatusKind(kind);
     setPublishStatus(message);
+  }
+
+  function setAudienceCallUserSpeaking(remoteId, speaking) {
+    const normalizedRemoteId = String(remoteId || "").trim();
+    if (!normalizedRemoteId) {
+      return;
+    }
+
+    const current = audienceCallSpeakingUserIdsRef.current;
+    if (speaking === current.has(normalizedRemoteId)) {
+      return;
+    }
+
+    const next = new Set(current);
+    if (speaking) {
+      next.add(normalizedRemoteId);
+    } else {
+      next.delete(normalizedRemoteId);
+    }
+    audienceCallSpeakingUserIdsRef.current = next;
+    setAudienceCallSpeakingUserIds(Array.from(next));
+  }
+
+  function clearAudienceCallSpeakingUsers() {
+    if (!audienceCallSpeakingUserIdsRef.current.size) {
+      return;
+    }
+    audienceCallSpeakingUserIdsRef.current = new Set();
+    setAudienceCallSpeakingUserIds([]);
   }
 
   function applyPublishQualityToSession(
@@ -788,6 +830,7 @@ export function usePublisherController({
     let keepaliveOscillator = null;
     let keepaliveGain = null;
     let destination = null;
+    let audienceCallSpeakingCheckTimer = null;
     const audienceCallNodes = new Map();
 
     try {
@@ -839,10 +882,38 @@ export function usePublisherController({
         try {
           existing.sourceNode?.disconnect?.();
           existing.gainNode?.disconnect?.();
+          existing.analyserNode?.disconnect?.();
         } catch {
           // Ignore stale remote audio node disconnect failures.
         }
         audienceCallNodes.delete(remoteId);
+        setAudienceCallUserSpeaking(remoteId, false);
+      };
+      const getAudienceCallRemoteSpeaking = (entry) => {
+        if (!entry?.analyserNode || !entry.sampleBuffer) {
+          return false;
+        }
+        entry.analyserNode.getByteTimeDomainData(entry.sampleBuffer);
+        let sumSquares = 0;
+        for (let index = 0; index < entry.sampleBuffer.length; index += 1) {
+          const centeredSample = (entry.sampleBuffer[index] - 128) / 128;
+          sumSquares += centeredSample * centeredSample;
+        }
+        const rms = Math.sqrt(sumSquares / entry.sampleBuffer.length);
+        return entry.speaking
+          ? rms >= AUDIENCE_CALL_SPEAKING_OFF_THRESHOLD
+          : rms >= AUDIENCE_CALL_SPEAKING_ON_THRESHOLD;
+      };
+      const checkAudienceCallRemoteSpeaking = () => {
+        for (const [remoteId, entry] of audienceCallNodes) {
+          const speaking = audienceCallRemoteMutedRef.current.has(remoteId)
+            ? false
+            : getAudienceCallRemoteSpeaking(entry);
+          if (speaking !== entry.speaking) {
+            entry.speaking = speaking;
+            setAudienceCallUserSpeaking(remoteId, speaking);
+          }
+        }
       };
       const setAudienceCallRemoteStream = (remoteId, remoteStream) => {
         removeAudienceCallRemoteStream(remoteId);
@@ -854,11 +925,32 @@ export function usePublisherController({
         const sourceNode = audioContext.createMediaStreamSource(
           new MediaStream(remoteAudioTracks),
         );
+        const analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 256;
+        analyserNode.smoothingTimeConstant = 0.35;
+        const sampleBuffer = new Uint8Array(analyserNode.fftSize);
         const gainNode = audioContext.createGain();
-        gainNode.gain.value = 1;
+        gainNode.gain.value = audienceCallRemoteMutedRef.current.has(remoteId) ? 0 : 1;
+        sourceNode.connect(analyserNode);
         sourceNode.connect(gainNode);
         gainNode.connect(destination);
-        audienceCallNodes.set(remoteId, { sourceNode, gainNode });
+        audienceCallNodes.set(remoteId, {
+          sourceNode,
+          analyserNode,
+          sampleBuffer,
+          gainNode,
+          speaking: false,
+        });
+      };
+      const setAudienceCallRemoteMuted = (remoteId, muted) => {
+        const existing = audienceCallNodes.get(remoteId);
+        if (existing?.gainNode) {
+          existing.gainNode.gain.value = muted ? 0 : 1;
+        }
+        if (muted && existing?.speaking) {
+          existing.speaking = false;
+          setAudienceCallUserSpeaking(remoteId, false);
+        }
       };
       const setMicrophoneInputEnabled = (enabled) => {
         if (microphoneGain) {
@@ -872,16 +964,25 @@ export function usePublisherController({
       for (const [remoteId, remoteStream] of audienceCallRemoteStreamsRef.current) {
         setAudienceCallRemoteStream(remoteId, remoteStream);
       }
+      audienceCallSpeakingCheckTimer = window.setInterval(
+        checkAudienceCallRemoteSpeaking,
+        AUDIENCE_CALL_SPEAKING_CHECK_INTERVAL_MS,
+      );
 
       return {
         track: mixedTrack,
         setAudienceCallRemoteStream,
+        setAudienceCallRemoteMuted,
         setMicrophoneInputEnabled,
         cleanup: () => {
           try {
             keepaliveOscillator?.stop?.();
           } catch {
             // Ignore oscillator cleanup after it has already stopped.
+          }
+          if (audienceCallSpeakingCheckTimer) {
+            window.clearInterval(audienceCallSpeakingCheckTimer);
+            audienceCallSpeakingCheckTimer = null;
           }
           try {
             sourceNode?.disconnect?.();
@@ -898,6 +999,7 @@ export function usePublisherController({
           } catch {
             // Ignore stale track cleanup failures.
           }
+          clearAudienceCallSpeakingUsers();
           void audioContext?.close?.().catch(() => {});
         },
       };
@@ -915,6 +1017,7 @@ export function usePublisherController({
       } catch {
         // Ignore audio context cleanup failures.
       }
+      clearAudienceCallSpeakingUsers();
       return { track: fallbackTrack, cleanup: null };
     }
   }
@@ -1097,10 +1200,27 @@ export function usePublisherController({
     }
 
     publishAudioMixerRef.current?.setMicrophoneInputEnabled?.(nextEnabled);
+    setAudienceCallHostMicrophoneEnabled(nextEnabled);
     const hasAudienceCallAudio = Boolean(
       getAudienceCallRemoteAudioCount() > 0,
     );
     setPublishTrackEnabled("audio", nextEnabled || hasAudienceCallAudio);
+  }
+
+  function clearAudienceCallHostAudioTrack() {
+    audienceCallHostAudioRef.current = {
+      track: null,
+      sourceTrack: null,
+      followsMicrophone: false,
+    };
+  }
+
+  function setAudienceCallHostMicrophoneEnabled(enabled) {
+    const hostAudio = audienceCallHostAudioRef.current;
+    if (!hostAudio.followsMicrophone || hostAudio.track?.readyState !== "live") {
+      return;
+    }
+    hostAudio.track.enabled = Boolean(enabled);
   }
 
   function getAudienceCallRemoteAudioCount() {
@@ -1127,10 +1247,55 @@ export function usePublisherController({
       publishAudioMixerRef.current?.setAudienceCallRemoteStream?.(remoteId, remoteStream);
     } else {
       audienceCallRemoteStreamsRef.current.delete(remoteId);
+      audienceCallRemoteMutedRef.current.delete(remoteId);
+      setAudienceCallUserSpeaking(remoteId, false);
       publishAudioMixerRef.current?.setAudienceCallRemoteStream?.(remoteId, null);
     }
     const hasAudienceCallAudio = getAudienceCallRemoteAudioCount() > 0;
     setPublishTrackEnabled("audio", microphoneEnabledRef.current || hasAudienceCallAudio);
+  }
+
+  function setAudienceCallRemoteMuted(remoteId, muted) {
+    const normalizedRemoteId = String(remoteId || "").trim();
+    if (!normalizedRemoteId) {
+      return;
+    }
+    if (muted) {
+      audienceCallRemoteMutedRef.current.add(normalizedRemoteId);
+    } else {
+      audienceCallRemoteMutedRef.current.delete(normalizedRemoteId);
+    }
+    publishAudioMixerRef.current?.setAudienceCallRemoteMuted?.(normalizedRemoteId, Boolean(muted));
+  }
+
+  async function createAudienceCallHostAudioTrack() {
+    const sourceTrack = audienceCallHostSourceAudioTrackRef.current;
+    if (sourceTrack?.readyState === "live") {
+      const clonedTrack = sourceTrack.clone?.() ?? sourceTrack;
+      const followsMicrophone = isMicrophoneAudioTrack(sourceTrack);
+      if (isMicrophoneAudioTrack(sourceTrack)) {
+        markMicrophoneAudioTrack(clonedTrack);
+      } else if (isMusicAudioTrack(sourceTrack)) {
+        markMusicAudioTrack(clonedTrack);
+      }
+      clonedTrack.enabled = followsMicrophone
+        ? microphoneEnabledRef.current && sourceTrack.enabled
+        : sourceTrack.enabled;
+      audienceCallHostAudioRef.current = {
+        track: clonedTrack,
+        sourceTrack,
+        followsMicrophone,
+      };
+      return clonedTrack;
+    }
+
+    const microphoneTrack = await requestPreferredMicrophoneTrack();
+    audienceCallHostAudioRef.current = {
+      track: microphoneTrack,
+      sourceTrack: microphoneTrack,
+      followsMicrophone: Boolean(microphoneTrack),
+    };
+    return microphoneTrack;
   }
 
   async function refreshMediaDevices(preferredStream = null) {
@@ -1681,6 +1846,7 @@ export function usePublisherController({
       const publishVideoTrack = canPublishVideo
         ? (previewVideoTrack?.clone?.() ?? null)
         : null;
+      audienceCallHostSourceAudioTrackRef.current = previewAudioTrack || null;
       stableAudio = await createStableAudioPublishTrack(previewAudioTrack);
       publishAudioMixerRef.current = stableAudio;
       const publishAudioTrack = stableAudio.track;
@@ -1703,6 +1869,8 @@ export function usePublisherController({
         publishVideoTrack?.stop?.();
         publishAudioTrack?.stop?.();
         stableAudio.cleanup?.();
+        audienceCallHostSourceAudioTrackRef.current = null;
+        clearAudienceCallHostAudioTrack();
         updatePublishStatus("idle", "直播启动已取消。");
         return;
       }
@@ -1769,6 +1937,8 @@ export function usePublisherController({
       }
       pendingPublisherRef.current = session;
       session.cleanupPublishTracks = () => {
+        audienceCallHostSourceAudioTrackRef.current = null;
+        clearAudienceCallHostAudioTrack();
         session.publishTracks.forEach((track) => {
           try {
             track.stop();
@@ -1808,6 +1978,8 @@ export function usePublisherController({
         stableAudio.cleanup?.();
       }
       publishAudioMixerRef.current = null;
+      audienceCallHostSourceAudioTrackRef.current = null;
+      clearAudienceCallHostAudioTrack();
       if (publishStartTokenRef.current !== startToken) {
         updatePublishStatus("idle", "直播启动已取消。");
         return;
@@ -2009,6 +2181,7 @@ export function usePublisherController({
     previewHasVideo,
     previewPending,
     previewSourceType,
+    audienceCallSpeakingUserIds,
     screenShareSupported,
     screenShareActive:
       previewSourceType === PREVIEW_SOURCE_SCREEN && previewActive,
@@ -2022,6 +2195,8 @@ export function usePublisherController({
     setCameraEnabled,
     setMicrophoneEnabled,
     setAudienceCallRemoteStream,
+    setAudienceCallRemoteMuted,
+    createAudienceCallHostAudioTrack,
     switchPublishCamera,
     startCameraPublish,
     stopCameraPublish,

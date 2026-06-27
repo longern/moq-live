@@ -16,7 +16,7 @@ import { usePushPermissionPromptController } from "./hooks/usePushPermissionProm
 import { useRegistrationDisplayNamePrompt } from "./hooks/useRegistrationDisplayNamePrompt.js";
 import { useChatController } from "./hooks/useChatController.js";
 import { useLiveRoomActivation } from "./hooks/useLiveRoomActivation.js";
-import { useCompactViewport, usePortraitViewport } from "./hooks/useMediaQuery.js";
+import { useCompactViewport, useMediaQuery, usePortraitViewport } from "./hooks/useMediaQuery.js";
 import { usePlayerController } from "./hooks/usePlayerController.js";
 import { useRouteController } from "./hooks/useRouteController.js";
 import { buildWatchLink, getInitialWatchRouteRoom, getRelayHostValue, writeRoute } from "./lib/routeState.js";
@@ -125,6 +125,7 @@ export function App() {
 
   const compactViewport = useCompactViewport();
   const portraitViewport = usePortraitViewport();
+  const shortLandscapeViewport = useMediaQuery("(max-width: 980px) and (orientation: landscape) and (max-height: 520px)");
   const liveRouteShellMode = compactViewport || portraitViewport ? "mobile" : "desktop";
 
   useEffect(() => {
@@ -476,14 +477,29 @@ export function App() {
   const effectivePlayerSession = testPlayerSession ?? player.playerSession;
   const effectivePlayerStarted = watchingTestChannel ? true : player.playerStarted;
   const effectivePlayerFreezeFrameUrl = watchingTestChannel ? "" : player.playerFreezeFrameUrl;
+  const watchRoomOffair = Boolean(
+    !watchingTestChannel &&
+    !watchingNamespace &&
+    watchJoined &&
+    resolvedWatchRoomId &&
+    chat.roomStateReady &&
+    !chat.streamState.isLive &&
+    !effectivePlayerSession
+  );
   const effectivePlayerOrientation = watchTestChannel?.orientation ?? player.playerOrientation;
-  const effectivePlayerStatusKind = watchingTestChannel ? "live" : player.playerStatusKind;
-  const effectivePlayerStatus = watchTestChannel?.statusMessage ?? player.playerStatus;
+  const effectivePlayerStatusKind = watchingTestChannel
+    ? "live"
+    : watchRoomOffair
+      ? (watchStreamEnded ? "ended" : "offair")
+      : player.playerStatusKind;
+  const effectivePlayerStatus = watchTestChannel?.statusMessage
+    ?? (watchRoomOffair ? "" : player.playerStatus);
   const playerBadge = describePlayerState(effectivePlayerStatusKind, t);
   const buildLabel = `Build ${__BUILD_HASH__}`;
   const watchPlayerShellActive = shouldUseWatchPlayerShell({
     page,
     watchJoined,
+    optimisticShellActive: shortLandscapeViewport,
     playerSession: effectivePlayerSession,
     playerStatusKind: effectivePlayerStatusKind,
     playerOrientation: effectivePlayerOrientation,

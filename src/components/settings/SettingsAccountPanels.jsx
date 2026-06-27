@@ -6,6 +6,7 @@ import { ProfileBio } from "../ProfileInfoSummary.jsx";
 import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
+import { formatAudienceCount } from "../../lib/audience.js";
 
 function ChevronIcon() {
   return <ChevronRight />;
@@ -477,6 +478,10 @@ export function DesktopAccountDetailsContent({
   handleIsDefault,
   handleSaving,
   handleStatus,
+  followerCount = 0,
+  followingCount = 0,
+  onOpenFollowers,
+  onOpenFollowing,
   onOpenAvatarPicker,
   onSelectAvatar,
   setBirthDateError,
@@ -597,43 +602,65 @@ export function DesktopAccountDetailsContent({
   return (
     <div className="my-account-form is-desktop-form">
       {!profileEditing ? (
-        <div className="desktop-account-profile-row">
-          <input
-            ref={avatarInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/avif"
-            className="account-avatar-input"
-            onChange={onSelectAvatar}
-          />
-          <button
-            type="button"
-            className="desktop-account-avatar-button"
-            aria-label={t("accountPanel.uploadAvatar")}
-            disabled={avatarSaving}
-            onClick={() => {
-              if (!avatarSaving) {
-                onOpenAvatarPicker();
-              }
-            }}
-          >
-            <SettingsProfileAvatar authUser={authUser} imgWidth={96} imgHeight={96} />
-            <span className="desktop-account-avatar-overlay" aria-hidden="true">
-              <EditIcon />
-            </span>
-          </button>
-          <span className="desktop-account-profile-copy">
-            <strong>{authUser.displayName || t("common.notSet")}</strong>
-          </span>
-          <span className="desktop-account-edit-profile-container">
+        <>
+          <div className="desktop-account-profile-row">
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              className="account-avatar-input"
+              onChange={onSelectAvatar}
+            />
             <button
               type="button"
-              className="desktop-account-edit-profile-button"
-              onClick={startProfileEditing}
+              className="desktop-account-avatar-button"
+              aria-label={t("accountPanel.uploadAvatar")}
+              disabled={avatarSaving}
+              onClick={() => {
+                if (!avatarSaving) {
+                  onOpenAvatarPicker();
+                }
+              }}
             >
-              {t("accountPanel.editProfile")}
+              <SettingsProfileAvatar authUser={authUser} imgWidth={96} imgHeight={96} />
+              <span className="desktop-account-avatar-overlay" aria-hidden="true">
+                <EditIcon />
+              </span>
             </button>
-          </span>
-        </div>
+            <span className="desktop-account-profile-copy">
+              <strong>{authUser.displayName || t("common.notSet")}</strong>
+            </span>
+            <span className="desktop-account-edit-profile-container">
+              <button
+                type="button"
+                className="desktop-account-edit-profile-button"
+                onClick={startProfileEditing}
+              >
+                {t("accountPanel.editProfile")}
+              </button>
+            </span>
+          </div>
+          <div className="desktop-account-profile-stats" aria-label={t("profile.statsAria")}>
+            <button
+              type="button"
+              className="desktop-account-profile-stat-button"
+              onClick={onOpenFollowing}
+              aria-label={t("profile.followingListAria", { count: formatAudienceCount(followingCount) })}
+            >
+              <strong>{formatAudienceCount(followingCount)}</strong>
+              <span>{t("profile.following")}</span>
+            </button>
+            <button
+              type="button"
+              className="desktop-account-profile-stat-button"
+              onClick={onOpenFollowers}
+              aria-label={t("profile.followersListAria", { count: formatAudienceCount(followerCount) })}
+            >
+              <strong>{formatAudienceCount(followerCount)}</strong>
+              <span>{t("profile.followers")}</span>
+            </button>
+          </div>
+        </>
       ) : null}
 
       <div className="account-panel-list">

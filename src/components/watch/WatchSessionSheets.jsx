@@ -1,4 +1,4 @@
-import { Camera, Copy, PhoneCall, PhoneOff, PictureInPicture2, QrCode, Share } from "lucide-react";
+import { Camera, Copy, Maximize, Minimize, PhoneCall, PhoneOff, PictureInPicture2, QrCode, Share } from "lucide-react";
 import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
 import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { ProfileBio, ProfileInfoChips } from "../ProfileInfoSummary.jsx";
@@ -39,15 +39,20 @@ export function WatchMobileMoreSheet({
   videoPipSupported,
   playerSession,
   pictureInPictureActive,
+  fullscreenActive = false,
+  showFullscreenAction = false,
   audienceCallEnabled = false,
   audienceCallConnected = false,
+  audienceCallRequestPending = false,
   onShareWatchLink,
   onOpenImageShareModal,
   onOpenScreenshotShareModal,
   onCopyWatchLink,
   onAudienceCallRequest,
+  onAudienceCallRequestCancel,
   onAudienceCallDisconnect,
   onOpenPictureInPicture,
+  onFullscreen,
   portalTarget = null,
   presentation = "drawer",
 }) {
@@ -139,20 +144,30 @@ export function WatchMobileMoreSheet({
         <button
           type="button"
           className="watch-mobile-more-action"
-          onClick={audienceCallConnected ? onAudienceCallDisconnect : onAudienceCallRequest}
+          onClick={audienceCallConnected
+            ? onAudienceCallDisconnect
+            : audienceCallRequestPending
+              ? onAudienceCallRequestCancel
+              : onAudienceCallRequest}
           disabled={!audienceCallEnabled}
           aria-label={audienceCallConnected
             ? t("watchSheet.audienceCallDisconnect")
-            : t("watchSheet.audienceCall")}
+            : audienceCallRequestPending
+              ? t("watchSheet.audienceCallCancelRequest")
+              : t("watchSheet.audienceCall")}
         >
           <span className="watch-mobile-more-action-icon">
             {audienceCallConnected
               ? <PhoneOff aria-hidden="true" />
-              : <PhoneCall aria-hidden="true" />}
+              : audienceCallRequestPending
+                ? <PhoneOff aria-hidden="true" />
+                : <PhoneCall aria-hidden="true" />}
           </span>
           <span>{audienceCallConnected
             ? t("watchSheet.audienceCallDisconnect")
-            : t("watchSheet.audienceCall")}</span>
+            : audienceCallRequestPending
+              ? t("watchSheet.audienceCallCancelRequest")
+              : t("watchSheet.audienceCall")}</span>
         </button>
         <button
           type="button"
@@ -166,6 +181,23 @@ export function WatchMobileMoreSheet({
           </span>
           <span>{pictureInPictureActive ? t("watchSheet.pipCloseShort") : t("watchSheet.pipOpenShort")}</span>
         </button>
+        {showFullscreenAction ? (
+          <button
+            type="button"
+            className="watch-mobile-more-action"
+            onClick={() => {
+              onFullscreen?.();
+              onClose?.();
+            }}
+            disabled={!playerSession}
+            aria-label={fullscreenActive ? t("watchSheet.fullscreenExit") : t("watchSheet.fullscreenEnter")}
+          >
+            <span className="watch-mobile-more-action-icon">
+              {fullscreenActive ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}
+            </span>
+            <span>{fullscreenActive ? t("watchSheet.fullscreenExitShort") : t("watchSheet.fullscreenEnterShort")}</span>
+          </button>
+        ) : null}
       </div>
     </SwipeableDrawer>
   );

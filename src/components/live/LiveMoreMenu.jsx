@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getAppErrorMessage } from "../../lib/appErrors.js";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
 import { LiveSwitch } from "./LiveSwitch.jsx";
 import {
@@ -66,10 +67,10 @@ function padDatePart(value) {
   return String(value).padStart(2, "0");
 }
 
-function formatMuteExpiresAt(value) {
+function formatMuteExpiresAt(value, t) {
   const timestamp = Date.parse(value);
   if (!Number.isFinite(timestamp)) {
-    return "未知";
+    return t("live.muteExpiresUnknown");
   }
   const date = new Date(timestamp);
   return [
@@ -85,8 +86,8 @@ function formatMuteExpiresAt(value) {
   ].join("");
 }
 
-function getMuteExpiresLabel(mute) {
-  return mute?.untilStreamEnds ? "本场直播结束" : formatMuteExpiresAt(mute?.expiresAt);
+function getMuteExpiresLabel(mute, t) {
+  return mute?.untilStreamEnds ? t("live.muteUntilStreamEnds") : formatMuteExpiresAt(mute?.expiresAt, t);
 }
 
 export function LiveMoreMenu({
@@ -120,6 +121,7 @@ export function LiveMoreMenu({
   onUnmuteUser,
   onClose,
 }) {
+  const { t } = useI18n();
   const [activeEditor, setActiveEditor] = useState("");
   const [titleDraft, setTitleDraft] = useState(roomTitle || "");
   const [titleSaving, setTitleSaving] = useState(false);
@@ -170,7 +172,7 @@ export function LiveMoreMenu({
       if (!result) {
         return;
       }
-      setTitleStatus("直播标题已保存");
+      setTitleStatus(t("live.titleSaved"));
     } catch (error) {
       setTitleError(getAppErrorMessage(error));
     } finally {
@@ -197,7 +199,7 @@ export function LiveMoreMenu({
       if (!result) {
         return;
       }
-      setWelcomeStatus("欢迎语已保存");
+      setWelcomeStatus(t("live.welcomeSaved"));
     } catch (error) {
       setWelcomeError(getAppErrorMessage(error));
     } finally {
@@ -206,12 +208,12 @@ export function LiveMoreMenu({
   }
 
   const editorTitle = activeEditor === "cover"
-    ? "直播封面"
+    ? t("live.cover")
     : activeEditor === "welcome"
-      ? "欢迎语"
+      ? t("live.welcomeMessage")
       : activeEditor === "management"
-        ? "房间管理"
-        : "直播标题";
+        ? t("live.roomManagement")
+        : t("live.title");
 
   function handleCommentSpeechToggle() {
     if (!commentSpeechSupported) {
@@ -244,60 +246,60 @@ export function LiveMoreMenu({
         accept="image/png,image/jpeg,image/webp,image/avif"
         onChange={onPickCover}
       />
-      <div className={`live-more-menu-shell${activeEditor ? " is-editing" : ""}`} aria-label="更多直播操作">
+      <div className={`live-more-menu-shell${activeEditor ? " is-editing" : ""}`} aria-label={t("live.moreActions")}>
         <div className="live-more-menu-track">
           <div className="live-more-menu-screen">
-            <div className="live-more-menu-title">直播设置</div>
+            <div className="live-more-menu-title">{t("live.liveSettings")}</div>
             <LiveMenuList className="live-more-menu-list">
               <LiveMoreMenuItem
                 icon={<CoverIcon />}
-                label="直播封面"
+                label={t("live.cover")}
                 onClick={() => setActiveEditor("cover")}
               />
               <LiveMoreMenuItem
                 icon={<TitleIcon />}
-                label="直播标题"
+                label={t("live.title")}
                 onClick={() => setActiveEditor("title")}
               />
               <LiveMoreMenuItem
                 icon={<ShareIcon />}
-                label="分享"
+                label={t("live.nativeShare")}
                 onClick={handleShare}
                 disabled={!shareSupported || !watchLink}
-                ariaLabel="分享直播间"
+                ariaLabel={t("live.shareRoom")}
               />
               <LiveMoreMenuItem
                 icon={<ChatIcon />}
-                label="欢迎语"
+                label={t("live.welcomeMessage")}
                 onClick={() => setActiveEditor("welcome")}
               />
               <LiveMoreMenuItem
                 icon={<AudienceIcon />}
-                label="房间管理"
+                label={t("live.roomManagement")}
                 onClick={() => setActiveEditor("management")}
               />
               <LiveMoreMenuSwitchItem
                 icon={<SpeakerIcon />}
-                label="朗读评论"
+                label={t("live.readComments")}
                 checked={commentSpeechEnabled}
                 onToggle={handleCommentSpeechToggle}
                 disabled={!commentSpeechSupported}
-                ariaLabel={commentSpeechSupported ? "朗读评论" : "当前浏览器不支持朗读评论"}
+                ariaLabel={commentSpeechSupported ? t("live.readComments") : t("live.readCommentsUnsupported")}
               />
               <LiveMoreMenuSwitchItem
                 icon={<NotificationIcon />}
-                label="开播通知"
+                label={t("live.liveNotifications")}
                 checked={liveNotificationEnabled}
                 onToggle={handleLiveNotificationToggle}
-                ariaLabel="开播通知"
+                ariaLabel={t("live.liveNotifications")}
               />
               <LiveMoreMenuSwitchItem
                 icon={<LocationIcon />}
-                label="位置信息"
+                label={t("live.locationInfo")}
                 checked={locationSharingEnabled}
                 onToggle={handleLocationSharingToggle}
                 disabled={!locationSharingSupported || locationSharingPending}
-                ariaLabel={locationSharingSupported ? "位置信息" : "当前浏览器不支持位置信息"}
+                ariaLabel={locationSharingSupported ? t("live.locationInfo") : t("live.locationInfoUnsupported")}
               />
             </LiveMenuList>
           </div>
@@ -308,7 +310,7 @@ export function LiveMoreMenu({
                 type="button"
                 className="live-more-editor-back"
                 onClick={() => setActiveEditor("")}
-                aria-label="返回更多菜单"
+                aria-label={t("live.backToMore")}
               >
                 <MenuChevronIcon />
               </button>
@@ -322,13 +324,13 @@ export function LiveMoreMenu({
                   className={`live-cover-preview${coverBusy ? " is-disabled" : ""}`}
                   onClick={coverBusy ? undefined : onOpenCoverPicker}
                   disabled={coverBusy}
-                  aria-label="上传直播封面"
+                  aria-label={t("live.uploadCover")}
                 >
                   {roomCoverUrl ? (
-                    <img src={roomCoverUrl} alt="直播封面预览" />
+                    <img src={roomCoverUrl} alt={t("live.coverPreviewAlt")} />
                   ) : (
                     <span className="live-cover-preview-placeholder">
-                      {roomCoverLoading ? "加载中" : "未设置封面"}
+                      {roomCoverLoading ? t("common.loading") : t("live.noCover")}
                     </span>
                   )}
                 </button>
@@ -338,23 +340,23 @@ export function LiveMoreMenu({
                   onClick={onOpenCoverPicker}
                   disabled={coverBusy}
                 >
-                  {roomCoverBusy ? "上传中" : "更换封面"}
+                  {roomCoverBusy ? t("live.uploading") : t("live.changeCover")}
                 </button>
-                <p className="live-cover-note">建议固定为 1280×720，支持 JPG、PNG、WebP、AVIF，文件不超过 5MB。</p>
+                <p className="live-cover-note">{t("live.coverNote")}</p>
                 {roomCoverError ? <p className="inline-warning">{roomCoverError}</p> : null}
                 {roomCoverStatus ? <p className="status">{roomCoverStatus}</p> : null}
               </div>
             ) : activeEditor === "management" ? (
               <div className="live-more-management">
                 <div className="live-more-management-section">
-                  <div className="live-more-management-title">禁言用户</div>
+                  <div className="live-more-management-title">{t("live.mutedUsers")}</div>
                   {visibleMutedUsers.length ? (
-                    <ul className="live-more-muted-list" aria-label="被禁言的用户">
+                    <ul className="live-more-muted-list" aria-label={t("live.mutedUsersAria")}>
                       {visibleMutedUsers.map((mute) => (
                         <li key={mute.userId} className="live-more-muted-row">
                           <span className="live-more-muted-copy">
-                            <strong>{mute.displayName || "用户"}</strong>
-                            <span>到期 {getMuteExpiresLabel(mute)}</span>
+                            <strong>{mute.displayName || t("common.user")}</strong>
+                            <span>{t("live.muteExpiresAt", { time: getMuteExpiresLabel(mute, t) })}</span>
                           </span>
                           <button
                             type="button"
@@ -362,20 +364,20 @@ export function LiveMoreMenu({
                             onClick={() => onUnmuteUser?.(mute.userId)}
                             disabled={!onUnmuteUser}
                           >
-                            解除
+                            {t("live.unmuteUser")}
                           </button>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="live-more-management-empty">暂无被禁言用户</p>
+                    <p className="live-more-management-empty">{t("live.noMutedUsers")}</p>
                   )}
                 </div>
               </div>
             ) : activeEditor === "welcome" ? (
               <form className="live-more-title-form" onSubmit={handleWelcomeSubmit}>
                 <label className="live-more-title-field">
-                  <span>欢迎语</span>
+                  <span>{t("live.welcomeMessage")}</span>
                   <textarea
                     value={welcomeDraft}
                     onChange={(event) => {
@@ -384,7 +386,7 @@ export function LiveMoreMenu({
                       setWelcomeStatus("");
                     }}
                     maxLength={160}
-                    placeholder="填写进入直播间时显示的欢迎语"
+                    placeholder={t("live.welcomePlaceholder")}
                     disabled={welcomeSaving}
                     rows={4}
                   />
@@ -395,7 +397,7 @@ export function LiveMoreMenu({
                   className="live-more-primary-action"
                   disabled={welcomeSaving || welcomeUnchanged}
                 >
-                  {welcomeSaving ? "保存中" : "保存欢迎语"}
+                  {welcomeSaving ? t("common.saving") : t("live.saveWelcomeMessage")}
                 </button>
                 {welcomeError ? <p className="inline-warning">{welcomeError}</p> : null}
                 {welcomeStatus ? <p className="status">{welcomeStatus}</p> : null}
@@ -403,7 +405,7 @@ export function LiveMoreMenu({
             ) : (
               <form className="live-more-title-form" onSubmit={handleTitleSubmit}>
                 <label className="live-more-title-field">
-                  <span>直播标题</span>
+                  <span>{t("live.title")}</span>
                   <input
                     value={titleDraft}
                     onChange={(event) => {
@@ -412,7 +414,7 @@ export function LiveMoreMenu({
                       setTitleStatus("");
                     }}
                     maxLength={80}
-                    placeholder="填写直播标题"
+                    placeholder={t("live.titlePlaceholder")}
                     disabled={titleSaving}
                   />
                 </label>
@@ -422,7 +424,7 @@ export function LiveMoreMenu({
                   className="live-more-primary-action"
                   disabled={titleSaving || titleUnchanged}
                 >
-                  {titleSaving ? "保存中" : "保存标题"}
+                  {titleSaving ? t("common.saving") : t("live.saveTitle")}
                 </button>
                 {titleError ? <p className="inline-warning">{titleError}</p> : null}
                 {titleStatus ? <p className="status">{titleStatus}</p> : null}

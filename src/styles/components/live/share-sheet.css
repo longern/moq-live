@@ -1,5 +1,5 @@
 @media (max-width: 980px) {
-  .live-mobile-share-panel {
+  .live-mobile-share-panel > .swipeable-drawer-panel-content {
     gap: 12px;
     padding: 16px;
   }

@@ -43,8 +43,8 @@ export function WatchMobileHud({
               displayName={hostChipLabel}
               className="watch-mobile-host-avatar"
               imgAlt={hostChipLabel || "主播头像"}
-              imgWidth={24}
-              imgHeight={24}
+              imgWidth={32}
+              imgHeight={32}
               monogramClassName="is-monogram"
               placeholderClassName="is-placeholder"
               iconClassName="watch-mobile-host-avatar-icon"

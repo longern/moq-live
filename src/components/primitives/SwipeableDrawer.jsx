@@ -211,7 +211,9 @@ export function SwipeableDrawer({
         >
           <span className="swipeable-drawer-indicator" />
         </div>
-        <div className={drawerPanelClassName}>{children}</div>
+        <div className={drawerPanelClassName}>
+          <div className="swipeable-drawer-panel-content">{children}</div>
+        </div>
       </div>
     </>
   );

@@ -275,6 +275,7 @@ export function WatchStage({
   authAvailable,
   authLoading,
   authUser,
+  audienceCallOverlay = null,
   chatDraft,
   chatError,
   chatConnectionState,
@@ -425,6 +426,7 @@ export function WatchStage({
             </button>
           ) : null}
           {immersiveShell ? mobileHudOverlay : null}
+          {audienceCallOverlay}
           {immersiveShell ? (
             <div
               className={`watch-portrait-chat-overlay${immersiveControlsHidden ? " is-hidden" : ""}`}

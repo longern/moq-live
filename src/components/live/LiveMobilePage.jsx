@@ -22,6 +22,7 @@ import {
   ShareIcon
 } from "./liveIcons.jsx";
 import { LiveMobileAudienceSheet } from "./LiveMobileAudienceSheet.jsx";
+import { LiveAudienceCallOverlay } from "./LiveAudienceCallOverlay.jsx";
 import { LiveMobileCohostPanel } from "./LiveMobileCohostPanel.jsx";
 import { LiveMobileMediaSettingsPanel } from "./LiveMobileMediaSettingsPanel.jsx";
 import { LiveMoreMenu } from "./LiveMoreMenu.jsx";
@@ -51,6 +52,7 @@ export function LiveMobilePage({
   const [qualityDrawerOpen, setQualityDrawerOpen] = useState(false);
   const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
   const [cohostDrawerOpen, setCohostDrawerOpen] = useState(false);
+  const [audienceCallPanelTab, setAudienceCallPanelTab] = useState("requests");
   const [cameraNoticeVisible, setCameraNoticeVisible] = useState(false);
   const [cameraNoticeMessage, setCameraNoticeMessage] = useState("");
   const [overlaysHidden, setOverlaysHidden] = useState(false);
@@ -114,13 +116,23 @@ export function LiveMobilePage({
     invitesAllowed: cohostInvitesAllowed = true,
     invite: cohostInvite = null,
     active: cohostActive = null,
+    playerSession: cohostPlayerSession = null,
+    playerMuted: cohostPlayerMuted = true,
+    playerRef: cohostPlayerRef,
+    playerStatus: cohostPlayerStatus = "",
     recentHosts: cohostRecentHosts = [],
   } = cohost;
   const {
     enabled: audienceCallEnabled = false,
     requests: audienceCallRequests = [],
+    invites: audienceCallInvites = [],
     active: audienceCallActive = [],
+    mutedUserIds: audienceCallMutedUserIds = [],
+    speakingUserIds: audienceCallSpeakingUserIds = [],
   } = audienceCall;
+  const audienceCallActiveCount = Array.isArray(audienceCallActive)
+    ? audienceCallActive.length
+    : 0;
   const {
     messages: chatMessages,
     draft: chatDraft,
@@ -169,6 +181,9 @@ export function LiveMobilePage({
     onCohostInviteRespond,
     onAudienceCallEnabledChange,
     onAudienceCallRequestRespond,
+    onAudienceCallInviteViewer,
+    onAudienceCallUserMuteChange,
+    onAudienceCallUserDisconnect,
     onRoomInfoBlocked,
     onPickCover,
     onOpenCoverPicker,
@@ -307,9 +322,9 @@ export function LiveMobilePage({
 
     try {
       await navigator.clipboard.writeText(normalizedHandle);
-      showLiveMobileNotice("UID 复制成功");
+      showLiveMobileNotice(t("live.copiedUid"));
     } catch {
-      showLiveMobileNotice("复制失败");
+      showLiveMobileNotice(t("live.copiedFailed"));
     }
   }
 
@@ -366,6 +381,20 @@ export function LiveMobilePage({
     setMoreOpen(false);
     setChatDrawerOpen(false);
     setAudienceOpen(false);
+    setShareOpen(false);
+    setQualityDrawerOpen(false);
+    setMediaSettingsOpen(false);
+    setHostProfileOpen(false);
+    setCohostDrawerOpen(true);
+  }
+
+  function openAudienceCallInviteSheet() {
+    if (!showCohostControl) {
+      return;
+    }
+    setAudienceCallPanelTab("invite");
+    setMoreOpen(false);
+    setChatDrawerOpen(false);
     setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
@@ -438,9 +467,9 @@ export function LiveMobilePage({
       avatarUrl={roomAvatarUrl}
       displayName={hostChipLabel}
       className="live-mobile-head-avatar"
-      imgAlt={hostChipLabel || "主播头像"}
-      imgWidth={24}
-      imgHeight={24}
+      imgAlt={hostChipLabel || t("live.hostAvatar")}
+      imgWidth={32}
+      imgHeight={32}
       monogramClassName="is-monogram"
       placeholderClassName="is-placeholder"
       iconClassName="live-mobile-head-avatar-icon"
@@ -463,7 +492,7 @@ export function LiveMobilePage({
               type="button"
               className={`live-page-close live-mobile-overlay-hideable${publishControlActive ? " is-live-control" : ""}`}
               onClick={publishControlActive ? onTogglePublish : onRequestClose}
-              aria-label={publishControlActive ? (isStarting ? "取消开播" : "结束直播") : "退出开播页"}
+              aria-label={publishControlActive ? (isStarting ? t("live.cancelStart") : t("live.endBroadcast")) : t("live.closeLivePage")}
             >
               {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
             </button>
@@ -472,7 +501,7 @@ export function LiveMobilePage({
                 type="button"
                 className="live-mobile-room-chip live-mobile-room-chip-head live-mobile-overlay-hideable"
                 onClick={openHostProfile}
-                aria-label="查看主播信息"
+                aria-label={t("live.viewHostInfo")}
               >
                 {hostAvatar}
                 <span className="live-mobile-room">{roomLabel}</span>
@@ -482,7 +511,7 @@ export function LiveMobilePage({
                 type="button"
                 className="live-mobile-host-avatar-button live-mobile-overlay-hideable"
                 onClick={openHostProfile}
-                aria-label="查看主播信息"
+                aria-label={t("live.viewHostInfo")}
               >
                 {hostAvatar}
               </button>
@@ -490,14 +519,14 @@ export function LiveMobilePage({
           </div>
           <div className="live-mobile-head-center live-mobile-overlay-hideable">
             {showModeSwitch ? (
-              <div className="live-mode-switch" role="group" aria-label="开播模式">
+              <div className="live-mode-switch" role="group" aria-label={t("live.modeSwitch")}>
                 <button
                   type="button"
                   className={mediaMode === "video" ? "is-active" : ""}
                   onClick={() => onSelectLiveMode?.("video")}
                   aria-pressed={mediaMode === "video"}
                 >
-                  视频
+                  {t("live.videoMode")}
                 </button>
                 <button
                   type="button"
@@ -505,7 +534,7 @@ export function LiveMobilePage({
                   onClick={() => onSelectLiveMode?.("voice")}
                   aria-pressed={mediaMode === "voice"}
                 >
-                  语音
+                  {t("live.voiceMode")}
                 </button>
               </div>
             ) : null}
@@ -519,7 +548,7 @@ export function LiveMobilePage({
                   event.stopPropagation();
                   openAudienceSheet();
                 }}
-                aria-label={`${audienceCountText}人在线，查看在线用户`}
+                aria-label={t("live.onlineAudienceAria", { count: audienceCountText })}
               >
                 <AudienceIcon />
                 <span>{audienceCountText}</span>
@@ -536,7 +565,7 @@ export function LiveMobilePage({
                 }
                 openShareSheet();
               }}
-              aria-label="分享直播间"
+              aria-label={t("live.shareRoom")}
               aria-expanded={shareOpen}
               disabled={!watchLink}
             >
@@ -559,6 +588,11 @@ export function LiveMobilePage({
             mediaMode={mediaMode}
             cameraEnabled={cameraEnabled}
             mirrorPreview={mirrorPreview}
+            cohostActive={cohostActive}
+            cohostPlayerSession={cohostPlayerSession}
+            cohostPlayerMuted={cohostPlayerMuted}
+            cohostPlayerRef={cohostPlayerRef}
+            cohostPlayerStatus={cohostPlayerStatus}
           />
           {publishBlockedReason ? (
             <FloatingToast className="live-lock-toast live-mobile-lock-toast">
@@ -568,6 +602,18 @@ export function LiveMobilePage({
           {cameraNoticeVisible ? (
             <FloatingToast className="live-mobile-toast">{cameraNoticeMessage}</FloatingToast>
           ) : null}
+          <LiveAudienceCallOverlay
+            active={audienceCallActive}
+            enabled={audienceCallEnabled}
+            mutedUserIds={audienceCallMutedUserIds}
+            speakingUserIds={audienceCallSpeakingUserIds}
+            hidden={overlaysHidden}
+            actionLabel={audienceCallEnabled && audienceCallActiveCount < 5 ? t("live.inviteAudienceCall") : ""}
+            actionAriaLabel={audienceCallEnabled && audienceCallActiveCount < 5 ? t("live.inviteAudience") : ""}
+            onAction={audienceCallEnabled && audienceCallActiveCount < 5 ? openAudienceCallInviteSheet : undefined}
+            onDisconnectUser={onAudienceCallUserDisconnect}
+            onMuteUserChange={onAudienceCallUserMuteChange}
+          />
           <div className="live-mobile-bottom-stack live-mobile-overlay-hideable">
             {showPassiveChatPreview ? (
               <div className="live-mobile-chat-overlay">
@@ -591,7 +637,7 @@ export function LiveMobilePage({
                   onRetractMessage={onChatMessageRetract}
                   variant="floating"
                   className="chat-panel-live-mobile"
-                  title="评论"
+                  title={t("chat.title")}
                   showComposer={false}
                   showWelcome={false}
                 />
@@ -615,7 +661,7 @@ export function LiveMobilePage({
                     type="button"
                     className={`live-fab live-fab-icon${cohostDrawerOpen ? " is-active" : ""}${cohostActive ? " is-connected" : ""}`}
                     onClick={cohostDrawerOpen ? closeCohostSheet : openCohostSheet}
-                    aria-label={cohostDrawerOpen ? "关闭连线" : "连线"}
+                    aria-label={cohostDrawerOpen ? t("live.closeCohost") : t("live.cohost")}
                     aria-expanded={cohostDrawerOpen}
                   >
                     <CohostIcon />
@@ -648,7 +694,7 @@ export function LiveMobilePage({
                   type="button"
                   className={`live-fab live-fab-icon${qualityDrawerOpen ? " is-active" : ""}`}
                   onClick={qualityDrawerOpen ? closeQualitySheet : openQualitySheet}
-                  aria-label={qualityDrawerOpen ? "关闭画质设置" : "画质设置"}
+                  aria-label={qualityDrawerOpen ? t("live.closeQualitySettings") : t("live.qualitySettings")}
                   aria-expanded={qualityDrawerOpen}
                 >
                   <QualityIcon />
@@ -664,7 +710,7 @@ export function LiveMobilePage({
                       }
                       openChatDrawer();
                     }}
-                    aria-label={chatDrawerOpen ? "关闭评论" : "打开评论"}
+                    aria-label={chatDrawerOpen ? t("common.closePanel") : t("chat.title")}
                     aria-expanded={chatDrawerOpen}
                   >
                     <ChatIcon />
@@ -680,7 +726,7 @@ export function LiveMobilePage({
                     }
                     openMoreSheet();
                   }}
-                  aria-label={moreOpen ? "关闭更多操作" : "打开更多操作"}
+                  aria-label={moreOpen ? t("common.closePanel") : t("live.more")}
                 >
                   <MoreIcon />
                 </button>
@@ -691,9 +737,9 @@ export function LiveMobilePage({
                   className={`live-fab live-fab-primary${isStarting ? " is-starting" : ""}`}
                   onClick={onTogglePublish}
                   disabled={isStarting || publishBlocked || (!cameraEnabled && !microphoneEnabled)}
-                  aria-label={isStarting ? "正在开始直播" : "开始直播"}
+                  aria-label={isStarting ? t("live.startingBroadcast") : t("live.startBroadcast")}
                 >
-                  开始直播
+                  {t("live.startBroadcast")}
                 </button>
               ) : null}
             </div>
@@ -719,7 +765,7 @@ export function LiveMobilePage({
             canRetractMessages={canRetractMessages}
             onMuteMessage={onChatMessageMute}
             onRetractMessage={onChatMessageRetract}
-            title="评论"
+            title={t("chat.title")}
             showWelcome={false}
             className="chat-panel-live-split"
           />
@@ -729,7 +775,7 @@ export function LiveMobilePage({
           <SwipeableDrawer
             open={chatDrawerOpen}
             onClose={closeChatDrawer}
-            ariaLabel="关闭评论"
+            ariaLabel={t("common.closePanel")}
             className="live-mobile-drawer live-mobile-chat-drawer"
             panelClassName="live-mobile-chat-panel"
           >
@@ -751,7 +797,7 @@ export function LiveMobilePage({
               canRetractMessages={canRetractMessages}
               onMuteMessage={onChatMessageMute}
               onRetractMessage={onChatMessageRetract}
-              title="评论"
+              title={t("chat.title")}
               showWelcome={false}
               className="chat-panel-live-drawer"
             />
@@ -808,19 +854,24 @@ export function LiveMobilePage({
           recentHosts={cohostRecentHosts}
           audienceCallEnabled={audienceCallEnabled}
           audienceCallRequests={audienceCallRequests}
+          audienceCallInvites={audienceCallInvites}
           audienceCallActive={audienceCallActive}
+          audienceCallInviteViewers={loggedInViewers}
+          audienceTab={audienceCallPanelTab}
           onDisconnect={onCohostDisconnect}
           onInvitesAllowedChange={onCohostInvitesAllowedChange}
           onInviteRequest={onCohostInviteRequest}
           onInviteRespond={onCohostInviteRespond}
           onAudienceCallEnabledChange={onAudienceCallEnabledChange}
           onAudienceCallRequestRespond={onAudienceCallRequestRespond}
+          onAudienceCallInviteViewer={onAudienceCallInviteViewer}
+          onAudienceTabChange={setAudienceCallPanelTab}
         />
 
         <SwipeableDrawer
           open={qualityDrawerOpen}
           onClose={closeQualitySheet}
-          ariaLabel="关闭画质设置"
+          ariaLabel={t("live.closeQualitySettings")}
           className="live-mobile-drawer"
           panelClassName="live-mobile-quality-panel"
         >
@@ -862,9 +913,9 @@ export function LiveMobilePage({
         <SwipeableDrawer
           open={moreOpen}
           onClose={closeMoreSheet}
-          ariaLabel="关闭更多操作"
+          ariaLabel={t("common.closePanel")}
           className="live-mobile-drawer"
-          panelClassName="live-mobile-more-panel"
+          panelClassName="live-mobile-more-panel live-more-menu-panel"
         >
           <LiveMoreMenu
             roomCoverUrl={roomCoverUrl}

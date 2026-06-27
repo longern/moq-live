@@ -1,9 +1,12 @@
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  Check,
   MoreHorizontal,
+  X,
 } from "lucide-react";
 import { ChatPanel } from "./ChatPanel.jsx";
+import { LiveAudienceCallOverlay } from "./live/LiveAudienceCallOverlay.jsx";
 import { useToast } from "./primitives/FloatingToast.jsx";
 import { StatusPill } from "./primitives/StatusPill.jsx";
 import {
@@ -36,6 +39,69 @@ import { useWatchPictureInPicture } from "../hooks/useWatchPictureInPicture.js";
 import { useWatchShareActions } from "../hooks/useWatchShareActions.js";
 import { useWatchStageControls } from "../hooks/useWatchStageControls.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
+
+function WatchAudienceCallInviteDialog({ invite, portalTarget, onRespond }) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+
+  if (!invite) {
+    return null;
+  }
+
+  async function respond(accepted) {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await onRespond?.(invite, accepted);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const dialog = (
+    <div className="watch-audience-call-invite-layer">
+      <section
+        className="watch-audience-call-invite-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("watchSheet.audienceCallInvite")}
+      >
+        <div className="watch-audience-call-invite-copy">
+          <strong>{t("watchSheet.audienceCallInvite")}</strong>
+          <span>{t("watchSheet.audienceCallInviteMessage")}</span>
+        </div>
+        <div className="watch-audience-call-invite-actions">
+          <button
+            type="button"
+            className="watch-audience-call-invite-button reject"
+            onClick={() => {
+              void respond(false);
+            }}
+            disabled={busy}
+            aria-label={t("watchSheet.audienceCallInviteReject")}
+          >
+            <X aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="watch-audience-call-invite-button accept"
+            onClick={() => {
+              void respond(true);
+            }}
+            disabled={busy}
+            aria-label={t("watchSheet.audienceCallInviteAccept")}
+          >
+            <Check aria-hidden="true" />
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+
+  return portalTarget ? createPortal(dialog, portalTarget) : dialog;
+}
 
 export function WatchSessionPage({
   hidden,
@@ -120,6 +186,10 @@ export function WatchSessionPage({
     onlineCount: chatOnlineCount,
     loggedInViewers: chatLoggedInViewers = [],
     audienceCallEnabled = false,
+    audienceCallRequests = [],
+    audienceCallInvite = null,
+    audienceCallActive = [],
+    audienceCallSpeakingUserIds = [],
     audienceCallRealtimeSession = null,
     readOnly: chatReadOnly,
     error: chatError,
@@ -137,6 +207,8 @@ export function WatchSessionPage({
     onChatSend,
     onChatRequireLogin,
     onAudienceCallRequest,
+    onAudienceCallRequestCancel,
+    onAudienceCallInviteRespond,
     onAudienceCallDisconnect,
   } = actions;
   const [moreOpen, setMoreOpen] = useState(false);
@@ -153,6 +225,16 @@ export function WatchSessionPage({
   const compactViewport = useCompactViewport();
   const portraitViewport = usePortraitViewport();
   const shortLandscapeViewport = useMediaQuery("(max-width: 980px) and (orientation: landscape) and (max-height: 520px)");
+  const standaloneDisplayMode = useMediaQuery("(display-mode: standalone), (display-mode: fullscreen)");
+  const iosStandaloneDisplayMode = typeof window !== "undefined" && window.navigator?.standalone === true;
+  const showMobileMoreFullscreenAction = Boolean(
+    compactViewport && !standaloneDisplayMode && !iosStandaloneDisplayMode
+  );
+  const audienceCallRequestPending = Boolean(
+    authUser?.id &&
+    Array.isArray(audienceCallRequests) &&
+    audienceCallRequests.some((request) => request.user?.id === authUser.id)
+  );
   const portraitMedia = isPortraitMedia(playerOrientation);
   const immersivePortrait = shouldUsePortraitImmersiveMode({
     mediaOrientation: playerOrientation,
@@ -165,6 +247,9 @@ export function WatchSessionPage({
   const hostFollowerCountText = formatAudienceCount(hostFollowerCount);
   const hostFollowingCountText = formatAudienceCount(hostFollowingCount);
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
+  const audienceCallActiveCount = Array.isArray(audienceCallActive)
+    ? audienceCallActive.length
+    : 0;
   const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
   const showHostFollowButton = Boolean(hostUserId && authUser?.id !== hostUserId);
   const showCohostLayout = Boolean(cohostActive && (cohostPlayerSession || cohostPlayerBadge.state === "warm"));
@@ -176,11 +261,12 @@ export function WatchSessionPage({
   const showStagePictureInPictureControl = !(compactViewport && !portraitMedia);
   const showStageReturnControl = Boolean(!portraitViewport && !immersiveShell);
   const showStageFullscreenControl = !(fullscreenActive && showStageReturnControl);
-  const fullscreenSheetOpen = Boolean(fullscreenLandscapeMedia && (moreOpen || hostProfileOpen || audienceOpen));
-  const fullscreenSheetPortalTarget = fullscreenLandscapeMedia
+  const landscapeSideSheet = fullscreenLandscapeMedia || landscapeImmersive;
+  const fullscreenSheetOpen = Boolean(landscapeSideSheet && (moreOpen || hostProfileOpen || audienceOpen));
+  const fullscreenSheetPortalTarget = landscapeSideSheet
     ? fullscreenSideSheetHost
     : null;
-  const watchSheetPresentation = fullscreenLandscapeMedia ? "fullscreen-side" : "drawer";
+  const watchSheetPresentation = landscapeSideSheet ? "fullscreen-side" : "drawer";
   const stageControls = useWatchStageControls({
     controlsHoldActive: longPressOpensMore && moreOpen,
     immersiveShell,
@@ -318,6 +404,7 @@ export function WatchSessionPage({
     }
     if (!authUser?.id) {
       onChatRequireLogin?.();
+      closeAudienceSheet();
       closeMoreSheet();
       return;
     }
@@ -325,7 +412,24 @@ export function WatchSessionPage({
     const sent = onAudienceCallRequest?.();
     if (sent) {
       showToast("已发送连线申请");
+      closeAudienceSheet();
       closeMoreSheet();
+    }
+  }
+
+  function cancelAudienceCallRequest() {
+    const cancelled = onAudienceCallRequestCancel?.();
+    if (cancelled) {
+      showToast(t("watchSheet.audienceCallRequestCancelled"));
+      closeAudienceSheet();
+      closeMoreSheet();
+    }
+  }
+
+  async function respondAudienceCallInvite(invite, accepted) {
+    const responded = await onAudienceCallInviteRespond?.(invite?.id, accepted);
+    if (responded && !accepted) {
+      showToast(t("watchSheet.audienceCallInviteRejected"));
     }
   }
 
@@ -333,6 +437,7 @@ export function WatchSessionPage({
     const disconnected = onAudienceCallDisconnect?.();
     if (disconnected) {
       showToast(t("watchSheet.audienceCallDisconnected"));
+      closeAudienceSheet();
       closeMoreSheet();
     }
   }
@@ -520,6 +625,22 @@ export function WatchSessionPage({
       authAvailable={authAvailable}
       authLoading={authLoading}
       authUser={authUser}
+      audienceCallOverlay={(
+        <LiveAudienceCallOverlay
+          active={audienceCallActive}
+          canManage={false}
+          enabled={audienceCallEnabled}
+          speakingUserIds={audienceCallSpeakingUserIds}
+          actionLabel={audienceCallEnabled && !audienceCallRealtimeSession && audienceCallActiveCount < 5
+            ? (audienceCallRequestPending
+                ? t("watchSheet.audienceCallCancelRequest")
+                : t("watchSheet.audienceCall"))
+            : ""}
+          onAction={audienceCallEnabled && !audienceCallRealtimeSession && audienceCallActiveCount < 5
+            ? (audienceCallRequestPending ? cancelAudienceCallRequest : requestAudienceCall)
+            : undefined}
+        />
+      )}
       chatConnectionState={chatConnectionState}
       chatDraft={chatDraft}
       chatError={chatError}
@@ -667,15 +788,25 @@ export function WatchSessionPage({
         videoPipSupported={videoPipSupported}
         playerSession={playerSession}
         pictureInPictureActive={pictureInPictureActive}
+        fullscreenActive={fullscreenActive}
+        showFullscreenAction={showMobileMoreFullscreenAction}
         audienceCallEnabled={audienceCallEnabled}
         audienceCallConnected={Boolean(audienceCallRealtimeSession)}
+        audienceCallRequestPending={audienceCallRequestPending}
         onShareWatchLink={shareWatchLink}
         onOpenImageShareModal={openImageShareModal}
         onOpenScreenshotShareModal={openScreenshotShareModal}
         onCopyWatchLink={copyWatchLink}
         onAudienceCallRequest={requestAudienceCall}
+        onAudienceCallRequestCancel={cancelAudienceCallRequest}
         onAudienceCallDisconnect={disconnectAudienceCall}
         onOpenPictureInPicture={openPictureInPicture}
+        onFullscreen={onFullscreen}
+      />
+      <WatchAudienceCallInviteDialog
+        invite={audienceCallInvite}
+        portalTarget={overlayPortalTarget}
+        onRespond={respondAudienceCallInvite}
       />
       <WatchHostProfileSheet
         open={hostProfileOpen}

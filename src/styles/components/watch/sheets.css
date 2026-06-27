@@ -1,4 +1,8 @@
 .swipeable-drawer-panel.watch-host-profile-panel {
+  overflow: auto;
+}
+
+.watch-host-profile-panel > .swipeable-drawer-panel-content {
   gap: 16px;
   padding: 10px 16px 18px;
 }
@@ -168,7 +172,7 @@
 
 .profile-bio {
   min-width: 0;
-  color: rgba(235, 244, 251, 0.74);
+  color: var(--text);
   font-size: 0.86rem;
   line-height: 1.55;
   overflow-wrap: anywhere;
@@ -287,6 +291,10 @@
 
 @media (max-width: 980px) {
   .watch-mobile-more-panel {
+    overflow: auto;
+  }
+
+  .watch-mobile-more-panel > .swipeable-drawer-panel-content {
     gap: 12px;
     padding: 16px;
   }
@@ -405,6 +413,10 @@
       var(--watch-audience-row-height) * 3 + var(--watch-audience-row-gap) * 2
     );
     --watch-audience-list-max-height: clamp(196px, 44svh, 420px);
+    overflow: auto;
+  }
+
+  .watch-audience-panel > .swipeable-drawer-panel-content {
     gap: 12px;
     padding: 16px 0;
   }

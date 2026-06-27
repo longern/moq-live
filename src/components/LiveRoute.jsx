@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { LivePage } from "./LivePage.jsx";
 import { useChatController } from "../hooks/useChatController.js";
 import { useCommentSpeech } from "../hooks/useCommentSpeech.js";
+import { usePlayerController } from "../hooks/usePlayerController.js";
 import { usePublisherController } from "../hooks/usePublisherController.js";
 import { buildWatchLink, generateRoomId } from "../lib/routeState.js";
 import { describePublishState } from "../lib/status.js";
@@ -16,6 +17,7 @@ const LOCATION_SHARING_STORAGE_PREFIX = "moq-live:location-sharing";
 const LIVE_NOTIFICATION_STORAGE_PREFIX = "moq-live:live-start-notifications";
 const COHOST_RECENTS_STORAGE_PREFIX = "moq-live:cohost-recents";
 const MAX_COHOST_RECENTS = 6;
+const AUDIENCE_CALL_SPEAKING_BROADCAST_INTERVAL_MS = 1000;
 
 function getStreamSettingsStorageKey(userId) {
   if (userId) {
@@ -131,18 +133,18 @@ function writeStoredCohostRecents(storageKey, recents) {
   }
 }
 
-function getCohostRequestErrorMessage(error) {
+function getCohostRequestErrorMessage(error, t) {
   if (error?.code === "room_not_found") {
-    return "直播间不存在";
+    return t("live.cohostErrors.roomNotFound");
   }
   if (error?.code === "room_not_live") {
-    return "直播间未开播";
+    return t("live.cohostErrors.roomNotLive");
   }
   if (error?.code === "cohost_invites_blocked") {
-    return "对方已屏蔽连线邀请";
+    return t("live.cohostErrors.invitesBlocked");
   }
   if (error?.code === "cohost_self") {
-    return "不能向自己发起连线";
+    return t("live.cohostErrors.self");
   }
   return getAppErrorMessage(error);
 }
@@ -429,7 +431,26 @@ export function LiveRoute({
   const webRtcPlaybackUrlRef = useRef("");
   const webRtcPlaybackRoomIdRef = useRef("");
   const [liveMode, setLiveMode] = useState("video");
+  const cohostPlaybackRelayUrlRef = useRef("");
+  const cohostPlaybackNamespaceRef = useRef("");
+  const cohostPlaybackProtocolRef = useRef("webrtc");
+  const cohostPlaybackWebRtcUrlRef = useRef("");
+  const [audienceCallMutedUserIds, setAudienceCallMutedUserIds] = useState(() => new Set());
   webRtcPlaybackRoomIdRef.current = liveChatRoomId || "";
+
+  useEffect(() => {
+    const activeUserIds = new Set(
+      (Array.isArray(liveChat.audienceCallActive) ? liveChat.audienceCallActive : [])
+        .map((item) => String(item.user?.id || "").trim())
+        .filter(Boolean),
+    );
+    setAudienceCallMutedUserIds((current) => {
+      const next = new Set(
+        Array.from(current).filter((userId) => activeUserIds.has(userId)),
+      );
+      return next.size === current.size ? current : next;
+    });
+  }, [liveChat.audienceCallActive]);
 
   const publisher = usePublisherController({
     page,
@@ -449,6 +470,87 @@ export function LiveRoute({
     log,
   });
   publisherControllerRef.current = publisher;
+  const cohostPlayer = usePlayerController({
+    initialAutorun: false,
+    relayUrlRef: cohostPlaybackRelayUrlRef,
+    roomRef: cohostPlaybackNamespaceRef,
+    streamProtocolRef: cohostPlaybackProtocolRef,
+    webRtcUrlRef: cohostPlaybackWebRtcUrlRef,
+    setLogText: () => {},
+    log,
+    layoutScopeKey: "live:cohost",
+  });
+  const audienceCallSpeakingBroadcastRef = useRef({
+    lastSentAt: 0,
+    lastSentSignature: "",
+    pendingIds: [],
+    timer: null,
+  });
+
+  useEffect(() => () => {
+    const current = audienceCallSpeakingBroadcastRef.current;
+    if (current.timer) {
+      window.clearTimeout(current.timer);
+      current.timer = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    const activeUserIds = new Set(
+      (Array.isArray(liveChat.audienceCallActive) ? liveChat.audienceCallActive : [])
+        .map((item) => String(item.user?.id || "").trim())
+        .filter(Boolean),
+    );
+    const speakingIds = (Array.isArray(publisher.audienceCallSpeakingUserIds)
+      ? publisher.audienceCallSpeakingUserIds
+      : [])
+      .map((userId) => String(userId || "").trim())
+      .filter((userId, index, list) => (
+        userId && activeUserIds.has(userId) && list.indexOf(userId) === index
+      ))
+      .sort();
+    const signature = speakingIds.join("\n");
+    const current = audienceCallSpeakingBroadcastRef.current;
+    if (signature === current.lastSentSignature) {
+      current.pendingIds = speakingIds;
+      if (current.timer) {
+        window.clearTimeout(current.timer);
+        current.timer = null;
+      }
+      return;
+    }
+
+    function sendSpeakingUpdate(ids, nextSignature) {
+      if (liveChat.updateAudienceCallSpeaking(ids)) {
+        current.lastSentAt = Date.now();
+        current.lastSentSignature = nextSignature;
+      }
+    }
+
+    const now = Date.now();
+    const elapsed = now - current.lastSentAt;
+    current.pendingIds = speakingIds;
+    if (elapsed >= AUDIENCE_CALL_SPEAKING_BROADCAST_INTERVAL_MS) {
+      if (current.timer) {
+        window.clearTimeout(current.timer);
+        current.timer = null;
+      }
+      sendSpeakingUpdate(speakingIds, signature);
+      return;
+    }
+
+    if (!current.timer) {
+      current.timer = window.setTimeout(() => {
+        current.timer = null;
+        const pendingIds = current.pendingIds;
+        sendSpeakingUpdate(pendingIds, pendingIds.join("\n"));
+      }, AUDIENCE_CALL_SPEAKING_BROADCAST_INTERVAL_MS - elapsed);
+    }
+  }, [
+    liveChat,
+    liveChat.audienceCallActive,
+    publisher.audienceCallSpeakingUserIds,
+  ]);
   const streamSettingsStorageKey = getStreamSettingsStorageKey(authState.user?.id);
   const commentSpeechStorageKey = getCommentSpeechStorageKey(authState.user?.id);
   const locationSharingStorageKey = getLocationSharingStorageKey(authState.user?.id);
@@ -570,6 +672,19 @@ export function LiveRoute({
   webRtcPublishUrlRef.current = webRtcPublishUrl.trim();
   webRtcPlaybackUrlRef.current = webRtcPlaybackUrl.trim() || defaultWebRtcPlaybackUrl;
   const webRtcUrl = webRtcPlaybackUrl.trim() || defaultWebRtcPlaybackUrl;
+  const cohostActive = liveChat.cohostActive;
+  const cohostStream = cohostActive?.stream || null;
+  const resolvedCohostProtocol = normalizeStreamProtocol(cohostStream?.protocol);
+  const resolvedCohostRelayUrl = cohostStream?.relayUrl || "";
+  const resolvedCohostNamespace = cohostStream?.namespace || "";
+  const resolvedCohostWebRtcUrl = cohostStream?.webRtcUrl || "";
+  const cohostPlaybackReady = resolvedCohostProtocol === "moq"
+    ? Boolean(resolvedCohostRelayUrl && resolvedCohostNamespace)
+    : Boolean(resolvedCohostWebRtcUrl);
+  cohostPlaybackRelayUrlRef.current = resolvedCohostRelayUrl;
+  cohostPlaybackNamespaceRef.current = resolvedCohostNamespace;
+  cohostPlaybackProtocolRef.current = resolvedCohostProtocol;
+  cohostPlaybackWebRtcUrlRef.current = resolvedCohostWebRtcUrl;
   const publishPolicyBlocked = isPublishBlocked(liveRoom);
   const publishControlBlocked =
     liveChatEnabled &&
@@ -599,6 +714,39 @@ export function LiveRoute({
     publishProtocol,
     webRtcUrl,
   });
+
+  useEffect(() => {
+    if (!cohostActive || !cohostPlaybackReady || page !== "live") {
+      if (cohostPlayer.playerSession) {
+        void cohostPlayer.stopPlayer();
+      }
+      return;
+    }
+
+    const currentSession = cohostPlayer.playerSession;
+    const currentProtocol = currentSession?.protocol || "";
+    const currentRoom = currentSession?.room || currentSession?.namespace || "";
+    const currentWebRtcUrl = currentSession?.webRtcUrl || "";
+    const sessionMatches = currentSession
+      && currentProtocol === resolvedCohostProtocol
+      && (
+        resolvedCohostProtocol === "webrtc"
+          ? currentWebRtcUrl === resolvedCohostWebRtcUrl
+          : currentRoom === resolvedCohostNamespace
+      );
+
+    if (!sessionMatches) {
+      void cohostPlayer.startPlayer();
+    }
+  }, [
+    cohostActive,
+    cohostPlaybackReady,
+    cohostPlayer.playerSession,
+    page,
+    resolvedCohostNamespace,
+    resolvedCohostProtocol,
+    resolvedCohostWebRtcUrl,
+  ]);
 
   useEffect(() => {
     if (!liveStreamActive || !liveRoom) {
@@ -687,8 +835,8 @@ export function LiveRoute({
 
     try {
       await navigator.share({
-        title: `${liveRoomLabel}的直播间`,
-        text: `${liveRoomLabel}正在直播`,
+        title: t("live.liveRoomTitle", { room: liveRoomLabel }),
+        text: t("live.liveRoomShareText", { room: liveRoomLabel }),
         url: liveWatchLink,
       });
       log("live room shared");
@@ -990,7 +1138,7 @@ export function LiveRoute({
 
     if (!response.ok) {
       const error = createApiError(payload, "cohost_request_failed", { status: response.status });
-      error.message = getCohostRequestErrorMessage(error);
+      error.message = getCohostRequestErrorMessage(error, t);
       throw error;
     }
 
@@ -1048,15 +1196,85 @@ export function LiveRoute({
       ) {
         return false;
       }
-      const hostSession = await liveChat.startAudienceCallRealtimeSession("host");
-      realtime = {
-        hostSessionId: hostSession.sessionId,
-        hostTrackPullToken: hostSession.trackPullToken,
-        expiresAt: hostSession.expiresAt,
-      };
+      try {
+        const audioTrack = liveChat.audienceCallRealtimeSession?.role === "host"
+          ? null
+          : await publisherControllerRef.current?.createAudienceCallHostAudioTrack?.();
+        const hostRealtime = await liveChat.startAudienceCallHostSession({ audioTrack });
+        const hostSession = hostRealtime.session;
+        realtime = {
+          hostSessionId: hostSession.sessionId,
+          hostTrackPullToken: hostSession.trackPullToken,
+          hostTrackName: hostRealtime.trackName,
+          expiresAt: hostSession.expiresAt,
+        };
+      } catch (error) {
+        log(`audience call host realtime failed: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
+      }
     }
 
     return liveChat.respondAudienceCallRequest(requestId, accepted, realtime);
+  }
+
+  async function inviteAudienceCallViewer(viewer) {
+    const userId = String(viewer?.id || "").trim();
+    if (!userId) {
+      return false;
+    }
+    const activeAudienceCalls = Array.isArray(liveChat.audienceCallActive)
+      ? liveChat.audienceCallActive
+      : [];
+    if (
+      activeAudienceCalls.length >= 5 &&
+      !activeAudienceCalls.some((item) => item.user?.id === userId)
+    ) {
+      return false;
+    }
+
+    try {
+      const audioTrack = liveChat.audienceCallRealtimeSession?.role === "host"
+        ? null
+        : await publisherControllerRef.current?.createAudienceCallHostAudioTrack?.();
+      const hostRealtime = await liveChat.startAudienceCallHostSession({ audioTrack });
+      const hostSession = hostRealtime.session;
+      return liveChat.inviteAudienceCallViewer(userId, {
+        hostSessionId: hostSession.sessionId,
+        hostTrackPullToken: hostSession.trackPullToken,
+        hostTrackName: hostRealtime.trackName,
+        expiresAt: hostSession.expiresAt,
+      });
+    } catch (error) {
+      log(`audience call host realtime failed: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
+
+  function setAudienceCallUserMuted(userId, muted) {
+    const normalizedUserId = String(userId || "").trim();
+    if (!normalizedUserId) {
+      return;
+    }
+    setAudienceCallMutedUserIds((current) => {
+      const next = new Set(current);
+      if (muted) {
+        next.add(normalizedUserId);
+      } else {
+        next.delete(normalizedUserId);
+      }
+      return next;
+    });
+    liveChat.setAudienceCallRemotePlaybackMuted(normalizedUserId, Boolean(muted));
+    publisher.setAudienceCallRemoteMuted(normalizedUserId, Boolean(muted));
+  }
+
+  function removeAudienceCallUser(userId) {
+    const normalizedUserId = String(userId || "").trim();
+    if (!normalizedUserId) {
+      return false;
+    }
+    setAudienceCallUserMuted(normalizedUserId, false);
+    return liveChat.removeAudienceCallActive(normalizedUserId);
   }
 
   async function closeLivePage() {
@@ -1126,13 +1344,21 @@ export function LiveRoute({
         invitesAllowed: liveChat.cohostInvitesAllowed,
         invite: liveChat.cohostInvite,
         inviteResponse: liveChat.cohostInviteResponse,
-        active: liveChat.cohostActive,
+        active: cohostActive,
+        playerSession: cohostPlayer.playerSession,
+        playerMuted: cohostPlayer.playerMuted,
+        playerRef: cohostPlayer.playerRef,
+        playerStatus: cohostPlayer.playerStatus,
+        playerStatusKind: cohostPlayer.playerStatusKind,
         recentHosts: cohostRecentHosts,
       }}
       audienceCall={{
         enabled: liveChat.audienceCallEnabled,
         requests: liveChat.audienceCallRequests,
+        invites: liveChat.audienceCallInvites,
         active: liveChat.audienceCallActive,
+        mutedUserIds: Array.from(audienceCallMutedUserIds),
+        speakingUserIds: publisher.audienceCallSpeakingUserIds,
       }}
       chat={{
         messages: liveChat.messages,
@@ -1232,6 +1458,9 @@ export function LiveRoute({
           liveChat.setAudienceCallEnabled(nextEnabled);
         },
         onAudienceCallRequestRespond: (request, accepted) => respondToAudienceCallRequest(request, accepted),
+        onAudienceCallInviteViewer: inviteAudienceCallViewer,
+        onAudienceCallUserMuteChange: setAudienceCallUserMuted,
+        onAudienceCallUserDisconnect: removeAudienceCallUser,
         onChatDraftChange: (event) => {
           liveChat.setDraft(event.currentTarget.value);
         },

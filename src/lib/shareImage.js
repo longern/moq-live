@@ -6,6 +6,8 @@ import QRCode from "qrcode";
 
 const SHARE_IMAGE_WIDTH = 960;
 const SHARE_IMAGE_HEIGHT = 1280;
+const SHARE_IMAGE_LANDSCAPE_WIDTH = SHARE_IMAGE_HEIGHT;
+const SHARE_IMAGE_LANDSCAPE_HEIGHT = SHARE_IMAGE_WIDTH;
 const SHARE_COVER_HEIGHT = 288;
 const SHARE_CONTENT_X = 120;
 const SHARE_CONTENT_WIDTH = SHARE_IMAGE_WIDTH - SHARE_CONTENT_X * 2;
@@ -153,6 +155,25 @@ function drawImageCover(ctx, image, x, y, width, height) {
   }
 
   ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
+}
+
+function drawMediaCover(ctx, media, sourceWidth, sourceHeight, x, y, width, height) {
+  const targetRatio = width / height;
+  const sourceRatio = sourceWidth / sourceHeight;
+  let cropX = 0;
+  let cropY = 0;
+  let cropWidth = sourceWidth;
+  let cropHeight = sourceHeight;
+
+  if (sourceRatio > targetRatio) {
+    cropWidth = sourceHeight * targetRatio;
+    cropX = (sourceWidth - cropWidth) / 2;
+  } else if (sourceRatio < targetRatio) {
+    cropHeight = sourceWidth / targetRatio;
+    cropY = (sourceHeight - cropHeight) / 2;
+  }
+
+  ctx.drawImage(media, cropX, cropY, cropWidth, cropHeight, x, y, width, height);
 }
 
 function drawCoverBanner(ctx, image, { x, y, width, height, radius = 0 }) {
@@ -452,23 +473,39 @@ export async function buildLiveScreenshotShareImage({
     loadOptionalImage(siteIconUrl),
   ]);
 
+  const outputPortrait = sourceHeight >= sourceWidth;
+  const outputWidth = outputPortrait
+    ? SHARE_IMAGE_WIDTH
+    : SHARE_IMAGE_LANDSCAPE_WIDTH;
+  const outputHeight = outputPortrait
+    ? SHARE_IMAGE_HEIGHT
+    : SHARE_IMAGE_LANDSCAPE_HEIGHT;
   const canvas = document.createElement("canvas");
-  canvas.width = sourceWidth;
-  canvas.height = sourceHeight;
+  canvas.width = outputWidth;
+  canvas.height = outputHeight;
   const ctx = canvas.getContext("2d");
 
   ctx.fillStyle = "#050d14";
-  ctx.fillRect(0, 0, sourceWidth, sourceHeight);
+  ctx.fillRect(0, 0, outputWidth, outputHeight);
 
   ctx.save();
   if (mirrorPreview) {
-    ctx.translate(sourceWidth, 0);
+    ctx.translate(outputWidth, 0);
     ctx.scale(-1, 1);
   }
-  ctx.drawImage(videoElement, 0, 0, sourceWidth, sourceHeight);
+  drawMediaCover(
+    ctx,
+    videoElement,
+    sourceWidth,
+    sourceHeight,
+    0,
+    0,
+    outputWidth,
+    outputHeight,
+  );
   ctx.restore();
 
-  const shortSide = Math.min(sourceWidth, sourceHeight);
+  const shortSide = Math.min(outputWidth, outputHeight);
   const qrSize = Math.max(96, Math.min(168, Math.round(shortSide * 0.18)));
   const qrPadding = Math.max(8, Math.round(qrSize * 0.08));
   const brandFontSize = Math.max(12, Math.min(16, Math.round(shortSide * 0.022)));
@@ -478,7 +515,7 @@ export async function buildLiveScreenshotShareImage({
   const scanLineHeight = Math.ceil(scanFontSize * 1.25);
   const qrToBrandGap = Math.max(6, Math.round(qrSize * 0.06));
   const brandToScanGap = Math.max(3, Math.round(qrSize * 0.03));
-  const cardWidth = Math.min(sourceWidth - qrPadding * 2, qrSize + qrPadding * 2);
+  const cardWidth = Math.min(outputWidth - qrPadding * 2, qrSize + qrPadding * 2);
   const cardHeight = qrPadding
     + qrSize
     + qrToBrandGap
@@ -488,8 +525,8 @@ export async function buildLiveScreenshotShareImage({
     + qrPadding;
   const cardRadius = Math.max(10, Math.round(cardWidth * 0.12));
   const edgeInset = Math.max(16, Math.round(shortSide * 0.035));
-  const cardX = sourceWidth - cardWidth - edgeInset;
-  const cardY = sourceHeight - cardHeight - edgeInset;
+  const cardX = outputWidth - cardWidth - edgeInset;
+  const cardY = outputHeight - cardHeight - edgeInset;
   const qrX = cardX + (cardWidth - qrSize) / 2;
   const qrY = cardY + qrPadding;
 
@@ -502,7 +539,10 @@ export async function buildLiveScreenshotShareImage({
   ctx.fill();
   ctx.restore();
 
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+  ctx.restore();
 
   if (hostAvatar) {
     const avatarSize = Math.max(28, Math.round(qrSize * 0.24));

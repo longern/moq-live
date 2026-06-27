@@ -16,6 +16,7 @@ export function createMediaRoutes(handlers) {
 export function createApiRoutes(handlers) {
   return [
     { method: "GET", path: "/api/me", handler: (env, request) => handlers.handleMe(env, request) },
+    { method: "GET", path: "/api/admin/users", handler: (env, request) => handlers.handleAdminUsers(env, request) },
     { method: "GET", path: "/api/me/room", handler: (env, request) => handlers.handleMyRoom(env, request) },
     { method: "POST", path: "/api/me/room", handler: (env, request) => handlers.handleMyRoomCreate(env, request) },
     { method: "PATCH", path: "/api/me/room", handler: (env, request) => handlers.handleMyRoomUpdate(env, request) },

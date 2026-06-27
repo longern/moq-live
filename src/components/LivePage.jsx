@@ -7,6 +7,7 @@ import { LiveDesktopPage } from "./live/LiveDesktopPage.jsx";
 import { LiveMobilePage } from "./live/LiveMobilePage.jsx";
 import { useToast } from "./primitives/FloatingToast.jsx";
 import { WatchImageShareDialog } from "./watch/WatchSharePanels.jsx";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 import { createApiError, getAppErrorMessage } from "../lib/appErrors.js";
 import { resizeRoomCoverFile } from "../lib/imageResize.js";
 import { DEFAULT_MEDIA_ORIENTATION, MEDIA_ORIENTATION_PORTRAIT } from "../lib/mediaLayout.js";
@@ -94,12 +95,20 @@ export function LivePage({
     invite: cohostInvite = null,
     inviteResponse: cohostInviteResponse = null,
     active: cohostActive = null,
+    playerSession: cohostPlayerSession = null,
+    playerMuted: cohostPlayerMuted = true,
+    playerRef: cohostPlayerRef,
+    playerStatus: cohostPlayerStatus = "",
+    playerStatusKind: cohostPlayerStatusKind = "idle",
     recentHosts: cohostRecentHosts = [],
   } = cohost;
   const {
     enabled: audienceCallEnabled = false,
     requests: audienceCallRequests = [],
+    invites: audienceCallInvites = [],
     active: audienceCallActive = [],
+    mutedUserIds: audienceCallMutedUserIds = [],
+    speakingUserIds: audienceCallSpeakingUserIds = [],
   } = audienceCall;
   const {
     messages: chatMessages,
@@ -143,6 +152,9 @@ export function LivePage({
     onCohostInviteRespond,
     onAudienceCallEnabledChange,
     onAudienceCallRequestRespond,
+    onAudienceCallInviteViewer,
+    onAudienceCallUserMuteChange,
+    onAudienceCallUserDisconnect,
     onChatDraftChange,
     onChatSend,
     onChatMessageMute,
@@ -185,6 +197,7 @@ export function LivePage({
   const shareImageRequestIdRef = useRef(0);
   const lastCohostResponseIdRef = useRef("");
   const { showToast } = useToast();
+  const { t } = useI18n();
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
   const useMobileShell = compactViewport || portraitViewport;
@@ -200,6 +213,10 @@ export function LivePage({
     : "media-layout media-portrait-split";
   const mobileLayoutClass = `${mobileLayoutModeClass} ${mediaClass}`;
   const desktopLayoutClass = landscapeSplitViewport ? `media-layout media-landscape-split ${mediaClass}` : mediaClass;
+  const localizedPublishQualityOptions = (publishQualityOptions || []).map((option) => ({
+    ...option,
+    label: option.labelKey ? t(option.labelKey) : option.label,
+  }));
 
   function requestClose() {
     onRequestClose?.();
@@ -227,7 +244,7 @@ export function LivePage({
     }
 
     const copied = await writeClipboardText(watchLink);
-    showToast(copied ? "复制成功" : "复制失败");
+    showToast(copied ? t("common.copied") : t("live.copiedFailed"));
   }
 
   async function shareLiveLink() {
@@ -240,15 +257,15 @@ export function LivePage({
     } catch (error) {
       if (!(error instanceof Error && error.name === "AbortError")) {
         console.error("live room share failed", error);
-        showToast("分享失败");
+        showToast(t("live.shareFailed"));
       }
     }
   }
 
   function getShareImageFileName() {
     return buildShareImageFileName({
-      subject: `${roomLabel || "主播"}的直播间`,
-      suffix: shareImageKind === "screenshot" ? "截屏分享图" : "分享图",
+      subject: t("live.liveRoomTitle", { room: roomLabel }),
+      suffix: shareImageKind === "screenshot" ? t("live.screenshotShare") : t("live.imageShare"),
     });
   }
 
@@ -258,7 +275,7 @@ export function LivePage({
     shareImage: shareLiveImage,
   } = useImageShareActions({
     getFileName: getShareImageFileName,
-    getShareText: () => `${roomLabel || "主播"}的直播间`,
+    getShareText: () => t("live.liveRoomTitle", { room: roomLabel }),
     getShareTitle: () => roomDetails?.title || roomLabel,
     logLabel: "live room share image",
     onFallbackShare: shareLiveLink,
@@ -316,7 +333,7 @@ export function LivePage({
       }
       console.error("live room share image failed", error);
       setImageShareMounted(false);
-      showToast("生成失败");
+      showToast(t("live.generateFailed"));
     } finally {
       if (shareImageRequestIdRef.current === requestId) {
         setShareImageLoading(false);
@@ -360,7 +377,7 @@ export function LivePage({
       }
       console.error("live room screenshot share image failed", error);
       setImageShareMounted(false);
-      showToast("生成失败");
+      showToast(t("live.generateFailed"));
     } finally {
       if (shareImageRequestIdRef.current === requestId) {
         setShareImageLoading(false);
@@ -374,24 +391,26 @@ export function LivePage({
     }
 
     lastCohostResponseIdRef.current = cohostInviteResponse.id;
-    const name = cohostInviteResponse.target?.displayName || cohostInviteResponse.target?.handle || "对方";
-    showToast(cohostInviteResponse.accepted ? `${name}已接受连线` : `${name}已拒绝连线`);
-  }, [cohostInviteResponse?.accepted, cohostInviteResponse?.id, cohostInviteResponse?.target]);
+    const name = cohostInviteResponse.target?.displayName || cohostInviteResponse.target?.handle || t("common.user");
+    showToast(cohostInviteResponse.accepted
+      ? t("live.cohostResponseAccepted", { name })
+      : t("live.cohostResponseRejected", { name }));
+  }, [cohostInviteResponse?.accepted, cohostInviteResponse?.id, cohostInviteResponse?.target, t]);
 
   useEffect(() => {
     if (!chatModerationEvent?.id) {
       return;
     }
     if (chatModerationEvent.type === "message.muted") {
-      const name = chatModerationEvent.mute?.displayName || "用户";
-      showToast(`已禁言 ${name}`);
+      const name = chatModerationEvent.mute?.displayName || t("common.user");
+      showToast(t("live.userMuted", { name }));
       return;
     }
     if (chatModerationEvent.type === "message.unmuted") {
-      const name = chatModerationEvent.mute?.displayName || "用户";
-      showToast(`已解除 ${name} 的禁言`);
+      const name = chatModerationEvent.mute?.displayName || t("common.user");
+      showToast(t("live.userUnmuted", { name }));
     }
-  }, [chatModerationEvent?.id, chatModerationEvent?.mute?.displayName, chatModerationEvent?.type]);
+  }, [chatModerationEvent?.id, chatModerationEvent?.mute?.displayName, chatModerationEvent?.type, t]);
 
   useEffect(() => {
     if (!authUser?.id || hidden) {
@@ -449,7 +468,7 @@ export function LivePage({
 
       setRoomCoverUrl(payload.room?.coverUrl || "");
       onRoomDetailsChange?.(payload.room || null);
-      setRoomCoverStatus("直播封面已更新");
+      setRoomCoverStatus(t("live.coverUpdated"));
     } catch (error) {
       setRoomCoverError(getAppErrorMessage(error));
     } finally {
@@ -508,7 +527,7 @@ export function LivePage({
   async function handleCohostInviteRequest(handle) {
     try {
       await onCohostInviteRequest?.(handle);
-      showToast("连线邀请已发送");
+      showToast(t("live.cohostInviteSent"));
       return true;
     } catch (error) {
       showToast(error?.message || getAppErrorMessage(error));
@@ -519,7 +538,7 @@ export function LivePage({
   async function handleCohostInviteRespond(invite, accepted) {
     try {
       await onCohostInviteRespond?.(invite, accepted);
-      showToast(accepted ? "已接受连线邀请" : "已拒绝连线邀请");
+      showToast(accepted ? t("live.cohostInviteAccepted") : t("live.cohostInviteRejected"));
       return true;
     } catch (error) {
       showToast(getAppErrorMessage(error));
@@ -561,7 +580,7 @@ export function LivePage({
     media: {
       cameraOptions,
       microphoneOptions,
-      publishQualityOptions,
+      publishQualityOptions: localizedPublishQualityOptions,
       publishProtocolOptions,
       selectedCameraId,
       selectedMicrophoneId,
@@ -595,12 +614,20 @@ export function LivePage({
       invitesAllowed: cohostInvitesAllowed,
       invite: cohostInvite,
       active: cohostActive,
+      playerSession: cohostPlayerSession,
+      playerMuted: cohostPlayerMuted,
+      playerRef: cohostPlayerRef,
+      playerStatus: cohostPlayerStatus,
+      playerStatusKind: cohostPlayerStatusKind,
       recentHosts: cohostRecentHosts,
     },
     audienceCall: {
       enabled: audienceCallEnabled,
       requests: audienceCallRequests,
+      invites: audienceCallInvites,
       active: audienceCallActive,
+      mutedUserIds: audienceCallMutedUserIds,
+      speakingUserIds: audienceCallSpeakingUserIds,
     },
     chat: {
       messages: chatMessages,
@@ -646,6 +673,9 @@ export function LivePage({
       onCohostInviteRespond: handleCohostInviteRespond,
       onAudienceCallEnabledChange,
       onAudienceCallRequestRespond,
+      onAudienceCallInviteViewer,
+      onAudienceCallUserMuteChange,
+      onAudienceCallUserDisconnect,
       onChatDraftChange,
       onChatSend,
       onChatMessageMute,
@@ -677,13 +707,13 @@ export function LivePage({
           <WatchImageShareDialog
             imageShareClosing={imageShareClosing}
             imageShareReady={Boolean(shareImageUrl && !shareImageLoading)}
-            imageShareTitle={shareImageKind === "screenshot" ? "截屏分享" : "图片分享"}
+            imageShareTitle={shareImageKind === "screenshot" ? t("live.screenshotShare") : t("live.imageShare")}
             onClose={closeImageShareModal}
             onCopyImage={copyLiveImage}
             onSaveImage={saveLiveImage}
             onShareImage={shareLiveImage}
             roomLabel={roomLabel}
-            shareImageAlt={shareImageKind === "screenshot" ? `${roomLabel}直播间截屏分享图` : undefined}
+            shareImageAlt={shareImageKind === "screenshot" ? t("live.screenshotShare") : undefined}
             shareImageLoading={shareImageLoading}
             shareImageUrl={shareImageUrl}
             shareSupported={shareSupported}
@@ -700,13 +730,13 @@ export function LivePage({
         <WatchImageShareDialog
           imageShareClosing={imageShareClosing}
           imageShareReady={Boolean(shareImageUrl && !shareImageLoading)}
-          imageShareTitle={shareImageKind === "screenshot" ? "截屏分享" : "图片分享"}
+          imageShareTitle={shareImageKind === "screenshot" ? t("live.screenshotShare") : t("live.imageShare")}
           onClose={closeImageShareModal}
           onCopyImage={copyLiveImage}
           onSaveImage={saveLiveImage}
           onShareImage={shareLiveImage}
           roomLabel={roomLabel}
-          shareImageAlt={shareImageKind === "screenshot" ? `${roomLabel}直播间截屏分享图` : undefined}
+          shareImageAlt={shareImageKind === "screenshot" ? t("live.screenshotShare") : undefined}
           shareImageLoading={shareImageLoading}
           shareImageUrl={shareImageUrl}
           shareSupported={shareSupported}

@@ -1,5 +1,6 @@
 @import "./styles/layout/base-shell.css";
 @import "./styles/layout/controls.css";
+@import "./styles/components/admin.css";
 @import "./styles/components/watch/idle.css";
 @import "./styles/components/settings/page.css";
 @import "./styles/components/settings/account.css";

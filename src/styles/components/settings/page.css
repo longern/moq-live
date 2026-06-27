@@ -218,11 +218,6 @@
   cursor: pointer;
 }
 
-.my-profile-stat-button:hover,
-.my-profile-stat-button:focus-visible {
-  background: rgba(255, 255, 255, 0.035);
-}
-
 .my-profile-stat-button:focus-visible {
   outline: 2px solid var(--primary-ring);
   outline-offset: -2px;
@@ -253,6 +248,11 @@
   min-height: 0;
   overflow: auto;
   padding: 0 0 32px;
+}
+
+.desktop-follows-content.follows-panel-body {
+  overflow: visible;
+  padding-bottom: 0;
 }
 
 .follow-list {
@@ -621,7 +621,8 @@
 }
 
 .settings-mobile-menu-shell .live-more-menu-title {
-  margin-inline: 16px;
+  margin: 0;
+  padding-inline: 16px;
 }
 
 .settings-panel-card-frame {

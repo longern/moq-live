@@ -1,16 +1,20 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Ban, Copy, RotateCcw, X } from "lucide-react";
+import { Ban, Copy, RotateCcw, UserRound, X } from "lucide-react";
+import {
+  FLOATING_CONTEXT_MENU_EXIT_MS,
+  FloatingActionMenu,
+  getFloatingContextMenuPosition,
+} from "./primitives/FloatingContextMenu.jsx";
 import { LoadingSpinner } from "./primitives/LoadingSpinner.jsx";
 import { SwipeableDrawer } from "./primitives/SwipeableDrawer.jsx";
 import { UserAvatar } from "./primitives/UserAvatar.jsx";
+import { WatchHostProfileSheet } from "./watch/WatchSessionSheets.jsx";
 import { useToast } from "./primitives/FloatingToast.jsx";
+import { useLazyUserProfileSheet } from "../hooks/useLazyUserProfileSheet.js";
 import { useOverlayPortalTarget } from "../hooks/useOverlayPortalTarget.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 
-const CHAT_MESSAGE_MENU_MARGIN = 8;
-const CHAT_MESSAGE_MENU_TOUCH_GAP = 10;
-const CHAT_MESSAGE_MENU_EXIT_MS = 120;
 const CHAT_COMPOSER_AUTOCOMPLETE = "off";
 const CHAT_COMPOSER_FIELD_NAME = "moq_draft_text";
 const CHAT_PANEL_MAX_VISIBLE_MESSAGES = 80;
@@ -107,29 +111,6 @@ function isMessageAfterAnchor(message, anchor) {
   return compareChatMessageOrder(message, anchor) > 0;
 }
 
-function getMeasuredContextMenuPosition(anchorLeft, anchorTop, menuNode, placement) {
-  const rect = menuNode.getBoundingClientRect();
-  const maxLeft = Math.max(
-    CHAT_MESSAGE_MENU_MARGIN,
-    window.innerWidth - rect.width - CHAT_MESSAGE_MENU_MARGIN
-  );
-  const maxTop = Math.max(
-    CHAT_MESSAGE_MENU_MARGIN,
-    window.innerHeight - rect.height - CHAT_MESSAGE_MENU_MARGIN
-  );
-  const preferredLeft = placement === "above-point"
-    ? anchorLeft - rect.width / 2
-    : anchorLeft;
-  const preferredTop = placement === "above-point"
-    ? anchorTop - rect.height - CHAT_MESSAGE_MENU_TOUCH_GAP
-    : anchorTop;
-
-  return {
-    left: Math.max(CHAT_MESSAGE_MENU_MARGIN, Math.min(preferredLeft, maxLeft)),
-    top: Math.max(CHAT_MESSAGE_MENU_MARGIN, Math.min(preferredTop, maxTop)),
-  };
-}
-
 function ChatMessageMutePanel({
   message,
   muteRetractMessage,
@@ -182,12 +163,14 @@ function ChatMessageMutePanel({
 
 function ChatMessageContextMenu({
   canMute,
+  canOpenProfile,
   canRetract,
   closing,
   left,
   menuRef,
   onClose,
   onCopy,
+  onOpenProfile,
   onOpenMute,
   onRetract,
   open,
@@ -195,76 +178,54 @@ function ChatMessageContextMenu({
   top,
 }) {
   const { t } = useI18n();
-  const overlayPortalTarget = useOverlayPortalTarget();
 
   if (!open) {
     return null;
   }
 
-  const menu = (
-    <>
-      <button
-        type="button"
-        className={`chat-message-context-backdrop${closing ? " is-closing" : ""}`}
-        aria-label={t("chat.closeContextMenu")}
-        onClick={onClose}
-      />
-      <div
-        ref={menuRef}
-        className={[
-          "chat-message-context-menu",
-          closing ? "is-closing" : "",
-          positioned ? "" : "is-measuring",
-        ].filter(Boolean).join(" ")}
-        role="menu"
-        style={{ left: `${left}px`, top: `${top}px` }}
-      >
-        <button
-          type="button"
-          className="chat-message-context-action"
-          role="menuitem"
-          onClick={onCopy}
-        >
-          <span className="chat-message-context-icon">
-            <Copy aria-hidden="true" />
-          </span>
-          <span>{t("chat.copy")}</span>
-        </button>
-        {canRetract ? (
-          <button
-            type="button"
-            className="chat-message-context-action"
-            role="menuitem"
-            onClick={onRetract}
-          >
-            <span className="chat-message-context-icon">
-              <RotateCcw aria-hidden="true" />
-            </span>
-            <span>{t("chat.retract")}</span>
-          </button>
-        ) : null}
-        {canMute ? (
-          <button
-            type="button"
-            className="chat-message-context-action"
-            role="menuitem"
-            onClick={onOpenMute}
-          >
-            <span className="chat-message-context-icon">
-              <Ban aria-hidden="true" />
-            </span>
-            <span>{t("chat.mute")}</span>
-          </button>
-        ) : null}
-      </div>
-    </>
+  const actions = [
+    {
+      id: "profile",
+      hidden: !canOpenProfile,
+      icon: <UserRound aria-hidden="true" />,
+      label: t("chat.profile"),
+      onClick: onOpenProfile,
+    },
+    {
+      id: "copy",
+      icon: <Copy aria-hidden="true" />,
+      label: t("chat.copy"),
+      onClick: onCopy,
+    },
+    {
+      id: "retract",
+      hidden: !canRetract,
+      icon: <RotateCcw aria-hidden="true" />,
+      label: t("chat.retract"),
+      onClick: onRetract,
+    },
+    {
+      id: "mute",
+      hidden: !canMute,
+      icon: <Ban aria-hidden="true" />,
+      label: t("chat.mute"),
+      onClick: onOpenMute,
+    },
+  ];
+
+  return (
+    <FloatingActionMenu
+      actions={actions}
+      ariaLabel={t("chat.closeContextMenu")}
+      closing={closing}
+      left={left}
+      menuRef={menuRef}
+      onClose={onClose}
+      open={open}
+      positioned={positioned}
+      top={top}
+    />
   );
-
-  if (typeof document === "undefined") {
-    return menu;
-  }
-
-  return createPortal(menu, overlayPortalTarget || document.body);
 }
 
 function ChatMessageMuteDialog({
@@ -388,6 +349,11 @@ export function ChatPanel({
   });
   const [muteRetractMessage, setMuteRetractMessage] = useState(true);
   const [welcomeAnchor, setWelcomeAnchor] = useState(null);
+  const {
+    openUserProfile,
+    profileError,
+    profileSheetProps,
+  } = useLazyUserProfileSheet();
 
   function clearContextMenuCloseTimer() {
     if (contextMenuCloseTimerRef.current) {
@@ -443,7 +409,7 @@ export function ChatPanel({
       return;
     }
 
-    const position = getMeasuredContextMenuPosition(
+    const position = getFloatingContextMenuPosition(
       contextMenu.anchorLeft,
       contextMenu.anchorTop,
       contextMenuRef.current,
@@ -544,7 +510,7 @@ export function ChatPanel({
           message: null,
         };
       });
-    }, CHAT_MESSAGE_MENU_EXIT_MS);
+    }, FLOATING_CONTEXT_MENU_EXIT_MS);
   }
 
   function closeMessageMenuImmediately() {
@@ -611,6 +577,17 @@ export function ChatPanel({
       message: contextMenu.message,
     });
     closeMessageMenuImmediately();
+  }
+
+  async function openContextProfile() {
+    const user = contextMenu.message?.user;
+    if (!user?.id) {
+      closeMessageMenu();
+      return;
+    }
+    await openUserProfile(user, {
+      onBeforeOpen: closeMessageMenuImmediately,
+    });
   }
 
   function muteContextMessage(option) {
@@ -806,12 +783,16 @@ export function ChatPanel({
           && contextMenu.message?.user?.id !== authUser?.id
           && onMuteMessage
         )}
+        canOpenProfile={Boolean(contextMenu.message?.user?.id)}
         canRetract={canRetractMessages}
         closing={contextMenu.closing}
         left={contextMenu.left}
         menuRef={contextMenuRef}
         onClose={closeMessageMenu}
         onCopy={copyContextMessage}
+        onOpenProfile={() => {
+          void openContextProfile();
+        }}
         onOpenMute={openMutePanel}
         onRetract={retractContextMessage}
         open={contextMenu.open}
@@ -843,6 +824,12 @@ export function ChatPanel({
           onMuteRetractMessageChange={setMuteRetractMessage}
         />
       </SwipeableDrawer>
+      <WatchHostProfileSheet
+        {...profileSheetProps}
+        portal
+        viewport
+        followButton={profileError ? <p className="inline-warning">{profileError}</p> : null}
+      />
 
       {chatError && !chatRecovering ? (
         <p className={`inline-warning${floating ? " chat-floating-warning" : ""}`}>{chatError}</p>

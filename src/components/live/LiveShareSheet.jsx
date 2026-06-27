@@ -1,5 +1,6 @@
 import { Camera, Copy, QrCode, Share } from "lucide-react";
 import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 export function LiveShareSheet({
   open,
@@ -12,15 +13,17 @@ export function LiveShareSheet({
   shareSupported = false,
   watchLink = "",
 }) {
+  const { t } = useI18n();
+
   return (
     <SwipeableDrawer
       open={open}
       onClose={onClose}
-      ariaLabel="关闭分享面板"
+      ariaLabel={t("live.closeSharePanel")}
       className="live-mobile-drawer"
       panelClassName="live-mobile-share-panel"
     >
-      <div className="watch-mobile-more-actions live-share-actions" role="group" aria-label="分享直播间">
+      <div className="watch-mobile-more-actions live-share-actions" role="group" aria-label={t("live.shareRoom")}>
         <button
           type="button"
           className="watch-mobile-more-action"
@@ -29,36 +32,36 @@ export function LiveShareSheet({
             onClose?.();
           }}
           disabled={!watchLink || !shareSupported}
-          aria-label="分享直播间"
+          aria-label={t("live.shareRoom")}
         >
           <span className="watch-mobile-more-action-icon">
             <Share aria-hidden="true" />
           </span>
-          <span>分享</span>
+          <span>{t("live.nativeShare")}</span>
         </button>
         <button
           type="button"
           className="watch-mobile-more-action"
           onClick={onOpenImageShare}
           disabled={!watchLink}
-          aria-label="图片分享"
+          aria-label={t("live.imageShare")}
         >
           <span className="watch-mobile-more-action-icon">
             <QrCode aria-hidden="true" />
           </span>
-          <span>图片分享</span>
+          <span>{t("live.imageShare")}</span>
         </button>
         <button
           type="button"
           className="watch-mobile-more-action"
           onClick={onOpenScreenshotShare}
           disabled={!watchLink || !screenshotShareAvailable}
-          aria-label="截屏分享"
+          aria-label={t("live.screenshotShare")}
         >
           <span className="watch-mobile-more-action-icon">
             <Camera aria-hidden="true" />
           </span>
-          <span>截屏分享</span>
+          <span>{t("live.screenshotShare")}</span>
         </button>
         <button
           type="button"
@@ -68,12 +71,12 @@ export function LiveShareSheet({
             onClose?.();
           }}
           disabled={!watchLink}
-          aria-label="复制直播链接"
+          aria-label={t("live.copyLiveLink")}
         >
           <span className="watch-mobile-more-action-icon">
             <Copy aria-hidden="true" />
           </span>
-          <span>复制链接</span>
+          <span>{t("live.copyLiveLink")}</span>
         </button>
       </div>
     </SwipeableDrawer>

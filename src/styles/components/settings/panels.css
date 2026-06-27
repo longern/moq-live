@@ -178,6 +178,10 @@
 }
 
 .account-field-drawer-panel {
+  overflow: auto;
+}
+
+.account-field-drawer-panel > .swipeable-drawer-panel-content {
   gap: 14px;
   padding: 4px 16px calc(18px + env(safe-area-inset-bottom));
 }

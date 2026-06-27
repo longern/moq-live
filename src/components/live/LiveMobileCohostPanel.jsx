@@ -4,8 +4,10 @@ import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { AudienceIcon, CheckIcon, CloseIcon, CohostIcon, EndBroadcastIcon } from "./liveIcons.jsx";
 import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
 import { LiveSwitch } from "./LiveSwitch.jsx";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 function LiveCohostInviteDialog({ invite, onRespond }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
 
   if (!invite) {
@@ -28,11 +30,11 @@ function LiveCohostInviteDialog({ invite, onRespond }) {
         className="live-cohost-invite-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="连线邀请"
+        aria-label={t("live.cohostInvite")}
       >
         <div className="live-cohost-invite-copy">
           <strong>{invite.requester.displayName || invite.requester.handle}</strong>
-          <span>申请与你连线</span>
+          <span>{t("live.cohostInviteMessage")}</span>
         </div>
         <div className="live-cohost-invite-actions">
           <button
@@ -42,7 +44,7 @@ function LiveCohostInviteDialog({ invite, onRespond }) {
               void respond(false);
             }}
             disabled={busy}
-            aria-label="拒绝连线邀请"
+            aria-label={t("live.rejectCohostInvite")}
           >
             <CloseIcon />
           </button>
@@ -53,7 +55,7 @@ function LiveCohostInviteDialog({ invite, onRespond }) {
               void respond(true);
             }}
             disabled={busy}
-            aria-label="接受连线邀请"
+            aria-label={t("live.acceptCohostInvite")}
           >
             <CheckIcon />
           </button>
@@ -72,18 +74,24 @@ export function LiveMobileCohostPanel({
   recentHosts = [],
   audienceCallEnabled = false,
   audienceCallRequests = [],
+  audienceCallInvites = [],
   audienceCallActive = [],
+  audienceCallInviteViewers = [],
+  audienceTab = "requests",
+  onAudienceTabChange,
   onDisconnect,
   onInvitesAllowedChange,
   onInviteRequest,
   onInviteRespond,
   onAudienceCallEnabledChange,
   onAudienceCallRequestRespond,
+  onAudienceCallInviteViewer,
 }) {
+  const { t } = useI18n();
   const [handle, setHandle] = useState("");
   const [busy, setBusy] = useState(false);
-  const [audienceTab, setAudienceTab] = useState("requests");
   const [audienceResponseBusyId, setAudienceResponseBusyId] = useState("");
+  const [audienceInviteBusyId, setAudienceInviteBusyId] = useState("");
 
   async function submitInvite(nextHandle = handle) {
     const value = String(nextHandle || "").trim().replace(/^@+/, "");
@@ -122,35 +130,64 @@ export function LiveMobileCohostPanel({
     }
   }
 
+  async function inviteAudienceCallViewer(viewer) {
+    if (!viewer?.id || audienceInviteBusyId) {
+      return;
+    }
+
+    setAudienceInviteBusyId(viewer.id);
+    try {
+      await onAudienceCallInviteViewer?.(viewer);
+    } finally {
+      setAudienceInviteBusyId("");
+    }
+  }
+
   const normalizedAudienceCallRequests = Array.isArray(audienceCallRequests)
     ? audienceCallRequests
+    : [];
+  const normalizedAudienceCallInvites = Array.isArray(audienceCallInvites)
+    ? audienceCallInvites
     : [];
   const normalizedAudienceCallActive = Array.isArray(audienceCallActive)
     ? audienceCallActive
     : [];
   const audienceCallActiveCount = normalizedAudienceCallActive.length;
+  const audienceCallActiveUserIds = new Set(
+    normalizedAudienceCallActive
+      .map((item) => String(item.user?.id || "").trim())
+      .filter(Boolean),
+  );
+  const audienceCallInvitedUserIds = new Set(
+    normalizedAudienceCallInvites
+      .map((item) => String(item.user?.id || "").trim())
+      .filter(Boolean),
+  );
+  const inviteViewers = (Array.isArray(audienceCallInviteViewers) ? audienceCallInviteViewers : [])
+    .filter((viewer) => viewer?.id && !audienceCallActiveUserIds.has(viewer.id))
+    .slice(0, 100);
 
   return (
     <>
       <SwipeableDrawer
         open={open}
         onClose={onClose}
-        ariaLabel="关闭连线"
+        ariaLabel={t("live.closeCohost")}
         className="live-mobile-drawer"
         panelClassName="live-mobile-cohost-panel"
       >
         {audienceCallEnabled ? (
           <>
             <div className="live-cohost-head live-audience-call-head">
-              <div className="live-audience-call-tabs" role="tablist" aria-label="观众连线">
+              <div className="live-audience-call-tabs" role="tablist" aria-label={t("live.audienceCall")}>
                 <button
                   type="button"
                   className={audienceTab === "requests" ? "is-active" : ""}
                   role="tab"
                   aria-selected={audienceTab === "requests"}
-                  onClick={() => setAudienceTab("requests")}
+                  onClick={() => onAudienceTabChange?.("requests")}
                 >
-                  申请消息
+                  {t("live.audienceCallRequests")}
                   {audienceCallActiveCount ? ` ${audienceCallActiveCount}/5` : ""}
                 </button>
                 <button
@@ -158,16 +195,16 @@ export function LiveMobileCohostPanel({
                   className={audienceTab === "invite" ? "is-active" : ""}
                   role="tab"
                   aria-selected={audienceTab === "invite"}
-                  onClick={() => setAudienceTab("invite")}
+                  onClick={() => onAudienceTabChange?.("invite")}
                 >
-                  邀请观众
+                  {t("live.inviteAudience")}
                 </button>
               </div>
               <button
                 type="button"
                 className="live-audience-call-close"
                 onClick={closeAudienceCallMode}
-                aria-label="关闭观众连线"
+                aria-label={t("live.closeAudienceCall")}
               >
                 <EndBroadcastIcon />
               </button>
@@ -176,7 +213,7 @@ export function LiveMobileCohostPanel({
               <div className="live-audience-call-list">
                 {normalizedAudienceCallRequests.length > 0 ? (
                   normalizedAudienceCallRequests.map((request) => {
-                    const name = request.user.displayName || "已登录用户";
+                    const name = request.user.displayName || t("common.signedInUser");
                     const activeLimitReached = audienceCallActiveCount >= 5
                       && !normalizedAudienceCallActive.some((item) => item.user?.id === request.user.id);
                     return (
@@ -185,7 +222,7 @@ export function LiveMobileCohostPanel({
                           avatarUrl={request.user.avatarUrl}
                           displayName={name}
                           className="live-cohost-avatar"
-                          imgAlt={`${name}头像`}
+                          imgAlt={t("live.userAvatar", { name })}
                           imgWidth={38}
                           imgHeight={38}
                           monogramClassName="is-monogram"
@@ -201,7 +238,7 @@ export function LiveMobileCohostPanel({
                               void respondAudienceCallRequest(request, false);
                             }}
                             disabled={Boolean(audienceResponseBusyId)}
-                            aria-label={`拒绝${name}的连线申请`}
+                            aria-label={t("live.audienceCallRequestReject", { name })}
                           >
                             <CloseIcon />
                           </button>
@@ -212,7 +249,7 @@ export function LiveMobileCohostPanel({
                               void respondAudienceCallRequest(request, true);
                             }}
                             disabled={Boolean(audienceResponseBusyId) || activeLimitReached}
-                            aria-label={`同意${name}的连线申请`}
+                            aria-label={t("live.audienceCallRequestAccept", { name })}
                           >
                             <CheckIcon />
                           </button>
@@ -221,42 +258,79 @@ export function LiveMobileCohostPanel({
                     );
                   })
                 ) : (
-                  <div className="live-cohost-empty">暂无申请消息</div>
+                  <div className="live-cohost-empty">{t("live.noAudienceCallRequests")}</div>
                 )}
               </div>
             ) : (
-              <div className="live-cohost-empty">暂无可邀请观众</div>
+              <div className="live-audience-call-list">
+                {inviteViewers.length > 0 ? (
+                  inviteViewers.map((viewer) => {
+                    const name = viewer.displayName || t("common.signedInUser");
+                    const activeLimitReached = audienceCallActiveCount >= 5;
+                    const invited = audienceCallInvitedUserIds.has(viewer.id);
+                    return (
+                      <div className="live-audience-call-row" key={viewer.id}>
+                        <UserAvatar
+                          avatarUrl={viewer.avatarUrl}
+                          displayName={name}
+                          className="live-cohost-avatar"
+                          imgAlt={t("live.userAvatar", { name })}
+                          imgWidth={38}
+                          imgHeight={38}
+                          monogramClassName="is-monogram"
+                          placeholderClassName="is-placeholder"
+                          iconClassName="live-cohost-avatar-icon"
+                        />
+                        <span className="live-audience-call-name">{name}</span>
+                        <button
+                          type="button"
+                          className="live-audience-call-invite-button"
+                          onClick={() => {
+                            void inviteAudienceCallViewer(viewer);
+                          }}
+                          disabled={Boolean(audienceInviteBusyId) || activeLimitReached || invited}
+                          aria-label={t("live.inviteAudienceUser", { name })}
+                        >
+                          {invited ? t("live.invited") : t("live.invite")}
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="live-cohost-empty">{t("live.noAudienceToInvite")}</div>
+                )}
+              </div>
             )}
           </>
         ) : (
           <>
             <div className="live-cohost-head">
-              <strong>连线</strong>
+              <strong>{t("live.cohost")}</strong>
             </div>
-            <LiveMenuList className="live-cohost-menu" ariaLabel="连线设置">
+            <LiveMenuList className="live-cohost-menu" ariaLabel={t("live.cohostSettings")}>
               {active ? (
                 <LiveMenuItem
                   className="live-more-menu-item live-cohost-menu-item live-cohost-disconnect-item"
-                  aria-label="断开连线"
+                  aria-label={t("live.disconnectCohost")}
                   onClick={disconnect}
                 >
                   <span className="live-more-menu-icon">
                     <CloseIcon />
                   </span>
-                  <span className="live-more-menu-label">断开连线</span>
+                  <span className="live-more-menu-label">{t("live.disconnectCohost")}</span>
                 </LiveMenuItem>
               ) : null}
               <li className="live-menu-list-item">
                 <button
                   type="button"
                   className="live-menu-item live-more-menu-item live-cohost-menu-item"
-                  aria-label="开启观众连线"
+                  aria-label={t("live.enableAudienceCall")}
                   onClick={() => onAudienceCallEnabledChange?.(true)}
                 >
                   <span className="live-more-menu-icon">
                     <AudienceIcon />
                   </span>
-                  <span className="live-more-menu-label">开启观众连线</span>
+                  <span className="live-more-menu-label">{t("live.enableAudienceCall")}</span>
                 </button>
               </li>
               <li className="live-menu-list-item">
@@ -265,13 +339,13 @@ export function LiveMobileCohostPanel({
                   className="live-menu-item live-more-menu-item live-more-menu-switch-item live-cohost-menu-item"
                   role="switch"
                   aria-checked={invitesAllowed}
-                  aria-label="允许其他主播邀请连线"
+                  aria-label={t("live.allowCohostInvites")}
                   onClick={() => onInvitesAllowedChange?.(!invitesAllowed)}
                 >
                   <span className="live-more-menu-icon">
                     <CohostIcon />
                   </span>
-                  <span className="live-more-menu-label">允许邀请</span>
+                  <span className="live-more-menu-label">{t("live.allowInvites")}</span>
                   <LiveSwitch checked={invitesAllowed} />
                 </button>
               </li>
@@ -286,16 +360,16 @@ export function LiveMobileCohostPanel({
               <input
                 value={handle}
                 onChange={(event) => setHandle(event.currentTarget.value)}
-                placeholder="输入 UID"
+                placeholder={t("live.inputUid")}
                 autoComplete="off"
                 inputMode="text"
               />
               <button type="submit" disabled={!handle.trim() || busy}>
-                申请
+                {t("live.requestCohost")}
               </button>
             </form>
             <div className="live-cohost-recent">
-              <div className="live-cohost-recent-head">最近连线</div>
+              <div className="live-cohost-recent-head">{t("live.recentCohosts")}</div>
               {recentHosts.length > 0 ? (
                 <div className="live-cohost-recent-list">
                   {recentHosts.map((host) => {
@@ -314,7 +388,7 @@ export function LiveMobileCohostPanel({
                           avatarUrl={host.avatarUrl}
                           displayName={name}
                           className="live-cohost-avatar"
-                          imgAlt={`${name}头像`}
+                          imgAlt={t("live.userAvatar", { name })}
                           imgWidth={38}
                           imgHeight={38}
                           monogramClassName="is-monogram"
@@ -327,7 +401,7 @@ export function LiveMobileCohostPanel({
                   })}
                 </div>
               ) : (
-                <div className="live-cohost-empty">暂无最近连线</div>
+                <div className="live-cohost-empty">{t("live.noRecentCohosts")}</div>
               )}
             </div>
           </>

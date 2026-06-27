@@ -291,6 +291,7 @@ export function useSettingsFollowsPanel({
     closeFollowsPanel,
     confirmUnfollow,
     followsPanelOpen,
+    followsState,
     loadFollows,
     openFollowsPanel,
     openFollowUserRoom,

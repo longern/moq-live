@@ -25,6 +25,7 @@ export class ChatRoomDO {
     this.env = env;
     this.recentMessages = [];
     this.roomState = getDefaultRoomState();
+    this.audienceCallSpeakingUserIds = [];
     this.ready = this.ctx.blockConcurrencyWhile(async () => {
       this.recentMessages =
         (await this.ctx.storage.get("recentMessages")) ?? [];
@@ -55,7 +56,11 @@ export class ChatRoomDO {
         roomMeta: this.roomState.roomMeta,
         location: getPublicRoomLocation(this.roomState.location),
         cohost: this.roomState.cohost,
-        audienceCall: getPublicAudienceCallState(this.roomState.audienceCall),
+        audienceCall: getPublicAudienceCallState(
+          this.roomState.audienceCall,
+          false,
+          this.audienceCallSpeakingUserIds,
+        ),
       });
     }
 
@@ -146,6 +151,7 @@ export class ChatRoomDO {
       audienceCall: getPublicAudienceCallState(
         this.roomState.audienceCall,
         canControlBroadcast,
+        this.audienceCallSpeakingUserIds,
       ),
       moderation: getPublicModerationState(
         this.roomState.moderation,
@@ -251,8 +257,23 @@ export class ChatRoomDO {
       return;
     }
 
+    if (payload?.type === "audience_call.request.cancel") {
+      await audiencecallHandlers.handleAudienceCallRequestCancel(this, ws, session);
+      return;
+    }
+
     if (payload?.type === "audience_call.respond") {
       await audiencecallHandlers.handleAudienceCallRespond(this, ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "audience_call.invite") {
+      await audiencecallHandlers.handleAudienceCallInvite(this, ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "audience_call.invite.respond") {
+      await audiencecallHandlers.handleAudienceCallInviteRespond(this, ws, session, payload);
       return;
     }
 
@@ -261,8 +282,23 @@ export class ChatRoomDO {
       return;
     }
 
+    if (payload?.type === "audience_call.viewer_failed") {
+      audiencecallHandlers.handleAudienceCallViewerFailed(this, ws, session, payload);
+      return;
+    }
+
     if (payload?.type === "audience_call.viewer_leave") {
       audiencecallHandlers.handleAudienceCallViewerLeave(this, ws, session);
+      return;
+    }
+
+    if (payload?.type === "audience_call.active.remove") {
+      await audiencecallHandlers.handleAudienceCallActiveRemove(this, ws, session, payload);
+      return;
+    }
+
+    if (payload?.type === "audience_call.speaking") {
+      audiencecallHandlers.handleAudienceCallSpeakingUpdate(this, ws, session, payload);
       return;
     }
 
@@ -381,6 +417,7 @@ export class ChatRoomDO {
   getPresenceSnapshot(options = {}) {
     const loggedInViewersById = new Map();
     let anonymousViewerCount = 0;
+    const now = Date.now();
 
     for (const { session } of this.getActiveSessions(options)) {
       if (session.role === "broadcaster") {
@@ -392,7 +429,9 @@ export class ChatRoomDO {
         continue;
       }
 
-      if (loggedInViewersById.has(session.user.id)) {
+      const watchDurationMs = Math.max(0, now - (Number(session.connectedAt) || now));
+      const existingViewer = loggedInViewersById.get(session.user.id);
+      if (existingViewer && existingViewer.watchDurationMs >= watchDurationMs) {
         continue;
       }
 
@@ -400,13 +439,15 @@ export class ChatRoomDO {
         id: session.user.id,
         displayName: session.user.displayName || "已登录用户",
         avatarUrl: session.user.avatarUrl || "",
+        watchDurationMs,
       });
     }
 
     const loggedInViewers = Array.from(loggedInViewersById.values()).sort(
       (left, right) =>
+        right.watchDurationMs - left.watchDurationMs ||
         left.displayName.localeCompare(right.displayName, "zh-Hans-CN"),
-    );
+    ).slice(0, 100);
 
     return {
       onlineCount: anonymousViewerCount + loggedInViewers.length,

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { WatchPage } from "./WatchPage.jsx";
 import { describePlayerState } from "../lib/status.js";
 
@@ -54,6 +55,29 @@ export function AppWatchPageSection({ context }) {
     watchTestChannel,
     watchWelcomeMessage,
   } = context;
+  const audienceCallConnected = Boolean(chat.audienceCallRealtimeSession);
+  const setPlayerMute = player.setPlayerMute;
+  const audienceCallPreviousMuteRef = useRef(null);
+
+  useEffect(() => {
+    if (audienceCallConnected) {
+      if (audienceCallPreviousMuteRef.current === null) {
+        audienceCallPreviousMuteRef.current = player.playerMuted;
+      }
+      void setPlayerMute?.(true).catch((error) => {
+        log(`mute live playback for audience call failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
+      return;
+    }
+
+    if (audienceCallPreviousMuteRef.current !== null) {
+      const previousMuted = audienceCallPreviousMuteRef.current;
+      audienceCallPreviousMuteRef.current = null;
+      void setPlayerMute?.(previousMuted).catch((error) => {
+        log(`restore live playback mute after audience call failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
+    }
+  }, [audienceCallConnected, log, player.playerMuted, setPlayerMute]);
 
   return (
     <WatchPage
@@ -111,7 +135,7 @@ export function AppWatchPageSection({ context }) {
         badge: playerBadge,
         fullscreenActive: player.fullscreenActive,
         paused: watchingTestChannel ? false : player.playerPaused,
-        muted: watchingTestChannel ? true : player.playerMuted,
+        muted: watchingTestChannel ? true : audienceCallConnected || player.playerMuted,
         showTapToUnmute: watchingTestChannel ? false : player.showTapToUnmute,
         orientation: effectivePlayerOrientation,
         stageRef: player.watchStageRef,
@@ -145,6 +169,10 @@ export function AppWatchPageSection({ context }) {
         onlineCount: chat.onlineCount,
         loggedInViewers: chat.loggedInViewers,
         audienceCallEnabled: chat.audienceCallEnabled,
+        audienceCallRequests: chat.audienceCallRequests,
+        audienceCallInvite: chat.audienceCallInvite,
+        audienceCallActive: chat.audienceCallActive,
+        audienceCallSpeakingUserIds: chat.audienceCallSpeakingUserIds,
         audienceCallRealtimeSession: chat.audienceCallRealtimeSession,
         readOnly: chat.readOnly,
         error: chat.chatError,
@@ -193,6 +221,12 @@ export function AppWatchPageSection({ context }) {
         },
         onAudienceCallRequest: () => {
           return chat.requestAudienceCall?.() ?? false;
+        },
+        onAudienceCallRequestCancel: () => {
+          return chat.cancelAudienceCallRequest?.() ?? false;
+        },
+        onAudienceCallInviteRespond: (inviteId, accepted) => {
+          return chat.respondAudienceCallInvite?.(inviteId, accepted) ?? false;
         },
         onAudienceCallDisconnect: () => {
           return chat.leaveAudienceCall?.() ?? false;

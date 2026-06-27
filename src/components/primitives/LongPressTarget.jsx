@@ -70,6 +70,12 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
     }, longPressDelay);
   }
 
+  function handleTouchStartCapture(event) {
+    if (event.touches.length !== 1) {
+      clearLongPressTimer();
+    }
+  }
+
   function handleTouchMove(event) {
     onTouchMove?.(event);
     const origin = touchRef.current;
@@ -82,6 +88,12 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
     const moved = Math.abs(touch.clientX - origin.clientX) > longPressMoveTolerance
       || Math.abs(touch.clientY - origin.clientY) > longPressMoveTolerance;
     if (moved) {
+      clearLongPressTimer();
+    }
+  }
+
+  function handleTouchMoveCapture(event) {
+    if (event.touches.length !== 1) {
       clearLongPressTimer();
     }
   }
@@ -124,7 +136,9 @@ export const LongPressTarget = forwardRef(function LongPressTarget({
       className={rootClassName}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
+      onTouchStartCapture={handleTouchStartCapture}
       onTouchStart={handleTouchStart}
+      onTouchMoveCapture={handleTouchMoveCapture}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchCancel}

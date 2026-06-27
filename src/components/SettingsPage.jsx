@@ -19,7 +19,7 @@ import {
   SettingsIcon,
   WatchHistorySection,
 } from "./settings/SettingsPageSections.jsx";
-import { SettingsFollowsDrawer } from "./settings/SettingsFollowsDrawer.jsx";
+import { SettingsFollowsContent, SettingsFollowsDrawer } from "./settings/SettingsFollowsDrawer.jsx";
 import { SwipeableDrawer } from "./primitives/SwipeableDrawer.jsx";
 import { useToast } from "./primitives/FloatingToast.jsx";
 import {
@@ -212,6 +212,22 @@ export function SettingsPage({
     openLoginPanel();
   }
 
+  function openDesktopFollowsSection(type) {
+    followsPanel.openFollowsPanel(type, { updateRoute: false });
+    if (authUser) {
+      setDesktopSection(type);
+    }
+  }
+
+  function selectDesktopSection(section) {
+    if (section === "following" || section === "followers") {
+      openDesktopFollowsSection(section);
+      return;
+    }
+
+    setDesktopSection(section);
+  }
+
   function closeAccountPanel() {
     closeRoutedSettingsPanel("account", () => {
       setAccountPanelOpen(false);
@@ -241,6 +257,12 @@ export function SettingsPage({
     setAccountPanelOpen(Boolean(authUser));
   }, [authPending, authUser, hidden, isMobilePanelViewport, routePanelType]);
 
+  useEffect(() => {
+    if (!authUser && (desktopSection === "following" || desktopSection === "followers")) {
+      setDesktopSection("account");
+    }
+  }, [authUser, desktopSection]);
+
   return (
     <section className="page" data-page="settings" hidden={hidden}>
       <div className="page-grid settings-layout">
@@ -261,7 +283,7 @@ export function SettingsPage({
             <aside className="profile-page-aside">
               <DesktopSettingsSidebar
                 activeSection={desktopSection}
-                onSelectSection={setDesktopSection}
+                onSelectSection={selectDesktopSection}
               />
             </aside>
 
@@ -274,6 +296,14 @@ export function SettingsPage({
                     {authUser ? (
                       <DesktopAccountDetailsContent
                         {...accountEditor.desktopAccountProps}
+                        followerCount={profileFollowerCount}
+                        followingCount={profileFollowingCount}
+                        onOpenFollowers={() => {
+                          openDesktopFollowsSection("followers");
+                        }}
+                        onOpenFollowing={() => {
+                          openDesktopFollowsSection("following");
+                        }}
                       />
                     ) : (
                       <div className="my-empty-state my-login-empty">
@@ -297,6 +327,37 @@ export function SettingsPage({
                     onClearWatchHistory={onClearWatchHistory}
                     onOpenWatchHistoryItem={onOpenWatchHistoryItem}
                   />
+                ) : null}
+
+                {desktopSection === "following" || desktopSection === "followers" ? (
+                  <SectionBlock title={getFollowsPanelTitle(desktopSection, t)}>
+                    <div className="desktop-follows-content follows-panel-body">
+                      <SettingsFollowsContent
+                        error={followsPanel.followsState[desktopSection]?.error || ""}
+                        hasMore={Boolean(followsPanel.followsState[desktopSection]?.hasMore)}
+                        items={followsPanel.followsState[desktopSection]?.items || []}
+                        loading={Boolean(followsPanel.followsState[desktopSection]?.loading)}
+                        loadingMore={Boolean(followsPanel.followsState[desktopSection]?.loadingMore)}
+                        onLoadMore={() => {
+                          void followsPanel.loadFollows(desktopSection);
+                        }}
+                        onOpenUserRoom={followsPanel.openFollowUserRoom}
+                        onRequestUnfollow={followsPanel.requestUnfollow}
+                        onRetry={() => {
+                          void followsPanel.loadFollows(desktopSection, { reset: true });
+                        }}
+                        onCancelUnfollow={followsPanel.cancelUnfollow}
+                        onConfirmUnfollow={() => {
+                          void followsPanel.confirmUnfollow();
+                        }}
+                        pendingUnfollowUser={followsPanel.pendingUnfollowUser}
+                        title={getFollowsPanelTitle(desktopSection, t)}
+                        type={desktopSection}
+                        unfollowBusy={followsPanel.unfollowBusy}
+                        unfollowError={followsPanel.unfollowError}
+                      />
+                    </div>
+                  </SectionBlock>
                 ) : null}
 
                 {desktopSection === "advanced" ? (
@@ -556,7 +617,7 @@ export function SettingsPage({
           ) : null)}
         </MobilePanelPresence>
 
-        <MobilePanelPresence open={Boolean(followsPanel.followsPanelOpen && authUser)}>
+        <MobilePanelPresence open={Boolean(isMobilePanelViewport && followsPanel.followsPanelOpen && authUser)}>
           {({ transitionClassName }) => followsPanel.visibleFollowsPanelType ? (
             <SettingsFollowsDrawer
               error={followsPanel.activeFollowsState.error}

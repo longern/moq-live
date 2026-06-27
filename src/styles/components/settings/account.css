@@ -426,6 +426,45 @@
   white-space: nowrap;
 }
 
+.desktop-account-profile-stats {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 40px 16px;
+}
+
+.desktop-account-profile-stat-button {
+  min-width: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: baseline;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  box-shadow: none;
+}
+
+.desktop-account-profile-stat-button:hover,
+.desktop-account-profile-stat-button:focus-visible {
+  background: transparent;
+  color: var(--muted);
+}
+
+.desktop-account-profile-stat-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 4px;
+}
+
+.desktop-account-profile-stats strong {
+  margin-right: 4px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .desktop-account-edit-profile-container {
   flex: 1 0 auto;
   display: flex;

@@ -11,7 +11,6 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  backdrop-filter: none;
   box-shadow: none;
   pointer-events: auto;
 }
@@ -174,7 +173,6 @@
   border-radius: 16px;
   background: rgba(9, 15, 24, 0.94);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(18px);
   transform-origin: top left;
   animation: chat-message-context-menu-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1)
     both;
@@ -214,6 +212,10 @@
 .chat-message-context-action:focus-visible {
   background: rgba(255, 255, 255, 0.08);
   transform: none;
+}
+
+.chat-message-context-action.is-danger {
+  color: #ffb7aa;
 }
 
 .chat-message-context-action:focus-visible {
@@ -736,6 +738,10 @@ pre {
   width: 18px;
   height: 18px;
   fill: currentColor;
+}
+
+.chat-message-mute-drawer-panel > .swipeable-drawer-panel-content {
+  padding: 6px 16px 18px;
 }
 
 .watch-composer-more-extra {

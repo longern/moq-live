@@ -20,15 +20,16 @@ import {
   ShareIcon
 } from "./liveIcons.jsx";
 import { LiveMenuItem, LiveMenuList } from "./LiveMenuList.jsx";
+import { LiveAudienceCallOverlay } from "./LiveAudienceCallOverlay.jsx";
 import { LiveMoreMenu } from "./LiveMoreMenu.jsx";
 import { LivePreviewStage } from "./LivePreviewStage.jsx";
 import { LiveQualityMenu } from "./LiveQualityMenu.jsx";
 
-function getCameraStatusLabel(cameraMode) {
+function getCameraStatusLabel(cameraMode, t) {
   if (cameraMode === "off") {
-    return "当前已关闭";
+    return t("live.cameraStatusOff");
   }
-  return cameraMode === "rear" ? "当前后置" : "当前前置";
+  return cameraMode === "rear" ? t("live.cameraStatusRear") : t("live.cameraStatusFront");
 }
 
 function LiveDesktopPanel({ children, className = "" }) {
@@ -48,14 +49,16 @@ function CameraPanel({
   onCameraChange,
   onCycleCamera,
 }) {
+  const { t } = useI18n();
+
   return (
     <>
       <div className="live-desktop-panel-head">
-        <strong>摄像头</strong>
-        <span>{getCameraStatusLabel(cameraMode)}</span>
+        <strong>{t("live.camera")}</strong>
+        <span>{getCameraStatusLabel(cameraMode, t)}</span>
       </div>
       <label>
-        选择设备
+        {t("live.selectDevice")}
         <select
           id="cameraSelect"
           value={selectedCameraId}
@@ -69,7 +72,7 @@ function CameraPanel({
       </label>
       <div className="action-row">
         <button type="button" className="secondary" onClick={onCycleCamera}>
-          翻转摄像头
+          {t("live.flipCameraFull")}
         </button>
       </div>
     </>
@@ -84,13 +87,15 @@ function MicrophonePanel({
   onMicrophoneChange,
   onToggleMicrophone,
 }) {
+  const { t } = useI18n();
+
   return (
     <>
       <div className="live-desktop-panel-head live-microphone-panel-head">
-        <strong>麦克风</strong>
+        <strong>{t("live.microphone")}</strong>
       </div>
       <label className="live-panel-field">
-        <span>选择设备</span>
+        <span>{t("live.selectDevice")}</span>
         <select id="microphoneSelect" value={selectedMicrophoneId} onChange={onMicrophoneChange} disabled={isPublishing}>
           {microphoneOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
@@ -104,7 +109,7 @@ function MicrophonePanel({
           onClick={onToggleMicrophone}
         >
           <MicrophoneIcon enabled={microphoneEnabled} />
-          <span>{microphoneEnabled ? "关闭麦克风" : "打开麦克风"}</span>
+          <span>{microphoneEnabled ? t("live.closeMicrophone") : t("live.openMicrophone")}</span>
         </button>
       </div>
     </>
@@ -141,6 +146,8 @@ function ShareLinkPanel({
   shareSupported,
   onClose,
 }) {
+  const { t } = useI18n();
+
   async function handleShareLink() {
     await onShare?.();
     onClose?.();
@@ -162,36 +169,36 @@ function ShareLinkPanel({
   }
 
   return (
-    <div className="live-more-menu-shell" aria-label="分享直播间">
-      <div className="live-more-menu-title">分享直播间</div>
+    <div className="live-more-menu-shell" aria-label={t("live.shareRoom")}>
+      <div className="live-more-menu-title">{t("live.shareRoom")}</div>
       <LiveMenuList className="live-more-menu-list live-desktop-share-menu-list">
         <LiveDesktopShareMenuItem
           icon={<Share aria-hidden="true" />}
-          label="分享"
+          label={t("live.nativeShare")}
           onClick={handleShareLink}
           disabled={!watchLink || !shareSupported}
-          ariaLabel="分享直播间"
+          ariaLabel={t("live.shareRoom")}
         />
         <LiveDesktopShareMenuItem
           icon={<QrCode aria-hidden="true" />}
-          label="图片分享"
+          label={t("live.imageShare")}
           onClick={handleImageShare}
           disabled={!watchLink}
-          ariaLabel="图片分享"
+          ariaLabel={t("live.imageShare")}
         />
         <LiveDesktopShareMenuItem
           icon={<Camera aria-hidden="true" />}
-          label="截屏分享"
+          label={t("live.screenshotShare")}
           onClick={handleScreenshotShare}
           disabled={!watchLink || !screenshotShareAvailable}
-          ariaLabel="截屏分享"
+          ariaLabel={t("live.screenshotShare")}
         />
         <LiveDesktopShareMenuItem
           icon={<Copy aria-hidden="true" />}
-          label="复制链接"
+          label={t("live.copyLiveLink")}
           onClick={handleCopyLink}
           disabled={!watchLink}
-          ariaLabel="复制直播链接"
+          ariaLabel={t("live.copyLiveLink")}
         />
       </LiveMenuList>
     </div>
@@ -271,8 +278,10 @@ export function LiveDesktopPage({
   publish = {},
   media = {},
   settings = {},
+  cohost = {},
   chat = {},
   auth = {},
+  audienceCall = {},
   actions = {},
 }) {
   const { t } = useI18n();
@@ -353,6 +362,19 @@ export function LiveDesktopPage({
     mutedUsers = [],
   } = chat;
   const {
+    enabled: audienceCallEnabled = false,
+    active: audienceCallActive = [],
+    mutedUserIds: audienceCallMutedUserIds = [],
+    speakingUserIds: audienceCallSpeakingUserIds = [],
+  } = audienceCall;
+  const {
+    active: cohostActive = null,
+    playerSession: cohostPlayerSession = null,
+    playerMuted: cohostPlayerMuted = true,
+    playerRef: cohostPlayerRef,
+    playerStatus: cohostPlayerStatus = "",
+  } = cohost;
+  const {
     available: authAvailable,
     loading: authLoading,
     user: authUser,
@@ -390,21 +412,23 @@ export function LiveDesktopPage({
     onRequestClose,
     onSelectLiveMode,
     onRoomInfoBlocked,
+    onAudienceCallUserMuteChange,
+    onAudienceCallUserDisconnect,
   } = actions;
   const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
   const hasSingleMicrophone = (microphoneOptions?.length ?? 0) === 1;
   const publishControlActive = isPublishing || isStarting;
   const screenShareUnavailableReason = !screenShareSupported
-    ? "当前浏览器不支持屏幕分享"
+    ? t("live.screenShareUnsupported")
     : isPublishing
-      ? "直播中不能切换共享源"
+      ? t("live.screenShareLiveLocked")
       : "";
   const screenShareUnavailable = Boolean(screenShareUnavailableReason);
   const screenShareButtonLabel = screenShareUnavailable
     ? screenShareUnavailableReason
     : screenShareActive
-      ? "停止屏幕分享"
-      : "屏幕分享";
+      ? t("live.stopScreenShare")
+      : t("live.screenShare");
   const desktopHostId = shareTarget || room || roomLabel;
   const hostDisplayName = authUser?.displayName || roomLabel;
   const hostHandle = authUser?.handle || "";
@@ -481,9 +505,9 @@ export function LiveDesktopPage({
 
     try {
       await navigator.clipboard.writeText(normalizedHandle);
-      showToast("UID 复制成功");
+      showToast(t("live.copiedUid"));
     } catch {
-      showToast("复制失败");
+      showToast(t("live.copiedFailed"));
     }
   }
 
@@ -565,7 +589,10 @@ export function LiveDesktopPage({
       onClose={() => setOpenPanel("")}
     />
   ) : null;
-  const activePanelClassName = openPanel === "microphone" ? "is-microphone-panel" : "";
+  const activePanelClassName = [
+    openPanel === "microphone" ? "is-microphone-panel" : "",
+    openPanel === "more" ? "live-more-menu-panel" : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <section
@@ -579,7 +606,7 @@ export function LiveDesktopPage({
             type="button"
             className={`live-page-close${publishControlActive ? " is-live-control" : ""}`}
             onClick={publishControlActive ? onTogglePublish : onRequestClose}
-            aria-label={publishControlActive ? (isStarting ? "取消开播" : "结束直播") : "退出开播页"}
+            aria-label={publishControlActive ? (isStarting ? t("live.cancelStart") : t("live.endBroadcast")) : t("live.closeLivePage")}
           >
             {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
           </button>
@@ -588,13 +615,13 @@ export function LiveDesktopPage({
               className="live-desktop-host-profile-trigger"
               role="group"
               tabIndex={0}
-              aria-label="查看主播信息"
+              aria-label={t("live.viewHostInfo")}
             >
               <UserAvatar
                 avatarUrl={roomAvatarUrl}
                 displayName={hostChipLabel}
                 className="live-desktop-head-avatar"
-                imgAlt={hostChipLabel || "主播头像"}
+                imgAlt={hostChipLabel || t("live.hostAvatar")}
                 imgWidth={30}
                 imgHeight={30}
                 monogramClassName="is-monogram"
@@ -604,7 +631,7 @@ export function LiveDesktopPage({
               <div
                 className="live-desktop-host-profile-popover"
                 role="dialog"
-                aria-label="主播信息"
+                aria-label={t("live.hostInfo")}
               >
                 <WatchHostProfileContent
                   hostAvatarUrl={roomAvatarUrl}
@@ -627,14 +654,14 @@ export function LiveDesktopPage({
           </div>
         </div>
         {!publishControlActive ? (
-          <div className="live-mode-switch" role="group" aria-label="开播模式">
+          <div className="live-mode-switch" role="group" aria-label={t("live.modeSwitch")}>
             <button
               type="button"
               className={mediaMode === "video" ? "is-active" : ""}
               onClick={() => onSelectLiveMode?.("video")}
               aria-pressed={mediaMode === "video"}
             >
-              视频
+              {t("live.videoMode")}
             </button>
             <button
               type="button"
@@ -642,7 +669,7 @@ export function LiveDesktopPage({
               onClick={() => onSelectLiveMode?.("voice")}
               aria-pressed={mediaMode === "voice"}
             >
-              语音
+              {t("live.voiceMode")}
             </button>
           </div>
         ) : null}
@@ -659,6 +686,19 @@ export function LiveDesktopPage({
               mediaMode={mediaMode}
               cameraEnabled={cameraEnabled}
               mirrorPreview={mirrorPreview}
+              cohostActive={cohostActive}
+              cohostPlayerSession={cohostPlayerSession}
+              cohostPlayerMuted={cohostPlayerMuted}
+              cohostPlayerRef={cohostPlayerRef}
+              cohostPlayerStatus={cohostPlayerStatus}
+            />
+            <LiveAudienceCallOverlay
+              active={audienceCallActive}
+              enabled={audienceCallEnabled}
+              mutedUserIds={audienceCallMutedUserIds}
+              speakingUserIds={audienceCallSpeakingUserIds}
+              onDisconnectUser={onAudienceCallUserDisconnect}
+              onMuteUserChange={onAudienceCallUserMuteChange}
             />
           </div>
           <div className="live-desktop-overlay">
@@ -666,7 +706,7 @@ export function LiveDesktopPage({
               <button
                 type="button"
                 className="live-desktop-backdrop"
-                aria-label="关闭浮动面板"
+                aria-label={t("live.closeFloatingPanel")}
                 onClick={() => setOpenPanel("")}
               />
             ) : null}
@@ -678,26 +718,26 @@ export function LiveDesktopPage({
             <div className="live-desktop-dock">
               <LiveDesktopPanel className={activePanelClassName}>{activePanel}</LiveDesktopPanel>
 
-              <div className="live-desktop-actions" role="toolbar" aria-label="开播控制">
+              <div className="live-desktop-actions" role="toolbar" aria-label={t("live.liveControls")}>
                 <button
                   type="button"
                   className={`live-dock-button${mediaMode === "voice" ? " is-muted" : ""}${cameraUnavailable ? " is-unavailable has-tooltip" : ""}`}
                   onClick={handleCameraFlip}
                   aria-label={
                     mediaMode === "voice"
-                      ? "语音模式下摄像头已关闭"
+                      ? t("live.cameraDisabledInVoiceMode")
                       : cameraUnavailable
-                        ? "未检测到可用摄像头"
-                        : `翻转摄像头，当前${cameraMode === "rear" ? "后摄" : "前摄"}`
+                        ? t("live.unavailableCamera")
+                        : t("live.flipCameraAria", { mode: cameraMode })
                   }
                   aria-describedby={cameraUnavailable ? "cameraUnavailableTooltip" : undefined}
                   aria-disabled={mediaMode === "voice" || cameraUnavailable ? "true" : undefined}
-                  title={cameraUnavailable ? "未检测到可用摄像头" : "翻转摄像头"}
+                  title={cameraUnavailable ? t("live.unavailableCamera") : t("live.flipCameraFull")}
                 >
                   <FlipCameraIcon />
                   {cameraUnavailable ? (
                     <span id="cameraUnavailableTooltip" className="live-dock-tooltip" role="tooltip">
-                      未检测到可用摄像头
+                      {t("live.unavailableCamera")}
                     </span>
                   ) : null}
                 </button>
@@ -705,9 +745,9 @@ export function LiveDesktopPage({
                   type="button"
                   className={`live-dock-button${openPanel === "microphone" ? " is-active" : ""}${microphoneEnabled ? "" : " is-muted"}`}
                   onClick={handleMicrophoneClick}
-                  aria-label={hasSingleMicrophone ? (microphoneEnabled ? "关闭麦克风" : "打开麦克风") : "麦克风设置"}
+                  aria-label={hasSingleMicrophone ? (microphoneEnabled ? t("live.closeMicrophone") : t("live.openMicrophone")) : t("live.microphoneSettings")}
                   aria-expanded={hasSingleMicrophone ? undefined : openPanel === "microphone"}
-                  title={hasSingleMicrophone ? (microphoneEnabled ? "关闭麦克风" : "打开麦克风") : "麦克风"}
+                  title={hasSingleMicrophone ? (microphoneEnabled ? t("live.closeMicrophone") : t("live.openMicrophone")) : t("live.microphone")}
                 >
                   <MicrophoneIcon enabled={microphoneEnabled} />
                 </button>
@@ -731,8 +771,8 @@ export function LiveDesktopPage({
                   type="button"
                   className={`live-dock-button live-dock-button-primary${isPublishing ? " is-live" : ""}${isStarting ? " is-starting" : ""}`}
                   onClick={onTogglePublish}
-                  aria-label={publishControlActive ? (isStarting ? "正在开始直播" : "结束直播") : "开始直播"}
-                  title={publishControlActive ? (isStarting ? "正在开始直播" : "结束直播") : "开始直播"}
+                  aria-label={publishControlActive ? (isStarting ? t("live.startingBroadcast") : t("live.endBroadcast")) : t("live.startBroadcast")}
+                  title={publishControlActive ? (isStarting ? t("live.startingBroadcast") : t("live.endBroadcast")) : t("live.startBroadcast")}
                   disabled={isStarting || publishBlocked || (!cameraEnabled && !microphoneEnabled)}
                 >
                   <BroadcastIcon active={publishControlActive} />
@@ -741,9 +781,9 @@ export function LiveDesktopPage({
                   type="button"
                   className={`live-dock-button${openPanel === "quality" ? " is-active" : ""}`}
                   onClick={() => setOpenPanel((current) => (current === "quality" ? "" : "quality"))}
-                  aria-label="画质设置"
+                  aria-label={t("live.qualitySettings")}
                   aria-expanded={openPanel === "quality"}
-                  title="画质"
+                  title={t("live.quality")}
                 >
                   <QualityIcon />
                 </button>
@@ -751,9 +791,9 @@ export function LiveDesktopPage({
                   type="button"
                   className={`live-dock-button${openPanel === "link" ? " is-active" : ""}`}
                   onClick={() => setOpenPanel((current) => (current === "link" ? "" : "link"))}
-                  aria-label="链接与分享"
+                  aria-label={t("live.linksAndShare")}
                   aria-expanded={openPanel === "link"}
-                  title="链接"
+                  title={t("live.links")}
                 >
                   <ShareIcon />
                 </button>
@@ -761,9 +801,9 @@ export function LiveDesktopPage({
                   type="button"
                   className={`live-dock-button${openPanel === "more" ? " is-active" : ""}`}
                   onClick={() => setOpenPanel((current) => (current === "more" ? "" : "more"))}
-                  aria-label="更多"
+                  aria-label={t("live.more")}
                   aria-expanded={openPanel === "more"}
-                  title="更多"
+                  title={t("live.more")}
                 >
                   <MoreIcon />
                 </button>
@@ -791,7 +831,7 @@ export function LiveDesktopPage({
             canRetractMessages={canRetractMessages}
             onMuteMessage={onChatMessageMute}
             onRetractMessage={onChatMessageRetract}
-            title="评论"
+            title={t("chat.title")}
             showWelcome={false}
           />
         </aside>

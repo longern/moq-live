@@ -1,12 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatedDialog } from "../AnimatedDialog.jsx";
 import { LoadingSpinner } from "../primitives/LoadingSpinner.jsx";
 import { UserAvatar } from "../primitives/UserAvatar.jsx";
 import { WatchHostProfileSheet } from "../watch/WatchSessionSheets.jsx";
 import { SettingsPanelShell } from "./SettingsPanelShell.jsx";
-import { formatAudienceCount } from "../../lib/audience.js";
-import { createApiError, getAppErrorMessage } from "../../lib/appErrors.js";
-import { buildHostProfileInfoItems } from "../../lib/watchSession.js";
+import { useLazyUserProfileSheet } from "../../hooks/useLazyUserProfileSheet.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 function PaginationControls({
@@ -155,13 +153,12 @@ function UnfollowConfirmDialog({
   );
 }
 
-export function SettingsFollowsDrawer({
+export function SettingsFollowsContent({
   error,
   hasMore,
   items,
   loading,
   loadingMore,
-  onClose,
   onConfirmUnfollow,
   onLoadMore,
   onOpenUserRoom,
@@ -173,86 +170,18 @@ export function SettingsFollowsDrawer({
   type,
   unfollowBusy,
   unfollowError,
-  transitionClassName,
 }) {
   const { t } = useI18n();
   const initialLoading = loading && !items.length;
   const showFollowingAction = type === "following";
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [profileUser, setProfileUser] = useState(null);
-  const [profileError, setProfileError] = useState("");
-  const profileRequestIdRef = useRef(0);
-  const profileUserName = profileUser?.displayName || profileUser?.handle || profileUser?.email || t("common.anonymousUser");
-  const profileUserHandle = profileUser?.handle || "";
-  const profileInfoItems = profileUser
-    ? buildHostProfileInfoItems({
-      gender: profileUser.gender || "",
-      birthDate: profileUser.birthDate || "",
-      province: profileUser.locationProvince || "",
-      t,
-    })
-    : [];
-
-  useEffect(() => () => {
-    profileRequestIdRef.current += 1;
-  }, []);
-
-  async function openUserProfile(user) {
-    if (!user?.id) {
-      return;
-    }
-    const requestId = profileRequestIdRef.current + 1;
-    profileRequestIdRef.current = requestId;
-    setProfileUser(user);
-    setProfileOpen(true);
-    setProfileError("");
-
-    try {
-      const response = await fetch(`/api/users/${encodeURIComponent(user.id)}/profile`, {
-        credentials: "same-origin",
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw createApiError(payload, "follows_list_failed", { status: response.status });
-      }
-      if (profileRequestIdRef.current !== requestId) {
-        return;
-      }
-      setProfileUser((current) => (
-        current?.id === user.id && payload.user
-          ? { ...current, ...payload.user }
-          : current
-      ));
-    } catch (fetchError) {
-      if (profileRequestIdRef.current === requestId) {
-        setProfileError(getAppErrorMessage(fetchError));
-      }
-    }
-  }
-
-  async function copyUserHandle(handleValue) {
-    const normalizedHandle = String(handleValue || "").trim();
-    if (!normalizedHandle || typeof navigator === "undefined" || !navigator.clipboard) {
-      return;
-    }
-
-    await navigator.clipboard.writeText(normalizedHandle).catch(() => {});
-  }
+  const {
+    openUserProfile,
+    profileError,
+    profileSheetProps,
+  } = useLazyUserProfileSheet({ errorKey: "follows_list_failed" });
 
   return (
-    <SettingsPanelShell
-      backdropClassName="auth-panel-backdrop"
-      backdropLabel={t("follows.closeList", { title })}
-      bodyClassName="follows-panel-body"
-      closeLabel={t("common.back")}
-      closeButtonClassName="account-panel-close"
-      headClassName="account-panel-head"
-      onClose={onClose}
-      panelClassName="auth-panel auth-panel-follows"
-      panelLabel={t("follows.panelLabel", { title })}
-      title={title}
-      transitionClassName={transitionClassName}
-    >
+    <>
       {initialLoading ? (
         <div className="follow-list-state">
           <LoadingSpinner className="follow-list-loading-spinner" label={t("common.loading")} />
@@ -282,9 +211,9 @@ export function SettingsFollowsDrawer({
           <PaginationControls
             hasMore={hasMore}
             loading={loadingMore}
-            onLoadMore={onLoadMore}
-          />
-        </>
+          onLoadMore={onLoadMore}
+        />
+      </>
       ) : (
         <div className="follow-list-state">{t("follows.empty", { title })}</div>
       )}
@@ -297,30 +226,40 @@ export function SettingsFollowsDrawer({
         user={pendingUnfollowUser}
       />
       <WatchHostProfileSheet
-        open={profileOpen}
-        onClose={() => {
-          profileRequestIdRef.current += 1;
-          setProfileOpen(false);
-          setProfileError("");
-        }}
+        {...profileSheetProps}
         portal
         viewport
-        hostAvatarUrl={profileUser?.avatarUrl || ""}
-        hostChipLabel={profileUserName}
-        hostDisplayName={profileUser?.displayName || profileUserName}
-        hostBio={profileUser?.bio || ""}
-        hostProfileInfoItems={profileInfoItems}
-        hostLocationClickable={false}
-        hostLocationPending={false}
-        onHostHandleCopy={copyUserHandle}
-        hostHandle={profileUserHandle}
-        roomLabel={profileUserName}
-        hostFollowerCountText={formatAudienceCount(profileUser?.followerCount || 0)}
-        hostFollowingCountText={formatAudienceCount(profileUser?.followingCount || 0)}
         followButton={(
           profileError ? <p className="inline-warning">{profileError}</p> : null
         )}
       />
+    </>
+  );
+}
+
+export function SettingsFollowsDrawer({
+  onClose,
+  title,
+  transitionClassName,
+  ...contentProps
+}) {
+  const { t } = useI18n();
+
+  return (
+    <SettingsPanelShell
+      backdropClassName="auth-panel-backdrop"
+      backdropLabel={t("follows.closeList", { title })}
+      bodyClassName="follows-panel-body"
+      closeLabel={t("common.back")}
+      closeButtonClassName="account-panel-close"
+      headClassName="account-panel-head"
+      onClose={onClose}
+      panelClassName="auth-panel auth-panel-follows"
+      panelLabel={t("follows.panelLabel", { title })}
+      title={title}
+      transitionClassName={transitionClassName}
+    >
+      <SettingsFollowsContent title={title} {...contentProps} />
     </SettingsPanelShell>
   );
 }

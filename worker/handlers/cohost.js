@@ -15,6 +15,14 @@ import {
   sanitizeCohostHandle
 } from "./shared.js";
 
+const MAX_COHOST_PEERS = 8;
+
+function getCohostActiveCount(state, excludingPeerRoomId = "") {
+  const active = state?.cohost?.active;
+  const activeItems = Array.isArray(active) ? active : (active ? [active] : []);
+  return activeItems.filter((item) => item?.peerRoomId !== excludingPeerRoomId).length;
+}
+
 export async function handleCohostRequest(env, request) {
   const db = getDb(env);
   const session = await getSessionUser(db, request);
@@ -177,6 +185,15 @@ export async function handleCohostRespond(env, request) {
     if (!targetState?.stream?.isLive || !requesterState?.stream?.isLive) {
       return json(
         { ok: false, error: "Room is not live", code: "room_not_live" },
+        { status: 409 },
+      );
+    }
+    if (
+      getCohostActiveCount(targetState, requesterRoomId) >= MAX_COHOST_PEERS ||
+      getCohostActiveCount(requesterState, targetRoomId) >= MAX_COHOST_PEERS
+    ) {
+      return json(
+        { ok: false, error: "Cohost is full", code: "cohost_full" },
         { status: 409 },
       );
     }

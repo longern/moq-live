@@ -103,6 +103,8 @@ export function LiveMobilePage({
     previewHasVideo,
     previewPending,
     mirrorPreview,
+    previewOrientation,
+    portraitViewport,
   } = media;
   const {
     commentSpeechEnabled,
@@ -116,10 +118,7 @@ export function LiveMobilePage({
     invitesAllowed: cohostInvitesAllowed = true,
     invite: cohostInvite = null,
     active: cohostActive = null,
-    playerSession: cohostPlayerSession = null,
-    playerMuted: cohostPlayerMuted = true,
-    playerRef: cohostPlayerRef,
-    playerStatus: cohostPlayerStatus = "",
+    players: cohostPlayers = [],
     recentHosts: cohostRecentHosts = [],
   } = cohost;
   const {
@@ -204,6 +203,7 @@ export function LiveMobilePage({
   const showCameraControl = !voiceMode;
   const showMediaSettingsControl = immersiveShell && isPublishing;
   const showCohostControl = showMediaSettingsControl;
+  const cohostConnected = (Array.isArray(cohostActive) ? cohostActive : (cohostActive ? [cohostActive] : [])).length > 0;
   const canHideOverlays = immersiveShell && isPublishing;
   const audienceCountText = formatAudienceCount(chatOnlineCount);
   const loggedInViewers = Array.isArray(chatLoggedInViewers) ? chatLoggedInViewers : [];
@@ -588,11 +588,10 @@ export function LiveMobilePage({
             mediaMode={mediaMode}
             cameraEnabled={cameraEnabled}
             mirrorPreview={mirrorPreview}
+            previewOrientation={previewOrientation}
+            portraitViewport={portraitViewport}
             cohostActive={cohostActive}
-            cohostPlayerSession={cohostPlayerSession}
-            cohostPlayerMuted={cohostPlayerMuted}
-            cohostPlayerRef={cohostPlayerRef}
-            cohostPlayerStatus={cohostPlayerStatus}
+            cohostPlayers={cohostPlayers}
           />
           {publishBlockedReason ? (
             <FloatingToast className="live-lock-toast live-mobile-lock-toast">
@@ -659,7 +658,7 @@ export function LiveMobilePage({
                 {showCohostControl ? (
                   <button
                     type="button"
-                    className={`live-fab live-fab-icon${cohostDrawerOpen ? " is-active" : ""}${cohostActive ? " is-connected" : ""}`}
+                    className={`live-fab live-fab-icon${cohostDrawerOpen ? " is-active" : ""}${cohostConnected ? " is-connected" : ""}`}
                     onClick={cohostDrawerOpen ? closeCohostSheet : openCohostSheet}
                     aria-label={cohostDrawerOpen ? t("live.closeCohost") : t("live.cohost")}
                     aria-expanded={cohostDrawerOpen}

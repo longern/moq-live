@@ -341,6 +341,8 @@ export function LiveDesktopPage({
     screenShareActive,
     previewVideoRef,
     mirrorPreview,
+    previewOrientation,
+    portraitViewport,
   } = media;
   const {
     commentSpeechEnabled,
@@ -369,10 +371,7 @@ export function LiveDesktopPage({
   } = audienceCall;
   const {
     active: cohostActive = null,
-    playerSession: cohostPlayerSession = null,
-    playerMuted: cohostPlayerMuted = true,
-    playerRef: cohostPlayerRef,
-    playerStatus: cohostPlayerStatus = "",
+    players: cohostPlayers = [],
   } = cohost;
   const {
     available: authAvailable,
@@ -686,11 +685,10 @@ export function LiveDesktopPage({
               mediaMode={mediaMode}
               cameraEnabled={cameraEnabled}
               mirrorPreview={mirrorPreview}
+              previewOrientation={previewOrientation}
+              portraitViewport={portraitViewport}
               cohostActive={cohostActive}
-              cohostPlayerSession={cohostPlayerSession}
-              cohostPlayerMuted={cohostPlayerMuted}
-              cohostPlayerRef={cohostPlayerRef}
-              cohostPlayerStatus={cohostPlayerStatus}
+              cohostPlayers={cohostPlayers}
             />
             <LiveAudienceCallOverlay
               active={audienceCallActive}

@@ -163,14 +163,7 @@ export function WatchSessionPage({
     ref: playerRef,
   } = player;
   const {
-    active: cohostActive = null,
-    session: cohostPlayerSession = null,
-    started: cohostPlayerStarted = false,
-    muted: cohostPlayerMuted = true,
-    ref: cohostPlayerRef,
-    status: cohostPlayerStatus = "",
-    badge: cohostPlayerBadge = { state: "idle" },
-    orientation: cohostPlayerOrientation,
+    players: cohostPlayers = [],
   } = cohost;
   const {
     available: authAvailable,
@@ -252,7 +245,7 @@ export function WatchSessionPage({
     : 0;
   const hostChipLabel = hostDisplayName || roomTitle || roomLabel;
   const showHostFollowButton = Boolean(hostUserId && authUser?.id !== hostUserId);
-  const showCohostLayout = Boolean(cohostActive && (cohostPlayerSession || cohostPlayerBadge.state === "warm"));
+  const showCohostLayout = cohostPlayers.some((item) => item.session || item.badge?.state === "warm");
   const landscapeImmersive = Boolean(shortLandscapeViewport && !portraitMedia && !showCohostLayout);
   const landscapePortraitSplit = Boolean(shortLandscapeViewport && portraitMedia && !showCohostLayout);
   const immersiveShell = immersivePortrait || fullscreenLandscapeMedia || landscapeImmersive || (portraitViewport && showCohostLayout);
@@ -650,13 +643,7 @@ export function WatchSessionPage({
       chatRecovering={chatRecovering}
       chatRoomLabel={chatRoomLabel}
       chatTrailingAction={renderMobileMoreButton()}
-      cohostActive={cohostActive}
-      cohostPlayerBadge={cohostPlayerBadge}
-      cohostPlayerMuted={cohostPlayerMuted}
-      cohostPlayerOrientation={cohostPlayerOrientation}
-      cohostPlayerRef={cohostPlayerRef}
-      cohostPlayerSession={cohostPlayerSession}
-      cohostPlayerStatus={cohostPlayerStatus}
+      cohostPlayers={cohostPlayers}
       controlsVisible={controlsVisible}
       elementPipSupported={elementPipSupported}
       fullscreenActive={fullscreenActive}

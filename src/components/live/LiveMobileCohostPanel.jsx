@@ -152,6 +152,9 @@ export function LiveMobileCohostPanel({
   const normalizedAudienceCallActive = Array.isArray(audienceCallActive)
     ? audienceCallActive
     : [];
+  const normalizedCohostActive = Array.isArray(active) ? active : (active ? [active] : []);
+  const cohostConnected = normalizedCohostActive.length > 0;
+  const cohostLimitReached = normalizedCohostActive.length >= 8;
   const audienceCallActiveCount = normalizedAudienceCallActive.length;
   const audienceCallActiveUserIds = new Set(
     normalizedAudienceCallActive
@@ -308,7 +311,7 @@ export function LiveMobileCohostPanel({
               <strong>{t("live.cohost")}</strong>
             </div>
             <LiveMenuList className="live-cohost-menu" ariaLabel={t("live.cohostSettings")}>
-              {active ? (
+              {cohostConnected ? (
                 <LiveMenuItem
                   className="live-more-menu-item live-cohost-menu-item live-cohost-disconnect-item"
                   aria-label={t("live.disconnectCohost")}
@@ -320,19 +323,21 @@ export function LiveMobileCohostPanel({
                   <span className="live-more-menu-label">{t("live.disconnectCohost")}</span>
                 </LiveMenuItem>
               ) : null}
-              <li className="live-menu-list-item">
-                <button
-                  type="button"
-                  className="live-menu-item live-more-menu-item live-cohost-menu-item"
-                  aria-label={t("live.enableAudienceCall")}
-                  onClick={() => onAudienceCallEnabledChange?.(true)}
-                >
-                  <span className="live-more-menu-icon">
-                    <AudienceIcon />
-                  </span>
-                  <span className="live-more-menu-label">{t("live.enableAudienceCall")}</span>
-                </button>
-              </li>
+              {!cohostConnected ? (
+                <li className="live-menu-list-item">
+                  <button
+                    type="button"
+                    className="live-menu-item live-more-menu-item live-cohost-menu-item"
+                    aria-label={t("live.enableAudienceCall")}
+                    onClick={() => onAudienceCallEnabledChange?.(true)}
+                  >
+                    <span className="live-more-menu-icon">
+                      <AudienceIcon />
+                    </span>
+                    <span className="live-more-menu-label">{t("live.enableAudienceCall")}</span>
+                  </button>
+                </li>
+              ) : null}
               <li className="live-menu-list-item">
                 <button
                   type="button"
@@ -364,7 +369,7 @@ export function LiveMobileCohostPanel({
                 autoComplete="off"
                 inputMode="text"
               />
-              <button type="submit" disabled={!handle.trim() || busy}>
+              <button type="submit" disabled={!handle.trim() || busy || cohostLimitReached}>
                 {t("live.requestCohost")}
               </button>
             </form>
@@ -379,7 +384,7 @@ export function LiveMobileCohostPanel({
                         type="button"
                         className="live-cohost-recent-row"
                         key={host.handle}
-                        disabled={busy}
+                        disabled={busy || cohostLimitReached}
                         onClick={() => {
                           void submitInvite(host.handle);
                         }}

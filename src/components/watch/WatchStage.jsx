@@ -285,13 +285,7 @@ export function WatchStage({
   chatRecovering,
   chatRoomLabel,
   chatTrailingAction,
-  cohostActive,
-  cohostPlayerBadge,
-  cohostPlayerMuted,
-  cohostPlayerOrientation,
-  cohostPlayerRef,
-  cohostPlayerSession,
-  cohostPlayerStatus,
+  cohostPlayers = [],
   controlsVisible,
   elementPipSupported,
   fullscreenActive,
@@ -373,15 +367,18 @@ export function WatchStage({
               testPlayback={testPlayback}
             />
             {showCohostLayout ? (
-              <WatchCohostPlayer
-                cohostActive={cohostActive}
-                cohostPlayerBadge={cohostPlayerBadge}
-                cohostPlayerMuted={cohostPlayerMuted}
-                cohostPlayerOrientation={cohostPlayerOrientation}
-                cohostPlayerRef={cohostPlayerRef}
-                cohostPlayerSession={cohostPlayerSession}
-                cohostPlayerStatus={cohostPlayerStatus}
-              />
+              cohostPlayers.map((item) => (
+                <WatchCohostPlayer
+                  key={item.active?.id || item.active?.peerRoomId}
+                  cohostActive={item.active}
+                  cohostPlayerBadge={item.badge}
+                  cohostPlayerMuted={item.muted}
+                  cohostPlayerOrientation={item.orientation}
+                  cohostPlayerRef={item.ref}
+                  cohostPlayerSession={item.session}
+                  cohostPlayerStatus={item.status}
+                />
+              ))
             ) : null}
           </div>
           {playerFreezeFrameUrl ? (

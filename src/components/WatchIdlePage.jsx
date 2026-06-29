@@ -39,6 +39,17 @@ function getRoomHref(room) {
   return buildWatchLink("", target) || "?";
 }
 
+function getRoomWatchFallback(room, roomTitle) {
+  const host = room.host || {};
+  return {
+    hostUserId: host.id || "",
+    hostHandle: host.handle || "",
+    hostDisplayName: host.displayName || "",
+    hostAvatarUrl: host.avatarUrl || "",
+    title: room.title || roomTitle || "",
+  };
+}
+
 function WatchRoomCard({ room, onOpenRoom }) {
   const { t } = useI18n();
   const [coverBroken, setCoverBroken] = useState(false);
@@ -53,7 +64,7 @@ function WatchRoomCard({ room, onOpenRoom }) {
       className={`watch-room-row${hasCover ? "" : " is-no-cover"}`}
       onClick={(event) => {
         event.preventDefault();
-        onOpenRoom?.(openTarget);
+        onOpenRoom?.(openTarget, getRoomWatchFallback(room, roomTitle));
       }}
     >
       <div className={`watch-room-cover${hasCover ? "" : " is-placeholder"}`}>

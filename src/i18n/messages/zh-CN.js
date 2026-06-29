@@ -429,6 +429,7 @@ export const zhCNMessages = {
       roomNotLive: "直播间未开播",
       invitesBlocked: "对方已屏蔽连线邀请",
       self: "不能向自己发起连线",
+      full: "连线人数已满",
     },
   },
   chat: {

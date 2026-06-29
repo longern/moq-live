@@ -66,7 +66,7 @@ function getDefaultRoomLocation() {
 function getDefaultCohostState() {
   return {
     invitesAllowed: true,
-    active: null
+    active: []
   };
 }
 
@@ -289,6 +289,24 @@ function normalizeCohostActive(value) {
   };
 }
 
+function normalizeCohostActiveList(value) {
+  const source = Array.isArray(value) ? value : (value ? [value] : []);
+  const seen = new Set();
+  const active = [];
+  for (const item of source) {
+    const normalized = normalizeCohostActive(item);
+    if (!normalized || seen.has(normalized.peerRoomId)) {
+      continue;
+    }
+    seen.add(normalized.peerRoomId);
+    active.push(normalized);
+    if (active.length >= 8) {
+      break;
+    }
+  }
+  return active;
+}
+
 function normalizeChatMute(value) {
   if (!value || typeof value !== "object") {
     return null;
@@ -340,7 +358,7 @@ export function useChatController({
   const [cohostInvitesAllowed, setCohostInvitesAllowed] = useState(true);
   const [cohostInvite, setCohostInvite] = useState(null);
   const [cohostInviteResponse, setCohostInviteResponse] = useState(null);
-  const [cohostActive, setCohostActive] = useState(null);
+  const [cohostActive, setCohostActive] = useState([]);
   const [audienceCallEnabled, setAudienceCallEnabledState] = useState(
     () => getDefaultAudienceCallState().enabled
   );
@@ -487,7 +505,7 @@ export function useChatController({
       setCohostInvitesAllowed(true);
       setCohostInvite(null);
       setCohostInviteResponse(null);
-      setCohostActive(null);
+      setCohostActive([]);
       setAudienceCallRequests([]);
       setAudienceCallInvites([]);
       setAudienceCallInvite(null);
@@ -579,7 +597,7 @@ export function useChatController({
               ? false
               : getDefaultCohostState().invitesAllowed
           );
-          setCohostActive(normalizeCohostActive(payload.cohost?.active));
+          setCohostActive(normalizeCohostActiveList(payload.cohost?.active));
           const audienceCall = normalizeAudienceCallState(payload.audienceCall);
           setAudienceCallEnabledState(audienceCall.enabled);
           setAudienceCallRequests(audienceCall.requests);
@@ -640,7 +658,7 @@ export function useChatController({
         }
 
         if (payload.type === "cohost.active.changed") {
-          setCohostActive(normalizeCohostActive(payload.active));
+          setCohostActive(normalizeCohostActiveList(payload.active));
           return;
         }
 
@@ -1143,7 +1161,7 @@ export function useChatController({
     socket.send(JSON.stringify({
       type: "cohost.active.clear"
     }));
-    setCohostActive(null);
+    setCohostActive([]);
     return true;
   }
 

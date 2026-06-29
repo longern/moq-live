@@ -67,8 +67,8 @@ export function usePlayerLayout({
       }
 
       const mediaSize = getMediaElementSize(playerEl, {
-        includeTrackSettings: false,
-        includeClientSize: true,
+        includeTrackSettings: true,
+        includeClientSize: false,
       });
       if (!hasRenderableMediaSize(mediaSize)) {
         return;

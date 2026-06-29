@@ -404,6 +404,7 @@ export const enMessages = {
       roomNotLive: "Live room is not live",
       invitesBlocked: "This host has blocked connect invites",
       self: "You cannot connect with yourself",
+      full: "Connect is full",
     },
   },
   chat: {

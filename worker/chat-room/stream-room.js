@@ -49,7 +49,7 @@ export async function handleStreamStarted(room, ws, session, payload) {
     cohost: {
       ...room.roomState.cohost,
       invitesAllowed: true,
-      active: null,
+      active: [],
     },
     audienceCall: getDefaultAudienceCallState(),
   };
@@ -105,7 +105,7 @@ export async function handleStreamStopped(room, ws, session) {
     location: getDefaultRoomLocation(),
     cohost: {
       ...room.roomState.cohost,
-      active: null,
+      active: [],
     },
     audienceCall: getDefaultAudienceCallState(),
     moderation: clearStreamScopedMutes(room.roomState.moderation),
@@ -132,13 +132,13 @@ export async function handleStreamStopped(room, ws, session) {
   });
   room.broadcast({
     type: "cohost.active.changed",
-    active: null,
+    active: [],
   });
   room.broadcast({
     type: "audience_call.changed",
     audienceCall: getPublicAudienceCallState(nextRoomState.audienceCall),
   });
-  await clearPeerCohostActive(room, previousActive);
+  await clearPeerCohostActive(room, previousActive, session.room);
 }
 
 export async function handleRoomUpdated(room, ws, session, payload) {

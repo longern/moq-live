@@ -1,10 +1,22 @@
 import {
   json,
+  MAX_COHOST_PEERS,
   normalizeCohostActive,
+  normalizeCohostActiveList,
   normalizeCohostInvite,
   normalizeCohostInviteResponse,
 } from "./utils.js";
 import { persistStorageOrNotify } from "./broadcast-control.js";
+
+function upsertCohostActive(currentActive, active) {
+  const current = normalizeCohostActiveList(currentActive);
+  if (!active) {
+    return current;
+  }
+  const next = current.filter((item) => item.peerRoomId !== active.peerRoomId);
+  next.push(active);
+  return next.slice(-MAX_COHOST_PEERS);
+}
 
 export async function handleCohostInvitesAllowed(room, ws, session, payload) {
   if (!session.isRoomOwner || !session.canControlBroadcast) {
@@ -46,8 +58,8 @@ export async function handleCohostActiveClear(room, ws, session) {
     return;
   }
 
-  const previousActive = room.roomState.cohost.active;
-  if (!previousActive) {
+  const previousActive = normalizeCohostActiveList(room.roomState.cohost.active);
+  if (!previousActive.length) {
     return;
   }
 
@@ -55,7 +67,7 @@ export async function handleCohostActiveClear(room, ws, session) {
     ...room.roomState,
     cohost: {
       ...room.roomState.cohost,
-      active: null,
+      active: [],
     },
   };
   const persisted = await persistStorageOrNotify(
@@ -71,9 +83,9 @@ export async function handleCohostActiveClear(room, ws, session) {
   room.roomState = nextRoomState;
   room.broadcast({
     type: "cohost.active.changed",
-    active: null,
+    active: [],
   });
-  await clearPeerCohostActive(room, previousActive);
+  await clearPeerCohostActive(room, previousActive, session.room);
 }
 
 export async function handleCohostInviteRequest(room, request) {
@@ -158,9 +170,22 @@ export async function handleCohostInviteResponse(room, request) {
 export async function handleCohostActiveUpdate(room, request) {
   const payload = await request.json().catch(() => ({}));
   const active = normalizeCohostActive(payload.active);
+  const removePeerRoomId = String(payload.removePeerRoomId || "").trim();
+  if (payload.active !== null && !removePeerRoomId && !active) {
+    return json(
+      { ok: false, error: "Invalid cohost active", code: "invalid_cohost_active" },
+      { status: 400 },
+    );
+  }
+  const nextActive = payload.active === null
+    ? []
+    : removePeerRoomId
+      ? normalizeCohostActiveList(room.roomState.cohost.active)
+          .filter((item) => item.peerRoomId !== removePeerRoomId)
+    : upsertCohostActive(room.roomState.cohost.active, active);
   const nextCohost = {
     ...room.roomState.cohost,
-    active,
+    active: nextActive,
   };
   const nextRoomState = {
     ...room.roomState,
@@ -170,31 +195,34 @@ export async function handleCohostActiveUpdate(room, request) {
   await room.ctx.storage.put("roomState", nextRoomState);
   room.broadcast({
     type: "cohost.active.changed",
-    active,
+    active: nextActive,
   });
   return json({ ok: true });
 }
 
-export async function clearPeerCohostActive(room, active) {
-  if (!active?.peerRoomId || !room.env?.CHAT_ROOM) {
+export async function clearPeerCohostActive(room, active, roomId = "") {
+  const activeItems = normalizeCohostActiveList(active);
+  if (!activeItems.length || !room.env?.CHAT_ROOM) {
     return;
   }
 
-  try {
-    const stub = room.env.CHAT_ROOM.get(
-      room.env.CHAT_ROOM.idFromName(active.peerRoomId),
-    );
-    await stub.fetch(
-      new Request("https://chat-room.internal/cohost/active", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ active: null }),
-      }),
-    );
-  } catch (error) {
-    console.warn(
-      "Failed to clear peer cohost state",
-      error instanceof Error ? error.message : String(error),
-    );
+  for (const item of activeItems) {
+    try {
+      const stub = room.env.CHAT_ROOM.get(
+        room.env.CHAT_ROOM.idFromName(item.peerRoomId),
+      );
+      await stub.fetch(
+        new Request("https://chat-room.internal/cohost/active", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(roomId ? { removePeerRoomId: roomId } : { active: null }),
+        }),
+      );
+    } catch (error) {
+      console.warn(
+        "Failed to clear peer cohost state",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 }

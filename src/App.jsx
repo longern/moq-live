@@ -15,6 +15,7 @@ import { useAuthController } from "./hooks/useAuthController.js";
 import { usePushPermissionPromptController } from "./hooks/usePushPermissionPromptController.js";
 import { useRegistrationDisplayNamePrompt } from "./hooks/useRegistrationDisplayNamePrompt.js";
 import { useChatController } from "./hooks/useChatController.js";
+import { useCohostPlayerControllers } from "./hooks/useCohostPlayerControllers.js";
 import { useLiveRoomActivation } from "./hooks/useLiveRoomActivation.js";
 import { useCompactViewport, useMediaQuery, usePortraitViewport } from "./hooks/useMediaQuery.js";
 import { usePlayerController } from "./hooks/usePlayerController.js";
@@ -76,6 +77,32 @@ function getAppToastClassName({ liveRouteActive, liveShellMode, settingsVisible 
   return "watch-session-toast";
 }
 
+function normalizeWatchRoomFallback(fallback, watchTarget) {
+  if (!fallback) {
+    return null;
+  }
+
+  const targetKey = getHandleWatchValue(String(watchTarget || ""));
+  const hostHandle = String(fallback.hostHandle || fallback.handle || "").trim();
+  const hostDisplayName = String(fallback.hostDisplayName || fallback.displayName || "").trim();
+  const hostAvatarUrl = String(fallback.hostAvatarUrl || fallback.avatarUrl || "").trim();
+  const hostUserId = String(fallback.hostUserId || fallback.userId || "").trim();
+  const title = String(fallback.title || fallback.roomTitle || "").trim();
+  if (!targetKey || (!hostHandle && !hostDisplayName && !hostAvatarUrl && !hostUserId && !title)) {
+    return null;
+  }
+
+  return {
+    targetKey,
+    hostUserId,
+    hostHandle,
+    hostHandleKey: getHandleWatchValue(hostHandle),
+    hostDisplayName,
+    hostAvatarUrl,
+    title,
+  };
+}
+
 export function App() {
   const { locale, t } = useI18n();
   const siteTitle = __APP_TITLE__;
@@ -100,7 +127,6 @@ export function App() {
   const liveRouteHistoryPushedRef = useRef(false);
   const suppressNextLivePopAnimationRef = useRef(false);
   const handledWatchPlaybackRef = useRef({ roomId: "", startedAt: "", protocol: "" });
-  const handledCohostPlaybackRef = useRef({ roomId: "", startedAt: "", protocol: "" });
   const watchLiveSeenRef = useRef({ roomId: "", hasBeenLive: false });
   const previousRouteRef = useRef({
     page: new URLSearchParams(window.location.search).get("p") === "l"
@@ -256,6 +282,7 @@ export function App() {
   });
 
   const [watchRoomResolution, setWatchRoomResolution] = useState(createInitialWatchRoomResolution);
+  const [watchRoomFallback, setWatchRoomFallback] = useState(null);
   const [watchFollowState, setWatchFollowState] = useState(createInitialWatchFollowState);
   const [watchStreamEnded, setWatchStreamEnded] = useState(false);
   const [topbarWatchRoom, setTopbarWatchRoom] = useState("");
@@ -265,10 +292,6 @@ export function App() {
   const watchPlaybackNamespaceRef = useRef("");
   const watchPlaybackProtocolRef = useRef(DEFAULT_STREAM_PROTOCOL);
   const watchPlaybackWebRtcUrlRef = useRef("");
-  const cohostPlaybackRelayUrlRef = useRef("");
-  const cohostPlaybackNamespaceRef = useRef("");
-  const cohostPlaybackProtocolRef = useRef(DEFAULT_STREAM_PROTOCOL);
-  const cohostPlaybackWebRtcUrlRef = useRef("");
 
   const normalizedWatchInput = watchRoom.trim();
   const watchTestChannel = getWatchTestChannel(normalizedWatchInput);
@@ -276,6 +299,13 @@ export function App() {
   const watchingNamespace = !watchingTestChannel && isNamespaceWatchTarget(normalizedWatchInput);
   const directWatchNamespace = getNamespaceWatchValue(normalizedWatchInput);
   const watchHandle = watchingNamespace || watchingTestChannel ? "" : getHandleWatchValue(normalizedWatchInput);
+  const activeWatchRoomFallback = !watchingNamespace
+    && !watchingTestChannel
+    && watchRoomFallback
+    && watchRoomFallback.targetKey === watchHandle
+    && (!watchRoomFallback.hostHandleKey || watchRoomFallback.hostHandleKey === watchHandle)
+    ? watchRoomFallback
+    : null;
   const resolvedWatchRoomId = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.roomId;
   const watchSessionActive = page === "watch" && watchRouteCommitted && Boolean(normalizedWatchInput);
   const watchChatRoom = watchingTestChannel
@@ -300,16 +330,6 @@ export function App() {
     setLogText,
     log,
     layoutScopeKey: watchPlayerLayoutScopeKey,
-  });
-  const cohostPlayer = usePlayerController({
-    initialAutorun: false,
-    relayUrlRef: cohostPlaybackRelayUrlRef,
-    roomRef: cohostPlaybackNamespaceRef,
-    streamProtocolRef: cohostPlaybackProtocolRef,
-    webRtcUrlRef: cohostPlaybackWebRtcUrlRef,
-    setLogText,
-    log,
-    layoutScopeKey: `${watchPlayerLayoutScopeKey}:cohost`,
   });
   const watchChatEnabled =
     watchSessionActive &&
@@ -345,15 +365,14 @@ export function App() {
   const resolvedWatchPlaybackReady = watchUsesMoqPlayback
     ? Boolean(resolvedWatchRelayUrl && resolvedWatchNamespace)
     : Boolean(resolvedWatchWebRtcUrl);
-  const cohostActive = !watchingTestChannel && !watchingNamespace ? chat.cohostActive : null;
-  const cohostStream = cohostActive?.stream || null;
-  const resolvedCohostProtocol = normalizeStreamProtocol(cohostStream?.protocol);
-  const resolvedCohostRelayUrl = cohostStream?.relayUrl || "";
-  const resolvedCohostNamespace = cohostStream?.namespace || "";
-  const resolvedCohostWebRtcUrl = cohostStream?.webRtcUrl || "";
-  const cohostPlaybackReady = resolvedCohostProtocol === STREAM_PROTOCOL_MOQ
-    ? Boolean(resolvedCohostRelayUrl && resolvedCohostNamespace)
-    : Boolean(resolvedCohostWebRtcUrl);
+  const cohostActive = !watchingTestChannel && !watchingNamespace ? chat.cohostActive : [];
+  const cohostPlayers = useCohostPlayerControllers({
+    active: cohostActive,
+    enabled: page === "watch" && watchRouteCommitted && chat.roomStateReady,
+    layoutScopeKey: watchPlayerLayoutScopeKey,
+    setLogText,
+    log,
+  });
   const watchJoined = watchSessionActive;
   const watchStageLoading = !watchingTestChannel
     && (
@@ -383,17 +402,15 @@ export function App() {
   watchPlaybackNamespaceRef.current = resolvedWatchNamespace;
   watchPlaybackProtocolRef.current = resolvedWatchProtocol;
   watchPlaybackWebRtcUrlRef.current = resolvedWatchWebRtcUrl;
-  cohostPlaybackRelayUrlRef.current = resolvedCohostRelayUrl;
-  cohostPlaybackNamespaceRef.current = resolvedCohostNamespace;
-  cohostPlaybackProtocolRef.current = resolvedCohostProtocol;
-  cohostPlaybackWebRtcUrlRef.current = resolvedCohostWebRtcUrl;
 
   const watchRoomLabel = watchingTestChannel
     ? watchTestChannel.label
     : watchingNamespace
       ? (directWatchNamespace ? `ns:${directWatchNamespace}` : t("watch.waitNamespace"))
       : watchRoomResolution.hostDisplayName
+      || activeWatchRoomFallback?.hostDisplayName
       || watchRoomResolution.hostHandle
+      || activeWatchRoomFallback?.hostHandle
       || chat.roomMeta.title
       || watchRoomResolution.title
       || watchHandle
@@ -404,7 +421,9 @@ export function App() {
     : watchingNamespace
       ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
       : watchRoomResolution.hostDisplayName
+      || activeWatchRoomFallback?.hostDisplayName
       || watchRoomResolution.hostHandle
+      || activeWatchRoomFallback?.hostHandle
       || watchHandle
       || "";
   const watchRoomTitle = watchingTestChannel
@@ -413,19 +432,27 @@ export function App() {
       ? t("watch.publicChannel", { namespace: directWatchNamespace })
       : chat.roomMeta.title
       || watchRoomResolution.title
+      || activeWatchRoomFallback?.title
       || (watchChatRoomLabel ? t("watch.roomOf", { room: watchChatRoomLabel }) : watchRoomLabel);
   const watchHostDisplayName = watchingTestChannel
     ? watchTestChannel.hostDisplayName
     : watchingNamespace
       ? ""
       : watchRoomResolution.hostDisplayName
+      || activeWatchRoomFallback?.hostDisplayName
       || watchRoomResolution.hostHandle
+      || activeWatchRoomFallback?.hostHandle
       || watchHandle
       || "";
+  const watchHostHandle = watchingNamespace || watchingTestChannel
+    ? ""
+    : watchRoomResolution.hostHandle || activeWatchRoomFallback?.hostHandle || "";
   const watchHostUserId = watchingNamespace || watchingTestChannel
     ? ""
-    : watchRoomResolution.hostUserId || "";
-  const watchHostAvatarUrl = watchingNamespace || watchingTestChannel ? "" : watchRoomResolution.hostAvatarUrl || "";
+    : watchRoomResolution.hostUserId || activeWatchRoomFallback?.hostUserId || "";
+  const watchHostAvatarUrl = watchingNamespace || watchingTestChannel
+    ? ""
+    : watchRoomResolution.hostAvatarUrl || activeWatchRoomFallback?.hostAvatarUrl || "";
   const watchHostLocationProvince = watchingNamespace || watchingTestChannel
     ? t("profile.locationUnknown")
     : chat.streamState.isLive
@@ -463,7 +490,7 @@ export function App() {
     ? ""
     : watchingNamespace
       ? (directWatchNamespace ? `ns:${directWatchNamespace}` : "")
-      : watchRoomResolution.hostHandle || watchHandle || watchRoom;
+      : watchHostHandle || watchHandle || watchRoom;
   const watchPageLink = buildWatchLink(relayUrl, watchShareTarget);
   const relayHost = getRelayHostValue(relayUrl);
   const testPlayerSession = watchingTestChannel
@@ -536,6 +563,12 @@ export function App() {
       setLivePageMounted(true);
     }
   }, [page]);
+
+  useEffect(() => {
+    if (!watchRouteCommitted) {
+      setWatchRoomFallback(null);
+    }
+  }, [watchRouteCommitted]);
 
   function selectPagePreservingLiveBackdrop(nextPage, options) {
     if (nextPage === "live" && pageRef.current !== "live") {
@@ -645,7 +678,7 @@ export function App() {
     selectPagePreservingLiveBackdrop(nextPage, options);
   }
 
-  function beginWatch(nextWatchTarget = watchRoom) {
+  function beginWatch(nextWatchTarget = watchRoom, fallback = null) {
     const normalizedTarget = nextWatchTarget.trim();
     if (!normalizedTarget) {
       return;
@@ -665,6 +698,7 @@ export function App() {
     if (nextWatchTarget !== watchRoom) {
       setWatchRoomValue(normalizedTarget);
     }
+    setWatchRoomFallback(normalizeWatchRoomFallback(fallback, normalizedTarget));
 
     autorunRef.current = true;
     setWatchRouteCommitted(true);
@@ -1259,77 +1293,6 @@ export function App() {
   ]);
 
   useEffect(() => {
-    const currentSession = cohostPlayer.playerSession;
-    const desiredCohostPlayback = getDesiredWatchPlaybackTarget({
-      page,
-      watchRouteCommitted,
-      watchingNamespace: false,
-      directWatchNamespace: "",
-      resolvedWatchRoomId: cohostActive?.peerRoomId || "",
-      roomStateReady: chat.roomStateReady,
-      isLive: Boolean(cohostActive),
-      playbackReady: cohostPlaybackReady,
-      protocol: resolvedCohostProtocol,
-      relayUrl: resolvedCohostRelayUrl,
-      namespace: resolvedCohostNamespace,
-      webRtcUrl: resolvedCohostWebRtcUrl,
-      startedAt: cohostActive?.acceptedAt || "",
-    });
-
-    if (!desiredCohostPlayback) {
-      if (currentSession) {
-        handledCohostPlaybackRef.current = { roomId: "", startedAt: "", protocol: "" };
-        void cohostPlayer.stopPlayer();
-      }
-      return;
-    }
-
-    const current = handledCohostPlaybackRef.current;
-    const sessionMatchesTarget = playerSessionMatchesWatchTarget(
-      currentSession,
-      desiredCohostPlayback,
-    );
-    const targetAlreadyHandled = watchPlaybackRecordMatches(
-      current,
-      desiredCohostPlayback,
-    );
-    const shouldRestartCurrentPlayback =
-      current.roomId === desiredCohostPlayback.roomId &&
-      Boolean(current.startedAt) &&
-      current.startedAt !== desiredCohostPlayback.startedAt &&
-      current.protocol === desiredCohostPlayback.protocol;
-
-    if (!currentSession || !sessionMatchesTarget || shouldRestartCurrentPlayback) {
-      handledCohostPlaybackRef.current = {
-        roomId: desiredCohostPlayback.roomId,
-        startedAt: desiredCohostPlayback.startedAt,
-        protocol: desiredCohostPlayback.protocol,
-      };
-      void cohostPlayer.startPlayer();
-      return;
-    }
-
-    if (!targetAlreadyHandled) {
-      handledCohostPlaybackRef.current = {
-        roomId: desiredCohostPlayback.roomId,
-        startedAt: desiredCohostPlayback.startedAt,
-        protocol: desiredCohostPlayback.protocol,
-      };
-    }
-  }, [
-    chat.roomStateReady,
-    cohostActive,
-    cohostPlaybackReady,
-    cohostPlayer.playerSession,
-    page,
-    resolvedCohostNamespace,
-    resolvedCohostProtocol,
-    resolvedCohostRelayUrl,
-    resolvedCohostWebRtcUrl,
-    watchRouteCommitted,
-  ]);
-
-  useEffect(() => {
     window.__moqTest = {
       startPlayer: async () => {
         await player.startPlayer();
@@ -1462,7 +1425,7 @@ export function App() {
               beginWatch,
               chat,
               cohostActive,
-              cohostPlayer,
+              cohostPlayers,
               effectivePlayerFreezeFrameUrl,
               effectivePlayerOrientation,
               effectivePlayerSession,
@@ -1490,6 +1453,7 @@ export function App() {
               watchHostDistanceAvailable,
               watchHostFollowerCount,
               watchHostFollowingCount,
+              watchHostHandle,
               watchHostIcon,
               watchHostLocationAvailable,
               watchHostLocationProvince,
@@ -1502,6 +1466,7 @@ export function App() {
               watchRoomCoverUrl,
               watchRoomLabel,
               watchRoomResolution,
+              watchSessionKey: watchPlayerLayoutScopeKey,
               watchRoomTitle,
               watchStageLoading,
               watchStageMessage,

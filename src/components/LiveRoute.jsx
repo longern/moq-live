@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { LivePage } from "./LivePage.jsx";
 import { useChatController } from "../hooks/useChatController.js";
+import { useCohostPlayerControllers } from "../hooks/useCohostPlayerControllers.js";
 import { useCommentSpeech } from "../hooks/useCommentSpeech.js";
-import { usePlayerController } from "../hooks/usePlayerController.js";
 import { usePublisherController } from "../hooks/usePublisherController.js";
 import { buildWatchLink, generateRoomId } from "../lib/routeState.js";
 import { describePublishState } from "../lib/status.js";
@@ -145,6 +145,9 @@ function getCohostRequestErrorMessage(error, t) {
   }
   if (error?.code === "cohost_self") {
     return t("live.cohostErrors.self");
+  }
+  if (error?.code === "cohost_full") {
+    return t("live.cohostErrors.full");
   }
   return getAppErrorMessage(error);
 }
@@ -431,10 +434,6 @@ export function LiveRoute({
   const webRtcPlaybackUrlRef = useRef("");
   const webRtcPlaybackRoomIdRef = useRef("");
   const [liveMode, setLiveMode] = useState("video");
-  const cohostPlaybackRelayUrlRef = useRef("");
-  const cohostPlaybackNamespaceRef = useRef("");
-  const cohostPlaybackProtocolRef = useRef("webrtc");
-  const cohostPlaybackWebRtcUrlRef = useRef("");
   const [audienceCallMutedUserIds, setAudienceCallMutedUserIds] = useState(() => new Set());
   webRtcPlaybackRoomIdRef.current = liveChatRoomId || "";
 
@@ -470,15 +469,12 @@ export function LiveRoute({
     log,
   });
   publisherControllerRef.current = publisher;
-  const cohostPlayer = usePlayerController({
-    initialAutorun: false,
-    relayUrlRef: cohostPlaybackRelayUrlRef,
-    roomRef: cohostPlaybackNamespaceRef,
-    streamProtocolRef: cohostPlaybackProtocolRef,
-    webRtcUrlRef: cohostPlaybackWebRtcUrlRef,
+  const cohostPlayers = useCohostPlayerControllers({
+    active: liveChat.cohostActive,
+    enabled: page === "live" && liveChat.roomStateReady,
+    layoutScopeKey: "live",
     setLogText: () => {},
     log,
-    layoutScopeKey: "live:cohost",
   });
   const audienceCallSpeakingBroadcastRef = useRef({
     lastSentAt: 0,
@@ -673,18 +669,6 @@ export function LiveRoute({
   webRtcPlaybackUrlRef.current = webRtcPlaybackUrl.trim() || defaultWebRtcPlaybackUrl;
   const webRtcUrl = webRtcPlaybackUrl.trim() || defaultWebRtcPlaybackUrl;
   const cohostActive = liveChat.cohostActive;
-  const cohostStream = cohostActive?.stream || null;
-  const resolvedCohostProtocol = normalizeStreamProtocol(cohostStream?.protocol);
-  const resolvedCohostRelayUrl = cohostStream?.relayUrl || "";
-  const resolvedCohostNamespace = cohostStream?.namespace || "";
-  const resolvedCohostWebRtcUrl = cohostStream?.webRtcUrl || "";
-  const cohostPlaybackReady = resolvedCohostProtocol === "moq"
-    ? Boolean(resolvedCohostRelayUrl && resolvedCohostNamespace)
-    : Boolean(resolvedCohostWebRtcUrl);
-  cohostPlaybackRelayUrlRef.current = resolvedCohostRelayUrl;
-  cohostPlaybackNamespaceRef.current = resolvedCohostNamespace;
-  cohostPlaybackProtocolRef.current = resolvedCohostProtocol;
-  cohostPlaybackWebRtcUrlRef.current = resolvedCohostWebRtcUrl;
   const publishPolicyBlocked = isPublishBlocked(liveRoom);
   const publishControlBlocked =
     liveChatEnabled &&
@@ -714,39 +698,6 @@ export function LiveRoute({
     publishProtocol,
     webRtcUrl,
   });
-
-  useEffect(() => {
-    if (!cohostActive || !cohostPlaybackReady || page !== "live") {
-      if (cohostPlayer.playerSession) {
-        void cohostPlayer.stopPlayer();
-      }
-      return;
-    }
-
-    const currentSession = cohostPlayer.playerSession;
-    const currentProtocol = currentSession?.protocol || "";
-    const currentRoom = currentSession?.room || currentSession?.namespace || "";
-    const currentWebRtcUrl = currentSession?.webRtcUrl || "";
-    const sessionMatches = currentSession
-      && currentProtocol === resolvedCohostProtocol
-      && (
-        resolvedCohostProtocol === "webrtc"
-          ? currentWebRtcUrl === resolvedCohostWebRtcUrl
-          : currentRoom === resolvedCohostNamespace
-      );
-
-    if (!sessionMatches) {
-      void cohostPlayer.startPlayer();
-    }
-  }, [
-    cohostActive,
-    cohostPlaybackReady,
-    cohostPlayer.playerSession,
-    page,
-    resolvedCohostNamespace,
-    resolvedCohostProtocol,
-    resolvedCohostWebRtcUrl,
-  ]);
 
   useEffect(() => {
     if (!liveStreamActive || !liveRoom) {
@@ -1345,11 +1296,16 @@ export function LiveRoute({
         invite: liveChat.cohostInvite,
         inviteResponse: liveChat.cohostInviteResponse,
         active: cohostActive,
-        playerSession: cohostPlayer.playerSession,
-        playerMuted: cohostPlayer.playerMuted,
-        playerRef: cohostPlayer.playerRef,
-        playerStatus: cohostPlayer.playerStatus,
-        playerStatusKind: cohostPlayer.playerStatusKind,
+        players: cohostPlayers.map(({ active, player: cohostPlayer }) => ({
+          active,
+          playerSession: cohostPlayer.playerSession,
+          playerMuted: cohostPlayer.playerMuted,
+          playerRef: cohostPlayer.playerRef,
+          playerStatus: cohostPlayer.playerStatus,
+          playerStatusKind: cohostPlayer.playerStatusKind,
+          playerMediaSize: cohostPlayer.playerMediaSize,
+          playerOrientation: cohostPlayer.playerOrientation,
+        })),
         recentHosts: cohostRecentHosts,
       }}
       audienceCall={{

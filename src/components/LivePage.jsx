@@ -95,11 +95,7 @@ export function LivePage({
     invite: cohostInvite = null,
     inviteResponse: cohostInviteResponse = null,
     active: cohostActive = null,
-    playerSession: cohostPlayerSession = null,
-    playerMuted: cohostPlayerMuted = true,
-    playerRef: cohostPlayerRef,
-    playerStatus: cohostPlayerStatus = "",
-    playerStatusKind: cohostPlayerStatusKind = "idle",
+    players: cohostPlayers = [],
     recentHosts: cohostRecentHosts = [],
   } = cohost;
   const {
@@ -200,6 +196,10 @@ export function LivePage({
   const { t } = useI18n();
   const shareSupported = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const mirrorPreview = previewSourceType === "camera" && cameraMode === "front";
+  const resolvedCohostPlayers = cohostPlayers.map((item) => ({
+    ...item,
+    playerOrientation: item.playerMediaSize ? item.playerOrientation : previewOrientation,
+  }));
   const useMobileShell = compactViewport || portraitViewport;
   const mobileShellMode = useLiveMobileShellMode({
     mediaMode,
@@ -601,6 +601,8 @@ export function LivePage({
       screenShareActive,
       previewVideoRef,
       mirrorPreview,
+      previewOrientation,
+      portraitViewport,
     },
     settings: {
       commentSpeechEnabled,
@@ -614,11 +616,7 @@ export function LivePage({
       invitesAllowed: cohostInvitesAllowed,
       invite: cohostInvite,
       active: cohostActive,
-      playerSession: cohostPlayerSession,
-      playerMuted: cohostPlayerMuted,
-      playerRef: cohostPlayerRef,
-      playerStatus: cohostPlayerStatus,
-      playerStatusKind: cohostPlayerStatusKind,
+      players: resolvedCohostPlayers,
       recentHosts: cohostRecentHosts,
     },
     audienceCall: {

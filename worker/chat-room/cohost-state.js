@@ -9,17 +9,19 @@ import {
   sanitizeUrl,
 } from "./sanitize.js";
 
+export const MAX_COHOST_PEERS = 8;
+
 export function getDefaultCohostState() {
   return {
     invitesAllowed: true,
-    active: null,
+    active: [],
   };
 }
 
 export function normalizeCohostState(cohost) {
   return {
     invitesAllowed: cohost?.invitesAllowed === false ? false : true,
-    active: normalizeCohostActive(cohost?.active),
+    active: normalizeCohostActiveList(cohost?.active),
   };
 }
 
@@ -134,4 +136,22 @@ export function normalizeCohostActive(value) {
     peer,
     stream,
   };
+}
+
+export function normalizeCohostActiveList(value) {
+  const source = Array.isArray(value) ? value : (value ? [value] : []);
+  const seen = new Set();
+  const active = [];
+  for (const item of source) {
+    const normalized = normalizeCohostActive(item);
+    if (!normalized || seen.has(normalized.peerRoomId)) {
+      continue;
+    }
+    seen.add(normalized.peerRoomId);
+    active.push(normalized);
+    if (active.length >= MAX_COHOST_PEERS) {
+      break;
+    }
+  }
+  return active;
 }

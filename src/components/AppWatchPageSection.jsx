@@ -9,7 +9,7 @@ export function AppWatchPageSection({ context }) {
     beginWatch,
     chat,
     cohostActive,
-    cohostPlayer,
+    cohostPlayers = [],
     effectivePlayerFreezeFrameUrl,
     effectivePlayerOrientation,
     effectivePlayerSession,
@@ -37,6 +37,7 @@ export function AppWatchPageSection({ context }) {
     watchHostDistanceAvailable,
     watchHostFollowerCount,
     watchHostFollowingCount,
+    watchHostHandle,
     watchHostIcon,
     watchHostLocationAvailable,
     watchHostLocationProvince,
@@ -49,6 +50,7 @@ export function AppWatchPageSection({ context }) {
     watchRoomCoverUrl,
     watchRoomLabel,
     watchRoomResolution,
+    watchSessionKey,
     watchRoomTitle,
     watchStageLoading,
     watchStageMessage,
@@ -84,6 +86,7 @@ export function AppWatchPageSection({ context }) {
       siteTitle={siteTitle}
       hidden={!showWatchPage}
       watchJoined={watchJoined}
+      watchSessionKey={watchSessionKey}
       roomLabel={watchRoomLabel}
       roomTitle={watchRoomTitle}
       welcomeMessage={watchWelcomeMessage}
@@ -94,12 +97,12 @@ export function AppWatchPageSection({ context }) {
       onStart={() => {
         beginWatch();
       }}
-      onOpenRoom={(nextRoom) => {
-        beginWatch(nextRoom);
+      onOpenRoom={(nextRoom, fallback) => {
+        beginWatch(nextRoom, fallback);
       }}
       host={{
         userId: watchHostUserId,
-        handle: watchRoomResolution.hostHandle,
+        handle: watchHostHandle,
         displayName: watchHostDisplayName,
         avatarUrl: watchHostAvatarUrl,
         gender: watchRoomResolution.hostGender,
@@ -115,8 +118,11 @@ export function AppWatchPageSection({ context }) {
         following: watchFollowState.hostUserId === watchHostUserId && watchFollowState.following,
         followLoading: authState.loading ||
           (
-            watchFollowState.hostUserId === watchHostUserId &&
-            watchFollowState.loading
+            Boolean(watchHostUserId) &&
+            (
+              watchFollowState.hostUserId !== watchHostUserId ||
+              watchFollowState.loading
+            )
           ),
         followBusy: watchFollowState.hostUserId === watchHostUserId && watchFollowState.busy,
         notifyLiveStarted: watchFollowState.hostUserId === watchHostUserId && watchFollowState.notifyLiveStarted,
@@ -146,13 +152,16 @@ export function AppWatchPageSection({ context }) {
       }}
       cohost={{
         active: cohostActive,
-        session: cohostPlayer.playerSession,
-        started: cohostPlayer.playerStarted,
-        muted: cohostPlayer.playerMuted,
-        ref: cohostPlayer.playerRef,
-        status: cohostPlayer.playerStatus,
-        badge: describePlayerState(cohostPlayer.playerStatusKind, t),
-        orientation: cohostPlayer.playerOrientation,
+        players: cohostPlayers.map(({ active, player: cohostPlayer }) => ({
+          active,
+          session: cohostPlayer.playerSession,
+          started: cohostPlayer.playerStarted,
+          muted: cohostPlayer.playerMuted,
+          ref: cohostPlayer.playerRef,
+          status: cohostPlayer.playerStatus,
+          badge: describePlayerState(cohostPlayer.playerStatusKind, t),
+          orientation: cohostPlayer.playerOrientation,
+        })),
       }}
       testPlayback={watchTestChannel}
       auth={{

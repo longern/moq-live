@@ -1,18 +1,19 @@
 # moq-live
 
-`moq-live` is a lightweight live-streaming web app built around Media over QUIC. It provides a viewer surface, a broadcaster surface, account settings, and a Cloudflare Worker backend for auth, room state, chat, social features, notifications, and media uploads.
+`moq-live` is a lightweight live-streaming web app built around WebRTC and Media over QUIC. It provides a viewer surface, a broadcaster surface, account settings, and a Cloudflare Worker backend for auth, room state, chat, social features, notifications, and media uploads.
 
 ## Features
 
 - Watch live rooms by host handle, with direct MoQ namespace support for development and diagnostics.
 - Broadcast from camera, microphone, or screen share over MoQ or WHIP.
-- Use MoQ by default, with WebRTC WHIP/WHEP support for publish and playback fallback.
+- Use WebRTC by default, with MoQ support for development and diagnostics.
 - Chat with presence, recent-message history, message retract, viewer mute controls, and broadcaster room-state sync.
 - Follow hosts, browse following/follower lists, and opt into live-start notifications.
 - Invite cohosts, accept or reject cohost requests, and watch active cohost streams in a split layout.
+- Enable audience call-in requests, host invites, active participant management, and Cloudflare Realtime-backed media sessions.
 - Share live room links and generated room/screenshot images.
 - Share live location while broadcasting so viewers can see the host's province and distance when available.
-- Sign in with Microsoft OAuth and manage display name, handle, bio, gender, birth date, avatar, room title, welcome text, and cover image.
+- Sign in with configured OAuth providers and manage display name, handle, bio, gender, birth date, avatar, room title, welcome text, and cover image.
 - Store users, sessions, rooms, follows, push subscriptions, and media on Cloudflare D1, Durable Objects, and R2.
 
 ## Stack
@@ -56,17 +57,17 @@ The Worker expects these bindings:
 - `APP_MEDIA`: R2 bucket for avatars and room covers
 - `ASSETS`: built frontend assets from `dist/`
 
-Required secrets and variables:
+Required secrets and variables depend on the enabled features:
 
-- `MICROSOFT_CLIENT_ID`
-- `MICROSOFT_CLIENT_SECRET`
-- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (optional, enables Google sign-in)
-- `TWITTER_CLIENT_ID` and `TWITTER_CLIENT_SECRET` (optional, enables Twitter/X sign-in)
 - `AUTH_COOKIE_SECRET`
+- `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` (enables Microsoft sign-in)
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (enables Google sign-in)
+- `TWITTER_CLIENT_ID` and `TWITTER_CLIENT_SECRET` (enables Twitter/X sign-in)
 - `AUTH_SESSION_TTL_DAYS` (optional, defaults to `30`)
 - `WEB_PUSH_PUBLIC_KEY` and `WEB_PUSH_PRIVATE_KEY` for live-start push notifications
 - `WEB_PUSH_SUBJECT` (optional, defaults to `mailto:admin@example.com`)
 - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (optional, used to provision Cloudflare Stream WebRTC live inputs for rooms)
+- `CLOUDFLARE_REALTIME_APP_ID` and `CLOUDFLARE_REALTIME_APP_SECRET` (optional, enables Cloudflare Realtime audience-call sessions)
 
 `GET /api/me` includes `authProviders`, the OAuth providers that are implemented
 and fully configured in the current Worker environment. It does not expose
@@ -92,7 +93,7 @@ The frontend is written to `dist/`. The Worker entry point is `worker/index.js`.
 
 ```text
 src/          Frontend app, components, hooks, and client-side protocol helpers
-worker/       Cloudflare Worker API, Microsoft OAuth, and ChatRoom Durable Object
+worker/       Cloudflare Worker API, OAuth, WebRTC proxying, and ChatRoom Durable Object
 migrations/   D1 schema migrations
 public/       Icons, headers, and static assets
 ```

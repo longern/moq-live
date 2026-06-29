@@ -166,6 +166,9 @@ export function LivePage({
   const landscapeSplitViewport = useMediaQuery(
     "(min-width: 601px) and (max-width: 980px) and (orientation: landscape)",
   );
+  const shortLandscapeViewport = useMediaQuery(
+    "(max-width: 980px) and (orientation: landscape) and (max-height: 520px)",
+  );
   const previewOrientationFallback = guessCameraPreviewOrientation({
     portraitViewport,
     previewSourceType,
@@ -200,17 +203,20 @@ export function LivePage({
     ...item,
     playerOrientation: item.playerMediaSize ? item.playerOrientation : previewOrientation,
   }));
-  const useMobileShell = compactViewport || portraitViewport;
+  const useMobileShell = compactViewport || portraitViewport || shortLandscapeViewport;
   const mobileShellMode = useLiveMobileShellMode({
     mediaMode,
     portraitViewport,
+    shortLandscapeViewport,
     previewOrientation,
     previewSourceType,
   });
   const mediaClass = `media-${mediaMode}`;
-  const mobileLayoutModeClass = mobileShellMode === "immersive"
-    ? "media-layout media-immersive"
-    : "media-layout media-portrait-split";
+  const mobileLayoutModeClass = mobileShellMode === "landscape-immersive"
+    ? "media-layout media-landscape-immersive"
+    : mobileShellMode === "immersive"
+      ? "media-layout media-immersive"
+      : "media-layout media-portrait-split";
   const mobileLayoutClass = `${mobileLayoutModeClass} ${mediaClass}`;
   const desktopLayoutClass = landscapeSplitViewport ? `media-layout media-landscape-split ${mediaClass}` : mediaClass;
   const localizedPublishQualityOptions = (publishQualityOptions || []).map((option) => ({

@@ -1,14 +1,26 @@
 import { useEffect, useState } from "react";
-import { shouldUsePortraitImmersiveMode } from "../lib/mediaLayout.js";
+import {
+  isPortraitMedia,
+  shouldUsePortraitImmersiveMode,
+} from "../lib/mediaLayout.js";
 
 const PREVIEW_SOURCE_CAMERA = "camera";
 
 function resolveLiveMobileShellMode({
   mediaMode,
   portraitViewport,
+  shortLandscapeViewport,
   previewOrientation,
   previewSourceType,
 }) {
+  if (
+    mediaMode === "video" &&
+    shortLandscapeViewport &&
+    !isPortraitMedia(previewOrientation)
+  ) {
+    return "landscape-immersive";
+  }
+
   const canUseImmersiveShell =
     mediaMode === "video" &&
     portraitViewport &&
@@ -29,12 +41,14 @@ function resolveLiveMobileShellMode({
 export function useLiveMobileShellMode({
   mediaMode = "video",
   portraitViewport,
+  shortLandscapeViewport = false,
   previewOrientation,
   previewSourceType,
 }) {
   const [shellMode, setShellMode] = useState(() => resolveLiveMobileShellMode({
     mediaMode,
     portraitViewport,
+    shortLandscapeViewport,
     previewOrientation,
     previewSourceType,
   }));
@@ -43,12 +57,14 @@ export function useLiveMobileShellMode({
     setShellMode(resolveLiveMobileShellMode({
       mediaMode,
       portraitViewport,
+      shortLandscapeViewport,
       previewOrientation,
       previewSourceType,
     }));
   }, [
     mediaMode,
     portraitViewport,
+    shortLandscapeViewport,
     previewOrientation,
     previewSourceType,
   ]);

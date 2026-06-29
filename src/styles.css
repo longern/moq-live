@@ -8,7 +8,12 @@
 @import "./styles/components/settings/mobile.css";
 @import "./styles/components/stage.css";
 @import "./styles/components/live/desktop.css";
+@import "./styles/components/live/menus.css";
+@import "./styles/components/live/desktop-dock.css";
 @import "./styles/components/live/mobile.css";
+@import "./styles/components/live/audience-call.css";
+@import "./styles/components/live/mobile-panels.css";
+@import "./styles/components/live/cohost-panel.css";
 @import "./styles/components/watch/session.css";
 @import "./styles/components/profile-info.css";
 @import "./styles/components/live/share-sheet.css";

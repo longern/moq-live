@@ -1,0 +1,369 @@
+.live-cohost-head {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.live-audience-call-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.live-cohost-head strong {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.live-audience-call-tabs {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-audience-call-tabs button {
+  min-height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(235, 244, 251, 0.62);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.live-audience-call-tabs button.is-active {
+  border-bottom-color: var(--primary);
+  color: var(--text);
+}
+
+.live-audience-call-tabs button:focus-visible,
+.live-audience-call-close:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.live-audience-call-close {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #ff8d9d;
+}
+
+.live-audience-call-close:hover,
+.live-audience-call-close:focus-visible {
+  background: rgba(255, 100, 121, 0.14);
+}
+
+.live-audience-call-close svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+.live-cohost-menu {
+  border-radius: 14px;
+}
+
+.live-cohost-menu-item {
+  min-height: 52px;
+}
+
+.live-cohost-menu-item .live-more-menu-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.live-cohost-disconnect-item {
+  color: #ffc8bd;
+}
+
+.live-cohost-form {
+  display: flex;
+  gap: 10px;
+}
+
+.live-cohost-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  font: inherit;
+  box-shadow: none;
+}
+
+.live-cohost-form button {
+  min-width: 72px;
+  height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--primary);
+  color: white;
+  font-weight: 650;
+}
+
+.live-cohost-form button:disabled {
+  opacity: 0.48;
+}
+
+.live-cohost-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.live-cohost-recent-head {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.live-cohost-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.live-audience-call-list {
+  min-height: 172px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.live-cohost-recent-row,
+.live-audience-call-row {
+  min-height: 52px;
+  padding: 6px 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.live-cohost-recent-row:hover,
+.live-cohost-recent-row:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.live-cohost-recent-name,
+.live-audience-call-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-audience-call-row-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-audience-call-response-button {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  color: white;
+}
+
+.live-audience-call-response-button.reject {
+  background: rgba(255, 94, 94, 0.88);
+}
+
+.live-audience-call-response-button.accept {
+  background: rgba(21, 196, 151, 0.9);
+}
+
+.live-audience-call-response-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.live-audience-call-response-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.live-audience-call-invite-button {
+  min-height: 30px;
+  padding: 0 10px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--primary), var(--primary-strong));
+  color: #ffffff;
+  box-shadow: 0 8px 18px var(--primary-shadow);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.live-audience-call-invite-button:hover,
+.live-audience-call-invite-button:focus-visible {
+  background: linear-gradient(180deg, var(--primary-hover), var(--primary-strong));
+  box-shadow: 0 10px 22px var(--primary-shadow);
+  transform: none;
+}
+
+.live-audience-call-invite-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.live-audience-call-invite-button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.live-audience-call-response-button svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.4;
+}
+
+.live-cohost-avatar {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.live-cohost-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.live-cohost-avatar-icon {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+}
+
+.live-cohost-empty {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.live-cohost-invite-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.live-cohost-invite-dialog {
+  width: min(300px, calc(100vw - 48px));
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--watch-float-bg);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
+  pointer-events: auto;
+}
+
+.live-cohost-invite-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.live-cohost-invite-copy strong {
+  color: var(--text);
+  font-size: 1.02rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.live-cohost-invite-copy span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.live-cohost-invite-actions {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+
+.live-cohost-invite-button {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  color: white;
+}
+
+.live-cohost-invite-button.reject {
+  background: rgba(255, 94, 94, 0.88);
+}
+
+.live-cohost-invite-button.accept {
+  background: rgba(21, 196, 151, 0.9);
+}
+
+.live-cohost-invite-button svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.2;
+}
+

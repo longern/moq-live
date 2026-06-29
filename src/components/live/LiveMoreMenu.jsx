@@ -10,7 +10,6 @@ import {
   LocationIcon,
   MenuChevronIcon,
   NotificationIcon,
-  ShareIcon,
   SpeakerIcon,
   TitleIcon,
 } from "./liveIcons.jsx";
@@ -114,12 +113,8 @@ export function LiveMoreMenu({
   onLocationSharingEnabledChange,
   roomInfoBlockedReason = "",
   onRoomInfoBlocked,
-  onShare,
-  shareSupported,
-  watchLink,
   mutedUsers = [],
   onUnmuteUser,
-  onClose,
 }) {
   const { t } = useI18n();
   const [activeEditor, setActiveEditor] = useState("");
@@ -147,11 +142,6 @@ export function LiveMoreMenu({
     setWelcomeError("");
     setWelcomeStatus("");
   }, [roomWelcomeMessage]);
-
-  function handleShare() {
-    onShare();
-    onClose?.();
-  }
 
   async function handleTitleSubmit(event) {
     event.preventDefault();
@@ -260,13 +250,6 @@ export function LiveMoreMenu({
                 icon={<TitleIcon />}
                 label={t("live.title")}
                 onClick={() => setActiveEditor("title")}
-              />
-              <LiveMoreMenuItem
-                icon={<ShareIcon />}
-                label={t("live.nativeShare")}
-                onClick={handleShare}
-                disabled={!shareSupported || !watchLink}
-                ariaLabel={t("live.shareRoom")}
               />
               <LiveMoreMenuItem
                 icon={<ChatIcon />}

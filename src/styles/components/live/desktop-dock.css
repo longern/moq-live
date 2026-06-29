@@ -1,0 +1,163 @@
+.live-desktop-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  background: rgba(4, 11, 17, 0.74);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+  pointer-events: auto;
+}
+
+.live-dock-button {
+  position: relative;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  flex: 0 0 auto;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease,
+    transform 160ms ease;
+}
+
+.live-dock-button:hover,
+.live-dock-button.is-active {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.live-dock-button:focus-visible {
+  background-color: rgba(255, 255, 255, 0.06);
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 2px;
+}
+
+.live-dock-button.is-muted {
+  color: #ffc8bd;
+}
+
+.live-dock-button.is-muted:hover,
+.live-dock-button.is-muted:focus-visible,
+.live-dock-button.is-muted.is-active {
+  background-color: rgba(255, 125, 100, 0.1);
+}
+
+.live-dock-button.is-unavailable {
+  color: #71879c;
+}
+
+.live-dock-button.is-unavailable:hover,
+.live-dock-button.is-unavailable:focus-visible {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.live-dock-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 5;
+  width: max-content;
+  max-width: 220px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(8, 16, 25, 0.96);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  white-space: normal;
+}
+
+.live-dock-button.has-tooltip:hover .live-dock-tooltip,
+.live-dock-button.has-tooltip:focus-visible .live-dock-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.live-dock-button-primary {
+  background: linear-gradient(180deg, var(--primary), var(--primary-strong));
+  color: white;
+  box-shadow: 0 14px 32px var(--primary-shadow);
+  filter: brightness(1);
+}
+
+.live-dock-button-primary.is-live {
+  background: linear-gradient(180deg, #ff5e76, #ef3d57);
+  box-shadow: 0 14px 32px rgba(239, 61, 87, 0.28);
+}
+
+.live-dock-button-primary.is-starting,
+.live-dock-button-primary:disabled.is-starting {
+  background: linear-gradient(180deg, #9fb0ff, var(--primary-hover));
+  color: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(82, 109, 255, 0.2);
+  filter: none;
+  cursor: default;
+}
+
+.live-dock-button-primary:disabled:not(.is-starting),
+.live-fab-primary:disabled:not(.is-starting) {
+  background: linear-gradient(180deg, #b9c7ff, #8fa3f2);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(82, 109, 255, 0.14);
+  filter: none;
+  cursor: not-allowed;
+}
+
+.live-dock-button-primary:hover,
+.live-dock-button-primary.is-active {
+  filter: brightness(1.12) saturate(1.08);
+  transform: translateY(-1px);
+}
+
+.live-dock-button-primary:focus-visible {
+  filter: brightness(1.12) saturate(1.08);
+  transform: translateY(-1px);
+}
+
+.live-dock-button-primary.is-live:hover,
+.live-dock-button-primary.is-live:focus-visible,
+.live-dock-button-primary.is-live.is-active {
+  background: linear-gradient(180deg, #ff6f85, #f14e67);
+  filter: none;
+  transform: none;
+}
+
+.live-dock-button-primary.is-starting:hover,
+.live-dock-button-primary.is-starting:focus-visible,
+.live-dock-button-primary.is-starting.is-active {
+  background: linear-gradient(180deg, #9fb0ff, var(--primary-hover));
+  filter: none;
+  transform: none;
+}
+
+.live-dock-button svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

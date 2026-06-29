@@ -191,18 +191,20 @@ export function LiveMobilePage({
   } = actions;
   const cameraUnavailable = (cameraOptions?.length ?? 0) === 0;
   const publishControlActive = isPublishing || isStarting;
-  const immersiveShell = shellMode === "immersive";
+  const landscapeImmersiveShell = shellMode === "landscape-immersive";
+  const immersiveShell = shellMode === "immersive" || landscapeImmersiveShell;
   const voiceMode = mediaMode === "voice";
   const splitChatPanel = !voiceMode && !immersiveShell;
   const hasInlineChatComposer = splitChatPanel;
   const showChatDrawerEntry = !hasInlineChatComposer;
   const showPassiveChatPreview = showChatDrawerEntry;
   const showLiveHeader = publishControlActive;
-  const showModeSwitch = !publishControlActive;
+  const showHostChip = showLiveHeader || landscapeImmersiveShell;
+  const showModeSwitch = !publishControlActive || landscapeImmersiveShell;
   const showStartButton = !isPublishing;
   const showCameraControl = !voiceMode;
   const showMediaSettingsControl = immersiveShell && isPublishing;
-  const showCohostControl = showMediaSettingsControl;
+  const showCohostControl = isPublishing;
   const cohostConnected = (Array.isArray(cohostActive) ? cohostActive : (cohostActive ? [cohostActive] : [])).length > 0;
   const canHideOverlays = immersiveShell && isPublishing;
   const audienceCountText = formatAudienceCount(chatOnlineCount);
@@ -240,9 +242,14 @@ export function LiveMobilePage({
   useEffect(() => {
     if (!showMediaSettingsControl) {
       setMediaSettingsOpen(false);
-      setCohostDrawerOpen(false);
     }
   }, [showMediaSettingsControl]);
+
+  useEffect(() => {
+    if (!showCohostControl) {
+      setCohostDrawerOpen(false);
+    }
+  }, [showCohostControl]);
 
   useEffect(() => {
     if (!canHideOverlays) {
@@ -496,7 +503,7 @@ export function LiveMobilePage({
             >
               {publishControlActive ? <EndBroadcastIcon /> : <CloseIcon />}
             </button>
-            {showLiveHeader ? (
+            {showHostChip ? (
               <button
                 type="button"
                 className="live-mobile-room-chip live-mobile-room-chip-head live-mobile-overlay-hideable"
@@ -637,7 +644,8 @@ export function LiveMobilePage({
                   variant="floating"
                   className="chat-panel-live-mobile"
                   title={t("chat.title")}
-                  showComposer={false}
+                  showComposer={landscapeImmersiveShell}
+                  showSendButton={!landscapeImmersiveShell}
                   showWelcome={false}
                 />
               </div>
@@ -653,17 +661,6 @@ export function LiveMobilePage({
                     aria-expanded={mediaSettingsOpen}
                   >
                     <AudioVideoSettingsIcon />
-                  </button>
-                ) : null}
-                {showCohostControl ? (
-                  <button
-                    type="button"
-                    className={`live-fab live-fab-icon${cohostDrawerOpen ? " is-active" : ""}${cohostConnected ? " is-connected" : ""}`}
-                    onClick={cohostDrawerOpen ? closeCohostSheet : openCohostSheet}
-                    aria-label={cohostDrawerOpen ? t("live.closeCohost") : t("live.cohost")}
-                    aria-expanded={cohostDrawerOpen}
-                  >
-                    <CohostIcon />
                   </button>
                 ) : null}
                 {!showMediaSettingsControl && showCameraControl ? (
@@ -687,6 +684,17 @@ export function LiveMobilePage({
                     aria-label={microphoneEnabled ? t("live.closeMicrophone") : t("live.openMicrophone")}
                   >
                     <MicrophoneIcon enabled={microphoneEnabled} />
+                  </button>
+                ) : null}
+                {showCohostControl ? (
+                  <button
+                    type="button"
+                    className={`live-fab live-fab-icon${cohostDrawerOpen ? " is-active" : ""}${cohostConnected ? " is-connected" : ""}`}
+                    onClick={cohostDrawerOpen ? closeCohostSheet : openCohostSheet}
+                    aria-label={cohostDrawerOpen ? t("live.closeCohost") : t("live.cohost")}
+                    aria-expanded={cohostDrawerOpen}
+                  >
+                    <CohostIcon />
                   </button>
                 ) : null}
                 <button
@@ -940,12 +948,8 @@ export function LiveMobilePage({
             onLocationSharingEnabledChange={onLocationSharingEnabledChange}
             roomInfoBlockedReason={roomInfoBlockedReason}
             onRoomInfoBlocked={onRoomInfoBlocked}
-            onShare={onShare}
-            shareSupported={shareSupported}
-            watchLink={watchLink}
             mutedUsers={mutedUsers}
             onUnmuteUser={onChatUserUnmute}
-            onClose={closeMoreSheet}
           />
         </SwipeableDrawer>
       </div>

@@ -4,7 +4,7 @@ import { FloatingToast } from "../primitives/FloatingToast.jsx";
 import { LongPressTarget } from "../primitives/LongPressTarget.jsx";
 import { SwipeableDrawer } from "../primitives/SwipeableDrawer.jsx";
 import { UserAvatar } from "../primitives/UserAvatar.jsx";
-import { WatchHostProfileSheet } from "../watch/WatchSessionSheets.jsx";
+import { WatchHostProfileContent, WatchHostProfileSheet } from "../watch/WatchSessionSheets.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { formatAudienceCount } from "../../lib/audience.js";
 import { buildHostProfileInfoItems } from "../../lib/watchSession.js";
@@ -21,14 +21,15 @@ import {
   QualityIcon,
   ShareIcon
 } from "./liveIcons.jsx";
-import { LiveMobileAudienceSheet } from "./LiveMobileAudienceSheet.jsx";
+import { LiveMobileAudienceContent, LiveMobileAudienceSheet } from "./LiveMobileAudienceSheet.jsx";
 import { LiveAudienceCallOverlay } from "./LiveAudienceCallOverlay.jsx";
-import { LiveMobileCohostPanel } from "./LiveMobileCohostPanel.jsx";
-import { LiveMobileMediaSettingsPanel } from "./LiveMobileMediaSettingsPanel.jsx";
+import { LiveLandscapeSidePanel } from "./LiveLandscapeSidePanel.jsx";
+import { LiveMobileCohostPanel, LiveMobileCohostPanelContent } from "./LiveMobileCohostPanel.jsx";
+import { LiveMobileMediaSettingsContent, LiveMobileMediaSettingsPanel } from "./LiveMobileMediaSettingsPanel.jsx";
 import { LiveMoreMenu } from "./LiveMoreMenu.jsx";
 import { LivePreviewStage } from "./LivePreviewStage.jsx";
 import { LiveQualityMenu } from "./LiveQualityMenu.jsx";
-import { LiveShareSheet } from "./LiveShareSheet.jsx";
+import { LiveShareActions, LiveShareSheet } from "./LiveShareSheet.jsx";
 
 export function LiveMobilePage({
   view = {},
@@ -56,6 +57,7 @@ export function LiveMobilePage({
   const [cameraNoticeVisible, setCameraNoticeVisible] = useState(false);
   const [cameraNoticeMessage, setCameraNoticeMessage] = useState("");
   const [overlaysHidden, setOverlaysHidden] = useState(false);
+  const [lastLandscapeSidePanel, setLastLandscapeSidePanel] = useState("");
   const cameraNoticeTimerRef = useRef(null);
   const {
     hidden,
@@ -260,6 +262,7 @@ export function LiveMobilePage({
   function openMoreSheet() {
     setChatDrawerOpen(false);
     setAudienceOpen(false);
+    setHostProfileOpen(false);
     setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
@@ -277,6 +280,7 @@ export function LiveMobilePage({
     }
     setMoreOpen(false);
     setAudienceOpen(false);
+    setHostProfileOpen(false);
     setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
@@ -294,6 +298,7 @@ export function LiveMobilePage({
     }
     setMoreOpen(false);
     setChatDrawerOpen(false);
+    setHostProfileOpen(false);
     setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
@@ -402,6 +407,7 @@ export function LiveMobilePage({
     setAudienceCallPanelTab("invite");
     setMoreOpen(false);
     setChatDrawerOpen(false);
+    setAudienceOpen(false);
     setShareOpen(false);
     setQualityDrawerOpen(false);
     setMediaSettingsOpen(false);
@@ -481,7 +487,229 @@ export function LiveMobilePage({
       placeholderClassName="is-placeholder"
       iconClassName="live-mobile-head-avatar-icon"
     />
-  )
+  );
+
+  const liveLandscapeSidePanel = landscapeImmersiveShell
+    ? hostProfileOpen
+      ? "host"
+      : audienceOpen
+        ? "audience"
+        : shareOpen
+          ? "share"
+          : mediaSettingsOpen
+            ? "media"
+            : cohostDrawerOpen
+              ? "cohost"
+              : qualityDrawerOpen
+                ? "quality"
+                : chatDrawerOpen
+                  ? "chat"
+                  : moreOpen
+                    ? "more"
+                    : ""
+    : "";
+  const liveLandscapeSidePanelOpen = Boolean(liveLandscapeSidePanel);
+  const renderedLandscapeSidePanel = liveLandscapeSidePanel || lastLandscapeSidePanel;
+  const landscapeSidePanelClassName = {
+    audience: "live-mobile-audience-panel",
+    chat: "live-mobile-chat-panel",
+    cohost: "live-mobile-cohost-panel",
+    host: "watch-host-profile-panel",
+    media: "live-mobile-media-panel",
+    more: "live-mobile-more-panel live-more-menu-panel",
+    quality: "live-mobile-quality-panel",
+    share: "live-mobile-share-panel",
+  }[renderedLandscapeSidePanel] || "";
+
+  useEffect(() => {
+    if (liveLandscapeSidePanel) {
+      setLastLandscapeSidePanel(liveLandscapeSidePanel);
+    }
+  }, [liveLandscapeSidePanel]);
+
+  function closeLandscapeSidePanel() {
+    setMoreOpen(false);
+    setChatDrawerOpen(false);
+    setAudienceOpen(false);
+    setHostProfileOpen(false);
+    setShareOpen(false);
+    setQualityDrawerOpen(false);
+    setMediaSettingsOpen(false);
+    setCohostDrawerOpen(false);
+  }
+
+  function renderChatDrawerPanel() {
+    return (
+      <ChatPanel
+        authAvailable={authAvailable}
+        authLoading={authLoading}
+        authUser={authUser}
+        hostUserId={authUser?.id}
+        messages={chatMessages}
+        draft={chatDraft}
+        onDraftChange={onChatDraftChange}
+        onSend={onChatSend}
+        onRequireLogin={onChatRequireLogin}
+        connectionState={chatConnectionState}
+        onlineCount={chatOnlineCount}
+        readOnly={chatReadOnly}
+        chatError={chatError}
+        chatRecovering={chatRecovering}
+        canRetractMessages={canRetractMessages}
+        onMuteMessage={onChatMessageMute}
+        onRetractMessage={onChatMessageRetract}
+        title={t("chat.title")}
+        showWelcome={false}
+        className="chat-panel-live-drawer"
+      />
+    );
+  }
+
+  function renderQualityMenu(onAfterSelect = closeQualitySheet) {
+    return (
+      <LiveQualityMenu
+        publishQualityOptions={publishQualityOptions}
+        publishQualityId={publishQualityId}
+        publishProtocolOptions={publishProtocolOptions}
+        publishProtocol={publishProtocol}
+        relayUrl={relayUrl}
+        webRtcPublishUrl={webRtcPublishUrl}
+        webRtcPlaybackUrl={webRtcPlaybackUrl}
+        onPublishQualityChange={onPublishQualityChange}
+        onPublishProtocolChange={onPublishProtocolChange}
+        onRelayUrlChange={onRelayUrlChange}
+        onWebRtcPublishUrlChange={onWebRtcPublishUrlChange}
+        onWebRtcPlaybackUrlChange={onWebRtcPlaybackUrlChange}
+        onAfterSelect={onAfterSelect}
+      />
+    );
+  }
+
+  function renderMoreMenu({ scrollContainer = "self" } = {}) {
+    return (
+      <LiveMoreMenu
+        roomCoverUrl={roomCoverUrl}
+        roomCoverLoading={roomCoverLoading}
+        roomCoverBusy={roomCoverBusy}
+        roomCoverError={roomCoverError}
+        roomCoverStatus={roomCoverStatus}
+        roomCoverInputRef={roomCoverInputRef}
+        roomTitle={roomTitle}
+        roomWelcomeMessage={roomWelcomeMessage}
+        commentSpeechEnabled={commentSpeechEnabled}
+        commentSpeechSupported={commentSpeechSupported}
+        liveNotificationEnabled={liveNotificationEnabled}
+        locationSharingEnabled={locationSharingEnabled}
+        locationSharingSupported={locationSharingSupported}
+        locationSharingPending={locationSharingPending}
+        onPickCover={onPickCover}
+        onOpenCoverPicker={onOpenCoverPicker}
+        onSaveRoomTitle={onSaveRoomTitle}
+        onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
+        onCommentSpeechEnabledChange={onCommentSpeechEnabledChange}
+        onLiveNotificationEnabledChange={onLiveNotificationEnabledChange}
+        onLocationSharingEnabledChange={onLocationSharingEnabledChange}
+        roomInfoBlockedReason={roomInfoBlockedReason}
+        onRoomInfoBlocked={onRoomInfoBlocked}
+        mutedUsers={mutedUsers}
+        onUnmuteUser={onChatUserUnmute}
+        scrollContainer={scrollContainer}
+      />
+    );
+  }
+
+  function renderLandscapeSidePanelContent() {
+    switch (renderedLandscapeSidePanel) {
+      case "host":
+        return (
+          <WatchHostProfileContent
+            hostAvatarUrl={roomAvatarUrl}
+            hostChipLabel={hostChipLabel}
+            hostDisplayName={hostDisplayName}
+            hostBio={authUser?.bio || ""}
+            hostProfileInfoItems={hostProfileInfoItems}
+            hostLocationClickable={false}
+            hostLocationPending={false}
+            onHostHandleCopy={copyHostHandle}
+            hostHandle={hostHandle}
+            roomLabel={roomLabel}
+            hostFollowerCountText={hostFollowerCountText}
+            hostFollowingCountText={hostFollowingCountText}
+            followButton={null}
+          />
+        );
+      case "audience":
+        return (
+          <LiveMobileAudienceContent
+            audienceCountText={audienceCountText}
+            loggedInViewers={loggedInViewers}
+          />
+        );
+      case "share":
+        return (
+          <LiveShareActions
+            onClose={closeLandscapeSidePanel}
+            onCopyLink={onCopyShareLink}
+            onOpenImageShare={() => {
+              closeLandscapeSidePanel();
+              onOpenImageShare?.();
+            }}
+            onOpenScreenshotShare={() => {
+              closeLandscapeSidePanel();
+              onOpenScreenshotShare?.();
+            }}
+            onShareLink={onShare}
+            screenshotShareAvailable={mediaMode === "video" && previewActive && previewHasVideo}
+            shareSupported={shareSupported}
+            watchLink={watchLink}
+          />
+        );
+      case "media":
+        return (
+          <LiveMobileMediaSettingsContent
+            cameraUnavailable={cameraUnavailable}
+            cameraMode={cameraMode}
+            cameraEnabled={cameraEnabled}
+            microphoneEnabled={microphoneEnabled}
+            previewVideoRef={previewVideoRef}
+            onCycleCamera={onCycleCamera}
+            onToggleCamera={onToggleCamera}
+            onToggleMicrophone={onToggleMicrophone}
+            onUnavailableCamera={() => showLiveMobileNotice(t("live.unavailableCamera"))}
+          />
+        );
+      case "cohost":
+        return (
+          <LiveMobileCohostPanelContent
+            active={cohostActive}
+            invitesAllowed={cohostInvitesAllowed}
+            recentHosts={cohostRecentHosts}
+            audienceCallEnabled={audienceCallEnabled}
+            audienceCallRequests={audienceCallRequests}
+            audienceCallInvites={audienceCallInvites}
+            audienceCallActive={audienceCallActive}
+            audienceCallInviteViewers={loggedInViewers}
+            audienceTab={audienceCallPanelTab}
+            onClose={closeLandscapeSidePanel}
+            onDisconnect={onCohostDisconnect}
+            onInvitesAllowedChange={onCohostInvitesAllowedChange}
+            onInviteRequest={onCohostInviteRequest}
+            onAudienceCallEnabledChange={onAudienceCallEnabledChange}
+            onAudienceCallRequestRespond={onAudienceCallRequestRespond}
+            onAudienceCallInviteViewer={onAudienceCallInviteViewer}
+            onAudienceTabChange={setAudienceCallPanelTab}
+          />
+        );
+      case "quality":
+        return renderQualityMenu(closeLandscapeSidePanel);
+      case "chat":
+        return renderChatDrawerPanel();
+      case "more":
+        return renderMoreMenu({ scrollContainer: "parent" });
+      default:
+        return null;
+    }
+  }
 
   return (
     <section
@@ -490,6 +718,7 @@ export function LiveMobilePage({
       data-media={mediaMode}
       data-shell={shellMode}
       data-overlays-hidden={overlaysHidden ? "true" : "false"}
+      data-side-panel-open={liveLandscapeSidePanelOpen ? "true" : "false"}
       hidden={hidden}
     >
       <div className="live-mobile-shell">
@@ -778,7 +1007,22 @@ export function LiveMobilePage({
           />
         ) : null}
 
-        {showChatDrawerEntry ? (
+        {landscapeImmersiveShell ? (
+          <LiveLandscapeSidePanel
+            open={liveLandscapeSidePanelOpen}
+            onClose={closeLandscapeSidePanel}
+            ariaLabel={t("common.closePanel")}
+            panelKey={renderedLandscapeSidePanel}
+            panelClassName={[
+              renderedLandscapeSidePanel ? `is-${renderedLandscapeSidePanel}` : "",
+              landscapeSidePanelClassName,
+            ].filter(Boolean).join(" ")}
+          >
+            {renderLandscapeSidePanelContent()}
+          </LiveLandscapeSidePanel>
+        ) : null}
+
+        {showChatDrawerEntry && !landscapeImmersiveShell ? (
           <SwipeableDrawer
             open={chatDrawerOpen}
             onClose={closeChatDrawer}
@@ -786,32 +1030,11 @@ export function LiveMobilePage({
             className="live-mobile-drawer live-mobile-chat-drawer"
             panelClassName="live-mobile-chat-panel"
           >
-            <ChatPanel
-              authAvailable={authAvailable}
-              authLoading={authLoading}
-              authUser={authUser}
-              hostUserId={authUser?.id}
-              messages={chatMessages}
-              draft={chatDraft}
-              onDraftChange={onChatDraftChange}
-              onSend={onChatSend}
-              onRequireLogin={onChatRequireLogin}
-              connectionState={chatConnectionState}
-              onlineCount={chatOnlineCount}
-              readOnly={chatReadOnly}
-              chatError={chatError}
-              chatRecovering={chatRecovering}
-              canRetractMessages={canRetractMessages}
-              onMuteMessage={onChatMessageMute}
-              onRetractMessage={onChatMessageRetract}
-              title={t("chat.title")}
-              showWelcome={false}
-              className="chat-panel-live-drawer"
-            />
+            {renderChatDrawerPanel()}
           </SwipeableDrawer>
         ) : null}
 
-        {showLiveHeader ? (
+        {showLiveHeader && !landscapeImmersiveShell ? (
           <LiveMobileAudienceSheet
             open={audienceOpen}
             onClose={closeAudienceSheet}
@@ -820,40 +1043,44 @@ export function LiveMobilePage({
           />
         ) : null}
 
-        <WatchHostProfileSheet
-          open={hostProfileOpen}
-          onClose={closeHostProfile}
-          hostAvatarUrl={roomAvatarUrl}
-          hostChipLabel={hostChipLabel}
-          hostDisplayName={hostDisplayName}
-          hostBio={authUser?.bio || ""}
-          hostProfileInfoItems={hostProfileInfoItems}
-          hostLocationClickable={false}
-          hostLocationPending={false}
-          onHostHandleCopy={copyHostHandle}
-          hostHandle={hostHandle}
-          roomLabel={roomLabel}
-          hostFollowerCountText={hostFollowerCountText}
-          hostFollowingCountText={hostFollowingCountText}
-          followButton={null}
-        />
+        {!landscapeImmersiveShell ? (
+          <WatchHostProfileSheet
+            open={hostProfileOpen}
+            onClose={closeHostProfile}
+            hostAvatarUrl={roomAvatarUrl}
+            hostChipLabel={hostChipLabel}
+            hostDisplayName={hostDisplayName}
+            hostBio={authUser?.bio || ""}
+            hostProfileInfoItems={hostProfileInfoItems}
+            hostLocationClickable={false}
+            hostLocationPending={false}
+            onHostHandleCopy={copyHostHandle}
+            hostHandle={hostHandle}
+            roomLabel={roomLabel}
+            hostFollowerCountText={hostFollowerCountText}
+            hostFollowingCountText={hostFollowingCountText}
+            followButton={null}
+          />
+        ) : null}
 
-        <LiveMobileMediaSettingsPanel
-          open={mediaSettingsOpen}
-          onClose={closeMediaSettingsSheet}
-          cameraUnavailable={cameraUnavailable}
-          cameraMode={cameraMode}
-          cameraEnabled={cameraEnabled}
-          microphoneEnabled={microphoneEnabled}
-          previewVideoRef={previewVideoRef}
-          onCycleCamera={onCycleCamera}
-          onToggleCamera={onToggleCamera}
-          onToggleMicrophone={onToggleMicrophone}
-          onUnavailableCamera={() => showLiveMobileNotice(t("live.unavailableCamera"))}
-        />
+        {!landscapeImmersiveShell ? (
+          <LiveMobileMediaSettingsPanel
+            open={mediaSettingsOpen}
+            onClose={closeMediaSettingsSheet}
+            cameraUnavailable={cameraUnavailable}
+            cameraMode={cameraMode}
+            cameraEnabled={cameraEnabled}
+            microphoneEnabled={microphoneEnabled}
+            previewVideoRef={previewVideoRef}
+            onCycleCamera={onCycleCamera}
+            onToggleCamera={onToggleCamera}
+            onToggleMicrophone={onToggleMicrophone}
+            onUnavailableCamera={() => showLiveMobileNotice(t("live.unavailableCamera"))}
+          />
+        ) : null}
 
         <LiveMobileCohostPanel
-          open={cohostDrawerOpen}
+          open={!landscapeImmersiveShell && cohostDrawerOpen}
           onClose={closeCohostSheet}
           active={cohostActive}
           invitesAllowed={cohostInvitesAllowed}
@@ -875,83 +1102,49 @@ export function LiveMobilePage({
           onAudienceTabChange={setAudienceCallPanelTab}
         />
 
-        <SwipeableDrawer
-          open={qualityDrawerOpen}
-          onClose={closeQualitySheet}
-          ariaLabel={t("live.closeQualitySettings")}
-          className="live-mobile-drawer"
-          panelClassName="live-mobile-quality-panel"
-        >
-          <LiveQualityMenu
-            publishQualityOptions={publishQualityOptions}
-            publishQualityId={publishQualityId}
-            publishProtocolOptions={publishProtocolOptions}
-            publishProtocol={publishProtocol}
-            relayUrl={relayUrl}
-            webRtcPublishUrl={webRtcPublishUrl}
-            webRtcPlaybackUrl={webRtcPlaybackUrl}
-            onPublishQualityChange={onPublishQualityChange}
-            onPublishProtocolChange={onPublishProtocolChange}
-            onRelayUrlChange={onRelayUrlChange}
-            onWebRtcPublishUrlChange={onWebRtcPublishUrlChange}
-            onWebRtcPlaybackUrlChange={onWebRtcPlaybackUrlChange}
-            onAfterSelect={closeQualitySheet}
-          />
-        </SwipeableDrawer>
+        {!landscapeImmersiveShell ? (
+          <SwipeableDrawer
+            open={qualityDrawerOpen}
+            onClose={closeQualitySheet}
+            ariaLabel={t("live.closeQualitySettings")}
+            className="live-mobile-drawer"
+            panelClassName="live-mobile-quality-panel"
+          >
+            {renderQualityMenu()}
+          </SwipeableDrawer>
+        ) : null}
 
-        <LiveShareSheet
-          open={shareOpen}
-          onClose={closeShareSheet}
-          onCopyLink={onCopyShareLink}
-          onOpenImageShare={() => {
-            closeShareSheet();
-            onOpenImageShare?.();
-          }}
-          onOpenScreenshotShare={() => {
-            closeShareSheet();
-            onOpenScreenshotShare?.();
-          }}
-          onShareLink={onShare}
-          screenshotShareAvailable={mediaMode === "video" && previewActive && previewHasVideo}
-          shareSupported={shareSupported}
-          watchLink={watchLink}
-        />
-
-        <SwipeableDrawer
-          open={moreOpen}
-          onClose={closeMoreSheet}
-          ariaLabel={t("common.closePanel")}
-          className="live-mobile-drawer"
-          panelClassName="live-mobile-more-panel live-more-menu-panel"
-        >
-          <LiveMoreMenu
-            roomCoverUrl={roomCoverUrl}
-            roomCoverLoading={roomCoverLoading}
-            roomCoverBusy={roomCoverBusy}
-            roomCoverError={roomCoverError}
-            roomCoverStatus={roomCoverStatus}
-            roomCoverInputRef={roomCoverInputRef}
-            roomTitle={roomTitle}
-            roomWelcomeMessage={roomWelcomeMessage}
-            commentSpeechEnabled={commentSpeechEnabled}
-            commentSpeechSupported={commentSpeechSupported}
-            liveNotificationEnabled={liveNotificationEnabled}
-            locationSharingEnabled={locationSharingEnabled}
-            locationSharingSupported={locationSharingSupported}
-            locationSharingPending={locationSharingPending}
-            onPickCover={onPickCover}
-            onOpenCoverPicker={onOpenCoverPicker}
-            onSaveRoomTitle={onSaveRoomTitle}
-            onSaveRoomWelcomeMessage={onSaveRoomWelcomeMessage}
-            onCommentSpeechEnabledChange={onCommentSpeechEnabledChange}
-            onLiveNotificationEnabledChange={onLiveNotificationEnabledChange}
-            onLocationSharingEnabledChange={onLocationSharingEnabledChange}
-            roomInfoBlockedReason={roomInfoBlockedReason}
-            onRoomInfoBlocked={onRoomInfoBlocked}
-            mutedUsers={mutedUsers}
-            onUnmuteUser={onChatUserUnmute}
+        {!landscapeImmersiveShell ? (
+          <LiveShareSheet
+            open={shareOpen}
+            onClose={closeShareSheet}
+            onCopyLink={onCopyShareLink}
+            onOpenImageShare={() => {
+              closeShareSheet();
+              onOpenImageShare?.();
+            }}
+            onOpenScreenshotShare={() => {
+              closeShareSheet();
+              onOpenScreenshotShare?.();
+            }}
+            onShareLink={onShare}
+            screenshotShareAvailable={mediaMode === "video" && previewActive && previewHasVideo}
+            shareSupported={shareSupported}
+            watchLink={watchLink}
           />
-        </SwipeableDrawer>
+        ) : null}
+
+        {!landscapeImmersiveShell ? (
+          <SwipeableDrawer
+            open={moreOpen}
+            onClose={closeMoreSheet}
+            ariaLabel={t("common.closePanel")}
+            className="live-mobile-drawer"
+            panelClassName="live-mobile-more-panel live-more-menu-panel"
+          >
+            {renderMoreMenu()}
+          </SwipeableDrawer>
+        ) : null}
       </div>
     </section>
   );

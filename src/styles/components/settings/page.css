@@ -24,7 +24,7 @@
 .profile-page-layout {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: minmax(240px, 280px) 1px minmax(0, 1fr);
+  grid-template-columns: minmax(160px, clamp(160px, 28vw, 280px)) 1px minmax(0, 1fr);
   gap: 0;
   align-items: stretch;
   border: 0;
@@ -569,10 +569,10 @@
 
 .desktop-settings-list-text {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  overflow: hidden;
   font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .my-profile-chevron svg,

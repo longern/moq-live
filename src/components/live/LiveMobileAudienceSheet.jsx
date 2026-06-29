@@ -18,6 +18,22 @@ export function LiveMobileAudienceSheet({
       className="live-mobile-drawer live-mobile-audience-drawer"
       panelClassName="live-mobile-audience-panel"
     >
+      <LiveMobileAudienceContent
+        audienceCountText={audienceCountText}
+        loggedInViewers={loggedInViewers}
+      />
+    </SwipeableDrawer>
+  );
+}
+
+export function LiveMobileAudienceContent({
+  audienceCountText,
+  loggedInViewers,
+}) {
+  const { t } = useI18n();
+
+  return (
+    <>
       <div className="live-audience-head">
         <strong>{t("watchSheet.onlineUsers")}</strong>
         <span>{t("watchSheet.peopleCount", { count: audienceCountText })}</span>
@@ -47,6 +63,6 @@ export function LiveMobileAudienceSheet({
       ) : (
         <div className="live-audience-empty">{t("watchSheet.noOnlineUsers")}</div>
       )}
-    </SwipeableDrawer>
+    </>
   );
 }

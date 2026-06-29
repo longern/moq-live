@@ -2,9 +2,6 @@
   --font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  --bg: #08131d;
-  --panel: rgba(10, 20, 31, 0.9);
-  --panel-2: rgba(8, 16, 25, 0.96);
   --line: rgba(209, 224, 238, 0.12);
   --text: #ebf4fb;
   --muted: #99aec1;
@@ -22,10 +19,8 @@
   --status-online-soft: rgba(16, 196, 182, 0.18);
   --status-warning-soft: rgba(255, 200, 109, 0.18);
   --status-danger-soft: rgba(255, 100, 121, 0.18);
-  --accent: var(--status-live);
   --accent-2: var(--status-online);
   --danger: var(--status-danger);
-  --warm: var(--status-warning);
   --shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
   --mobile-nav-height: 56px;
   --z-page-overlay: 70;
@@ -43,9 +38,6 @@
   --z-modal-backdrop: 120;
   --z-modal-panel: 121;
   --z-toast: 140;
-  --z-menu: var(--z-menu-panel);
-  --z-share-backdrop: var(--z-menu-backdrop);
-  --z-share-panel: var(--z-menu-panel);
 }
 
 * {

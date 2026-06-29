@@ -68,9 +68,35 @@ function LiveCohostInviteDialog({ invite, onRespond }) {
 export function LiveMobileCohostPanel({
   open,
   onClose,
+  invite,
+  onInviteRespond,
+  ...contentProps
+}) {
+  const { t } = useI18n();
+
+  return (
+    <>
+      <SwipeableDrawer
+        open={open}
+        onClose={onClose}
+        ariaLabel={t("live.closeCohost")}
+        className="live-mobile-drawer"
+        panelClassName="live-mobile-cohost-panel"
+      >
+        <LiveMobileCohostPanelContent
+          {...contentProps}
+          onClose={onClose}
+        />
+      </SwipeableDrawer>
+      <LiveCohostInviteDialog invite={invite} onRespond={onInviteRespond} />
+    </>
+  );
+}
+
+export function LiveMobileCohostPanelContent({
+  onClose,
   active,
   invitesAllowed,
-  invite,
   recentHosts = [],
   audienceCallEnabled = false,
   audienceCallRequests = [],
@@ -82,7 +108,6 @@ export function LiveMobileCohostPanel({
   onDisconnect,
   onInvitesAllowedChange,
   onInviteRequest,
-  onInviteRespond,
   onAudienceCallEnabledChange,
   onAudienceCallRequestRespond,
   onAudienceCallInviteViewer,
@@ -172,15 +197,8 @@ export function LiveMobileCohostPanel({
 
   return (
     <>
-      <SwipeableDrawer
-        open={open}
-        onClose={onClose}
-        ariaLabel={t("live.closeCohost")}
-        className="live-mobile-drawer"
-        panelClassName="live-mobile-cohost-panel"
-      >
-        {audienceCallEnabled ? (
-          <>
+      {audienceCallEnabled ? (
+        <>
             <div className="live-cohost-head live-audience-call-head">
               <div className="live-audience-call-tabs" role="tablist" aria-label={t("live.audienceCall")}>
                 <button
@@ -304,9 +322,9 @@ export function LiveMobileCohostPanel({
                 )}
               </div>
             )}
-          </>
-        ) : (
-          <>
+        </>
+      ) : (
+        <>
             <div className="live-cohost-head">
               <strong>{t("live.cohost")}</strong>
             </div>
@@ -409,10 +427,8 @@ export function LiveMobileCohostPanel({
                 <div className="live-cohost-empty">{t("live.noRecentCohosts")}</div>
               )}
             </div>
-          </>
-        )}
-      </SwipeableDrawer>
-      <LiveCohostInviteDialog invite={invite} onRespond={onInviteRespond} />
+        </>
+      )}
     </>
   );
 }

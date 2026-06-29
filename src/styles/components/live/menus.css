@@ -249,6 +249,9 @@
 .live-more-menu-shell {
   width: 100%;
   min-height: 0;
+}
+
+.live-more-menu-shell.is-self-scrolled {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -638,4 +641,3 @@
 .live-switch.is-on .live-switch-thumb {
   transform: translateX(16px);
 }
-

@@ -100,6 +100,42 @@ export function LiveMobileMediaSettingsPanel({
   onUnavailableCamera,
 }) {
   const { t } = useI18n();
+
+  return (
+    <SwipeableDrawer
+      open={open}
+      onClose={onClose}
+      ariaLabel={t("live.closeMediaSettings")}
+      className="live-mobile-drawer"
+      panelClassName="live-mobile-media-panel"
+    >
+      <LiveMobileMediaSettingsContent
+        cameraUnavailable={cameraUnavailable}
+        cameraMode={cameraMode}
+        cameraEnabled={cameraEnabled}
+        microphoneEnabled={microphoneEnabled}
+        previewVideoRef={previewVideoRef}
+        onCycleCamera={onCycleCamera}
+        onToggleCamera={onToggleCamera}
+        onToggleMicrophone={onToggleMicrophone}
+        onUnavailableCamera={onUnavailableCamera}
+      />
+    </SwipeableDrawer>
+  );
+}
+
+export function LiveMobileMediaSettingsContent({
+  cameraUnavailable,
+  cameraMode,
+  cameraEnabled,
+  microphoneEnabled,
+  previewVideoRef,
+  onCycleCamera,
+  onToggleCamera,
+  onToggleMicrophone,
+  onUnavailableCamera,
+}) {
+  const { t } = useI18n();
   const cameraLabel = cameraUnavailable
     ? t("live.cameraUnavailable")
     : cameraEnabled
@@ -129,13 +165,7 @@ export function LiveMobileMediaSettingsPanel({
   }
 
   return (
-    <SwipeableDrawer
-      open={open}
-      onClose={onClose}
-      ariaLabel={t("live.closeMediaSettings")}
-      className="live-mobile-drawer"
-      panelClassName="live-mobile-media-panel"
-    >
+    <>
       <div className="live-mobile-media-panel-head">
         <strong>{t("live.mediaSettings")}</strong>
       </div>
@@ -172,6 +202,6 @@ export function LiveMobileMediaSettingsPanel({
           cameraMode={cameraMode}
         />
       </div>
-    </SwipeableDrawer>
+    </>
   );
 }

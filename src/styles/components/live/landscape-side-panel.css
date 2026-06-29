@@ -1,0 +1,68 @@
+@media (min-width: 601px) and (max-width: 980px) and (orientation: landscape) {
+  .live-mobile-page.media-landscape-immersive .live-landscape-side-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 72;
+    width: var(--live-landscape-side-panel-width);
+    height: 100%;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 16, 25, 0.98);
+    box-shadow: -18px 0 44px rgba(0, 0, 0, 0.34);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: rgba(153, 174, 193, 0.42) transparent;
+    scrollbar-width: thin;
+    transform: translate3d(100%, 0, 0);
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .live-mobile-page.media-landscape-immersive .live-landscape-side-panel.is-open {
+    transform: translate3d(0, 0, 0);
+  }
+
+  .live-mobile-page.media-landscape-immersive .live-landscape-side-panel::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .live-mobile-page.media-landscape-immersive .live-landscape-side-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .live-mobile-page.media-landscape-immersive .live-landscape-side-panel::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(153, 174, 193, 0.38);
+  }
+
+  .live-mobile-page.media-landscape-immersive .live-landscape-side-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(153, 174, 193, 0.56);
+  }
+
+  .live-mobile-page.media-landscape-immersive .live-landscape-side-panel-surface {
+    width: 100%;
+    min-height: 100%;
+    height: auto;
+    max-height: none;
+    box-sizing: border-box;
+    overflow: visible;
+  }
+
+  .live-mobile-page.media-landscape-immersive
+    .live-landscape-side-panel-surface
+    > .swipeable-drawer-panel-content {
+    min-height: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .live-mobile-page.media-landscape-immersive
+    .live-landscape-side-panel
+    .chat-panel-live-drawer {
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+}

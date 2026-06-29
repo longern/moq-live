@@ -115,6 +115,7 @@ export function LiveMoreMenu({
   onRoomInfoBlocked,
   mutedUsers = [],
   onUnmuteUser,
+  scrollContainer = "self",
 }) {
   const { t } = useI18n();
   const [activeEditor, setActiveEditor] = useState("");
@@ -236,7 +237,14 @@ export function LiveMoreMenu({
         accept="image/png,image/jpeg,image/webp,image/avif"
         onChange={onPickCover}
       />
-      <div className={`live-more-menu-shell${activeEditor ? " is-editing" : ""}`} aria-label={t("live.moreActions")}>
+      <div
+        className={[
+          "live-more-menu-shell",
+          scrollContainer === "parent" ? "is-parent-scrolled" : "is-self-scrolled",
+          activeEditor ? "is-editing" : "",
+        ].filter(Boolean).join(" ")}
+        aria-label={t("live.moreActions")}
+      >
         <div className="live-more-menu-track">
           <div className="live-more-menu-screen">
             <div className="live-more-menu-title">{t("live.liveSettings")}</div>

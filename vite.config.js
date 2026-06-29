@@ -303,10 +303,6 @@ export default defineConfig(({ mode }) => {
                 changeOrigin: true,
                 ws: true,
               },
-              "/share": {
-                target: backendProxyTarget,
-                changeOrigin: true,
-              },
             },
           }
         : {}),

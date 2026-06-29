@@ -9,6 +9,18 @@ import {
 } from "./shared.js";
 
 const LIVE_NOTIFICATION_COOLDOWN_MS = 10 * 60 * 1000;
+const HANDLE_PATH_PATTERN = /^(?!\d+$)[a-z0-9](?:[a-z0-9_]{4,22}[a-z0-9])?$/;
+
+function buildWatchPath(roomHandle) {
+  const normalizedHandle = String(roomHandle || "").trim();
+  if (!normalizedHandle) {
+    return "/";
+  }
+  if (HANDLE_PATH_PATTERN.test(normalizedHandle)) {
+    return `/${encodeURIComponent(normalizedHandle)}`;
+  }
+  return `/?r=${encodeURIComponent(normalizedHandle)}`;
+}
 
 export async function handlePushPublicKey(env) {
   return json({
@@ -208,9 +220,7 @@ async function sendLiveStartedPushNotifications(
   const hostDisplayName = String(notification.hostDisplayName ?? "").trim();
   const notificationPayload = {
     hostDisplayName,
-    url: notification.roomHandle
-      ? `/?r=${encodeURIComponent(notification.roomHandle)}`
-      : "/",
+    url: buildWatchPath(notification.roomHandle),
   };
 
   await Promise.allSettled(

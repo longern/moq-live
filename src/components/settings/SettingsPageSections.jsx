@@ -45,7 +45,12 @@ function getLanguageDisplayName(locale) {
 
 function getWatchHistoryHref(item) {
   const room = item?.room?.trim();
-  return room ? `?r=${encodeURIComponent(room)}` : "?";
+  if (!room) {
+    return "?";
+  }
+  return /^(?!\d+$)[a-z0-9](?:[a-z0-9_]{4,22}[a-z0-9])?$/.test(room)
+    ? `/${encodeURIComponent(room)}`
+    : `?r=${encodeURIComponent(room)}`;
 }
 
 function SettingsMenuItem({

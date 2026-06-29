@@ -10,28 +10,26 @@ function copyStyleSheetsToPictureInPicture(pipWindow) {
 export function useWatchPictureInPicture({
   onCloseMoreSheet,
   playerRef,
+  stageContentRef,
   stageRef,
 }) {
   const [elementPipSupported, setElementPipSupported] = useState(false);
   const [pipWindow, setPipWindow] = useState(null);
   const [videoPipSupported, setVideoPipSupported] = useState(false);
   const [pictureInPictureActive, setPictureInPictureActive] = useState(false);
-  const pipPlaceholderRef = useRef(null);
   const pipWindowRef = useRef(null);
   const pipVideoRef = useRef(null);
   const pipVideoStreamRef = useRef(null);
 
   function restoreElementPictureInPicture() {
     const pipWindow = pipWindowRef.current;
-    const placeholder = pipPlaceholderRef.current;
+    const contentEl = stageContentRef?.current;
     const stageEl = stageRef?.current;
 
-    if (placeholder?.parentNode && stageEl) {
-      placeholder.parentNode.insertBefore(stageEl, placeholder);
-      placeholder.remove();
+    if (stageEl && contentEl && contentEl.parentNode !== stageEl) {
+      stageEl.appendChild(contentEl);
     }
 
-    pipPlaceholderRef.current = null;
     pipWindowRef.current = null;
     setPipWindow(null);
     setPictureInPictureActive(false);
@@ -42,15 +40,13 @@ export function useWatchPictureInPicture({
   }
 
   function handleElementPictureInPictureClosed() {
-    const placeholder = pipPlaceholderRef.current;
+    const contentEl = stageContentRef?.current;
     const stageEl = stageRef?.current;
 
-    if (placeholder?.parentNode && stageEl) {
-      placeholder.parentNode.insertBefore(stageEl, placeholder);
-      placeholder.remove();
+    if (stageEl && contentEl && contentEl.parentNode !== stageEl) {
+      stageEl.appendChild(contentEl);
     }
 
-    pipPlaceholderRef.current = null;
     pipWindowRef.current = null;
     setPipWindow(null);
     setPictureInPictureActive(false);
@@ -154,9 +150,10 @@ export function useWatchPictureInPicture({
 
   async function openElementPictureInPicture() {
     const stageEl = stageRef?.current;
+    const contentEl = stageContentRef?.current;
     const requestWindow = window.documentPictureInPicture?.requestWindow;
 
-    if (!stageEl || typeof requestWindow !== "function") {
+    if (!stageEl || !contentEl || typeof requestWindow !== "function") {
       return false;
     }
 
@@ -166,15 +163,11 @@ export function useWatchPictureInPicture({
         width: Math.round(Math.min(Math.max(rect.width || 360, 320), 720)),
         height: Math.round(Math.min(Math.max(rect.height || 240, 240), 540)),
       });
-      const placeholder = document.createComment("watch-stage-picture-in-picture-placeholder");
-      stageEl.parentNode?.insertBefore(placeholder, stageEl);
-
       pipWindowRef.current = pipWindow;
-      pipPlaceholderRef.current = placeholder;
 
       copyStyleSheetsToPictureInPicture(pipWindow);
       pipWindow.document.body.className = "watch-element-pip-body";
-      pipWindow.document.body.appendChild(stageEl);
+      pipWindow.document.body.appendChild(contentEl);
       pipWindow.addEventListener("pagehide", handleElementPictureInPictureClosed, { once: true });
       setPipWindow(pipWindow);
       setPictureInPictureActive(true);

@@ -1,4 +1,9 @@
 import { DesktopNavigation } from "./Navigation.jsx";
+import {
+  AnchoredPopover,
+  PopoverMenu,
+  PopoverMenuItem,
+} from "./primitives/AnchoredPopover.jsx";
 import { UserAvatar } from "./primitives/UserAvatar.jsx";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 
@@ -117,57 +122,66 @@ export function AppTopbar({
               />
             </button>
 
-            <div className={`auth-menu-dropdown${authMenuOpen ? " is-open" : ""}`} role="menu" aria-label={t("account.menu")}>
-              {authState.user ? (
-                <>
-                  <button
-                    type="button"
-                    className="auth-menu-item"
-                    role="menuitem"
-                    onClick={() => {
-                      onAuthMenuClose();
-                      onOpenSettings();
-                    }}
-                  >
-                    {t("account.personalCenter")}
-                  </button>
-                  {authState.user.isSuperAdmin ? (
-                    <a
+            <AnchoredPopover
+              anchorRef={authMenuRef}
+              ariaLabel={t("account.menu")}
+              className="auth-menu-dropdown"
+              onBlur={onAuthMenuScheduleClose}
+              onClose={onAuthMenuClose}
+              onFocus={onAuthMenuOpen}
+              onMouseEnter={onAuthMenuOpen}
+              onMouseLeave={onAuthMenuScheduleClose}
+              open={authMenuOpen}
+            >
+              <PopoverMenu ariaLabel={t("account.menu")}>
+                {authState.user ? (
+                  <>
+                    <PopoverMenuItem
                       className="auth-menu-item"
-                      role="menuitem"
-                      href="/admin/"
+                      onClick={() => {
+                        onAuthMenuClose();
+                        onOpenSettings();
+                      }}
                     >
-                      {t("account.admin")}
-                    </a>
-                  ) : null}
-                  <button
-                    type="button"
+                      {t("account.personalCenter")}
+                    </PopoverMenuItem>
+                    {authState.user.isSuperAdmin ? (
+                      <PopoverMenuItem
+                        className="auth-menu-item"
+                        href="/admin/"
+                      >
+                        {t("account.admin")}
+                      </PopoverMenuItem>
+                    ) : null}
+                    <PopoverMenuItem
+                      className="auth-menu-item"
+                      onClick={() => {
+                        onAuthMenuClose();
+                        onLogout();
+                      }}
+                    >
+                      {t("account.logout")}
+                    </PopoverMenuItem>
+                  </>
+                ) : (
+                  <PopoverMenuItem
                     className="auth-menu-item"
-                    role="menuitem"
                     onClick={() => {
                       onAuthMenuClose();
-                      onLogout();
+                      onStartLogin();
                     }}
+                    disabled={authState.loading || !authState.available}
+                    title={
+                      !authState.available
+                        ? t("account.authServiceUnavailable")
+                        : undefined
+                    }
                   >
-                    {t("account.logout")}
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="auth-menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    onAuthMenuClose();
-                    onStartLogin();
-                  }}
-                  disabled={authState.loading || !authState.available}
-                  title={!authState.available ? t("account.authServiceUnavailable") : undefined}
-                >
-                  {t("account.loginNow")}
-                </button>
-              )}
-            </div>
+                    {t("account.loginNow")}
+                  </PopoverMenuItem>
+                )}
+              </PopoverMenu>
+            </AnchoredPopover>
           </div>
         </div>
       </div>

@@ -208,6 +208,7 @@ export function WatchSessionPage({
   const [hostProfileOpen, setHostProfileOpen] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
   const [fullscreenSideSheetHost, setFullscreenSideSheetHost] = useState(null);
+  const stageContentRef = useRef(null);
   const fullscreenSideSheetHostRef = useRef(null);
   const overlayPortalTarget = useOverlayPortalTarget();
   const setFullscreenSideSheetHostNode = useCallback((node) => {
@@ -350,9 +351,7 @@ export function WatchSessionPage({
     shareImageLoading,
     shareImageKind,
     shareImageUrl,
-    shareMenuMounted,
-    shareMenuPosition,
-    shareMenuVisible,
+    shareMenuOpen,
     shareSupported,
     shareWatchImage,
     shareWatchLink,
@@ -378,6 +377,7 @@ export function WatchSessionPage({
   } = useWatchPictureInPicture({
     onCloseMoreSheet: closeMoreSheet,
     playerRef,
+    stageContentRef,
     stageRef,
   });
 
@@ -669,6 +669,7 @@ export function WatchSessionPage({
       onToggleMute={onToggleMute}
       onTogglePlayback={onTogglePlayback}
       pictureInPictureActive={pictureInPictureActive}
+      pictureInPicturePlaceholderLabel={t("watchSheet.pipPlaceholder")}
       playerBadgeState={playerBadge.state}
       playerFreezeFrameUrl={playerFreezeFrameUrl}
       playerMuted={playerMuted}
@@ -682,6 +683,7 @@ export function WatchSessionPage({
       showPictureInPictureControl={showStagePictureInPictureControl}
       showReturnControl={showStageReturnControl}
       showTapToUnmute={showTapToUnmute}
+      stageContentRef={stageContentRef}
       stageClassName={stageClassName}
       fullscreenSideSheetHostRef={setFullscreenSideSheetHostNode}
       stageRef={stageRef}
@@ -726,7 +728,7 @@ export function WatchSessionPage({
             roomLabel={roomLabel}
             roomTitle={roomTitle}
             shareButtonRef={shareButtonRef}
-            shareMenuMounted={shareMenuMounted}
+            shareMenuMounted={shareMenuOpen}
             watchLink={watchLink}
           />
         </section>
@@ -850,14 +852,12 @@ export function WatchSessionPage({
         loggedInViewers={loggedInViewers}
       />
       <WatchDesktopSharePanel
-        left={shareMenuPosition.left}
+        anchorRef={shareButtonRef}
         onClose={closeShareMenu}
         onCopyLink={copyWatchLink}
         onShareLink={shareWatchLink}
-        open={shareMenuMounted}
+        open={shareMenuOpen}
         shareSupported={shareSupported}
-        top={shareMenuPosition.top}
-        visible={shareMenuVisible}
         watchLink={watchLink}
       />
       {pipWindow ? createPortal(

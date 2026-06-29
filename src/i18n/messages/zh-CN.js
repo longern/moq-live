@@ -220,6 +220,7 @@ export const zhCNMessages = {
     pipClose: "关闭小窗播放",
     pipOpenShort: "小窗播放",
     pipCloseShort: "关闭小窗",
+    pipPlaceholder: "以“画中画”模式播放",
     fullscreenEnter: "全屏播放",
     fullscreenExit: "退出全屏",
     fullscreenEnterShort: "全屏",

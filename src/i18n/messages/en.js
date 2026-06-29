@@ -210,6 +210,7 @@ export const enMessages = {
     pipClose: "Close picture in picture",
     pipOpenShort: "Picture in picture",
     pipCloseShort: "Close PiP",
+    pipPlaceholder: "Playing in Picture-in-Picture",
     fullscreenEnter: "Fullscreen",
     fullscreenExit: "Exit fullscreen",
     fullscreenEnterShort: "Fullscreen",

@@ -1,5 +1,10 @@
 import { Copy, Download, Share, X } from "lucide-react";
 import { createPortal } from "react-dom";
+import {
+  AnchoredPopover,
+  PopoverMenu,
+  PopoverMenuItem,
+} from "../primitives/AnchoredPopover.jsx";
 import { LoadingSpinner } from "../primitives/LoadingSpinner.jsx";
 
 export function WatchImageShareDialog({
@@ -86,64 +91,44 @@ export function WatchImageShareDialog({
 }
 
 export function WatchDesktopSharePanel({
-  left = 0,
+  anchorRef,
   onClose,
   onCopyLink,
   onShareLink,
   open = false,
   shareSupported = false,
-  top = 0,
-  visible = false,
   watchLink = "",
 }) {
-  if (!open) {
-    return null;
-  }
-
   return (
-    <>
-      <button
-        type="button"
-        className="watch-desktop-share-backdrop"
-        aria-label="关闭分享面板"
-        onClick={onClose}
-      />
-      <section
-        className={`watch-desktop-share-panel${visible ? " is-open" : ""}`}
-        style={{
-          left: `${left}px`,
-          top: `${top}px`,
-        }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="分享到"
-      >
-        <div className="watch-desktop-share-title">分享到</div>
-        <ul className="watch-desktop-share-actions">
-          <li>
-            <button
-              type="button"
-              className="watch-desktop-share-action"
-              onClick={onCopyLink}
-              disabled={!watchLink}
-            >
-              <Copy aria-hidden="true" />
-              <span>复制链接</span>
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              className="watch-desktop-share-action"
-              onClick={onShareLink}
-              disabled={!watchLink || !shareSupported}
-            >
-              <Share aria-hidden="true" />
-              <span>分享</span>
-            </button>
-          </li>
-        </ul>
-      </section>
-    </>
+    <AnchoredPopover
+      anchorRef={anchorRef}
+      ariaLabel="分享到"
+      backdrop
+      backdropAriaLabel="关闭分享面板"
+      className="watch-desktop-share-panel"
+      onClose={onClose}
+      open={open}
+      role="dialog"
+    >
+      <div className="watch-desktop-share-title">分享到</div>
+      <PopoverMenu className="watch-desktop-share-actions" ariaLabel="分享到">
+        <PopoverMenuItem
+          className="watch-desktop-share-action"
+          onClick={onCopyLink}
+          disabled={!watchLink}
+        >
+          <Copy aria-hidden="true" />
+          <span>复制链接</span>
+        </PopoverMenuItem>
+        <PopoverMenuItem
+          className="watch-desktop-share-action"
+          onClick={onShareLink}
+          disabled={!watchLink || !shareSupported}
+        >
+          <Share aria-hidden="true" />
+          <span>分享</span>
+        </PopoverMenuItem>
+      </PopoverMenu>
+    </AnchoredPopover>
   );
 }

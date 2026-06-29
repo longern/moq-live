@@ -46,7 +46,7 @@ VITE_SITE_TITLE="MoQ Live"
 BACKEND_PROXY_TARGET="http://127.0.0.1:8788"
 ```
 
-Set `BACKEND_PROXY_TARGET` when running the Worker separately and proxying `/api` and `/share` from Vite.
+Set `BACKEND_PROXY_TARGET` when running the Worker separately and proxying `/api` from Vite.
 
 ## Cloudflare Setup
 

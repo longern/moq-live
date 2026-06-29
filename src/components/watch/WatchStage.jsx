@@ -311,6 +311,7 @@ export function WatchStage({
   onToggleMute,
   onTogglePlayback,
   pictureInPictureActive,
+  pictureInPicturePlaceholderLabel = "",
   playerFreezeFrameUrl,
   playerMuted,
   playerOrientation,
@@ -324,6 +325,7 @@ export function WatchStage({
   showPictureInPictureControl = true,
   showReturnControl = false,
   showTapToUnmute,
+  stageContentRef,
   stageClassName,
   fullscreenSideSheetHostRef,
   stageRef,
@@ -352,7 +354,13 @@ export function WatchStage({
       onClick={handleStageClick}
       onContextMenu={handleStageContextMenu}
     >
-      <div className="watch-fullscreen-media-layout">
+      <div
+        className={`watch-pip-placeholder${pictureInPictureActive ? " is-visible" : ""}`}
+        aria-hidden="true"
+      >
+        {pictureInPicturePlaceholderLabel}
+      </div>
+      <div ref={stageContentRef} className="watch-fullscreen-media-layout">
         <div className="watch-fullscreen-media-pane">
           <div id="playerMount" className={showCohostLayout ? "watch-player-mount is-cohost" : "watch-player-mount"}>
             <WatchPrimaryPlayer

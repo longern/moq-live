@@ -437,6 +437,7 @@ export class ChatRoomDO {
 
       loggedInViewersById.set(session.user.id, {
         id: session.user.id,
+        handle: session.user.handle || "",
         displayName: session.user.displayName || "已登录用户",
         avatarUrl: session.user.avatarUrl || "",
         watchDurationMs,

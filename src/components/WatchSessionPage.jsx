@@ -296,7 +296,7 @@ export function WatchSessionPage({
   ].filter(Boolean).join(" ");
   const watchLayoutClassName = [
     "page-grid",
-    "watch-layout",
+    "watch-session-layout",
     landscapeImmersive ? "media-layout media-landscape-immersive" : "",
     landscapePortraitSplit ? "media-layout media-landscape-portrait-split" : "",
   ].filter(Boolean).join(" ");
@@ -642,7 +642,7 @@ export function WatchSessionPage({
       chatReadOnly={chatReadOnly}
       chatRecovering={chatRecovering}
       chatRoomLabel={chatRoomLabel}
-      chatTrailingAction={renderMobileMoreButton()}
+      chatTrailingAction={landscapeImmersive ? null : renderMobileMoreButton()}
       cohostPlayers={cohostPlayers}
       controlsVisible={controlsVisible}
       elementPipSupported={elementPipSupported}
@@ -657,6 +657,7 @@ export function WatchSessionPage({
       hostUserId={hostUserId}
       immersiveControlsHidden={immersiveControlsHidden}
       immersiveShell={immersiveShell}
+      immersiveBottomAction={landscapeImmersive ? renderMobileMoreButton("watch-immersive-bottom-more") : null}
       longPressControlsEnabled={manualHideControlsEnabled || longPressOpensMore}
       mobileHudOverlay={renderMobileHud("stage-mobile-hud-overlay", true)}
       onChatDraftChange={onChatDraftChange}
@@ -697,9 +698,8 @@ export function WatchSessionPage({
 
   return (
     <section
-      className="page page-immersive"
+      className="page page-immersive watch-session-page"
       data-page="watch"
-      data-joined="true"
       data-immersive={immersiveShell ? "true" : "false"}
       hidden={hidden}
     >
@@ -733,15 +733,7 @@ export function WatchSessionPage({
           />
         </section>
 
-        <aside className={`control-column${!immersiveShell ? " watch-control-column-landscape" : ""}`} data-joined="true">
-          <div className="info-strip info-strip-mobile">
-            <div className="info-item">
-              <strong data-room-label>{roomLabel}</strong>
-            </div>
-            <div className="info-item info-item-pill">
-              <StatusPill id="playerBadgeInlineMobile" label={playerBadge.label} state={playerBadge.state} />
-            </div>
-          </div>
+        <aside className={`control-column${!immersiveShell ? " watch-control-column-landscape" : ""}`}>
           <ChatPanel
             roomLabel={chatRoomLabel}
             welcomeMessage={welcomeMessage}

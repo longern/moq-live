@@ -2,8 +2,8 @@ import { CircleUserRound } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner.jsx";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 
-function getAvatarText(displayName, email, initialsLength) {
-  const source = String(displayName || email || "").trim();
+function getAvatarText(displayName, initialsLength) {
+  const source = String(displayName || "").trim();
   if (!source) {
     return "";
   }
@@ -27,7 +27,6 @@ function getLoadingSpinnerStyle(imgWidth, imgHeight) {
 export function UserAvatar({
   avatarUrl,
   displayName,
-  email,
   className = "",
   imgAlt = "",
   imgWidth,
@@ -40,7 +39,7 @@ export function UserAvatar({
   placeholderClassName = ""
 }) {
   const { t } = useI18n();
-  const initials = getAvatarText(displayName, email, initialsLength);
+  const initials = getAvatarText(displayName, initialsLength);
   const shouldRenderImage = Boolean(avatarUrl) && !loading;
 
   if (shouldRenderImage) {

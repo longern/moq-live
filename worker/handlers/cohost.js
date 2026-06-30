@@ -89,7 +89,6 @@ export async function handleCohostRequest(env, request) {
       handle: session.user.handle || "",
       displayName:
         session.user.displayName ||
-        session.user.email ||
         session.user.handle ||
         "",
       avatarUrl: session.user.avatarUrl || "",
@@ -173,7 +172,7 @@ export async function handleCohostRespond(env, request) {
       displayName:
         session.user.displayName ||
         targetRoom.host_display_name ||
-        session.user.email ||
+        session.user.handle ||
         "",
       avatarUrl: session.user.avatarUrl || targetRoom.host_avatar_url || "",
     },

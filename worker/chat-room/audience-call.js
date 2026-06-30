@@ -83,8 +83,9 @@ export async function handleAudienceCallRequest(room, ws, session) {
   const requestedAt = new Date(now).toISOString();
   const user = {
     id: String(session.user.id || "").trim(),
+    handle: String(session.user.handle || "").trim(),
     displayName: sanitizeDisplayName(
-      session.user.displayName || session.user.email || "已登录用户",
+      session.user.displayName || session.user.handle || "已登录用户",
     ),
     avatarUrl: sanitizeUrl(session.user.avatarUrl),
   };
@@ -303,8 +304,9 @@ export async function handleAudienceCallInvite(room, ws, session, payload) {
     requestedAt: new Date().toISOString(),
     user: {
       id: String(targetSession.user.id || "").trim(),
+      handle: String(targetSession.user.handle || "").trim(),
       displayName: sanitizeDisplayName(
-        targetSession.user.displayName || targetSession.user.email || "已登录用户",
+        targetSession.user.displayName || targetSession.user.handle || "已登录用户",
       ),
       avatarUrl: sanitizeUrl(targetSession.user.avatarUrl),
     },
@@ -470,8 +472,9 @@ export function handleAudienceCallViewerReady(room, ws, session, payload) {
 
   const viewer = {
     userId: String(session.user.id || "").trim(),
+    handle: String(session.user.handle || "").trim(),
     displayName: sanitizeDisplayName(
-      session.user.displayName || session.user.email || "已登录用户",
+      session.user.displayName || session.user.handle || "已登录用户",
     ),
     avatarUrl: sanitizeUrl(session.user.avatarUrl),
     sessionId: String(payload.viewer?.sessionId || "").trim(),
@@ -510,6 +513,7 @@ export function handleAudienceCallViewerReady(room, ws, session, payload) {
       trackName: viewer.trackName,
       user: {
         id: viewer.userId,
+        handle: viewer.handle,
         displayName: viewer.displayName,
         avatarUrl: viewer.avatarUrl,
       },
@@ -547,8 +551,9 @@ export function handleAudienceCallViewerFailed(room, ws, session, payload) {
 
   const user = {
     id: String(session.user.id || "").trim(),
+    handle: String(session.user.handle || "").trim(),
     displayName: sanitizeDisplayName(
-      session.user.displayName || session.user.email || "已登录用户",
+      session.user.displayName || session.user.handle || "已登录用户",
     ),
     avatarUrl: sanitizeUrl(session.user.avatarUrl),
   };

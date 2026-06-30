@@ -109,6 +109,7 @@ export function normalizeAudienceCallActive(value) {
     trackName: String(value.trackName || "").trim(),
     user: {
       id: userId,
+      handle: sanitizeHandle(value.user?.handle),
       displayName: sanitizeDisplayName(value.user?.displayName) || "已登录用户",
       avatarUrl: sanitizeUrl(value.user?.avatarUrl),
     },
@@ -168,6 +169,7 @@ export function normalizeAudienceCallRequest(value) {
       sanitizeIsoTimestamp(value.requestedAt) ?? new Date().toISOString(),
     user: {
       id: userId,
+      handle: sanitizeHandle(value.user?.handle),
       displayName: sanitizeDisplayName(value.user?.displayName) || "已登录用户",
       avatarUrl: sanitizeUrl(value.user?.avatarUrl),
     },

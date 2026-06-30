@@ -163,7 +163,7 @@ export function WatchIdlePage({
   }, []);
 
   return (
-    <section className="page page-immersive watch-idle-page" data-page="watch" data-joined="false" hidden={hidden}>
+    <section className="page page-immersive watch-idle-page" data-page="watch" hidden={hidden}>
       <div className="watch-idle-shell">
         <div className="watch-idle-panel">
           <form

@@ -46,7 +46,6 @@
     min-height: 100%;
     height: auto;
     max-height: none;
-    box-sizing: border-box;
     overflow: visible;
   }
 

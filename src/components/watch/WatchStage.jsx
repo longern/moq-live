@@ -299,6 +299,7 @@ export function WatchStage({
   hostUserId,
   immersiveControlsHidden,
   immersiveShell,
+  immersiveBottomAction,
   longPressControlsEnabled = true,
   mobileHudOverlay,
   onChatDraftChange,
@@ -461,6 +462,16 @@ export function WatchStage({
                 composerTrailingAction={chatTrailingAction}
                 showSendButton={false}
               />
+            </div>
+          ) : null}
+          {immersiveShell && immersiveBottomAction ? (
+            <div
+              className={`watch-immersive-bottom-action${immersiveControlsHidden ? " is-hidden" : ""}`}
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+            >
+              {immersiveBottomAction}
             </div>
           ) : null}
           {stageView.showPlaybackControls && !immersiveShell && !suppressStageControls ? (

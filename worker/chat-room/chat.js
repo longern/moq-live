@@ -92,10 +92,10 @@ export async function handleMessageSend(room, ws, session, payload) {
     sentAt: new Date(now).toISOString(),
     user: {
       id: session.user.id,
+      handle: session.user.handle || "",
       displayName:
-        session.user.displayName || session.user.email || "匿名用户",
+        session.user.displayName || session.user.handle || "匿名用户",
       avatarUrl: session.user.avatarUrl || "",
-      email: session.user.email || "",
     },
   };
 
@@ -197,7 +197,7 @@ export async function handleMessageMute(room, ws, session, payload) {
   const mute = {
     userId: targetUserId,
     displayName: sanitizeMuteDisplayName(
-      targetMessage.user?.displayName || targetMessage.user?.email || "用户",
+      targetMessage.user?.displayName || targetMessage.user?.handle || "用户",
     ),
     mutedAt,
     expiresAt: untilStreamEnds

@@ -409,7 +409,6 @@ pre {
 
 .loading-spinner {
   display: inline-block;
-  box-sizing: border-box;
   flex: 0 0 auto;
   width: 34px;
   height: 34px;
@@ -517,7 +516,7 @@ a.nav-button {
   gap: 14px;
 }
 
-.watch-layout,
+.watch-session-layout,
 .live-layout {
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 400px);
   align-items: start;

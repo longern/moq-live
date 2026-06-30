@@ -278,7 +278,6 @@
 
 .live-audience-row {
   min-height: var(--live-audience-row-height);
-  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -327,7 +326,6 @@
 
 .live-audience-empty {
   min-height: var(--live-audience-list-min-height);
-  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -12,7 +12,7 @@ function getCommentSpeechLanguage() {
 function buildCommentSpeechText(message) {
   const author = String(
     message?.user?.displayName
-      || message?.user?.email
+      || message?.user?.handle
       || "匿名用户",
   ).trim();
   const text = String(message?.text || "").replace(/\s+/g, " ").trim();

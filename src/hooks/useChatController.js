@@ -99,6 +99,7 @@ function normalizeLoggedInViewers(value) {
   return value
     .map((viewer) => ({
       id: String(viewer?.id ?? "").trim(),
+      handle: String(viewer?.handle ?? "").trim(),
       displayName: String(viewer?.displayName ?? "").trim(),
       avatarUrl: String(viewer?.avatarUrl ?? "").trim(),
       watchDurationMs: Math.max(0, Number(viewer?.watchDurationMs) || 0)
@@ -123,6 +124,7 @@ function normalizeAudienceCallRequest(value) {
     requestedAt: String(value.requestedAt ?? "").trim(),
     user: {
       id: userId,
+      handle: String(value.user?.handle ?? "").trim(),
       displayName: String(value.user?.displayName ?? "").trim(),
       avatarUrl: String(value.user?.avatarUrl ?? "").trim()
     }
@@ -160,6 +162,7 @@ function normalizeAudienceCallActive(value) {
     trackName: String(value.trackName ?? "").trim(),
     user: {
       id: userId,
+      handle: String(value.user?.handle ?? "").trim(),
       displayName: String(value.user?.displayName ?? "").trim(),
       avatarUrl: String(value.user?.avatarUrl ?? "").trim()
     }

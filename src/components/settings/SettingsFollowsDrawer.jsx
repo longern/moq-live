@@ -48,24 +48,38 @@ function FollowListItem({
   const primary = user.displayName || user.handle || user.email || t("common.anonymousUser");
   const secondary = user.handle ? `@${user.handle}` : user.email || "";
   const watchTarget = user.handle || user.id || "";
+  const watchHref = user.handle
+    ? `/${encodeURIComponent(user.handle)}`
+    : `?r=${encodeURIComponent(user.id || "")}`;
+  const openUserRoom = () => {
+    if (watchTarget) {
+      onOpenUserRoom(watchTarget);
+    }
+  };
+  const openUserProfile = () => {
+    onOpenUserProfile(user);
+  };
+  const FollowOpenElement = showFollowingAction ? "a" : "button";
+  const interactiveProps = showFollowingAction
+    ? {
+        href: watchHref,
+        onClick: (event) => {
+          event.preventDefault();
+          openUserRoom();
+        },
+      }
+    : {
+        type: "button",
+        disabled: !watchTarget,
+        onClick: openUserProfile,
+      };
 
   return (
     <li>
       <div className={`follow-list-row${showFollowingAction ? " has-action" : ""}`}>
-        <button
-          type="button"
+        <FollowOpenElement
           className="follow-list-open-button"
-          disabled={!watchTarget}
-          onClick={() => {
-            if (!watchTarget) {
-              return;
-            }
-            if (showFollowingAction) {
-              onOpenUserRoom(watchTarget);
-              return;
-            }
-            onOpenUserProfile(user);
-          }}
+          {...interactiveProps}
         >
           <UserAvatar
             avatarUrl={user.avatarUrl}
@@ -80,7 +94,7 @@ function FollowListItem({
             <strong>{primary}</strong>
             {secondary ? <span>{secondary}</span> : null}
           </div>
-        </button>
+        </FollowOpenElement>
         {showFollowingAction ? (
           <button
             type="button"

@@ -119,7 +119,7 @@ function ChatMessageMutePanel({
   onMuteRetractMessageChange,
 }) {
   const { t } = useI18n();
-  const targetName = message?.user?.displayName || message?.user?.email || t("common.user");
+  const targetName = message?.user?.displayName || message?.user?.handle || t("common.user");
   const messageText = String(message?.text || "").trim() || t("chat.thisComment");
 
   return (
@@ -634,7 +634,7 @@ export function ChatPanel({
   const floating = variant === "floating";
   const panelClassName = [
     "chat-panel-block",
-    floating ? "chat-panel-floating" : "control-block",
+    floating ? "chat-panel-floating" : "chat-panel-stretch",
     className
   ].filter(Boolean).join(" ");
   const configuredWelcomeText = String(welcomeMessage || "").trim();
@@ -721,15 +721,13 @@ export function ChatPanel({
           message.type === "system" ? (
             <article
               key={message.id}
-              className="chat-message-card chat-message-card-system chat-message-card-system-no-avatar"
+              className="chat-message-card chat-message-card-system"
             >
-              <div className="chat-message-hit-area chat-message-hit-area-system">
-                <div className="chat-message-body chat-message-body-system">
-                  <p className="chat-message-line chat-message-line-system">
-                    <span className="chat-message-author">{t("chat.system")}</span>
-                    <span className="chat-message-text">{message.text}</span>
-                  </p>
-                </div>
+              <div className="chat-message-body chat-message-body-system">
+                <p className="chat-message-line chat-message-line-system">
+                  <span className="chat-message-author">{t("chat.system")}</span>
+                  <span className="chat-message-text">{message.text}</span>
+                </p>
               </div>
             </article>
           ) : (
@@ -742,33 +740,28 @@ export function ChatPanel({
                 <article
                   key={message.id}
                   className="chat-message-card"
+                  onPointerDown={rememberMessagePointer}
+                  onContextMenu={(event) => openMessageMenu(event, message)}
+                  onClick={(event) => {
+                    if (isCoarsePointer()) {
+                      openMessageMenu(event, message, { placement: "above-point" });
+                    }
+                  }}
                 >
-                  <div
-                    className="chat-message-hit-area"
-                    onPointerDown={rememberMessagePointer}
-                    onContextMenu={(event) => openMessageMenu(event, message)}
-                    onClick={(event) => {
-                      if (isCoarsePointer()) {
-                        openMessageMenu(event, message, { placement: "above-point" });
-                      }
-                    }}
-                  >
-                    <UserAvatar
-                      avatarUrl={message.user?.avatarUrl}
-                      displayName={message.user?.displayName}
-                      email={message.user?.email}
-                      className="chat-avatar"
-                      imgAlt={message.user?.displayName || t("common.userAvatar")}
-                      placeholderClassName="is-placeholder"
-                    />
-                    <div className="chat-message-body">
-                      <p className="chat-message-line">
-                        <span className={`chat-message-author${hostMessage ? " chat-message-author-host" : ""}`}>
-                          {message.user?.displayName || message.user?.email || t("chat.anonymousUser")}
-                        </span>
-                        <span className="chat-message-text">{message.text}</span>
-                      </p>
-                    </div>
+                  <UserAvatar
+                    avatarUrl={message.user?.avatarUrl}
+                    displayName={message.user?.displayName}
+                    className="chat-avatar"
+                    imgAlt={message.user?.displayName || t("common.userAvatar")}
+                    placeholderClassName="is-placeholder"
+                  />
+                  <div className="chat-message-body">
+                    <p className="chat-message-line">
+                      <span className={`chat-message-author${hostMessage ? " chat-message-author-host" : ""}`}>
+                        {message.user?.displayName || message.user?.handle || t("chat.anonymousUser")}
+                      </span>
+                      <span className="chat-message-text">{message.text}</span>
+                    </p>
                   </div>
                 </article>
               );

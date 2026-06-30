@@ -532,6 +532,7 @@ export function App() {
     playerOrientation: effectivePlayerOrientation,
   });
   const mobileWatchJoinedClass = watchPlayerShellActive ? " app-container-watch-joined" : "";
+  const watchNavigationHidden = page === "watch" && watchJoined;
   const avatarLabel = getAvatarLabel(authState, t);
   const avatarStateClass = authState.loading
     ? " is-loading"
@@ -1550,7 +1551,7 @@ export function App() {
         </main>
       </div>
 
-      {watchPlayerShellActive ? null : (
+      {watchNavigationHidden ? null : (
         <MobileNavigation
           currentPage={page}
           onSelect={(nextPage) => selectPageWithGuard(nextPage)}

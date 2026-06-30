@@ -33,13 +33,34 @@ export function sanitizeDisplayName(value) {
     .slice(0, 48);
 }
 
+export function sanitizePublicUser(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = String(value.id || "").trim();
+  if (!id) {
+    return null;
+  }
+
+  const email = String(value.email || "").trim().toLowerCase();
+  const displayName = sanitizeDisplayName(value.displayName);
+
+  return {
+    id,
+    handle: sanitizeHandle(value.handle),
+    displayName: email && displayName.toLowerCase() === email ? "" : displayName,
+    avatarUrl: sanitizeUrl(value.avatarUrl),
+  };
+}
+
 export function parseUserHeader(headerValue) {
   if (!headerValue) {
     return null;
   }
 
   try {
-    return JSON.parse(decodeURIComponent(headerValue));
+    return sanitizePublicUser(JSON.parse(decodeURIComponent(headerValue)));
   } catch {
     return null;
   }

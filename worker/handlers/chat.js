@@ -7,6 +7,26 @@ import {
   postToChatRoom,
 } from "./shared.js";
 
+function buildChatPublicUser(user) {
+  const id = String(user?.id || "").trim();
+  if (!id) {
+    return null;
+  }
+
+  const email = String(user?.email || "").trim();
+  const displayName = String(user?.displayName || "").trim();
+  const publicDisplayName = displayName && displayName !== email
+    ? displayName
+    : "";
+
+  return {
+    id,
+    handle: String(user?.handle || "").trim(),
+    displayName: publicDisplayName,
+    avatarUrl: String(user?.avatarUrl || "").trim(),
+  };
+}
+
 export async function handleChatLocationDistance(env, request) {
   const roomId = decodeURIComponent(
     new URL(request.url).pathname.split("/")[3] || "",
@@ -70,10 +90,11 @@ export async function handleChatWebSocket(env, request) {
   headers.set("x-chat-role", role);
   headers.set("x-chat-room-owner", isRoomOwner ? "1" : "0");
   headers.set("x-chat-read-only", session?.user ? "0" : "1");
-  if (session?.user) {
+  const chatUser = buildChatPublicUser(session?.user);
+  if (chatUser) {
     headers.set(
       "x-chat-user",
-      encodeURIComponent(JSON.stringify(session.user)),
+      encodeURIComponent(JSON.stringify(chatUser)),
     );
   } else {
     headers.delete("x-chat-user");

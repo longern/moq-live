@@ -1,6 +1,6 @@
-.watch-layout .watch-stage-frame:fullscreen,
-.watch-layout .watch-stage-frame.is-fullscreen-landscape-media,
-.watch-layout .watch-stage-frame.is-landscape-immersive-stage {
+.watch-session-layout .watch-stage-frame:fullscreen,
+.watch-session-layout .watch-stage-frame.is-fullscreen-landscape-media,
+.watch-session-layout .watch-stage-frame.is-landscape-immersive-stage {
   --watch-fullscreen-side-sheet-width: clamp(280px, 32vw, 420px);
   width: 100vw;
   height: 100vh;
@@ -11,7 +11,7 @@
   background: #000;
 }
 
-.watch-layout
+.watch-session-layout
   .watch-stage-frame:is(:fullscreen, .is-fullscreen-landscape-media, .is-landscape-immersive-stage)
   .watch-fullscreen-media-layout {
   position: absolute;
@@ -25,7 +25,7 @@
   background: #000;
 }
 
-.watch-layout
+.watch-session-layout
   .watch-stage-frame:is(:fullscreen, .is-fullscreen-landscape-media, .is-landscape-immersive-stage)
   .watch-fullscreen-media-pane {
   display: block;
@@ -38,7 +38,7 @@
   order: 1;
 }
 
-.watch-layout
+.watch-session-layout
   .watch-stage-frame:is(:fullscreen, .is-fullscreen-landscape-media, .is-landscape-immersive-stage)
   #playerMount {
   width: 100%;
@@ -48,7 +48,7 @@
   background: #000;
 }
 
-.watch-layout
+.watch-session-layout
   .watch-stage-frame:is(:fullscreen, .is-fullscreen-landscape-media, .is-landscape-immersive-stage)
   .watch-fullscreen-side-sheet-host {
   position: relative;
@@ -65,7 +65,7 @@
     width 285ms cubic-bezier(0, 0, 0.2, 1);
 }
 
-.watch-layout
+.watch-session-layout
   .watch-stage-frame:is(:fullscreen, .is-fullscreen-landscape-media, .is-landscape-immersive-stage)
   .watch-fullscreen-side-sheet-overlay {
   position: absolute;
@@ -78,11 +78,11 @@
   cursor: default;
 }
 
-.watch-layout
+.watch-session-layout
   .watch-stage-frame:is(:fullscreen, .is-fullscreen-landscape-media, .is-landscape-immersive-stage)
   .watch-fullscreen-media-pane
   .stage-error,
-.watch-layout
+.watch-session-layout
   .watch-stage-frame:is(:fullscreen, .is-fullscreen-landscape-media, .is-landscape-immersive-stage)
   .watch-fullscreen-media-pane
   .placeholder {
@@ -90,7 +90,7 @@
   inset: 0;
 }
 
-.watch-layout
+.watch-session-layout
   .watch-stage-frame:is(:fullscreen, .is-fullscreen-landscape-media, .is-landscape-immersive-stage).is-fullscreen-side-sheet-open
   .watch-fullscreen-side-sheet-host {
   flex-basis: var(--watch-fullscreen-side-sheet-width);

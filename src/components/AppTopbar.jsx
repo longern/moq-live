@@ -111,7 +111,6 @@ export function AppTopbar({
               <UserAvatar
                 avatarUrl={authState.user?.avatarUrl}
                 displayName={authState.user?.displayName}
-                email={authState.user?.email}
                 className={`auth-avatar${avatarStateClass}`}
                 imgAlt={authState.user?.displayName || t("common.userAvatar")}
                 imgWidth={40}

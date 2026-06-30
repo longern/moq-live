@@ -286,7 +286,6 @@
   width: var(--watch-fullscreen-side-sheet-width);
   height: 100%;
   max-height: none;
-  box-sizing: border-box;
 }
 
 @media (max-width: 980px) {
@@ -454,7 +453,6 @@
 
   .watch-audience-row {
     min-height: var(--watch-audience-row-height);
-    box-sizing: border-box;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -503,7 +501,6 @@
 
   .watch-audience-empty {
     min-height: var(--watch-audience-list-min-height);
-    box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: center;

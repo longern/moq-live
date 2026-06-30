@@ -12,7 +12,6 @@ export function useLazyUserProfileSheet({ errorKey = "profile_load_failed" } = {
   const [profileError, setProfileError] = useState("");
   const profileUserName = profileUser?.displayName
     || profileUser?.handle
-    || profileUser?.email
     || t("common.anonymousUser");
   const profileInfoItems = profileUser
     ? buildHostProfileInfoItems({

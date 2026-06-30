@@ -810,7 +810,7 @@ export function LiveDesktopPage({
           </div>
         </section>
 
-        <aside className="control-column live-chat-column">
+        <aside className="live-chat-column">
           <ChatPanel
             authAvailable={authAvailable}
             authLoading={authLoading}

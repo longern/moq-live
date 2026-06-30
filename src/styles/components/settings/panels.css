@@ -131,6 +131,8 @@
 .account-panel-body {
   min-height: 0;
   display: block;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 0 0 32px;
 }
 

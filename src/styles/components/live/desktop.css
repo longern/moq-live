@@ -68,12 +68,8 @@
   align-items: stretch;
 }
 
-.live-desktop-page .stage-column,
-.live-desktop-page .control-column {
-  min-height: 0;
-}
-
 .live-desktop-page .stage-column {
+  min-height: 0;
   position: relative;
   flex: 1 1 auto;
 }
@@ -92,9 +88,7 @@
 .live-desktop-page .live-chat-column {
   width: min(400px, 32vw);
   flex: 0 0 min(400px, 32vw);
-  display: flex;
-  flex-direction: column;
-  padding: 0;
+  padding: 8px 0 12px;
   border-left: 1px solid var(--line);
 }
 

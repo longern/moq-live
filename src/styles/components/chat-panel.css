@@ -36,10 +36,6 @@
   flex: 1 1 auto;
 }
 
-.chat-panel-head {
-  align-items: center;
-}
-
 .chat-panel-title-row {
   display: flex;
   align-items: baseline;
@@ -98,7 +94,7 @@
 .chat-message-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   max-height: min(48vh, 460px);
   min-height: 220px;
   overflow: auto;
@@ -113,7 +109,6 @@
 
 .chat-panel-stretch .chat-panel-head {
   flex: 0 0 auto;
-  margin: 0;
   padding-inline: 16px;
 }
 
@@ -172,6 +167,7 @@
   border: 0;
   border-radius: 0;
   outline: 0;
+  gap: 4px;
   background: transparent;
   box-shadow: none;
   overflow: auto;

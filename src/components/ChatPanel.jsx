@@ -1,19 +1,20 @@
+import { Ban, Copy, RotateCcw, UserRound, X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Ban, Copy, RotateCcw, UserRound, X } from "lucide-react";
+import { useLazyUserProfileSheet } from "../hooks/useLazyUserProfileSheet.js";
+import { useOverlayPortalTarget } from "../hooks/useOverlayPortalTarget.js";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 import {
   FLOATING_CONTEXT_MENU_EXIT_MS,
   FloatingActionMenu,
   getFloatingContextMenuPosition,
 } from "./primitives/FloatingContextMenu.jsx";
+import { useToast } from "./primitives/FloatingToast.jsx";
 import { LoadingSpinner } from "./primitives/LoadingSpinner.jsx";
 import { SwipeableDrawer } from "./primitives/SwipeableDrawer.jsx";
 import { UserAvatar } from "./primitives/UserAvatar.jsx";
+import { useOptionalWatchPanel } from "./watch/WatchPanelContext.jsx";
 import { WatchHostProfileSheet } from "./watch/WatchSessionSheets.jsx";
-import { useToast } from "./primitives/FloatingToast.jsx";
-import { useLazyUserProfileSheet } from "../hooks/useLazyUserProfileSheet.js";
-import { useOverlayPortalTarget } from "../hooks/useOverlayPortalTarget.js";
-import { useI18n } from "../i18n/I18nProvider.jsx";
 
 const CHAT_COMPOSER_AUTOCOMPLETE = "off";
 const CHAT_COMPOSER_FIELD_NAME = "moq_draft_text";
@@ -317,6 +318,7 @@ export function ChatPanel({
   onMuteMessage,
 }) {
   const { t } = useI18n();
+  const watchPanel = useOptionalWatchPanel();
   const composerInputId = useId();
   const { showToast } = useToast();
   const listRef = useRef(null);
@@ -585,6 +587,11 @@ export function ChatPanel({
       closeMessageMenu();
       return;
     }
+    if (watchPanel?.openUserProfile) {
+      closeMessageMenuImmediately();
+      await watchPanel.openUserProfile(user);
+      return;
+    }
     await openUserProfile(user, {
       onBeforeOpen: closeMessageMenuImmediately,
     });
@@ -817,12 +824,14 @@ export function ChatPanel({
           onMuteRetractMessageChange={setMuteRetractMessage}
         />
       </SwipeableDrawer>
-      <WatchHostProfileSheet
-        {...profileSheetProps}
-        portal
-        viewport
-        followButton={profileError ? <p className="inline-warning">{profileError}</p> : null}
-      />
+      {!watchPanel?.openUserProfile ? (
+        <WatchHostProfileSheet
+          {...profileSheetProps}
+          portal
+          viewport
+          followButton={profileError ? <p className="inline-warning">{profileError}</p> : null}
+        />
+      ) : null}
 
       {chatError && !chatRecovering ? (
         <p className={`inline-warning${floating ? " chat-floating-warning" : ""}`}>{chatError}</p>

@@ -1,27 +1,18 @@
-import { useCallback, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   Check,
   MoreHorizontal,
   X,
 } from "lucide-react";
-import { ChatPanel } from "./ChatPanel.jsx";
-import { LiveAudienceCallOverlay } from "./live/LiveAudienceCallOverlay.jsx";
-import { useToast } from "./primitives/FloatingToast.jsx";
-import { StatusPill } from "./primitives/StatusPill.jsx";
-import {
-  WatchAudienceSheet,
-  WatchHostProfileSheet,
-  WatchMobileMoreSheet,
-} from "./watch/WatchSessionSheets.jsx";
-import { WatchHostProfileActions } from "./watch/WatchHostProfileActions.jsx";
-import { WatchMobileHud } from "./watch/WatchMobileHud.jsx";
-import { WatchRoomInfoStrip } from "./watch/WatchRoomInfoStrip.jsx";
-import {
-  WatchDesktopSharePanel,
-  WatchImageShareDialog,
-} from "./watch/WatchSharePanels.jsx";
-import { WatchPictureInPictureControlsLayer, WatchStage } from "./watch/WatchStage.jsx";
+import { useCallback, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useLazyUserProfileSheet } from "../hooks/useLazyUserProfileSheet.js";
+import { useCompactViewport, useMediaQuery, usePortraitViewport } from "../hooks/useMediaQuery.js";
+import { useOverlayPortalTarget } from "../hooks/useOverlayPortalTarget.js";
+import { useWatchHostDistance } from "../hooks/useWatchHostDistance.js";
+import { useWatchPictureInPicture } from "../hooks/useWatchPictureInPicture.js";
+import { useWatchShareActions } from "../hooks/useWatchShareActions.js";
+import { useWatchStageControls } from "../hooks/useWatchStageControls.js";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 import { formatAudienceCount } from "../lib/audience.js";
 import {
   isPortraitMedia,
@@ -32,13 +23,24 @@ import {
   getWatchStageLayout,
 } from "../lib/watchSession.js";
 import { getWatchStageView } from "../lib/watchStageView.js";
-import { useCompactViewport, useMediaQuery, usePortraitViewport } from "../hooks/useMediaQuery.js";
-import { useWatchHostDistance } from "../hooks/useWatchHostDistance.js";
-import { useOverlayPortalTarget } from "../hooks/useOverlayPortalTarget.js";
-import { useWatchPictureInPicture } from "../hooks/useWatchPictureInPicture.js";
-import { useWatchShareActions } from "../hooks/useWatchShareActions.js";
-import { useWatchStageControls } from "../hooks/useWatchStageControls.js";
-import { useI18n } from "../i18n/I18nProvider.jsx";
+import { ChatPanel } from "./ChatPanel.jsx";
+import { LiveAudienceCallOverlay } from "./live/LiveAudienceCallOverlay.jsx";
+import { useToast } from "./primitives/FloatingToast.jsx";
+import { StatusPill } from "./primitives/StatusPill.jsx";
+import { WatchHostProfileActions } from "./watch/WatchHostProfileActions.jsx";
+import { WatchMobileHud } from "./watch/WatchMobileHud.jsx";
+import { WatchPanelProvider } from "./watch/WatchPanelContext.jsx";
+import { WatchRoomInfoStrip } from "./watch/WatchRoomInfoStrip.jsx";
+import {
+  WatchAudienceSheet,
+  WatchHostProfileSheet,
+  WatchMobileMoreSheet,
+} from "./watch/WatchSessionSheets.jsx";
+import {
+  WatchDesktopSharePanel,
+  WatchImageShareDialog,
+} from "./watch/WatchSharePanels.jsx";
+import { WatchPictureInPictureControlsLayer, WatchStage } from "./watch/WatchStage.jsx";
 
 function WatchAudienceCallInviteDialog({ invite, portalTarget, onRespond }) {
   const { t } = useI18n();
@@ -204,9 +206,7 @@ export function WatchSessionPage({
     onAudienceCallInviteRespond,
     onAudienceCallDisconnect,
   } = actions;
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [hostProfileOpen, setHostProfileOpen] = useState(false);
-  const [audienceOpen, setAudienceOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState(null);
   const [fullscreenSideSheetHost, setFullscreenSideSheetHost] = useState(null);
   const stageContentRef = useRef(null);
   const fullscreenSideSheetHostRef = useRef(null);
@@ -216,6 +216,12 @@ export function WatchSessionPage({
     setFullscreenSideSheetHost(node);
   }, []);
   const { showToast } = useToast();
+  const {
+    closeUserProfile,
+    openUserProfile,
+    profileError,
+    profileSheetProps,
+  } = useLazyUserProfileSheet();
   const compactViewport = useCompactViewport();
   const portraitViewport = usePortraitViewport();
   const shortLandscapeViewport = useMediaQuery("(max-width: 980px) and (orientation: landscape) and (max-height: 520px)");
@@ -256,7 +262,12 @@ export function WatchSessionPage({
   const showStageReturnControl = Boolean(!portraitViewport && !immersiveShell);
   const showStageFullscreenControl = !(fullscreenActive && showStageReturnControl);
   const landscapeSideSheet = fullscreenLandscapeMedia || landscapeImmersive;
-  const fullscreenSheetOpen = Boolean(landscapeSideSheet && (moreOpen || hostProfileOpen || audienceOpen));
+  const activePanelType = activePanel?.type || "";
+  const moreOpen = activePanelType === "more";
+  const hostProfileOpen = activePanelType === "host-profile";
+  const audienceOpen = activePanelType === "audience";
+  const userProfileOpen = activePanelType === "user-profile";
+  const fullscreenSheetOpen = Boolean(landscapeSideSheet && activePanelType);
   const fullscreenSheetPortalTarget = landscapeSideSheet
     ? fullscreenSideSheetHost
     : null;
@@ -382,13 +393,14 @@ export function WatchSessionPage({
   });
 
   function openMoreSheet() {
-    setHostProfileOpen(false);
-    setAudienceOpen(false);
-    setMoreOpen(true);
+    closeUserProfile();
+    setActivePanel({ type: "more" });
   }
 
   function closeMoreSheet() {
-    setMoreOpen(false);
+    setActivePanel((current) => (
+      current?.type === "more" ? null : current
+    ));
   }
 
   function requestAudienceCall() {
@@ -437,13 +449,14 @@ export function WatchSessionPage({
 
   function openHostProfile(event) {
     event?.stopPropagation();
-    setMoreOpen(false);
-    setAudienceOpen(false);
-    setHostProfileOpen(true);
+    closeUserProfile();
+    setActivePanel({ type: "host-profile" });
   }
 
   function closeHostProfile() {
-    setHostProfileOpen(false);
+    setActivePanel((current) => (
+      current?.type === "host-profile" ? null : current
+    ));
   }
 
   async function copyHostHandle(handleValue) {
@@ -496,19 +509,34 @@ export function WatchSessionPage({
   }
 
   function openAudienceSheet() {
-    setMoreOpen(false);
-    setHostProfileOpen(false);
-    setAudienceOpen(true);
+    closeUserProfile();
+    setActivePanel({ type: "audience" });
   }
 
   function closeAudienceSheet() {
-    setAudienceOpen(false);
+    setActivePanel((current) => (
+      current?.type === "audience" ? null : current
+    ));
   }
 
   function closeWatchSideSheets() {
-    setMoreOpen(false);
-    setHostProfileOpen(false);
-    setAudienceOpen(false);
+    closeUserProfile();
+    setActivePanel(null);
+  }
+
+  async function openChatUserProfile(user) {
+    if (!user?.id) {
+      return false;
+    }
+    setActivePanel({ type: "user-profile" });
+    return openUserProfile(user);
+  }
+
+  function closeChatUserProfile() {
+    closeUserProfile();
+    setActivePanel((current) => (
+      current?.type === "user-profile" ? null : current
+    ));
   }
 
   function blurFocusedChatComposer() {
@@ -613,6 +641,11 @@ export function WatchSessionPage({
     );
   }
 
+  const watchPanelContext = {
+    closePanel: closeWatchSideSheets,
+    openUserProfile: openChatUserProfile,
+  };
+
   const watchStage = (
     <WatchStage
       authAvailable={authAvailable}
@@ -626,8 +659,8 @@ export function WatchSessionPage({
           speakingUserIds={audienceCallSpeakingUserIds}
           actionLabel={audienceCallEnabled && !audienceCallRealtimeSession && audienceCallActiveCount < 5
             ? (audienceCallRequestPending
-                ? t("watchSheet.audienceCallCancelRequest")
-                : t("watchSheet.audienceCall"))
+              ? t("watchSheet.audienceCallCancelRequest")
+              : t("watchSheet.audienceCall"))
             : ""}
           onAction={audienceCallEnabled && !audienceCallRealtimeSession && audienceCallActiveCount < 5
             ? (audienceCallRequestPending ? cancelAudienceCallRequest : requestAudienceCall)
@@ -697,181 +730,191 @@ export function WatchSessionPage({
   );
 
   return (
-    <section
-      className="page page-immersive watch-session-page"
-      data-page="watch"
-      data-immersive={immersiveShell ? "true" : "false"}
-      hidden={hidden}
-    >
-      <div className={watchLayoutClassName}>
-        <section className="stage-column">
-          {!immersiveShell && !landscapePortraitSplit ? renderMobileHud("stage-mobile-hud-top", true) : null}
-          {watchStage}
-          <WatchRoomInfoStrip
-            copyHostHandle={copyHostHandle}
-            hostAvatarUrl={hostAvatarUrl}
-            hostBio={hostBio}
-            hostChipLabel={hostChipLabel}
-            hostDisplayName={hostDisplayName}
-            hostDistancePending={hostDistancePending}
-            hostFollowerCountText={hostFollowerCountText}
-            hostFollowingCountText={hostFollowingCountText}
-            hostHandle={hostHandle}
-            hostIcon={hostIcon}
-            hostLocationClickable={hostLocationClickable}
-            hostProfileInfoItems={hostProfileInfoItems}
-            onHostLocationClick={handleHostLocationClick}
-            openShareMenu={openShareMenu}
-            playerBadge={playerBadge}
-            renderHostFollowButton={renderHostFollowButton}
-            renderHostProfileActions={renderHostProfileActions}
-            roomLabel={roomLabel}
-            roomTitle={roomTitle}
-            shareButtonRef={shareButtonRef}
-            shareMenuMounted={shareMenuOpen}
-            watchLink={watchLink}
-          />
-        </section>
+    <WatchPanelProvider value={watchPanelContext}>
+      <section
+        className="page page-immersive watch-session-page"
+        data-page="watch"
+        data-immersive={immersiveShell ? "true" : "false"}
+        hidden={hidden}
+      >
+        <div className={watchLayoutClassName}>
+          <section className="stage-column">
+            {!immersiveShell && !landscapePortraitSplit ? renderMobileHud("stage-mobile-hud-top", true) : null}
+            {watchStage}
+            <WatchRoomInfoStrip
+              copyHostHandle={copyHostHandle}
+              hostAvatarUrl={hostAvatarUrl}
+              hostBio={hostBio}
+              hostChipLabel={hostChipLabel}
+              hostDisplayName={hostDisplayName}
+              hostDistancePending={hostDistancePending}
+              hostFollowerCountText={hostFollowerCountText}
+              hostFollowingCountText={hostFollowingCountText}
+              hostHandle={hostHandle}
+              hostIcon={hostIcon}
+              hostLocationClickable={hostLocationClickable}
+              hostProfileInfoItems={hostProfileInfoItems}
+              onHostLocationClick={handleHostLocationClick}
+              openShareMenu={openShareMenu}
+              playerBadge={playerBadge}
+              renderHostFollowButton={renderHostFollowButton}
+              renderHostProfileActions={renderHostProfileActions}
+              roomLabel={roomLabel}
+              roomTitle={roomTitle}
+              shareButtonRef={shareButtonRef}
+              shareMenuMounted={shareMenuOpen}
+              watchLink={watchLink}
+            />
+          </section>
 
-        <aside className={`control-column${!immersiveShell ? " watch-control-column-landscape" : ""}`}>
-          <ChatPanel
-            roomLabel={chatRoomLabel}
-            welcomeMessage={welcomeMessage}
-            hostUserId={hostUserId}
-            authAvailable={authAvailable}
-            authLoading={authLoading}
-            authUser={authUser}
-            messages={chatMessages}
-            draft={chatDraft}
-            onDraftChange={onChatDraftChange}
-            onSend={onChatSend}
-            onRequireLogin={onChatRequireLogin}
-            connectionState={chatConnectionState}
-            onlineCount={chatOnlineCount}
-            readOnly={chatReadOnly}
-            chatError={chatError}
-            chatRecovering={chatRecovering}
-            composerTrailingAction={compactViewport ? renderMobileMoreButton() : null}
-            showSendButton={!compactViewport}
-          />
-        </aside>
-      </div>
-      <WatchMobileMoreSheet
-        open={moreOpen}
-        onClose={closeMoreSheet}
-        portalTarget={fullscreenSheetPortalTarget}
-        presentation={watchSheetPresentation}
-        hostAvatarUrl={hostAvatarUrl}
-        hostChipLabel={hostChipLabel}
-        watchLink={watchLink}
-        shareSupported={shareSupported}
-        elementPipSupported={elementPipSupported}
-        videoPipSupported={videoPipSupported}
-        playerSession={playerSession}
-        pictureInPictureActive={pictureInPictureActive}
-        fullscreenActive={fullscreenActive}
-        showFullscreenAction={showMobileMoreFullscreenAction}
-        audienceCallEnabled={audienceCallEnabled}
-        audienceCallConnected={Boolean(audienceCallRealtimeSession)}
-        audienceCallRequestPending={audienceCallRequestPending}
-        onShareWatchLink={shareWatchLink}
-        onOpenImageShareModal={openImageShareModal}
-        onOpenScreenshotShareModal={openScreenshotShareModal}
-        onCopyWatchLink={copyWatchLink}
-        onAudienceCallRequest={requestAudienceCall}
-        onAudienceCallRequestCancel={cancelAudienceCallRequest}
-        onAudienceCallDisconnect={disconnectAudienceCall}
-        onOpenPictureInPicture={openPictureInPicture}
-        onFullscreen={onFullscreen}
-      />
-      <WatchAudienceCallInviteDialog
-        invite={audienceCallInvite}
-        portalTarget={overlayPortalTarget}
-        onRespond={respondAudienceCallInvite}
-      />
-      <WatchHostProfileSheet
-        open={hostProfileOpen}
-        onClose={closeHostProfile}
-        portalTarget={fullscreenSheetPortalTarget}
-        presentation={watchSheetPresentation}
-        hostAvatarUrl={hostAvatarUrl}
-        hostChipLabel={hostChipLabel}
-        hostDisplayName={hostDisplayName}
-        hostBio={hostBio}
-        hostProfileInfoItems={hostProfileInfoItems}
-        hostLocationClickable={hostLocationClickable}
-        hostLocationPending={hostDistancePending}
-        onHostLocationClick={handleHostLocationClick}
-        onHostHandleCopy={copyHostHandle}
-        hostHandle={hostHandle}
-        roomLabel={roomLabel}
-        hostFollowerCountText={hostFollowerCountText}
-        hostFollowingCountText={hostFollowingCountText}
-        followButton={renderHostProfileActions()}
-      />
-      {fullscreenSheetOpen && overlayPortalTarget ? createPortal(
-        <button
-          type="button"
-          className="watch-fullscreen-side-sheet-overlay"
-          aria-label="关闭面板"
-          onClick={closeWatchSideSheets}
-        />,
-        overlayPortalTarget
-      ) : null}
-      {imageShareMounted ? (
-        <WatchImageShareDialog
-          imageShareClosing={imageShareClosing}
-          imageShareReady={imageShareReady}
-          imageShareTitle={shareImageKind === "screenshot" ? t("watchSheet.screenshotShare") : t("watchSheet.imageShare")}
-          onClose={closeImageShareModal}
-          onCopyImage={copyWatchImage}
-          onSaveImage={saveWatchImage}
-          onShareImage={shareWatchImage}
-          roomLabel={roomLabel}
-          shareImageAlt={shareImageKind === "screenshot" ? `${roomLabel}直播间截屏分享图` : undefined}
-          shareImageLoading={shareImageLoading}
-          shareImageUrl={shareImageUrl}
+          <aside className={`control-column${!immersiveShell ? " watch-control-column-landscape" : ""}`}>
+            <ChatPanel
+              roomLabel={chatRoomLabel}
+              welcomeMessage={welcomeMessage}
+              hostUserId={hostUserId}
+              authAvailable={authAvailable}
+              authLoading={authLoading}
+              authUser={authUser}
+              messages={chatMessages}
+              draft={chatDraft}
+              onDraftChange={onChatDraftChange}
+              onSend={onChatSend}
+              onRequireLogin={onChatRequireLogin}
+              connectionState={chatConnectionState}
+              onlineCount={chatOnlineCount}
+              readOnly={chatReadOnly}
+              chatError={chatError}
+              chatRecovering={chatRecovering}
+              composerTrailingAction={compactViewport ? renderMobileMoreButton() : null}
+              showSendButton={!compactViewport}
+            />
+          </aside>
+        </div>
+        <WatchMobileMoreSheet
+          open={moreOpen}
+          onClose={closeMoreSheet}
+          portalTarget={fullscreenSheetPortalTarget}
+          presentation={watchSheetPresentation}
+          hostAvatarUrl={hostAvatarUrl}
+          hostChipLabel={hostChipLabel}
+          watchLink={watchLink}
           shareSupported={shareSupported}
-          portalTarget={overlayPortalTarget}
-        />
-      ) : null}
-      <WatchAudienceSheet
-        open={audienceOpen}
-        onClose={closeAudienceSheet}
-        portalTarget={fullscreenSheetPortalTarget}
-        presentation={watchSheetPresentation}
-        audienceCountText={audienceCountText}
-        loggedInViewers={loggedInViewers}
-      />
-      <WatchDesktopSharePanel
-        anchorRef={shareButtonRef}
-        onClose={closeShareMenu}
-        onCopyLink={copyWatchLink}
-        onShareLink={shareWatchLink}
-        open={shareMenuOpen}
-        shareSupported={shareSupported}
-        watchLink={watchLink}
-      />
-      {pipWindow ? createPortal(
-        <WatchPictureInPictureControlsLayer
-          controlsVisible={controlsVisible}
           elementPipSupported={elementPipSupported}
-          fullscreenActive={fullscreenActive}
-          handleStagePointerLeave={handleStagePointerLeave}
-          handleStagePointerMove={handleStagePointerMove}
-          onFullscreen={onFullscreen}
-          onOpenPictureInPicture={openPictureInPicture}
-          onToggleMute={onToggleMute}
-          onTogglePlayback={onTogglePlayback}
-          pictureInPictureActive={pictureInPictureActive}
-          playerMuted={playerMuted}
-          playerPaused={playerPaused}
-          playerSession={playerSession}
-          revealControls={revealControls}
           videoPipSupported={videoPipSupported}
-        />,
-        pipWindow.document.body
-      ) : null}
-    </section>
+          playerSession={playerSession}
+          pictureInPictureActive={pictureInPictureActive}
+          fullscreenActive={fullscreenActive}
+          showFullscreenAction={showMobileMoreFullscreenAction}
+          audienceCallEnabled={audienceCallEnabled}
+          audienceCallConnected={Boolean(audienceCallRealtimeSession)}
+          audienceCallRequestPending={audienceCallRequestPending}
+          onShareWatchLink={shareWatchLink}
+          onOpenImageShareModal={openImageShareModal}
+          onOpenScreenshotShareModal={openScreenshotShareModal}
+          onCopyWatchLink={copyWatchLink}
+          onAudienceCallRequest={requestAudienceCall}
+          onAudienceCallRequestCancel={cancelAudienceCallRequest}
+          onAudienceCallDisconnect={disconnectAudienceCall}
+          onOpenPictureInPicture={openPictureInPicture}
+          onFullscreen={onFullscreen}
+        />
+        <WatchAudienceCallInviteDialog
+          invite={audienceCallInvite}
+          portalTarget={overlayPortalTarget}
+          onRespond={respondAudienceCallInvite}
+        />
+        <WatchHostProfileSheet
+          open={hostProfileOpen}
+          onClose={closeHostProfile}
+          portalTarget={fullscreenSheetPortalTarget}
+          presentation={watchSheetPresentation}
+          hostAvatarUrl={hostAvatarUrl}
+          hostChipLabel={hostChipLabel}
+          hostDisplayName={hostDisplayName}
+          hostBio={hostBio}
+          hostProfileInfoItems={hostProfileInfoItems}
+          hostLocationClickable={hostLocationClickable}
+          hostLocationPending={hostDistancePending}
+          onHostLocationClick={handleHostLocationClick}
+          onHostHandleCopy={copyHostHandle}
+          hostHandle={hostHandle}
+          roomLabel={roomLabel}
+          hostFollowerCountText={hostFollowerCountText}
+          hostFollowingCountText={hostFollowingCountText}
+          followButton={renderHostProfileActions()}
+        />
+        <WatchHostProfileSheet
+          {...profileSheetProps}
+          open={userProfileOpen && profileSheetProps.open}
+          onClose={closeChatUserProfile}
+          portalTarget={fullscreenSheetPortalTarget}
+          presentation={watchSheetPresentation}
+          followButton={profileError ? <p className="inline-warning">{profileError}</p> : null}
+        />
+        {fullscreenSheetOpen && overlayPortalTarget ? createPortal(
+          <button
+            type="button"
+            className="watch-fullscreen-side-sheet-overlay"
+            aria-label="关闭面板"
+            onClick={closeWatchSideSheets}
+          />,
+          overlayPortalTarget
+        ) : null}
+        {imageShareMounted ? (
+          <WatchImageShareDialog
+            imageShareClosing={imageShareClosing}
+            imageShareReady={imageShareReady}
+            imageShareTitle={shareImageKind === "screenshot" ? t("watchSheet.screenshotShare") : t("watchSheet.imageShare")}
+            onClose={closeImageShareModal}
+            onCopyImage={copyWatchImage}
+            onSaveImage={saveWatchImage}
+            onShareImage={shareWatchImage}
+            roomLabel={roomLabel}
+            shareImageAlt={shareImageKind === "screenshot" ? `${roomLabel}直播间截屏分享图` : undefined}
+            shareImageLoading={shareImageLoading}
+            shareImageUrl={shareImageUrl}
+            shareSupported={shareSupported}
+            portalTarget={overlayPortalTarget}
+          />
+        ) : null}
+        <WatchAudienceSheet
+          open={audienceOpen}
+          onClose={closeAudienceSheet}
+          portalTarget={fullscreenSheetPortalTarget}
+          presentation={watchSheetPresentation}
+          audienceCountText={audienceCountText}
+          loggedInViewers={loggedInViewers}
+        />
+        <WatchDesktopSharePanel
+          anchorRef={shareButtonRef}
+          onClose={closeShareMenu}
+          onCopyLink={copyWatchLink}
+          onShareLink={shareWatchLink}
+          open={shareMenuOpen}
+          shareSupported={shareSupported}
+          watchLink={watchLink}
+        />
+        {pipWindow ? createPortal(
+          <WatchPictureInPictureControlsLayer
+            controlsVisible={controlsVisible}
+            elementPipSupported={elementPipSupported}
+            fullscreenActive={fullscreenActive}
+            handleStagePointerLeave={handleStagePointerLeave}
+            handleStagePointerMove={handleStagePointerMove}
+            onFullscreen={onFullscreen}
+            onOpenPictureInPicture={openPictureInPicture}
+            onToggleMute={onToggleMute}
+            onTogglePlayback={onTogglePlayback}
+            pictureInPictureActive={pictureInPictureActive}
+            playerMuted={playerMuted}
+            playerPaused={playerPaused}
+            playerSession={playerSession}
+            revealControls={revealControls}
+            videoPipSupported={videoPipSupported}
+          />,
+          pipWindow.document.body
+        ) : null}
+      </section>
+    </WatchPanelProvider>
   );
 }

@@ -46,7 +46,7 @@ export function AppTopbar({
   return (
     <header className="topbar">
       <a
-        href={window.location.pathname}
+        href="/"
         className="brand brand-button"
         onClick={(event) => {
           event.preventDefault();

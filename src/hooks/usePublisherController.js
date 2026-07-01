@@ -1,18 +1,20 @@
-import { useEffect, useRef, useState } from "react";
 import * as MoqPublish from "@moq/publish";
+import { VideoOff } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createAppError, getAppErrorMessage } from "../lib/appErrors.js";
 import {
   createMediaSessionManager,
   stopMediaStream,
 } from "../lib/mediaSessionManager.js";
-import { createAppError, getAppErrorMessage } from "../lib/appErrors.js";
 import { getPublishBlockError } from "../lib/roomPolicy.js";
 import {
   DEFAULT_STREAM_PROTOCOL,
-  STREAM_PROTOCOL_WEBRTC,
   STREAM_PROTOCOL_OPTIONS,
+  STREAM_PROTOCOL_WEBRTC,
   normalizeStreamProtocol,
 } from "../lib/streamProtocol.js";
 import { createWhipPublishSession } from "../lib/whipClient.js";
+import { getLucideIconDataUrl } from "../lib/lucideIconDataUrl.js";
 
 const VIDEO_TARGET_WIDTH = 1280;
 const VIDEO_TARGET_HEIGHT = 720;
@@ -59,13 +61,109 @@ const AUDIENCE_CALL_SPEAKING_OFF_THRESHOLD = 0.02;
 const MUSIC_AUDIO_TRACKS = new WeakSet();
 const MICROPHONE_AUDIO_TRACKS = new WeakSet();
 const BLACK_VIDEO_TRACKS = new WeakSet();
+const BLACK_VIDEO_TRACK_CLEANUPS = new WeakMap();
+const GENERATED_VIDEO_SOURCES = new WeakMap();
 const DEFAULT_WEBRTC_PUBLISH_PROXY_URL = "/api/me/room/webrtc/whip";
+const BLACK_VIDEO_FRAME_INTERVAL_MS = 1_000;
+const MUTED_COLOR_FALLBACK = "#99aec1";
 
 function buildDefaultWebRtcPlaybackProxyUrl({ roomId }) {
   const normalizedRoomId = String(roomId || "").trim();
   return normalizedRoomId
     ? `/api/rooms/${encodeURIComponent(normalizedRoomId)}/webrtc/whep`
     : "";
+}
+
+function getMutedCanvasColor() {
+  if (typeof document === "undefined") {
+    return MUTED_COLOR_FALLBACK;
+  }
+
+  return (
+    window
+      .getComputedStyle(document.documentElement)
+      .getPropertyValue("--muted")
+      .trim() || MUTED_COLOR_FALLBACK
+  );
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+function drawBlackVideoFrame(context, width, height) {
+  context.fillStyle = "#000";
+  context.fillRect(0, 0, width, height);
+}
+
+function requestVideoFrame(track) {
+  try {
+    track?.requestFrame?.();
+  } catch {
+    // Ignore browsers that expose requestFrame but reject on cloned tracks.
+  }
+}
+
+function drawBlackVideoIconImage(context, width, height, iconImage) {
+  const iconSize = Math.min(width, height) * 0.18;
+  context.drawImage(
+    iconImage,
+    (width - iconSize) / 2,
+    (height - iconSize) / 2,
+    iconSize,
+    iconSize,
+  );
+}
+
+async function loadBlackVideoIconImage(width, height) {
+  const iconSize = Math.min(width, height) * 0.18;
+  const iconUrl = await getLucideIconDataUrl(VideoOff, {
+    absoluteStrokeWidth: false,
+    color: getMutedCanvasColor(),
+    size: iconSize,
+    strokeWidth: 2,
+  });
+  return loadImage(iconUrl);
+}
+
+function startBlackVideoFramePump(context, width, height, track, onError) {
+  let iconImage = null;
+  let stopped = false;
+  const drawFrame = () => {
+    drawBlackVideoFrame(context, width, height);
+    if (iconImage) {
+      drawBlackVideoIconImage(context, width, height, iconImage);
+    }
+    requestVideoFrame(track);
+  };
+
+  const intervalId = window.setInterval(
+    drawFrame,
+    BLACK_VIDEO_FRAME_INTERVAL_MS,
+  );
+  void loadBlackVideoIconImage(width, height)
+    .then((image) => {
+      if (stopped) {
+        return;
+      }
+      iconImage = image;
+      drawFrame();
+    })
+    .catch(onError);
+  drawFrame();
+
+  const cleanup = () => {
+    stopped = true;
+    window.clearInterval(intervalId);
+    BLACK_VIDEO_TRACK_CLEANUPS.delete(track);
+  };
+  BLACK_VIDEO_TRACK_CLEANUPS.set(track, cleanup);
+  track.addEventListener("ended", cleanup, { once: true });
 }
 
 function getPublishQuality(id) {
@@ -129,10 +227,16 @@ function getStreamVideoDimensions(stream, videoElement = null) {
   return { width, height };
 }
 
-function normalizeVideoDimensions(size, qualityId = DEFAULT_PUBLISH_QUALITY_ID) {
+function normalizeVideoDimensions(
+  size,
+  qualityId = DEFAULT_PUBLISH_QUALITY_ID,
+) {
   const quality = getPublishQuality(qualityId);
   const width = Math.max(2, Math.floor((size?.width || quality.width) / 2) * 2);
-  const height = Math.max(2, Math.floor((size?.height || quality.height) / 2) * 2);
+  const height = Math.max(
+    2,
+    Math.floor((size?.height || quality.height) / 2) * 2,
+  );
   return { width, height };
 }
 
@@ -497,7 +601,10 @@ export function usePublisherController({
   }
 
   function rememberCameraVideoSize(stream = previewMediaStreamRef.current) {
-    const dimensions = getStreamVideoDimensions(stream, previewVideoRef.current);
+    const dimensions = getStreamVideoDimensions(
+      stream,
+      previewVideoRef.current,
+    );
     if (dimensions.width && dimensions.height) {
       lastCameraVideoSizeRef.current = dimensions;
     }
@@ -519,47 +626,93 @@ export function usePublisherController({
     );
   }
 
+  function registerGeneratedVideoSource(previewTrack, source) {
+    if (!previewTrack || !source?.createPublishTrack) {
+      return;
+    }
+    GENERATED_VIDEO_SOURCES.set(previewTrack, source);
+  }
+
+  function createPublishVideoTrackFromPreview(previewTrack) {
+    if (!previewTrack) {
+      return null;
+    }
+    const generatedSource = GENERATED_VIDEO_SOURCES.get(previewTrack);
+    if (generatedSource) {
+      return generatedSource.createPublishTrack();
+    }
+    return previewTrack.clone?.() ?? null;
+  }
+
+  function cleanupBlackVideoTrack(track) {
+    BLACK_VIDEO_TRACK_CLEANUPS.get(track)?.();
+  }
+
+  function stopTrack(track) {
+    if (!track) {
+      return;
+    }
+    cleanupBlackVideoTrack(track);
+    try {
+      track.stop();
+    } catch {
+      // Ignore stale track cleanup failures.
+    }
+  }
+
   function stopBlackVideoTrack(exceptTrack = null) {
     const track = blackVideoTrackRef.current;
     if (!track || track === exceptTrack) {
       return;
     }
     blackVideoTrackRef.current = null;
-    try {
-      track.stop();
-    } catch {
-      // Ignore stale generated track cleanup failures.
-    }
+    stopTrack(track);
   }
 
-  function createBlackVideoTrack() {
+  function createBlackVideoTrack({ managed = true } = {}) {
     const size = normalizeVideoDimensions(
       lastCameraVideoSizeRef.current ||
-        getStreamVideoDimensions(previewMediaStreamRef.current, previewVideoRef.current),
+        getStreamVideoDimensions(
+          previewMediaStreamRef.current,
+          previewVideoRef.current,
+        ),
       publishQualityIdRef.current,
     );
     const canvas = document.createElement("canvas");
     canvas.width = size.width;
     canvas.height = size.height;
     const context = canvas.getContext("2d");
-    context.fillStyle = "#000";
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    drawBlackVideoFrame(context, canvas.width, canvas.height);
 
     if (typeof canvas.captureStream !== "function") {
       throw createAppError("video_track_unavailable");
     }
 
     const quality = getPublishQuality(publishQualityIdRef.current);
-    const stream = canvas.captureStream(quality.frameRate || VIDEO_TARGET_FRAMERATE);
+    const stream = canvas.captureStream(
+      quality.frameRate || VIDEO_TARGET_FRAMERATE,
+    );
     const track = stream.getVideoTracks()[0] ?? null;
     if (!track) {
       throw createAppError("video_track_unavailable");
     }
 
     BLACK_VIDEO_TRACKS.add(track);
-    blackVideoCanvasRef.current = canvas;
-    stopBlackVideoTrack(track);
-    blackVideoTrackRef.current = track;
+    startBlackVideoFramePump(context, canvas.width, canvas.height, track,
+      (error) => {
+        log(
+          `black camera icon draw warning: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      },
+    );
+    if (managed) {
+      registerGeneratedVideoSource(track, {
+        createPublishTrack: () => createBlackVideoTrack({ managed: false }),
+      });
+      blackVideoCanvasRef.current = canvas;
+      stopBlackVideoTrack(track);
+      blackVideoTrackRef.current = track;
+    }
     return track;
   }
 
@@ -573,11 +726,7 @@ export function usePublisherController({
         continue;
       }
       stream.removeTrack(track);
-      try {
-        track.stop();
-      } catch {
-        // Ignore stale stream track cleanup failures.
-      }
+      stopTrack(track);
     }
 
     if (!stream.getVideoTracks().includes(nextTrack)) {
@@ -606,7 +755,8 @@ export function usePublisherController({
     }
 
     session.publishTracks = [
-      ...(session.publishTracks?.filter((track) => track.kind !== "video") ?? []),
+      ...(session.publishTracks?.filter((track) => track.kind !== "video") ??
+        []),
       nextTrack,
     ];
 
@@ -614,11 +764,7 @@ export function usePublisherController({
       if (track === nextTrack) {
         continue;
       }
-      try {
-        track.stop();
-      } catch {
-        // Ignore stale publish track cleanup failures.
-      }
+      stopTrack(track);
     }
 
     return true;
@@ -632,11 +778,7 @@ export function usePublisherController({
       } catch {
         // Ignore stale stream cleanup failures.
       }
-      try {
-        track.stop();
-      } catch {
-        // Ignore stale track cleanup failures.
-      }
+      stopTrack(track);
     }
   }
 
@@ -668,13 +810,7 @@ export function usePublisherController({
     session.publishTracks =
       session.publishTracks?.filter((track) => track.kind !== "video") ?? [];
 
-    for (const track of videoTracks) {
-      try {
-        track.stop();
-      } catch {
-        // Ignore stale publish track cleanup failures.
-      }
-    }
+    videoTracks.forEach(stopTrack);
   }
 
   async function installBlackCameraTrack() {
@@ -684,14 +820,17 @@ export function usePublisherController({
 
     rememberCameraVideoSize();
     const previewTrack = createBlackVideoTrack();
-    const publishTrack = previewTrack.clone();
-    BLACK_VIDEO_TRACKS.add(publishTrack);
+    const publishTrack = publisherIsPublishingRef.current
+      ? createPublishVideoTrackFromPreview(previewTrack)
+      : null;
     previewTrack.enabled = true;
-    publishTrack.enabled = true;
+    if (publishTrack) {
+      publishTrack.enabled = true;
+    }
 
     let publishTrackAdopted = false;
     try {
-      if (publisherIsPublishingRef.current) {
+      if (publishTrack) {
         publishTrackAdopted = await replacePublishVideoTrack(publishTrack);
         if (!publishTrackAdopted) {
           throw createAppError("video_track_unavailable");
@@ -700,13 +839,14 @@ export function usePublisherController({
 
       cameraBlackoutActiveRef.current = true;
       const liveStream = getLiveMediaStream();
-      const previewStream = previewMediaStreamRef.current || liveStream || new MediaStream();
+      const previewStream =
+        previewMediaStreamRef.current || liveStream || new MediaStream();
       replaceStreamVideoTrack(previewStream, previewTrack);
       updatePreviewState(previewStream, PREVIEW_SOURCE_CAMERA);
       setPreviewPending(false);
       return true;
     } finally {
-      if (!publishTrackAdopted) {
+      if (publishTrack && !publishTrackAdopted) {
         try {
           publishTrack.stop();
         } catch {
@@ -930,7 +1070,9 @@ export function usePublisherController({
         analyserNode.smoothingTimeConstant = 0.35;
         const sampleBuffer = new Uint8Array(analyserNode.fftSize);
         const gainNode = audioContext.createGain();
-        gainNode.gain.value = audienceCallRemoteMutedRef.current.has(remoteId) ? 0 : 1;
+        gainNode.gain.value = audienceCallRemoteMutedRef.current.has(remoteId)
+          ? 0
+          : 1;
         sourceNode.connect(analyserNode);
         sourceNode.connect(gainNode);
         gainNode.connect(destination);
@@ -954,14 +1096,18 @@ export function usePublisherController({
       };
       const setMicrophoneInputEnabled = (enabled) => {
         if (microphoneGain) {
-          microphoneGain.gain.value = enabled && sourceTrack && isMicrophoneAudioTrack(sourceTrack)
-            ? MICROPHONE_PUBLISH_GAIN
-            : enabled
-              ? 1
-              : 0;
+          microphoneGain.gain.value =
+            enabled && sourceTrack && isMicrophoneAudioTrack(sourceTrack)
+              ? MICROPHONE_PUBLISH_GAIN
+              : enabled
+                ? 1
+                : 0;
         }
       };
-      for (const [remoteId, remoteStream] of audienceCallRemoteStreamsRef.current) {
+      for (const [
+        remoteId,
+        remoteStream,
+      ] of audienceCallRemoteStreamsRef.current) {
         setAudienceCallRemoteStream(remoteId, remoteStream);
       }
       audienceCallSpeakingCheckTimer = window.setInterval(
@@ -1118,23 +1264,27 @@ export function usePublisherController({
 
       if (shouldRestoreBlackout) {
         if (publisherIsPublishingRef.current) {
-          void switchPublishCamera(selectedCameraIdRef.current).then((switched) => {
-            if (switched) {
-              stopBlackVideoTrack();
-            }
-          }).catch((error) => {
-            const message = getAppErrorMessage(error);
-            updatePublishStatus("error", `切换摄像头失败：${message}`);
-            log(`camera restore failed: ${message}`);
-          });
+          void switchPublishCamera(selectedCameraIdRef.current)
+            .then((switched) => {
+              if (switched) {
+                stopBlackVideoTrack();
+              }
+            })
+            .catch((error) => {
+              const message = getAppErrorMessage(error);
+              updatePublishStatus("error", `切换摄像头失败：${message}`);
+              log(`camera restore failed: ${message}`);
+            });
         } else if (pageRef.current === "live") {
-          void startLivePreview().then(() => {
-            stopBlackVideoTrack();
-          }).catch((error) => {
-            const message = getAppErrorMessage(error);
-            updatePublishStatus("error", `预览失败：${message}`);
-            log(`camera restore failed: ${message}`);
-          });
+          void startLivePreview()
+            .then(() => {
+              stopBlackVideoTrack();
+            })
+            .catch((error) => {
+              const message = getAppErrorMessage(error);
+              updatePublishStatus("error", `预览失败：${message}`);
+              log(`camera restore failed: ${message}`);
+            });
         }
         return;
       }
@@ -1201,9 +1351,7 @@ export function usePublisherController({
 
     publishAudioMixerRef.current?.setMicrophoneInputEnabled?.(nextEnabled);
     setAudienceCallHostMicrophoneEnabled(nextEnabled);
-    const hasAudienceCallAudio = Boolean(
-      getAudienceCallRemoteAudioCount() > 0,
-    );
+    const hasAudienceCallAudio = Boolean(getAudienceCallRemoteAudioCount() > 0);
     setPublishTrackEnabled("audio", nextEnabled || hasAudienceCallAudio);
   }
 
@@ -1217,7 +1365,10 @@ export function usePublisherController({
 
   function setAudienceCallHostMicrophoneEnabled(enabled) {
     const hostAudio = audienceCallHostAudioRef.current;
-    if (!hostAudio.followsMicrophone || hostAudio.track?.readyState !== "live") {
+    if (
+      !hostAudio.followsMicrophone ||
+      hostAudio.track?.readyState !== "live"
+    ) {
       return;
     }
     hostAudio.track.enabled = Boolean(enabled);
@@ -1232,27 +1383,36 @@ export function usePublisherController({
   }
 
   function setAudienceCallRemoteStream(remoteIdOrStream, maybeRemoteStream) {
-    const remoteId = maybeRemoteStream === undefined
-      ? "default"
-      : String(remoteIdOrStream || "").trim();
-    const remoteStream = maybeRemoteStream === undefined
-      ? remoteIdOrStream
-      : maybeRemoteStream;
+    const remoteId =
+      maybeRemoteStream === undefined
+        ? "default"
+        : String(remoteIdOrStream || "").trim();
+    const remoteStream =
+      maybeRemoteStream === undefined ? remoteIdOrStream : maybeRemoteStream;
     if (!remoteId) {
       return;
     }
 
     if (remoteStream) {
       audienceCallRemoteStreamsRef.current.set(remoteId, remoteStream);
-      publishAudioMixerRef.current?.setAudienceCallRemoteStream?.(remoteId, remoteStream);
+      publishAudioMixerRef.current?.setAudienceCallRemoteStream?.(
+        remoteId,
+        remoteStream,
+      );
     } else {
       audienceCallRemoteStreamsRef.current.delete(remoteId);
       audienceCallRemoteMutedRef.current.delete(remoteId);
       setAudienceCallUserSpeaking(remoteId, false);
-      publishAudioMixerRef.current?.setAudienceCallRemoteStream?.(remoteId, null);
+      publishAudioMixerRef.current?.setAudienceCallRemoteStream?.(
+        remoteId,
+        null,
+      );
     }
     const hasAudienceCallAudio = getAudienceCallRemoteAudioCount() > 0;
-    setPublishTrackEnabled("audio", microphoneEnabledRef.current || hasAudienceCallAudio);
+    setPublishTrackEnabled(
+      "audio",
+      microphoneEnabledRef.current || hasAudienceCallAudio,
+    );
   }
 
   function setAudienceCallRemoteMuted(remoteId, muted) {
@@ -1265,7 +1425,10 @@ export function usePublisherController({
     } else {
       audienceCallRemoteMutedRef.current.delete(normalizedRemoteId);
     }
-    publishAudioMixerRef.current?.setAudienceCallRemoteMuted?.(normalizedRemoteId, Boolean(muted));
+    publishAudioMixerRef.current?.setAudienceCallRemoteMuted?.(
+      normalizedRemoteId,
+      Boolean(muted),
+    );
   }
 
   async function createAudienceCallHostAudioTrack() {
@@ -1832,7 +1995,8 @@ export function usePublisherController({
       const streamVideoTrack = stream.getVideoTracks()[0] ?? null;
       const canPublishVideo =
         previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN ||
-        (previewSourceTypeRef.current === PREVIEW_SOURCE_CAMERA && streamVideoTrack);
+        (previewSourceTypeRef.current === PREVIEW_SOURCE_CAMERA &&
+          streamVideoTrack);
       const previewVideoTrack = canPublishVideo ? streamVideoTrack : null;
       const previewAudioTrack = stream.getAudioTracks()[0];
       const previewAudioKind = isMusicAudioTrack(previewAudioTrack)
@@ -1844,7 +2008,7 @@ export function usePublisherController({
       const previewVideo = previewVideoRef.current;
       const makeEven = (value) => Math.floor(value / 2) * 2;
       const publishVideoTrack = canPublishVideo
-        ? (previewVideoTrack?.clone?.() ?? null)
+        ? createPublishVideoTrackFromPreview(previewVideoTrack)
         : null;
       audienceCallHostSourceAudioTrackRef.current = previewAudioTrack || null;
       stableAudio = await createStableAudioPublishTrack(previewAudioTrack);
@@ -1877,9 +2041,7 @@ export function usePublisherController({
 
       if (publishVideoTrack) {
         publishVideoTrack.enabled =
-          previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN
-            ? true
-            : true;
+          previewSourceTypeRef.current === PREVIEW_SOURCE_SCREEN ? true : true;
       }
 
       if (publishAudioTrack) {
@@ -1896,7 +2058,9 @@ export function usePublisherController({
         const nextWebRtcPlaybackUrl = (
           webRtcPlaybackUrlRef?.current ||
           webRtcPlaybackUrlValueRef.current ||
-          buildDefaultWebRtcPlaybackProxyUrl({ roomId: webRtcPlaybackRoomIdRef?.current }) ||
+          buildDefaultWebRtcPlaybackProxyUrl({
+            roomId: webRtcPlaybackRoomIdRef?.current,
+          }) ||
           ""
         ).trim();
         if (!nextWebRtcPlaybackUrl) {

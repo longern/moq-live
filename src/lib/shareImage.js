@@ -1,8 +1,6 @@
-import { createElement } from "react";
-import { flushSync } from "react-dom";
-import { createRoot } from "react-dom/client";
 import { Download, ScanQrCode } from "lucide-react";
 import QRCode from "qrcode";
+import { getLucideIconDataUrl } from "./lucideIconDataUrl.js";
 
 const SHARE_IMAGE_WIDTH = 960;
 const SHARE_IMAGE_HEIGHT = 1280;
@@ -266,35 +264,6 @@ function drawSiteBrand(ctx, {
   ctx.restore();
 }
 
-async function getLucideIconDataUrl(IconComponent, size) {
-  const host = document.createElement("div");
-  host.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:0;height:0;overflow:hidden;";
-  document.body.appendChild(host);
-  const root = createRoot(host);
-
-  try {
-    flushSync(() => {
-      root.render(createElement(IconComponent, {
-        absoluteStrokeWidth: true,
-        color: "#667085",
-        size,
-        strokeWidth: 3.4,
-      }));
-    });
-
-    const svg = host.querySelector("svg");
-    if (!svg) {
-      throw new Error("lucide_icon_render_failed");
-    }
-
-    const markup = new XMLSerializer().serializeToString(svg);
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
-  } finally {
-    root.unmount();
-    host.remove();
-  }
-}
-
 function drawShareHint(ctx, { x, y, width, text, iconImage }) {
   const iconSize = 64;
   ctx.save();
@@ -329,8 +298,16 @@ export async function buildWatchShareImage({
   });
   const qrImage = await loadImage(qrDataUrl);
   const [saveIconUrl, scanIconUrl] = await Promise.all([
-    getLucideIconDataUrl(Download, 64),
-    getLucideIconDataUrl(ScanQrCode, 64),
+    getLucideIconDataUrl(Download, {
+      color: "#667085",
+      size: 64,
+      strokeWidth: 3.4,
+    }),
+    getLucideIconDataUrl(ScanQrCode, {
+      color: "#667085",
+      size: 64,
+      strokeWidth: 3.4,
+    }),
   ]);
   const [saveHintIcon, scanHintIcon] = await Promise.all([
     loadImage(saveIconUrl),
